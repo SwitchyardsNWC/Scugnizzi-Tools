@@ -2050,3 +2050,67 @@ drag does not select text — also stops the browser from ever dispatching `dblc
 reads two presses on the same text within a beat itself. The same trap is waiting for any
 pointer-driven surface that also wants a double-click.
 
+### 3.68 A canvas you fall into
+
+**Jared, 2026-09-13:** "love how you double click into freeform blocks give it a zoom in effect and
+make the freeform canvas feel more like a figjam style canvas. make it fun and playful." And, while
+it was being built: keep the canvas's layers out of the panel until you are in it; give text playful,
+experimental styles with a category of their own; group drawing strokes automatically; make copy and
+paste inside the canvas its own thing; let the page's height be dragged too.
+
+**The zoom.** The canvas is an overlay above the email now, not a replacement for it. It measures
+where the block's picture sits on the email, opens with the page exactly there at exactly that size,
+and flies out to fit with a small overshoot while a warm dotted field fades in; Done flies it home.
+Because the email is still drawn underneath, the first and last frames of the flight *are* the email,
+which is what makes it read as zooming in rather than switching screens. The zoom moves in log space,
+so 30% to 200% does not rush its start, and the page is filled with the ground the picture sits on,
+so nothing changes colour at either end. `prefers-reduced-motion` skips the flight.
+
+**FigJam's shape.** Floating chrome on a light field whatever the app's theme: a dock of chunky
+tools at the bottom (select, hand, note, box, ellipse, line, marker, text, stamp), a colour swatch
+that opens palette and note colours, pills at the top for the way back and the zoom. The picked tool
+lifts and wiggles; layers pop in on a spring and poof out before a delete commits. The motion uses
+the individual `scale` property, because CSS `transform` on an SVG element replaces its transform
+attribute and would snap a rotated layer straight for the length of the animation.
+
+**Two new layer kinds, both real.** Sticky notes: note colours as hex (a design system has no reason
+to carry a sticky-note yellow), words in a type role, and a soft offset shadow drawn as a second
+shape rather than a filter, so the render has nothing to approximate. Stamps: the bundled brand marks
+nested as an SVG in their colour, with a few degrees of tilt each time. The tilt is chosen by the
+editor and stored in the layer, so the recipe, the hash and the picture stay exact.
+
+**Canvas type.** A category of its own in the Design panel, because it follows none of the email's
+rules: it ships inside a picture. Marker (wobbling italic), Sticker (a white border), Outline,
+Retro (a hard shadow), Highlighter and Arc, each with font, size, weight, case, tracking, colour, an
+effect colour and an amount. Every effect is something a picture carries exactly: a stroke, a shadow
+or a gradient in CSS inside the `foreignObject`; per-letter transforms for the wobble, computed from
+the letter's index rather than chance; an SVG `textPath` for the arc. The sticker's border is a ring
+of sixteen hard shadows, because a stroke drawn *outside* the letters is not something every engine
+agrees on. The chips in the panel and in the canvas's text tray are drawn by the canvas renderer, so
+the sample is the picture.
+
+**Drawings group themselves.** Every stroke of one marker session shares a group. A click on any
+stroke picks the drawing; it moves, scales by its box, colours, copies and deletes as one; the layer
+list shows it as one foldable row. Alt picks a single stroke; a group can be undone into strokes.
+
+**The canvas's own clipboard.** Copy, cut and paste are caught in the capture phase on the document
+while the canvas is open and stopped there, so the email's own clipboard handlers never hear them, and
+the email's clipboard handler refuses to act while the canvas is open besides. Focus is moved out of
+the email's frame on the way in, because a double-click leaves it there and the frame's own copy event
+would otherwise go to the block. Layers travel as their own clipboard text with their own marker, and
+each paste steps further out, the way a design tool pastes.
+
+**The page.** Its right edge drags the width, its bottom edge the height, its corner both, with the
+size shown under the corner.
+
+**A drawing inherits where it is drawn.** The first note rendered left-aligned on the canvas and
+centred in the email, because its words stated a font and a size but not an alignment, and inside the
+email the drawing sits in a cell that centres its content. `foreignObject` content takes CSS from the
+document around the SVG, which is a different document on the canvas, in the email and in the render.
+Every text property a layer's words depend on is stated now, so all three draw the same picture.
+
+**The panel.** On the email, a freeform block shows *Open canvas* and a line of facts, plus its
+alt text, render, appearance and spacing. The layer list, the page size and the background appear
+only inside the canvas. The email canvas no longer edits a freeform block's layers at all; a drag on
+it moves the block.
+

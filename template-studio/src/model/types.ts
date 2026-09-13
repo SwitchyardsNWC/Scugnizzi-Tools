@@ -346,18 +346,31 @@ export interface ButtonBlock extends BlockBase {
   align: Align | 'full';
 }
 
+/** What every layer carries: its id, its turn about its own centre, and the group it moves with. */
+interface LayerBase {
+  id: string;
+  rotation?: number;
+  /** Strokes drawn in one marker session share one, and move, scale, colour and delete as one. */
+  group?: string;
+}
+
 /**
- * One layer of a freeform block. Six kinds, and no seventh until each of these renders identically
- * on export: everything here is a recipe that becomes pixels (docs/freeform-and-effects.md).
- * Positions and sizes are in the surface's own pixels.
+ * One layer of a freeform block. Every kind is a recipe that becomes pixels, and none is added
+ * until it renders identically on export (docs/freeform-and-effects.md). Positions and sizes are
+ * in the surface's own pixels.
+ *
+ * `look` on text names a style from Design › Canvas type: playful type that only ever ships as a
+ * picture (learnings 3.68). Absent, the text is set in its email type role.
  */
 export type FreeformLayer =
-  | { kind: 'text'; id: string; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; rotation?: number }
-  | { kind: 'image'; id: string; src: string; x: number; y: number; width: number; height: number; opacity: number; rotation?: number }
-  | { kind: 'rect'; id: string; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; radius: number; rotation?: number }
-  | { kind: 'ellipse'; id: string; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; rotation?: number }
-  | { kind: 'line'; id: string; x1: number; y1: number; x2: number; y2: number; stroke: ColorRef; strokeWidth: number; rotation?: number }
-  | { kind: 'path'; id: string; points: number[]; stroke: ColorRef; strokeWidth: number; rotation?: number };
+  | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string })
+  | (LayerBase & { kind: 'image'; src: string; x: number; y: number; width: number; height: number; opacity: number })
+  | (LayerBase & { kind: 'rect'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; radius: number })
+  | (LayerBase & { kind: 'ellipse'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number })
+  | (LayerBase & { kind: 'line'; x1: number; y1: number; x2: number; y2: number; stroke: ColorRef; strokeWidth: number })
+  | (LayerBase & { kind: 'path'; points: number[]; stroke: ColorRef; strokeWidth: number })
+  | (LayerBase & { kind: 'sticky'; text: string; role: string; color: ColorRef; fill: ColorRef; x: number; y: number; width: number; height: number })
+  | (LayerBase & { kind: 'mark'; mark: string; color: ColorRef; x: number; y: number; width: number; height: number });
 
 /**
  * A drawing surface — images, text and simple shapes — that the email carries as one picture.

@@ -194,9 +194,18 @@ Manual, checked by Jared.
       there and in its panel, renders to a PNG through the same path as text, and ships in the
       file only as that picture; the checks refuse an unrendered one and warn about a stale one.
       *(Learnings 3.65, docs/freeform-and-effects.md phases 1 and most of 2.)*
-- [x] A freeform block opens as a workspace: pan and zoom on an endless field, handles to resize and
-      rotate, shapes dragged out, text edited in place, the pen, the page resized by its corner, and
-      pictures dropped in from the Assets panel. *(Learnings 3.67.)*
+- [x] A freeform block opens as a canvas: it flies out of the block on the email and back into it,
+      pans and zooms on a dotted field, and has handles to resize and rotate, shapes dragged out, text
+      edited in place, the marker, sticky notes, brand stamps, a colour swatch, and pictures dropped in
+      from Assets. The page's width and height drag by its edges. *(Learnings 3.67, 3.68.)*
+- [x] Strokes drawn in one marker session group themselves and move, scale, colour, copy and delete as
+      one; the layer list shows the drawing as one foldable row. *(Learnings 3.68.)*
+- [x] Copy, cut and paste inside the canvas act on layers and never on the email. *(Learnings 3.68.)*
+- [x] Text on the canvas can take a Canvas type style (outline, hard shadow, highlighter, sticker,
+      wobble, arc), tuned in its own Design panel category, and renders into the picture exactly.
+      *(Learnings 3.68.)*
+- [x] A freeform block's layers and page settings show in the panel only inside the canvas.
+      *(Learnings 3.68.)*
 - [x] A brand block shows one of the bundled marks at a width, in a colour that follows the section's
       text unless set, and ships as a rendered picture with the same check as a freeform block.
       *(Learnings 3.66.)*

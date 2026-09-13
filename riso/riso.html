@@ -332,7 +332,7 @@ function sampleImage() {
   x.fillStyle = '#ffd400'; x.beginPath(); x.arc(250, 330, 90, 0, Math.PI * 2); x.fill();
   x.save(); x.translate(0, 0); x.rotate(-0.35); x.fillStyle = 'rgba(0,0,0,.55)'; for (let i = -6; i < 14; i++) x.fillRect(i * 70 - 200, 520, 28, 700); x.restore();
   x.fillStyle = '#111'; x.font = '700 150px "Helvetica Neue",Helvetica,Arial,sans-serif'; x.textBaseline = 'alphabetic'; x.fillText('RISO', 60, 200);
-  x.fillStyle = '#fff'; x.font = '500 28px "Helvetica Neue",Helvetica,Arial,sans-serif'; x.fillText('scuggnizzi tools · sample', 62, 240);
+  x.fillStyle = '#fff'; x.font = '500 28px "Helvetica Neue",Helvetica,Arial,sans-serif'; x.fillText('scugnizzi tools · sample', 62, 240);
   const img = new Image(); img.onload = () => useImage(img, 'sample', true); img.src = c.toDataURL();
 }
 

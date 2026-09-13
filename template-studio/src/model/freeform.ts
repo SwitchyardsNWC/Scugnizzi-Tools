@@ -7,6 +7,7 @@
 import type { ColorRef } from './design-system.ts';
 import type { Align } from './types.ts';
 import type { Block, BrandBlock, FreeformBlock, FreeformLayer, Template } from './types.ts';
+import { MARKS, markOf } from './marks.ts';
 
 export type LayerKind = FreeformLayer['kind'];
 
@@ -73,6 +74,12 @@ export function defaultLayer(kind: LayerKind, block: FreeformBlock): FreeformLay
       return { kind, id, x1: x, y1: y, x2: x + w, y2: y + h, stroke: null, strokeWidth: 3 };
     case 'path':
       return { kind, id, points: [], stroke: null, strokeWidth: 3 };
+    case 'sticky':
+      return { kind, id, text: '', role: 'body', color: null, fill: STICKY_COLORS[0]!, x, y, width: 180, height: 180 };
+    case 'mark': {
+      const m = MARKS[0]!;
+      return { kind, id, mark: m.key, color: null, x, y, width: 96, height: Math.round(96 / m.ratio) };
+    }
   }
 }
 
@@ -228,12 +235,12 @@ export function addImageLayerAt(template: Template, blockId: string, src: string
 }
 
 /** A shape drawn out by dragging: a rectangle, an ellipse or a line, from one corner to the other. */
-export function addShapeAt(template: Template, blockId: string, kind: 'rect' | 'ellipse' | 'line', from: { x: number; y: number }, to: { x: number; y: number }): Template {
+export function addShapeAt(template: Template, blockId: string, kind: 'rect' | 'ellipse' | 'line', from: { x: number; y: number }, to: { x: number; y: number }, color: ColorRef = null): Template {
   return withFreeform(template, blockId, (block) => {
     const id = newLayerId(block);
     const r = (n: number) => Math.round(n);
     if (kind === 'line') {
-      return { ...block, layers: [...block.layers, { kind, id, x1: r(from.x), y1: r(from.y), x2: r(to.x), y2: r(to.y), stroke: null, strokeWidth: 3 }] };
+      return { ...block, layers: [...block.layers, { kind, id, x1: r(from.x), y1: r(from.y), x2: r(to.x), y2: r(to.y), stroke: color, strokeWidth: 3 }] };
     }
     const x = r(Math.min(from.x, to.x));
     const y = r(Math.min(from.y, to.y));
@@ -241,30 +248,229 @@ export function addShapeAt(template: Template, blockId: string, kind: 'rect' | '
     const height = Math.max(4, r(Math.abs(to.y - from.y)));
     const shape: FreeformLayer =
       kind === 'rect'
-        ? { kind, id, x, y, width, height, fill: null, stroke: null, strokeWidth: 2, radius: 0 }
-        : { kind, id, x, y, width, height, fill: null, stroke: null, strokeWidth: 2 };
+        ? { kind, id, x, y, width, height, fill: color, stroke: null, strokeWidth: 2, radius: 0 }
+        : { kind, id, x, y, width, height, fill: color, stroke: null, strokeWidth: 2 };
     return { ...block, layers: [...block.layers, shape] };
   });
 }
 
 /** A text layer at a point, in the heading role, ready to be typed into. */
-export function addTextAt(template: Template, blockId: string, at: { x: number; y: number }): Template {
+export function addTextAt(template: Template, blockId: string, at: { x: number; y: number }, color: ColorRef = null, look?: string): Template {
   return withFreeform(template, blockId, (block) => ({
     ...block,
-    layers: [...block.layers, { kind: 'text', id: newLayerId(block), text: 'Text', role: 'h2', color: null, x: Math.round(at.x), y: Math.round(at.y), width: Math.max(80, Math.round(block.width - at.x - 16)), align: 'left' }],
+    layers: [...block.layers, { kind: 'text', id: newLayerId(block), text: 'Text', role: 'h2', color, x: Math.round(at.x), y: Math.round(at.y), width: Math.max(80, Math.round(block.width - at.x - 16)), align: 'left', ...(look ? { look } : {}) }],
   }));
 }
 
 /** A freehand stroke, as drawn: pairs of x and y in the surface's pixels. Fewer than two points is nothing. */
-export function drawPath(template: Template, blockId: string, points: number[], stroke: ColorRef, strokeWidth: number): Template {
+export function drawPath(template: Template, blockId: string, points: number[], stroke: ColorRef, strokeWidth: number, group?: string): Template {
   if (points.length < 4) return template;
   return withFreeform(template, blockId, (block) => ({
     ...block,
-    layers: [...block.layers, { kind: 'path', id: newLayerId(block), points: points.map((v) => Math.round(v * 10) / 10), stroke, strokeWidth }],
+    layers: [...block.layers, { kind: 'path', id: newLayerId(block), points: points.map((v) => Math.round(v * 10) / 10), stroke, strokeWidth, ...(group ? { group } : {}) }],
   }));
 }
 
 /** The picture was drawn from the recipe as it stands: remember both. */
 export function markRendered(template: Template, blockId: string, src: string): Template {
   return withFreeform(template, blockId, (block) => ({ ...block, src, renderedHash: recipeHash(block) }));
+}
+
+// --- sticky notes, stamps and colour ------------------------------------------------------------
+
+type Point = { x: number; y: number };
+
+/** Note colours, near enough to FigJam's. Hex, since a design system has no reason to carry a sticky-note yellow. */
+export const STICKY_COLORS = ['#FFE58A', '#FFC6D9', '#C4E4FF', '#CDEFC6', '#E0D4FF', '#FFD2A8'];
+
+/** A note centred on a point, empty, ready to be typed into. */
+export function addStickyAt(template: Template, blockId: string, at: Point, fill: ColorRef): Template {
+  const size = 180;
+  return withFreeform(template, blockId, (block) => ({
+    ...block,
+    layers: [
+      ...block.layers,
+      { kind: 'sticky', id: newLayerId(block), text: '', role: 'body', color: null, fill: fill ?? STICKY_COLORS[0]!, x: Math.round(at.x - size / 2), y: Math.round(at.y - size / 2), width: size, height: size },
+    ],
+  }));
+}
+
+/** A brand mark stamped at a point, at its own proportions. The tilt is the caller's, so the recipe stays exact. */
+export function addMarkAt(template: Template, blockId: string, key: string, at: Point, color: ColorRef, rotation = 0): Template {
+  const mark = markOf(key);
+  const width = 88;
+  const height = Math.round(width / mark.ratio);
+  return withFreeform(template, blockId, (block) => ({
+    ...block,
+    layers: [...block.layers, { kind: 'mark', id: newLayerId(block), mark: mark.key, color, x: Math.round(at.x - width / 2), y: Math.round(at.y - height / 2), width, height, ...(rotation ? { rotation } : {}) }],
+  }));
+}
+
+/** A layer in a colour, by whichever property that kind is coloured by. A picture has none. */
+export function paintOne(l: FreeformLayer, color: ColorRef): FreeformLayer {
+  switch (l.kind) {
+    case 'text':
+    case 'mark':
+      return { ...l, color };
+    case 'sticky':
+      return { ...l, fill: color ?? STICKY_COLORS[0]! };
+    case 'rect':
+    case 'ellipse':
+      return { ...l, fill: color };
+    case 'line':
+    case 'path':
+      return { ...l, stroke: color };
+    case 'image':
+      return l;
+  }
+}
+
+export function paintLayer(template: Template, blockId: string, layerId: string, color: ColorRef): Template {
+  return withFreeform(template, blockId, (block) => ({ ...block, layers: block.layers.map((l) => (l.id === layerId ? paintOne(l, color) : l)) }));
+}
+
+// --- groups ----------------------------------------------------------------------------------------
+//
+// Strokes drawn in one marker session share a group, so a doodle is one thing: it moves, scales,
+// colours, copies and deletes together, and the layer list shows it as one row. The editors name a
+// picked group `group:<id>`; a group with one member is just that layer.
+
+export const groupKey = (id: string): string => `group:${id}`;
+export const groupOfKey = (key: string | null | undefined): string | null => (key && key.startsWith('group:') ? key.slice(6) : null);
+export const membersOf = (block: FreeformBlock, group: string): FreeformLayer[] => block.layers.filter((l) => l.group === group);
+
+export function newGroupId(block: FreeformBlock): string {
+  const used = new Set(block.layers.map((l) => l.group).filter((g): g is string => Boolean(g)));
+  let n = used.size + 1;
+  while (used.has(`g${n}`)) n += 1;
+  return `g${n}`;
+}
+
+/** The box around several layers, unrotated. */
+export function groupBox(layers: FreeformLayer[], heights: Record<string, number> = {}): Box {
+  if (layers.length === 0) return { x: 0, y: 0, width: 1, height: 1 };
+  let x1 = Infinity;
+  let y1 = Infinity;
+  let x2 = -Infinity;
+  let y2 = -Infinity;
+  for (const l of layers) {
+    const b = layerBox(l, heights[l.id]);
+    x1 = Math.min(x1, b.x);
+    y1 = Math.min(y1, b.y);
+    x2 = Math.max(x2, b.x + b.width);
+    y2 = Math.max(y2, b.y + b.height);
+  }
+  return { x: x1, y: y1, width: Math.max(1, x2 - x1), height: Math.max(1, y2 - y1) };
+}
+
+/** Layers swapped in by id, wherever they sit in the stack. */
+export function replaceLayers(template: Template, blockId: string, next: FreeformLayer[]): Template {
+  const byId = new Map(next.map((l) => [l.id, l]));
+  return withFreeform(template, blockId, (block) => ({ ...block, layers: block.layers.map((l) => byId.get(l.id) ?? l) }));
+}
+
+/** Several layers scaled together from one box into another, each keeping its place inside it. */
+export function scaleLayers(layers: FreeformLayer[], from: Box, to: Box): FreeformLayer[] {
+  const sx = from.width > 0 ? to.width / from.width : 1;
+  const sy = from.height > 0 ? to.height / from.height : 1;
+  return layers.map((l) => {
+    const b = layerBox(l);
+    return withLayerBox(l, { x: to.x + (b.x - from.x) * sx, y: to.y + (b.y - from.y) * sy, width: b.width * sx, height: b.height * sy });
+  });
+}
+
+export function updateMembers(template: Template, blockId: string, group: string, fn: (l: FreeformLayer) => FreeformLayer): Template {
+  return withFreeform(template, blockId, (block) => ({ ...block, layers: block.layers.map((l) => (l.group === group ? fn(l) : l)) }));
+}
+
+export function paintGroup(template: Template, blockId: string, group: string, color: ColorRef): Template {
+  return updateMembers(template, blockId, group, (l) => paintOne(l, color));
+}
+
+export function removeGroup(template: Template, blockId: string, group: string): Template {
+  return withFreeform(template, blockId, (block) => ({ ...block, layers: block.layers.filter((l) => l.group !== group) }));
+}
+
+export function ungroupLayers(template: Template, blockId: string, group: string): Template {
+  return updateMembers(template, blockId, group, (l) => {
+    const { group: _gone, ...rest } = l;
+    void _gone;
+    return rest as FreeformLayer;
+  });
+}
+
+/** A copy of a group, a step down and right, as a new group on top of the stack. */
+export function duplicateGroup(template: Template, blockId: string, group: string): Template {
+  return withFreeform(template, blockId, (block) => {
+    const members = membersOf(block, group);
+    if (members.length === 0) return block;
+    const gid = newGroupId(block);
+    let layers = block.layers;
+    for (const m of members) layers = [...layers, { ...translateLayer(m, 16, 16), id: newLayerId({ ...block, layers }), group: gid }];
+    return { ...block, layers };
+  });
+}
+
+export type LayerItem = { kind: 'layer'; layer: FreeformLayer } | { kind: 'group'; id: string; layers: FreeformLayer[] };
+
+/** The stack as a list shows it, bottom to top: a group of more than one gathered where its first member sits. */
+export function groupRuns(layers: FreeformLayer[]): LayerItem[] {
+  const counts = new Map<string, number>();
+  for (const l of layers) if (l.group) counts.set(l.group, (counts.get(l.group) ?? 0) + 1);
+  const seen = new Set<string>();
+  const out: LayerItem[] = [];
+  for (const l of layers) {
+    if (l.group && (counts.get(l.group) ?? 0) > 1) {
+      if (seen.has(l.group)) continue;
+      seen.add(l.group);
+      out.push({ kind: 'group', id: l.group, layers: layers.filter((x) => x.group === l.group) });
+    } else out.push({ kind: 'layer', layer: l });
+  }
+  return out;
+}
+
+// --- the canvas's own clipboard --------------------------------------------------------------------
+//
+// A copy inside the canvas is a copy of layers, never of the block around them: "if i'm in the
+// canvas and use copy paste it's effecting the parent block. This should feel like it's own
+// experience" (learnings 3.68). Its own marker, so an email clipboard never pastes in here and this
+// one never pastes into the email.
+
+const LAYER_CLIP = 'template-studio-layers';
+
+export function layerClipText(layers: FreeformLayer[]): string {
+  return JSON.stringify({ [LAYER_CLIP]: 1, layers });
+}
+
+export function parseLayerClip(text: string): FreeformLayer[] | null {
+  try {
+    const value = JSON.parse(text) as Record<string, unknown> | null;
+    if (!value || value[LAYER_CLIP] !== 1 || !Array.isArray(value['layers'])) return null;
+    const layers = (value['layers'] as unknown[]).filter(
+      (l): l is FreeformLayer => Boolean(l) && typeof l === 'object' && typeof (l as { kind?: unknown }).kind === 'string' && typeof (l as { id?: unknown }).id === 'string',
+    );
+    return layers.length ? layers : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Layers from the clipboard, offset, with ids of their own and groups of their own. */
+export function pasteLayers(template: Template, blockId: string, layers: FreeformLayer[], offset: number): Template {
+  return withFreeform(template, blockId, (block) => {
+    const groups = new Map<string, string>();
+    let next = block.layers;
+    for (const l of layers) {
+      let group: string | undefined;
+      if (l.group) {
+        if (!groups.has(l.group)) groups.set(l.group, newGroupId({ ...block, layers: next }));
+        group = groups.get(l.group);
+      }
+      const { group: _source, ...rest } = l;
+      void _source;
+      const copy = { ...translateLayer(rest as FreeformLayer, offset, offset), id: newLayerId({ ...block, layers: next }), ...(group ? { group } : {}) } as FreeformLayer;
+      next = [...next, copy];
+    }
+    return { ...block, layers: next };
+  });
 }

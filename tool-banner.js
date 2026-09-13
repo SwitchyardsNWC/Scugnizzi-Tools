@@ -19,7 +19,7 @@
     #tool-banner a:focus-visible{outline:1px solid ${t.ink};outline-offset:-3px}`;
   document.head.appendChild(style);
   const el = document.createElement('div'); el.id = 'tool-banner';
-  el.innerHTML = `<a href="${home}"><span class="arr">←</span><span>Scuggnizzi tools</span></a><span class="name"></span>`;
+  el.innerHTML = `<a href="${home}"><span class="arr">←</span><span>Scugnizzi tools</span></a><span class="name"></span>`;
   el.querySelector('.name').textContent = name.toLowerCase();
   document.body.prepend(el);
 })();

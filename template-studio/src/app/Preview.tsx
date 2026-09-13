@@ -1358,7 +1358,7 @@ export function Preview({
 
       // On the selected freeform surface the pointer belongs to the surface: a layer under it
       // moves, and with the pen down anything under it is drawn on. Neither starts a block drag.
-      const svg = blockId === selectedRef.current ? (found.querySelector('svg[data-sy-freeform]') as SVGSVGElement | null) : null;
+      const svg = blockId === selectedRef.current && (drawingRef.current || surfaceRef.current.onMoveLayer) ? (found.querySelector('svg[data-sy-freeform]') as SVGSVGElement | null) : null;
       if (svg && svg.contains(event.target as Node)) {
         const rect = svg.getBoundingClientRect();
         const scale = (Number(svg.getAttribute('width')) || rect.width) / (rect.width || 1);
