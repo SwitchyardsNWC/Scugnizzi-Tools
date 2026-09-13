@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 
 import { brushSampleSvg, canvasTypeSampleSvg } from '../compile/freeform.ts';
@@ -6,7 +6,10 @@ import { amountLabel, LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } 
 import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
-import type { Align, FreeformBlock, FreeformLayer } from '../model/types.ts';
+import { Riso } from '../effects/riso.ts';
+import { misregister, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
+import type { MarkKey, MarkState } from '../model/rich-text.ts';
+import type { Align, EffectStep, FreeformBlock, FreeformLayer, RisoInk, TextMarks } from '../model/types.ts';
 
 // The canvas's own controls, in the canvas's own look: the layers panel docked on its right, the
 // mini menu that floats over whatever is picked, and the slash menu under text being typed.
@@ -62,9 +65,16 @@ export interface FigLayersProps {
   onMove(key: string, to: number): void;
   onPage(patch: { width?: number; height?: number; background?: ColorRef }): void;
   onClose(): void;
+  /** The page's effects, replaced as a list. `coalesce` makes a slider drag one undo step. */
+  onEffects(next: EffectStep[] | undefined, label: string, coalesce?: string): void;
+  onOpenRiso(): void;
+  /** A line about the effect: where the Riso tab is, or why it could not open. */
+  effectNote?: string | null;
+  /** The printed picture is being made again after a change. */
+  effectBusy?: boolean;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** Where a drag would land, as a gap in the list as shown: 0 is above the first row. */
@@ -216,6 +226,232 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           ))}
         </div>
       </div>
+
+      <FigEffects effects={block.effects} onEffects={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
+    </div>
+  );
+}
+
+// --- effects ----------------------------------------------------------------------------------------
+
+/**
+ * The presets' screens at half size. They were tuned on 900px photographs; a page of drawn lines and
+ * type loses its detail in dots that coarse, and at half size it still reads as a print.
+ */
+const pageScreens = (step: EffectStep): EffectStep => ({ ...step, inks: step.inks.map((k) => ({ ...k, cell: Math.max(2, Math.round(k.cell) / 2) })) });
+
+const PAPERS: Array<[string, string]> = [
+  ['Natural', '#f6f2e8'],
+  ['White', '#ffffff'],
+  ['Kraft', '#e9dcc2'],
+  ['Grey', '#dfe6e9'],
+];
+
+/**
+ * The page printed through the Riso press: a preset to start from, the few dials worth having on the
+ * canvas, and every other dial one click away in the Riso tool itself.
+ */
+function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: EffectStep[] | undefined; onEffects: FigLayersProps['onEffects']; onOpenRiso(): void; note: string | null; busy: boolean }) {
+  const [ink, setInk] = useState<number | null>(null);
+  const step = effects?.find((e) => e.effect === 'riso');
+  const set = (next: EffectStep, label: string, coalesce?: string) => onEffects([next], label, coalesce);
+  // The project's saved looks, kept current when one is saved in the Riso tab.
+  const [saved, setSaved] = useState<SavedRisoPreset[]>(readSaved);
+  const [naming, setNaming] = useState<string | null>(null);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === RISO_PROJECT_PRESETS) setSaved(readSaved());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const saveLook = () => {
+    if (!step || naming === null) return;
+    try {
+      localStorage.setItem(RISO_PROJECT_PRESETS, withSavedRisoPreset(localStorage.getItem(RISO_PROJECT_PRESETS), naming, step, `p${Date.now().toString(36)}`));
+      setSaved(readSaved());
+    } catch {
+      // Storage full or blocked: the look stays on the page, just not in the list.
+    }
+    setNaming(null);
+  };
+
+  if (!step) {
+    return (
+      <div class="fig-effects">
+        <div class="fig-page-row">
+          <b>Effects</b>
+        </div>
+        <div class="fig-fx-presets">
+          {RISO_PRESETS.map((p, i) => (
+            <button key={p.name} class="fig-fx-preset" title={`Riso: ${p.desc}`} onClick={() => onEffects([pageScreens(risoStep(i, 1))], 'Riso print')}>
+              <span class="fig-fx-inks" aria-hidden="true">
+                {p.apply.inks.map((k, j) => (
+                  <i key={j} style={{ background: k.color }} />
+                ))}
+              </span>
+              {p.name}
+            </button>
+          ))}
+        </div>
+        {saved.length > 0 && (
+          <>
+            <div class="fig-fx-sub">Saved in this project</div>
+            <div class="fig-fx-presets">
+              {saved.map((p) => (
+                <button key={p.id} class="fig-fx-preset" title={`${p.name}: a saved look`} onClick={() => onEffects([p.step], `Riso · ${p.name}`)}>
+                  <span class="fig-fx-inks" aria-hidden="true">
+                    {p.step.inks.map((k, j) => (
+                      <i key={j} style={{ background: k.color }} />
+                    ))}
+                  </span>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <p class="fig-fx-hint">{note ?? 'Print the page through the Riso press. The layers stay editable underneath.'}</p>
+      </div>
+    );
+  }
+
+  const first = step.inks[0];
+  const screen = first?.screen ?? 'dot';
+  const addInk = () => {
+    const used = new Set(step.inks.map((k) => k.color));
+    const color = ['#ffe800', '#00a95c', '#ff48b0', '#0078bf', '#1d1d1b'].find((c) => !used.has(c)) ?? '#1d1d1b';
+    const n = step.inks.length;
+    const added: RisoInk = { ...Riso.INK_DEFAULT, color, source: (['lum', 'mids', 'highlights'] as const)[n] ?? 'lum', angle: [15, 75, 45][n] ?? 0, screen, cell: first?.cell ?? Riso.INK_DEFAULT.cell };
+    set(misregister({ ...step, inks: [...step.inks, added] }, step.press.misreg), 'Add ink');
+    setInk(n);
+  };
+
+  return (
+    <div class="fig-effects">
+      <div class="fig-page-row">
+        <b>Riso print</b>
+        {busy && <span class="fig-fx-busy">inking…</span>}
+        <button class="fig-text-btn" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
+          Save look
+        </button>
+        <button class="fig-icon-btn danger" title="Take the print off. The layers are untouched." aria-label="Remove effect" onClick={() => onEffects(undefined, 'Remove effect')}>
+          {icon(<path key="a" d="M6 6l12 12M18 6L6 18" />)}
+        </button>
+      </div>
+
+      <div class="fig-page-row">
+        {step.inks.map((k, i) => (
+          <button key={i} class={`fig-dot ${ink === i ? 'on' : ''}`} style={{ background: k.color }} title={`Ink ${i + 1}: ${Riso.inkName(k.color)}. Click to change it.`} aria-label={`Ink ${i + 1}`} onClick={() => setInk(ink === i ? null : i)} />
+        ))}
+        {step.inks.length < 3 && (
+          <button class="fig-dot fig-dot-add" title="Add an ink (up to three)" aria-label="Add an ink" onClick={addInk}>
+            +
+          </button>
+        )}
+        <span class="grow" />
+        <span class="fig-seg" role="group" aria-label="Screen">
+          {(['dot', 'line', 'grain'] as const).map((s) => (
+            <button key={s} class={screen === s ? 'on' : ''} aria-pressed={screen === s} onClick={() => set({ ...step, inks: step.inks.map((k) => ({ ...k, screen: s })) }, 'Screen')}>
+              {s}
+            </button>
+          ))}
+        </span>
+      </div>
+
+      {ink !== null && step.inks[ink] && (
+        <div class="fig-fx-swatches">
+          {RISO_SWATCHES.map(([name, hex]) => (
+            <button key={hex} class={`fig-dot ${step.inks[ink]!.color === hex ? 'on' : ''}`} style={{ background: hex }} title={name} aria-label={name} onClick={() => set({ ...step, inks: step.inks.map((k, j) => (j === ink ? { ...k, color: hex } : k)) }, 'Ink colour')} />
+          ))}
+          {step.inks.length > 1 && (
+            <button
+              class="fig-reset"
+              onClick={() => {
+                set({ ...step, inks: step.inks.filter((_, j) => j !== ink) }, 'Remove ink');
+                setInk(null);
+              }}
+            >
+              Remove this ink
+            </button>
+          )}
+        </div>
+      )}
+
+      <div class="fig-sliders">
+        {screen !== 'grain' && <Slide label="Screen" unit="px" min={2} max={24} step={0.5} value={first?.cell ?? 6} onInput={(v) => set({ ...step, inks: step.inks.map((k) => ({ ...k, cell: v })) }, 'Screen size', 'fx-cell')} />}
+        <Slide label="Misprint" unit="mm" min={0} max={3} step={0.1} value={step.press.misreg} onInput={(v) => set(misregister(step, v), 'Misprint', 'fx-misreg')} />
+        <Slide label="Ink soak" unit="%" min={0} max={100} value={Math.round(step.press.soak * 100)} onInput={(v) => set({ ...step, press: { ...step.press, soak: v / 100 } }, 'Ink soak', 'fx-soak')} />
+        <Slide label="Paper grain" unit="%" min={0} max={100} value={Math.round(step.press.grain * 100)} onInput={(v) => set({ ...step, press: { ...step.press, grain: v / 100 } }, 'Paper grain', 'fx-grain')} />
+      </div>
+
+      <div class="fig-page-row dots" role="group" aria-label="Paper">
+        {PAPERS.map(([name, hex]) => (
+          <button key={hex} class={`fig-dot ${step.press.paper === hex ? 'on' : ''}`} style={{ background: hex }} title={`${name} paper`} aria-label={`${name} paper`} onClick={() => set({ ...step, press: { ...step.press, paper: hex } }, 'Paper')} />
+        ))}
+      </div>
+
+      {naming !== null && (
+        <form
+          class="fig-fx-name"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveLook();
+          }}
+        >
+          <input
+            ref={(el) => el?.focus()}
+            value={naming}
+            placeholder="Name this look"
+            maxLength={40}
+            onInput={(e) => setNaming((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setNaming(null);
+              e.stopPropagation();
+            }}
+          />
+          <button class="fig-chip primary" type="submit">
+            Save
+          </button>
+        </form>
+      )}
+
+      <div class="fig-fx-chips" role="group" aria-label="Looks">
+        {RISO_PRESETS.map((p, i) => (
+          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set(pageScreens(risoStep(i, step.seed)), `Riso · ${p.name}`)}>
+            <span class="fig-fx-inks" aria-hidden="true">
+              {p.apply.inks.map((k, j) => (
+                <i key={j} style={{ background: k.color }} />
+              ))}
+            </span>
+            {p.name}
+          </button>
+        ))}
+        {saved.map((p) => (
+          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set(p.step, `Riso · ${p.name}`)}>
+            <span class="fig-fx-inks" aria-hidden="true">
+              {p.step.inks.map((k, j) => (
+                <i key={j} style={{ background: k.color }} />
+              ))}
+            </span>
+            {p.name}
+          </button>
+        ))}
+      </div>
+
+      <div class="fig-fx-actions">
+        <button
+          class="fig-chip"
+          title="A new roll: grain, screen noise and misprint"
+          onClick={() => set(misregister(step, step.press.misreg, 1 + Math.floor(Math.random() * 99999)), 'Reshuffle')}
+        >
+          Reshuffle
+        </button>
+        <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
+          Open in Riso ↗
+        </button>
+      </div>
+      {note && <p class="fig-fx-hint">{note}</p>}
     </div>
   );
 }
@@ -240,11 +476,15 @@ export interface FigBarProps {
   onOrder(delta: number): void;
 }
 
-type Pop = 'style' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' | 'brush' | null;
+type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' | 'brush' | null;
+
+/** A design system font's key as a name: `georgia` is Georgia. */
+const fontName = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
 export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder }: FigBarProps) {
   const [pop, setPop] = useState<Pop>(null);
   const one = group ? undefined : layers[0];
+  const inverted = layers.length > 0 && layers.every((l) => l.invert);
   const id = group ?? one?.id ?? '';
   const palette = Object.keys(ds.colors).slice(0, 8);
   const toggle = (p: Pop) => setPop((cur) => (cur === p ? null : p));
@@ -286,6 +526,17 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
   const sticky = one?.kind === 'sticky' ? one : undefined;
   const shape = one?.kind === 'rect' || one?.kind === 'ellipse' ? one : undefined;
   const style = text || sticky ? textStyleOf((text ?? sticky)!, ds) : null;
+  const words = text ?? sticky;
+  const fontChip =
+    words && style ? (
+      <button class={`fig-chip ${pop === 'font' ? 'on' : ''}`} title="Font, from the design system  ·  or type /font while editing" onClick={() => toggle('font')}>
+        <span class="fig-font-aa" style={{ fontFamily: style.font }}>
+          Aa
+        </span>
+        {words.font ? fontName(words.font) : 'Font'}
+        <span class="caret">▾</span>
+      </button>
+    ) : null;
   const looks = canvasTypeOf(ds);
   const firstStroke = strokes[0];
   const brushOf = firstStroke?.kind === 'path' ? (firstStroke.brush ?? 'marker') : null;
@@ -303,6 +554,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
           {lookLabel}
           <span class="caret">▾</span>
         </button>
+        {fontChip}
         {stepper('Size', style.size, style.size >= 40 ? 4 : 2, 6, 240, (v) => set('Text size', { size: v }, 'size'))}
         <button class="fig-icon-btn" title={`Align ${text.align} · click for ${NEXT_ALIGN[text.align]}`} aria-label="Alignment" onClick={() => set('Align', { align: NEXT_ALIGN[text.align] })}>
           {ALIGN_ICONS[text.align]()}
@@ -329,6 +581,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
         <button class={`fig-swatch-btn square ${pop === 'fill' ? 'on' : ''}`} title="Note colour" aria-label="Note colour" onClick={() => toggle('fill')}>
           <span style={{ background: swatch(sticky.fill, STICKY_COLORS[0]!) }} />
         </button>
+        {fontChip}
         {stepper('Size', style.size, 2, 8, 80, (v) => set('Note text size', { size: v }, 'size'))}
         <button class={`fig-swatch-btn ${pop === 'colour' ? 'on' : ''}`} title="Ink" aria-label="Ink" onClick={() => toggle('colour')}>
           <span style={{ background: swatch(sticky.color, '#2b2620') }} />
@@ -408,6 +661,15 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
             {icon(<rect key="a" x="3" y="3" width="8" height="8" rx="2" />, <rect key="b" x="13" y="13" width="8" height="8" rx="2" />)}
           </button>
         )}
+        <button
+          class={`fig-icon-btn ${inverted ? 'on' : ''}`}
+          aria-pressed={inverted}
+          aria-label="Invert"
+          title="Invert the colours: a photo as its negative, dark ink as light"
+          onClick={() => onChange(inverted ? 'Uninvert' : 'Invert', (l) => ({ ...l, invert: inverted ? undefined : true }) as FreeformLayer)}
+        >
+          {icon(<circle key="a" cx="12" cy="12" r="8" />, <path key="b" d="M12 4a8 8 0 010 16z" fill="currentColor" />)}
+        </button>
         <button class="fig-icon-btn" title="Bring forward" aria-label="Bring forward" onClick={() => onOrder(1)}>
           {icon(<path key="a" d="M12 19V5M6 11l6-6 6 6" />)}
         </button>
@@ -452,6 +714,20 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
             </div>
           )}
           {pop === 'tweak' && tweaks && <div class="fig-sliders">{tweaks}</div>}
+          {pop === 'font' && words && (
+            <div class="fig-font-list">
+              <button class={`fig-font-item ${words.font ? '' : 'on'}`} onClick={() => set('Font', { font: undefined })}>
+                <span style={{ fontFamily: textStyleOf({ ...words, font: undefined } as typeof words, ds).font }}>Aa</span>
+                Style’s font
+              </button>
+              {Object.entries(ds.fonts).map(([key, stack]) => (
+                <button key={key} class={`fig-font-item ${words.font === key ? 'on' : ''}`} title={stack} onClick={() => set('Font', { font: key })}>
+                  <span style={{ fontFamily: stack }}>Aa</span>
+                  {fontName(key)}
+                </button>
+              ))}
+            </div>
+          )}
           {pop === 'brush' && (
             <div class="fig-bar-looks">
               {BRUSHES.map((b) => (
@@ -527,6 +803,10 @@ export function FigSlash({ ds, items, index, query, left, top, onPick, onHover }
                   <span class="look" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, item.look, 'Aa') }} />
                 ) : item.swatch ? (
                   <span class="swatch" style={{ background: item.swatch }} />
+                ) : item.fontStack ? (
+                  <span class="glyph face" style={{ fontFamily: item.fontStack }}>
+                    Aa
+                  </span>
                 ) : (
                   <span class="glyph">{GROUP_GLYPHS[item.group] ?? '·'}</span>
                 )}
@@ -539,4 +819,128 @@ export function FigSlash({ ds, items, index, query, left, top, onPick, onHover }
       })}
     </div>
   );
+}
+
+// --- the format bar, while words are being typed --------------------------------------------------------
+
+export interface FormatState extends MarkState {
+  /** Formatting goes on the selected words, or on all of them when nothing is selected. */
+  scope: 'selection' | 'all';
+}
+
+const HIGHLIGHTS = ['#FFE58A', '#FFC6D9', '#C4E4FF', '#CDEFC6', '#FFD2A8', '#E0D4FF'];
+
+const FORMAT_KEYS: Array<{ key: MarkKey; label: string; keys: string }> = [
+  { key: 'bold', label: 'Bold', keys: '⌘B' },
+  { key: 'italic', label: 'Italic', keys: '⌘I' },
+  { key: 'underline', label: 'Underline', keys: '⌘U' },
+  { key: 'strike', label: 'Strikethrough', keys: '⇧⌘X' },
+];
+
+/**
+ * Bold, italic, underline, strike, colour, highlight and font for the words being typed: the selected
+ * ones, or every one when nothing is selected. It never takes focus, so the selection it acts on
+ * stays selected while you click about in it.
+ */
+export function FigFormat({
+  ds,
+  state,
+  left,
+  top,
+  below,
+  onToggle,
+  onMarks,
+  onClear,
+}: {
+  ds: DesignSystem;
+  state: FormatState;
+  left: number;
+  top: number;
+  below: boolean;
+  onToggle(key: MarkKey): void;
+  onMarks(label: string, patch: Partial<TextMarks>): void;
+  onClear(): void;
+}) {
+  const [pop, setPop] = useState<'colour' | 'highlight' | 'font' | null>(null);
+  const toggle = (p: 'colour' | 'highlight' | 'font') => setPop((cur) => (cur === p ? null : p));
+  const where = state.scope === 'selection' ? 'the selected words' : 'all the words';
+  const palette = Object.keys(ds.colors).slice(0, 8);
+  const colour = state.color ? (colorOf(ds, state.color) ?? state.color) : null;
+
+  return (
+    <div class={`fig-chrome fig-format ${below ? 'below' : ''}`} style={{ left: `${left}px`, top: `${top}px` }} onMouseDown={(e) => e.preventDefault()}>
+      <div class="fig-bar-row">
+        {FORMAT_KEYS.map(({ key, label, keys }) => (
+          <button key={key} class={`fig-icon-btn ${state[key] ? 'on' : ''}`} aria-pressed={state[key]} aria-label={label} title={`${label} ${where}  ·  ${keys}`} onClick={() => onToggle(key)}>
+            <span class={`fmt-glyph ${key}`}>{label[0]}</span>
+          </button>
+        ))}
+        <span class="fig-sep" aria-hidden="true" />
+        <button class={`fig-swatch-btn ${pop === 'colour' ? 'on' : ''}`} aria-label="Colour" title={`Colour ${where}`} onClick={() => toggle('colour')}>
+          <span class={colour ? '' : 'empty'} style={colour ? { background: colour } : undefined} />
+        </button>
+        <button class={`fig-icon-btn ${pop === 'highlight' ? 'on' : ''}`} aria-label="Highlight" title={`Highlight ${where}`} onClick={() => toggle('highlight')}>
+          <span class="fmt-hl" style={{ background: `linear-gradient(transparent 55%, ${state.highlight ?? '#FFE58A'} 55%, ${state.highlight ?? '#FFE58A'} 92%, transparent 92%)` }}>
+            ab
+          </span>
+        </button>
+        <button class={`fig-chip ${pop === 'font' ? 'on' : ''}`} title={`Font for ${where}`} onClick={() => toggle('font')}>
+          <span class="fig-font-aa" style={state.font ? { fontFamily: ds.fonts[state.font] } : undefined}>
+            Aa
+          </span>
+          {state.font ? fontName(state.font) : state.font === undefined ? 'Mixed' : 'Font'}
+          <span class="caret">▾</span>
+        </button>
+        <span class="fig-sep" aria-hidden="true" />
+        <button class="fig-icon-btn" aria-label="Clear formatting" title={`Clear the formatting on ${where}`} onClick={onClear}>
+          <span class="fmt-glyph clear">T</span>
+        </button>
+        <span class="fig-format-scope">{state.scope === 'selection' ? 'Selection' : 'All words'}</span>
+      </div>
+
+      {pop && (
+        <div class="fig-bar-pop">
+          {pop === 'colour' && (
+            <div class="fig-bar-dots">
+              <button class={`fig-dot none ${state.color === null ? 'on' : ''}`} title="The layer's own colour" aria-label="Default colour" onClick={() => onMarks('Colour', { color: undefined })} />
+              {palette.map((name) => (
+                <button key={name} class={`fig-dot ${state.color === name ? 'on' : ''}`} style={{ background: colorOf(ds, name) ?? undefined }} title={name} aria-label={name} onClick={() => onMarks('Colour', { color: name })} />
+              ))}
+            </div>
+          )}
+          {pop === 'highlight' && (
+            <div class="fig-bar-dots">
+              <button class={`fig-dot clear ${state.highlight === null ? 'on' : ''}`} title="No highlight" aria-label="No highlight" onClick={() => onMarks('Highlight', { highlight: undefined })} />
+              {HIGHLIGHTS.map((hex) => (
+                <button key={hex} class={`fig-dot ${state.highlight === hex ? 'on' : ''}`} style={{ background: hex }} title="Highlighter" aria-label={`Highlight ${hex}`} onClick={() => onMarks('Highlight', { highlight: hex })} />
+              ))}
+            </div>
+          )}
+          {pop === 'font' && (
+            <div class="fig-font-list">
+              <button class={`fig-font-item ${state.font === null ? 'on' : ''}`} onClick={() => onMarks('Font', { font: undefined })}>
+                <span>Aa</span>
+                Layer’s font
+              </button>
+              {Object.entries(ds.fonts).map(([key, stack]) => (
+                <button key={key} class={`fig-font-item ${state.font === key ? 'on' : ''}`} title={stack} onClick={() => onMarks('Font', { font: key })}>
+                  <span style={{ fontFamily: stack }}>Aa</span>
+                  {fontName(key)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The project's saved Riso looks, from this site's shared storage. */
+function readSaved(): SavedRisoPreset[] {
+  try {
+    return readSavedRisoPresets(localStorage.getItem(RISO_PROJECT_PRESETS));
+  } catch {
+    return [];
+  }
 }

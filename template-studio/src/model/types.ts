@@ -361,6 +361,28 @@ export interface TextTweaks {
   lineHeight?: number;
   /** The effect's strength, 0 to 100 — see `CanvasTextStyle.amount`. */
   amount?: number;
+  /** A key of the design system's `fonts`, over the style's own face. */
+  font?: string;
+}
+
+/**
+ * Formatting on some of a layer's words. False is an answer too: un-bolded words in a bold style.
+ * Colour is a palette name or a hex; highlight is a hex; font is a key of the design system's `fonts`.
+ */
+export interface TextMarks {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  color?: string;
+  highlight?: string;
+  font?: string;
+}
+
+/** Marks over the characters `from` to `to` of a layer's text. A layer's ranges never overlap (model/rich-text.ts). */
+export interface StyleRange extends TextMarks {
+  from: number;
+  to: number;
 }
 
 /** How a freehand stroke is drawn. Absent is the marker every stroke was before there was a choice. */
@@ -369,6 +391,8 @@ export type Brush = 'pen' | 'marker' | 'highlighter' | 'brush';
 interface LayerBase {
   id: string;
   rotation?: number;
+  /** Drawn with its colours inverted: a photo as its negative, dark ink as light. */
+  invert?: boolean;
   /** Strokes drawn in one marker session share one, and move, scale, colour and delete as one. */
   group?: string;
 }
@@ -382,13 +406,13 @@ interface LayerBase {
  * picture (learnings 3.68). Absent, the text is set in its email type role.
  */
 export type FreeformLayer =
-  | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string } & TextTweaks)
+  | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string; styles?: StyleRange[] } & TextTweaks)
   | (LayerBase & { kind: 'image'; src: string; x: number; y: number; width: number; height: number; opacity: number })
   | (LayerBase & { kind: 'rect'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; radius: number })
   | (LayerBase & { kind: 'ellipse'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number })
   | (LayerBase & { kind: 'line'; x1: number; y1: number; x2: number; y2: number; stroke: ColorRef; strokeWidth: number })
   | (LayerBase & { kind: 'path'; points: number[]; stroke: ColorRef; strokeWidth: number; brush?: Brush })
-  | (LayerBase & { kind: 'sticky'; text: string; role: string; color: ColorRef; fill: ColorRef; x: number; y: number; width: number; height: number; size?: number })
+  | (LayerBase & { kind: 'sticky'; text: string; role: string; color: ColorRef; fill: ColorRef; x: number; y: number; width: number; height: number; size?: number; font?: string; styles?: StyleRange[] })
   | (LayerBase & { kind: 'mark'; mark: string; color: ColorRef; x: number; y: number; width: number; height: number });
 
 /**
@@ -400,6 +424,8 @@ export type FreeformLayer =
  * the checks say rather than the export shipping it (learnings 3.65).
  */
 export interface FreeformBlock extends BlockBase {
+  /** Run on the picture after it is drawn, in order. Part of the recipe, so the hash covers them (docs/freeform-and-effects.md). */
+  effects?: EffectStep[];
   type: 'freeform';
   /** What arrives where images are blocked. Not a HubSpot field: the picture is the template's. */
   alt: string;
@@ -443,3 +469,36 @@ export interface LegalBlock extends BlockBase {
   note: string;
   noteLock: Lock;
 }
+
+/** One ink on the Riso press: the separator's own settings, shared through `effects/riso.js`. */
+export interface RisoInk {
+  color: string;
+  source: 'lum' | 'shadows' | 'mids' | 'highlights' | 'red' | 'green' | 'blue' | 'sat' | 'flat';
+  invert: boolean;
+  density: number;
+  contrast: number;
+  lift: number;
+  screen: 'dot' | 'line' | 'grain';
+  /** Screen size, in the press's pixels. */
+  cell: number;
+  angle: number;
+  opacity: number;
+  /** Misregistration, in millimetres. */
+  dx: number;
+  dy: number;
+}
+
+export interface RisoPress {
+  paper: string;
+  grain: number;
+  soak: number;
+  spread: number;
+  dither: number;
+  misreg: number;
+}
+
+/**
+ * A step run on a freeform page's picture after it is drawn. Every setting and the seed are stored,
+ * so the same recipe prints the same picture on every export.
+ */
+export type EffectStep = { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number };

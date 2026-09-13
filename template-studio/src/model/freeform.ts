@@ -16,7 +16,8 @@ export type LayerKind = FreeformLayer['kind'];
  * change when the recipe does, and be the same for the same recipe on every machine.
  */
 export function recipeHash(block: FreeformBlock): string {
-  return hashOf(JSON.stringify({ w: block.width, h: block.height, bg: block.background, layers: block.layers }));
+  // Effects join the hash only when there are some, so every picture rendered before effects existed stays current.
+  return hashOf(JSON.stringify({ w: block.width, h: block.height, bg: block.background, layers: block.layers, ...(block.effects?.length ? { fx: block.effects } : {}) }));
 }
 
 /** What decides a brand block's picture: the mark, its width and its colour. */

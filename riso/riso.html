@@ -73,6 +73,10 @@
   .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
   .presets button small{display:block;color:var(--muted);font-size:11px}
   .presets button.on{border-color:var(--accent);color:#fff}
+  .presets button{position:relative}
+  .presets button.saved{padding-right:22px}
+  .presets button .x{position:absolute;top:4px;right:6px;color:var(--muted);font-size:14px;line-height:1;padding:1px 3px;border-radius:3px}
+  .presets button .x:hover{color:#f0b0b0;background:rgba(255,255,255,.06)}
   main{display:flex;flex-direction:column;min-width:0;min-height:0}
   .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
   .topbar .spacer{flex:1}
@@ -100,6 +104,7 @@
 <body>
 <script src="../tool-banner.js" data-tool="Riso separator"></script>
 <script src="../tool-kit.js"></script>
+<script src="../effects/riso.js"></script>
 <div class="app">
   <aside>
     <h1>Riso separator</h1>
@@ -119,6 +124,8 @@
       <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
         <div class="presets" id="presets"></div>
+        <div class="row" style="margin-top:10px"><input type="text" id="presetName" placeholder="Name this look…" maxlength="40"><button id="savePreset">Save preset</button></div>
+        <p class="hint">Saved presets belong to the project: every tool on this site sees them, Freeform included.</p>
         <div class="row" style="margin-top:10px"><label></label><button id="resetTool" class="danger">Reset to defaults</button></div>
         <p class="hint">A preset sets the inks and the press; the image stays. Reset clears everything saved for this tool, image included.</p>
       </div>
@@ -176,6 +183,7 @@
   <main>
     <div class="topbar">
       <span id="meta"></span>
+      <button id="backToFreeform" class="primary" hidden title="Send these settings back to the Freeform canvas. It keeps its layers and prints them again whenever they change.">Back to Freeform</button>
       <span class="spacer"></span>
       <div class="seg" id="viewSeg"><button data-v="composite">Print</button><button data-v="separations">Separations</button><button data-v="compare">Before · after</button></div>
       <label>Zoom <select id="zoomSel">
@@ -196,45 +204,22 @@
 </div>
 
 <script>
-// ---------- Riso ink swatches (drum colours, approximate sRGB) ----------
-const SWATCHES = [
-  ['Black', '#1d1d1b'], ['Fluorescent pink', '#ff48b0'], ['Blue', '#0078bf'], ['Federal blue', '#3d5588'], ['Teal', '#00838a'], ['Green', '#00a95c'], ['Yellow', '#ffe800'], ['Sunflower', '#ffb511'], ['Orange', '#ff6c2f'],
-  ['Fluorescent orange', '#ff7477'], ['Red', '#ff665e'], ['Burgundy', '#914e72'], ['Purple', '#765ba7'], ['Brown', '#925f52'], ['Cornflower', '#62a8e5'], ['Aqua', '#5ec8e5'], ['Mint', '#82d8d5'], ['Light grey', '#88898a'],
-];
-const inkName = hex => { const s = SWATCHES.find(([, h]) => h === hex.toLowerCase()); return s ? s[0] : hex; };
-const INK_DEFAULT = { color: '#0078bf', source: 'lum', invert: false, density: 1, contrast: 1.15, lift: 0, screen: 'dot', cell: 6, angle: 15, opacity: 1, dx: 0, dy: 0 };
+// ---------- The press ----------
+// The inks, presets and every calculation live in ../effects/riso.js, shared with Freeform, so a print
+// tuned here and a print on the canvas are the same code.
+const E = window.RisoEngine;
+const SWATCHES = E.SWATCHES;
+const inkName = E.inkName;
+const INK_DEFAULT = E.INK_DEFAULT;
+const PRESETS = E.PRESETS;
 const DEFAULTS = {
-  inks: [
-    { ...INK_DEFAULT, color: '#0078bf', source: 'lum', contrast: 1.25, angle: 15 },
-    { ...INK_DEFAULT, color: '#ff48b0', source: 'mids', density: 0.9, contrast: 1.1, angle: 75, dx: 0.4, dy: -0.3 },
-  ],
+  inks: JSON.parse(JSON.stringify(PRESETS[0].apply.inks)),
   selected: 0,
-  press: { paper: '#f6f2e8', grain: 0.3, soak: 0.5, spread: 0.25, dither: 0.35, misreg: 1.2 },
+  press: { ...PRESETS[0].apply.press },
   view: 'composite', zoom: 'fit', seed: 1,
 };
 const state = JSON.parse(JSON.stringify(DEFAULTS));
 let presetsEl = null;
-const PRESETS = [
-  { name: 'Pink & blue poster', desc: 'the classic two-drum pass, dot screens at 15° and 75°', apply: {
-      inks: [
-        { ...INK_DEFAULT, color: '#0078bf', source: 'lum', contrast: 1.25, angle: 15 },
-        { ...INK_DEFAULT, color: '#ff48b0', source: 'mids', density: 0.9, contrast: 1.1, angle: 75, dx: 0.4, dy: -0.3 },
-      ],
-      press: { paper: '#f6f2e8', grain: 0.3, soak: 0.5, spread: 0.25, dither: 0.35, misreg: 1.2 } } },
-  { name: 'Tri-colour photo', desc: 'blue, pink and yellow pulled from the RGB channels', apply: {
-      inks: [
-        { ...INK_DEFAULT, color: '#0078bf', source: 'red', density: 1, contrast: 1.15, cell: 4.5, angle: 15 },
-        { ...INK_DEFAULT, color: '#ff48b0', source: 'green', density: 1, contrast: 1.15, cell: 4.5, angle: 75, dx: 0.3, dy: 0.2 },
-        { ...INK_DEFAULT, color: '#ffe800', source: 'blue', density: 1.05, contrast: 1.1, cell: 4.5, angle: 0, dx: -0.4, dy: 0.3 },
-      ],
-      press: { paper: '#ffffff', grain: 0.15, soak: 0.35, spread: 0.2, dither: 0.3, misreg: 0.8 } } },
-  { name: 'Zine grain', desc: 'black and fluorescent orange, stochastic screens, kraft paper', apply: {
-      inks: [
-        { ...INK_DEFAULT, color: '#1d1d1b', source: 'shadows', density: 1, contrast: 1.3, screen: 'grain', opacity: 0.95 },
-        { ...INK_DEFAULT, color: '#ff7477', source: 'mids', density: 1.1, contrast: 1.2, screen: 'grain', dx: 0.9, dy: -0.6 },
-      ],
-      press: { paper: '#e9dcc2', grain: 0.55, soak: 0.7, spread: 0.35, dither: 0.85, misreg: 1.8 } } },
-];
 const sel = () => state.inks[state.selected] || null;
 const PX_PER_MM = 5.9;   // the press runs at a nominal 150 dpi
 
@@ -245,73 +230,21 @@ function getPath(p) { const [o, q] = resolve(p); return o ? q.split('.').reduce(
 function setPath(p, v) { const [o0, q] = resolve(p); if (!o0) return; const ks = q.split('.'); let o = o0; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; }
 const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const fmt = { pct: v => Math.round(v * 100) + '%', px: v => (+v).toFixed(1) + ' px', mm: v => (+v).toFixed(1) + ' mm', deg: v => Math.round(v) + '°', x: v => (+v).toFixed(2) + '×', int: v => String(Math.round(v)) };
-// Seeded noise and blur, lifted from Ink bleed.
-function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function valueNoise(w, h, cell, rng, linear) {
-  const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2;
-  const g = new Float32Array(gw * gh); for (let i = 0; i < g.length; i++) g[i] = rng();
-  const out = new Float32Array(w * h);
-  const ixs = new Int32Array(w), fxs = new Float32Array(w);
-  for (let x = 0; x < w; x++) { const u = x / cell, i = Math.floor(u), f = u - i; ixs[x] = i; fxs[x] = linear ? f : f * f * (3 - 2 * f); }
-  for (let y = 0; y < h; y++) {
-    const v = y / cell, j = Math.floor(v); let f = v - j; if (!linear) f = f * f * (3 - 2 * f);
-    const r0 = j * gw, r1 = r0 + gw, o = y * w;
-    for (let x = 0; x < w; x++) {
-      const i = ixs[x], fx = fxs[x];
-      const a = g[r0 + i], b = g[r0 + i + 1], c = g[r1 + i], d = g[r1 + i + 1];
-      const top = a + (b - a) * fx, bot = c + (d - c) * fx;
-      out[o + x] = top + (bot - top) * f;
-    }
-  }
-  return out;
-}
-const cl = (i, n) => i < 0 ? 0 : (i >= n ? n - 1 : i);
-function boxH(s, d, w, h, r) {
-  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
-  for (let y = 0; y < h; y++) {
-    const o = y * w; let sum = 0;
-    for (let k = -ri; k <= ri; k++) sum += s[o + cl(k, w)];
-    for (let x = 0; x < w; x++) {
-      d[o + x] = (sum + fr * (s[o + cl(x - ri - 1, w)] + s[o + cl(x + ri + 1, w)])) * norm;
-      sum += s[o + cl(x + ri + 1, w)] - s[o + cl(x - ri, w)];
-    }
-  }
-}
-function boxV(s, d, w, h, r) {
-  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
-  for (let x = 0; x < w; x++) {
-    let sum = 0;
-    for (let k = -ri; k <= ri; k++) sum += s[cl(k, h) * w + x];
-    for (let y = 0; y < h; y++) {
-      d[y * w + x] = (sum + fr * (s[cl(y - ri - 1, h) * w + x] + s[cl(y + ri + 1, h) * w + x])) * norm;
-      sum += s[cl(y + ri + 1, h) * w + x] - s[cl(y - ri, h) * w + x];
-    }
-  }
-}
-function blurField(a, w, h, r, passes) {
-  if (r < 0.2) return a;
-  let src = a, tmp = new Float32Array(a.length), dst = new Float32Array(a.length);
-  for (let p = 0; p < passes; p++) { boxH(src, tmp, w, h, r); boxV(tmp, dst, w, h, r); const t = src; src = dst; dst = (t === a) ? new Float32Array(a.length) : t; }
-  return src;
-}
+const mulberry32 = E.mulberry32;
 
 
 // ---------- Source image ----------
 const MAX = 900;
 let src = null;           // { w, h, data: Uint8ClampedArray RGBA, name }
-let lum = null, satF = null;
+let prep = null;         // the pixels with their luminance and saturation, from E.prepare
 const srcCanvas = document.createElement('canvas'), sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
-function useImage(img, name, remember) {
-  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+// `max` is the press size. A picture handed over from Freeform keeps its own size, so its screens line up with the canvas.
+function useImage(img, name, remember, max = MAX) {
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
   const w = Math.max(1, Math.floor(img.width * scale)), h = Math.max(1, Math.floor(img.height * scale));
   srcCanvas.width = w; srcCanvas.height = h; sctx.drawImage(img, 0, 0, w, h);
   src = { w, h, data: sctx.getImageData(0, 0, w, h).data, name };
-  const n = w * h; lum = new Float32Array(n); satF = new Float32Array(n);
-  for (let i = 0, q = 0; i < n; i++, q += 4) {
-    const r = src.data[q] / 255, g = src.data[q + 1] / 255, b = src.data[q + 2] / 255;
-    lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b); satF[i] = mx > 0 ? (mx - mn) / mx : 0;
-  }
+  prep = E.prepare(src.data, w, h);
   fields = null;
   if (remember && window.ToolKit) { const data = srcCanvas.toDataURL('image/jpeg', 0.85); ToolKit.saveAux('image', data.length < 3500000 ? { name, data } : null); }
   invalidate();
@@ -337,68 +270,22 @@ function sampleImage() {
 }
 
 // ---------- Fields (seeded, cached per image size + seed) ----------
+// `unit` is 1 here and 2 for a picture from Freeform, which is drawn at twice its page size.
+const unit = () => state.unit || 1;
 let fields = null;
 function getFields() {
-  if (fields && fields.seed === state.seed && fields.w === src.w && fields.h === src.h) return fields;
-  const n = src.w * src.h, r = mulberry32(state.seed * 1000 + 7), W = new Float32Array(n); for (let i = 0; i < n; i++) W[i] = r();
-  const P = valueNoise(src.w, src.h, 3, mulberry32(state.seed * 1000 + 17)), P2 = valueNoise(src.w, src.h, 24, mulberry32(state.seed * 1000 + 19));
-  const B = blurField(W, src.w, src.h, 0.8, 1);
-  for (let i = 0; i < n; i++) { P[i] = 0.55 * P[i] + 0.45 * P2[i]; }
-  fields = { seed: state.seed, w: src.w, h: src.h, W, B, P };
+  if (fields && fields.seed === state.seed && fields.w === src.w && fields.h === src.h && fields.unit === unit()) return fields;
+  fields = E.fields(src.w, src.h, state.seed, unit());
   return fields;
 }
 
 // ---------- Separation ----------
-const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
-const smooth = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
-function densityAt(ink, i) {
-  const L = lum[i]; let d;
-  switch (ink.source) {
-    case 'lum': d = 1 - L; break;
-    case 'shadows': d = 1 - smooth(0.15, 0.55, L); break;
-    case 'mids': d = smooth(0.15, 0.45, L) * (1 - smooth(0.55, 0.9, L)); break;
-    case 'highlights': d = smooth(0.45, 0.95, L); break;
-    case 'red': d = 1 - src.data[i * 4] / 255; break;
-    case 'green': d = 1 - src.data[i * 4 + 1] / 255; break;
-    case 'blue': d = 1 - src.data[i * 4 + 2] / 255; break;
-    case 'sat': d = satF[i]; break;
-    default: d = 1;
-  }
-  if (ink.invert) d = 1 - d;
-  d = ((d - 0.5) * ink.contrast + 0.5) * ink.density + ink.lift;
-  return clamp01(d);
-}
-// Coverage map for one ink: density run through its screen, then soak and spread.
-function coverage(ink) {
-  const w = src.w, h = src.h, n = w * h, F = getFields(), P = state.press, out = new Float32Array(n);
-  const D = new Float32Array(n); for (let i = 0; i < n; i++) D[i] = densityAt(ink, i);
-  if (ink.screen === 'grain') {
-    // Stochastic screen: a blurred-noise threshold, blended toward smooth tone by the dither amount.
-    for (let i = 0; i < n; i++) { const d = D[i], s = clamp01((d - F.B[i]) * 3 + 0.5); out[i] = d + (s - d) * P.dither; }
-  } else {
-    const c = Math.max(2, ink.cell), th = ink.angle * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th), line = ink.screen === 'line';
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const u = x * cs + y * sn, v = -x * sn + y * cs;
-      const cu = (Math.floor(u / c) + 0.5) * c, cv = (Math.floor(v / c) + 0.5) * c;
-      // Sample the density at the cell centre (mapped back into the image), like a real screen.
-      let sx = Math.round(cu * cs - cv * sn), sy = Math.round(cu * sn + cv * cs);
-      sx = sx < 0 ? 0 : sx >= w ? w - 1 : sx; sy = sy < 0 ? 0 : sy >= h ? h - 1 : sy;
-      const d = D[sy * w + sx]; let cov;
-      if (line) { const half = d * c * 0.5, dist = Math.abs(v - cv); cov = clamp01(half - dist + 0.5); }
-      else { const r = c * Math.sqrt(d / Math.PI) * 1.05, du = u - cu, dv = v - cv, dist = Math.sqrt(du * du + dv * dv); cov = clamp01(r - dist + 0.5); }
-      out[y * w + x] = cov;
-    }
-  }
-  let res = out;
-  if (P.soak > 0) res = blurField(res, w, h, 0.3 + P.soak * 1.6, 1);
-  if (P.spread > 0) { const g = 1 - P.spread * 0.55; for (let i = 0; i < n; i++) res[i] = Math.pow(res[i], g); }
-  return res;
-}
+function coverage(ink) { return E.coverage(prep, ink, state.press, getFields(), unit()); }
 
 // ---------- Render ----------
 const canvas = $('#canvas'), ctx = canvas.getContext('2d');
 let covCache = new Map();   // ink index → {key, cov}
-function inkKey(ink) { return JSON.stringify([ink.source, ink.invert, ink.density, ink.contrast, ink.lift, ink.screen, ink.cell, ink.angle, state.press.soak, state.press.spread, state.press.dither, state.seed, src.w, src.h, src.name]); }
+function inkKey(ink) { return JSON.stringify([ink.source, ink.invert, ink.density, ink.contrast, ink.lift, ink.screen, ink.cell, ink.angle, state.press.soak, state.press.spread, state.press.dither, state.seed, unit(), src.w, src.h, src.name]); }
 function coverages() {
   const out = [];
   state.inks.forEach((ink, i) => {
@@ -409,32 +296,8 @@ function coverages() {
   for (const k of [...covCache.keys()]) if (k >= state.inks.length) covCache.delete(k);
   return out;
 }
-function composite(covs) {
-  const w = src.w, h = src.h, n = w * h, F = getFields(), P = state.press, img = ctx.createImageData(w, h), d = img.data, paper = hexToRgb(P.paper);
-  for (let i = 0, q = 0; i < n; i++, q += 4) {
-    const g = 1 + (F.W[i] - 0.5) * P.grain * 0.12 + (F.P[i] - 0.5) * P.grain * 0.1;
-    d[q] = paper[0] * g; d[q + 1] = paper[1] * g; d[q + 2] = paper[2] * g; d[q + 3] = 255;
-  }
-  state.inks.forEach((ink, k) => {
-    const cov = covs[k], col = hexToRgb(ink.color), ox = Math.round(ink.dx * PX_PER_MM), oy = Math.round(ink.dy * PX_PER_MM);
-    const mr = 1 - col[0] / 255, mg = 1 - col[1] / 255, mb = 1 - col[2] / 255, op = ink.opacity;
-    for (let y = 0; y < h; y++) {
-      const sy = y - oy; if (sy < 0 || sy >= h) continue;
-      for (let x = 0; x < w; x++) {
-        const sx = x - ox; if (sx < 0 || sx >= w) continue;
-        const a = cov[sy * w + sx] * op; if (a <= 0.002) continue;
-        const q = (y * w + x) * 4;
-        d[q] *= 1 - a * mr; d[q + 1] *= 1 - a * mg; d[q + 2] *= 1 - a * mb;   // multiply, like ink on paper
-      }
-    }
-  });
-  return img;
-}
-function separationImage(cov) {
-  const w = src.w, h = src.h, img = ctx.createImageData(w, h), d = img.data;
-  for (let i = 0, q = 0; i < w * h; i++, q += 4) { const v = 255 * (1 - cov[i]); d[q] = d[q + 1] = d[q + 2] = v; d[q + 3] = 255; }
-  return img;
-}
+function composite(covs) { return new ImageData(E.composite(prep, state.inks, state.press, covs, getFields(), unit()), src.w, src.h); }
+function separationImage(cov) { return new ImageData(E.separation(cov, src.w, src.h), src.w, src.h); }
 let pending = 0;
 function invalidate() { if (window.ToolKit) ToolKit.commit(); updateHints(); updateRecipe(); if (!pending) pending = requestAnimationFrame(render); }
 function render() {
@@ -509,17 +372,58 @@ addSlider(Ps, { path: 'press.spread', label: 'Dot gain', min: 0, max: 1, step: 0
 addSlider(Ps, { path: 'press.dither', label: 'Grain screen strength', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
 addSlider(Ps, { path: 'press.misreg', label: 'Shuffle range', min: 0, max: 3, step: 0.1, fmt: fmt.mm });
 
-// Presets and reset
-presetsEl = $('#presets');
-PRESETS.forEach((p, i) => {
-  const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
-  b.addEventListener('click', () => {
-    const a = JSON.parse(JSON.stringify(p.apply));
-    state.inks = a.inks; state.selected = 0; Object.assign(state.press, a.press); covCache.clear();
-    refreshAll(); [...presetsEl.children].forEach((c, j) => c.classList.toggle('on', i === j)); invalidate();
+// Presets and reset. The built-in looks, then the project's saved ones. A saved look is kept in
+// scuggnizzi.project.riso-presets, which every tool on the site reads, so Freeform offers it too
+// (template-studio/src/model/effects.ts reads the same shape).
+const PROJECT_PRESETS = 'scuggnizzi.project.riso-presets';
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function savedPresets() {
+  try { const v = JSON.parse(localStorage.getItem(PROJECT_PRESETS) || 'null'); return v && Array.isArray(v.presets) ? v.presets.filter(p => p && typeof p.name === 'string' && Array.isArray(p.inks) && p.inks.length && p.press) : []; }
+  catch (e) { return []; }
+}
+function writePresets(list) { try { localStorage.setItem(PROJECT_PRESETS, JSON.stringify({ version: 1, presets: list })); return true; } catch (e) { return false; } }
+let activePreset = null;
+function applyLook(apply, key) {
+  const a = JSON.parse(JSON.stringify(apply));
+  state.inks = a.inks.slice(0, 3); state.selected = 0; Object.assign(state.press, a.press);
+  if (a.seed) state.seed = Math.max(1, parseInt(a.seed, 10) || 1);
+  covCache.clear(); activePreset = key; refreshAll(); renderPresets(); invalidate();
+}
+function renderPresets() {
+  presetsEl.innerHTML = '';
+  PRESETS.forEach((p, i) => {
+    const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
+    b.classList.toggle('on', activePreset === `b${i}`);
+    b.addEventListener('click', () => applyLook(p.apply, `b${i}`));
+    presetsEl.appendChild(b);
   });
-  presetsEl.appendChild(b);
+  for (const p of savedPresets()) {
+    const b = document.createElement('button'); b.className = 'saved'; b.classList.toggle('on', activePreset === p.id);
+    b.innerHTML = `${escHtml(p.name)}<small>saved to the project · ${p.inks.map(i => escHtml(inkName(i.color || ''))).join(' + ')}</small><span class="x" role="button" title="Delete this preset" aria-label="Delete ${escHtml(p.name)}">×</span>`;
+    b.addEventListener('click', e => {
+      if (e.target.closest('.x')) {
+        writePresets(savedPresets().filter(q => q.id !== p.id));
+        if (activePreset === p.id) activePreset = null;
+        renderPresets(); updateHints(); return;
+      }
+      applyLook({ inks: p.inks, press: p.press, seed: p.seed }, p.id);
+    });
+    presetsEl.appendChild(b);
+  }
+}
+presetsEl = $('#presets');
+renderPresets();
+$('#savePreset').addEventListener('click', () => {
+  const input = $('#presetName'), list = savedPresets();
+  const name = input.value.trim().slice(0, 40) || `Look ${list.length + 1}`;
+  const id = 'p' + Date.now().toString(36);
+  const next = list.filter(q => q.name.trim().toLowerCase() !== name.toLowerCase());   // a name saved again replaces the old look
+  next.push({ id, name, inks: JSON.parse(JSON.stringify(state.inks)), press: { ...state.press }, seed: state.seed, savedAt: Date.now() });
+  if (!writePresets(next)) { flash($('#savePreset'), 'Storage full'); return; }
+  input.value = ''; activePreset = id; renderPresets(); updateHints(); flash($('#savePreset'), 'Saved ✓');
 });
+$('#presetName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('#savePreset').click(); });
+window.addEventListener('storage', e => { if (e.key === PROJECT_PRESETS) renderPresets(); });
 $('#resetTool').addEventListener('click', () => ToolKit.reset());
 
 // Ink list and per-ink controls
@@ -543,7 +447,7 @@ function refreshInk() {
   $('#screenSliders').hidden = I.screen === 'grain';
   $('#inkName').textContent = inkName(I.color);
 }
-function clearPreset() { [...presetsEl.children].forEach(c => c.classList.remove('on')); }
+function clearPreset() { activePreset = null; [...presetsEl.children].forEach(c => c.classList.remove("on")); }
 const sw = $('#swatches');
 SWATCHES.forEach(([name, hex]) => { const b = document.createElement('button'); b.style.background = hex; b.title = name; b.dataset.v = hex; b.addEventListener('click', () => { const I = sel(); if (!I) return; I.color = hex; refreshInk(); renderInkList(); invalidate(); }); sw.appendChild(b); });
 $('#inkColor').addEventListener('input', e => { const I = sel(); if (!I) return; I.color = e.target.value; refreshInk(); renderInkList(); invalidate(); });
@@ -611,11 +515,25 @@ $('#copyImg').addEventListener('click', async () => {
 });
 $('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
 
+// ---------- Hand-off from Freeform ----------
+// Freeform's "Open in Riso" leaves the canvas's picture and its current settings in this browser and
+// opens this page with ?handoff=<session>. "Back to Freeform" sends the settings back, not the pixels.
+// A session's work is saved under its own key, so it never replaces the separator's own saved state.
+const HANDOFF_KEY = 'scuggnizzi.handoff.riso', RETURN_KEY = 'scuggnizzi.handoff.riso.return';
+const handoff = (() => {
+  const id = new URLSearchParams(location.search).get('handoff'); if (!id) return null;
+  try { const h = JSON.parse(localStorage.getItem(HANDOFF_KEY) || 'null'); return h && h.session === id && h.image ? h : null; } catch (e) { return null; }
+})();
+
 // ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
 const ZOOMS = ['fit', '0.5', '1', '2'];
 function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+// A hand-off starts from the settings Freeform sent, never from the last session's. ToolKit restores saved
+// state once the document has loaded, which is after the hand-off below has been applied, so a session's
+// saved state would quietly overwrite it: a screen tuned to 2 px in Freeform came back 4.5 px here.
+if (handoff) { try { localStorage.removeItem('scuggnizzi.riso-freeform.state'); } catch (e) {} }
 ToolKit.init({
-  tool: 'riso', version: 1,
+  tool: handoff ? 'riso-freeform' : 'riso', version: 1,
   getState: () => JSON.parse(JSON.stringify(state)),
   setState: s => { for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s); if (!state.inks.length) state.inks = [{ ...INK_DEFAULT }]; state.selected = Math.min(state.selected, state.inks.length - 1); covCache.clear(); refreshAll(); invalidate(); },
   defaults: () => JSON.parse(JSON.stringify(DEFAULTS)),
@@ -638,7 +556,40 @@ ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom
 
 // ---------- Go ----------
 refreshAll(); updateMeta(); updateHints(); updateRecipe();
-{ const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
+if (handoff) {
+  const s = handoff.step || {};
+  if (Array.isArray(s.inks) && s.inks.length) state.inks = JSON.parse(JSON.stringify(s.inks)).slice(0, 3);
+  if (s.press) Object.assign(state.press, s.press);
+  state.seed = Math.max(1, parseInt(s.seed, 10) || 1); state.unit = handoff.unit || 1; state.selected = 0; covCache.clear();
+  // The same size on screen as on the canvas: Freeform's zoom is CSS px per page px, and the picture has `unit` image px per page px.
+  if (handoff.zoom > 0) {
+    const z = String(+(handoff.zoom / (handoff.unit || 1)).toFixed(4));
+    const opt = document.createElement('option'); opt.value = z; opt.textContent = `As in Freeform · ${Math.round(handoff.zoom * 100)}%`;
+    $('#zoomSel').prepend(opt); state.zoom = z;
+  }
+  refreshAll();
+  const back = $('#backToFreeform'); back.hidden = false;
+  back.addEventListener('click', () => {
+    const step = { effect: 'riso', inks: JSON.parse(JSON.stringify(state.inks)), press: { ...state.press }, seed: state.seed };
+    try { localStorage.setItem(RETURN_KEY, JSON.stringify({ session: handoff.session, blockId: handoff.blockId, step, at: Date.now() })); }
+    catch (e) { flash(back, 'Could not send'); return; }
+    // Freeform open in another tab: go back to it and close this one. Freeform in this same tab (a
+    // browser that opened Riso in place, or pop-ups blocked): go back to the page it came from.
+    // Never close a tab that is the only way back, which is what the first version did.
+    const opener = (() => { try { return window.opener && !window.opener.closed ? window.opener : null; } catch (e) { return null; } })();
+    if (opener) {
+      back.textContent = 'Sent · back to Freeform';
+      try { opener.focus(); } catch (e) {}
+      setTimeout(() => window.close(), 400);
+    } else if (handoff.returnUrl) {
+      back.textContent = 'Sent · going back…';
+      location.replace(handoff.returnUrl);
+    } else {
+      back.textContent = 'Sent · switch back to Freeform';
+    }
+  });
+  const img = new Image(); img.onload = () => useImage(img, handoff.title || 'Freeform', false, Infinity); img.src = handoff.image;
+} else { const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
 </script>
 </body>
 </html>
