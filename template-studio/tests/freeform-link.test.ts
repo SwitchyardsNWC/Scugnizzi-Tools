@@ -131,7 +131,8 @@ describe('from the Freeform app to Template Studio', () => {
   it('knows an open Template Studio only while it keeps saying so', async () => {
     const { readStudioPresence, PRESENCE_FRESH_MS } = await import('../src/model/freeform-link.ts');
     const raw = JSON.stringify({ tab: 't1', email: 'Standard email', linked: 1, at: 1000 });
-    expect(readStudioPresence(raw, 2000)).toEqual({ tab: 't1', email: 'Standard email', linked: 1, at: 1000 });
+    expect(readStudioPresence(raw, 2000)).toEqual({ tab: 't1', email: 'Standard email', linked: 1, keys: [], at: 1000 });
+    expect(readStudioPresence(JSON.stringify({ tab: 't1', at: 1000, keys: ['a', 3, 'b'] }), 2000)?.keys).toEqual(['a', 'b']);
     expect(readStudioPresence(raw, 1000 + PRESENCE_FRESH_MS + 1)).toBeNull();
     expect(readStudioPresence('nope', 2000)).toBeNull();
     expect(readStudioPresence(JSON.stringify({ email: 'x', at: 1000 }), 2000)).toBeNull();

@@ -11,11 +11,12 @@
 
 import { createSection } from './catalog.ts';
 import { colorOf, DEFAULT_DESIGN_SYSTEM } from './design-system.ts';
+import { FREEFORM_APP_FRAME, FRAMES_INDEX, readFrameIndex } from './frame-store.ts';
 import { recipeHash, withFreeform } from './freeform.ts';
 import type { Block, FreeformBlock, Template } from './types.ts';
 
-/** Where the Freeform app keeps its frame. The misspelt prefix is every tool's, kept on purpose. */
-export const FREEFORM_APP_FRAME = 'scuggnizzi.freeform.v1';
+/** Where the Freeform app kept its one frame, and now its first frame's key. The misspelt prefix is every tool's, kept on purpose. */
+export { FREEFORM_APP_FRAME };
 
 export interface AppFrame {
   key: string;
@@ -57,6 +58,22 @@ export function readAppFrame(raw: string | null, key = FREEFORM_APP_FRAME): AppF
           return { key, name: template?.name || 'Freeform', page: block, ground, hash: recipeHash(followed({ page: block, ground })) };
         }
   return null;
+}
+
+/**
+ * Every frame the Freeform app keeps, in its order, named as its index names them. A frame whose drawing
+ * cannot be read is left out. With no index yet, the one frame kept before there were frames.
+ */
+export function readAppFrames(get: (key: string) => string | null): AppFrame[] {
+  const index = readFrameIndex(get(FRAMES_INDEX));
+  if (!index) {
+    const one = readAppFrame(get(FREEFORM_APP_FRAME));
+    return one ? [{ ...one, name: 'Frame 1' }] : [];
+  }
+  return index.frames.flatMap((entry) => {
+    const frame = readAppFrame(get(entry.key), entry.key);
+    return frame ? [{ ...frame, name: entry.name }] : [];
+  });
 }
 
 /** Every freeform block in a template that follows a Freeform app frame. */
@@ -122,8 +139,10 @@ export const PRESENCE_FRESH_MS = 120_000;
 export interface StudioPresence {
   tab: string;
   email: string;
-  /** Blocks in that email following the Freeform app's frame. */
+  /** Blocks in that email following a Freeform app frame. */
   linked: number;
+  /** The frames that email follows, by key. */
+  keys: string[];
   at: number;
 }
 
@@ -132,7 +151,8 @@ export function readStudioPresence(raw: string | null, now = Date.now()): Studio
   try {
     const p = raw ? (JSON.parse(raw) as Partial<StudioPresence>) : null;
     if (!p || typeof p.tab !== 'string' || typeof p.at !== 'number' || now - p.at > PRESENCE_FRESH_MS) return null;
-    return { tab: p.tab, email: typeof p.email === 'string' && p.email ? p.email : 'your email', linked: typeof p.linked === 'number' ? p.linked : 0, at: p.at };
+    const keys = Array.isArray(p.keys) ? p.keys.filter((k): k is string => typeof k === 'string') : [];
+    return { tab: p.tab, email: typeof p.email === 'string' && p.email ? p.email : 'your email', linked: typeof p.linked === 'number' ? p.linked : 0, keys, at: p.at };
   } catch {
     return null;
   }

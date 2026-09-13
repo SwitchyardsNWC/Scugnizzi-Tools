@@ -75,15 +75,19 @@ export interface FreeformUi {
 }
 
 export interface FreeformAppUi {
-  frame: { name: string; width: number; height: number; layers: number; printed: boolean; thumb: string } | null;
-  linked: boolean;
+  frames: Array<{ key: string; name: string; width: number; height: number; layers: number; printed: boolean; thumb: string }>;
+  /** The frame this block follows, or null. */
+  linkedKey: string | null;
+  /** Linked to a frame the Freeform app no longer has. */
+  missing: boolean;
   /** Linked, and already showing the frame as it is now. */
   current: boolean;
-  /** The block's printed picture, when it has effects: the thumbnail then shows what the email shows. */
+  /** The block's printed picture, when it has effects: its frame's card then shows what the email shows. */
   print?: string;
-  onLink(): void;
+  onLink(key: string): void;
   onUnlink(): void;
-  onOpen(): void;
+  /** Opens the Freeform app, on the given frame or the one this block follows. */
+  onOpen(key?: string): void;
 }
 
 export function Inspector({ editor, onRasterise, rasterising, patternInfo, multi, onSpacingHot, freeform }: InspectorProps) {
@@ -560,7 +564,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
   if (!freeform?.open) {
     const n = block.layers.length;
     const app = freeform?.app;
-    const linked = Boolean(app?.linked);
+    const linked = Boolean(app?.linkedKey);
     return (
       <div class="field wide canvas-entry">
         {linked ? (
@@ -584,30 +588,48 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
         {app && (
           <div class="canvas-link">
             <div class="canvas-link-head">
-              <b>Freeform app</b>
-              {linked && <span class={`canvas-link-badge ${app.current ? '' : 'stale'}`}>{app.current ? 'Linked · up to date' : 'Linked · updating'}</span>}
+              <b>Freeform frames</b>
+              {linked && (
+                <span class={`canvas-link-badge ${app.missing || !app.current ? 'stale' : ''}`}>{app.missing ? 'Frame deleted' : app.current ? 'Linked · up to date' : 'Linked · updating'}</span>
+              )}
             </div>
-            {app.frame ? (
-              <>
-                <button class="canvas-link-thumb" title={`${app.frame.name}, ${app.frame.width} × ${app.frame.height}. Opens the Freeform app.`} onClick={app.onOpen}>
-                  {linked && app.print ? <img src={app.print} alt="" /> : <span dangerouslySetInnerHTML={{ __html: app.frame.thumb }} />}
-                </button>
-                <span class="canvas-facts">
-                  {app.frame.layers} {app.frame.layers === 1 ? 'layer' : 'layers'} · {app.frame.width} × {app.frame.height}
-                  {app.frame.printed ? ' · Riso print' : ''}
-                </span>
-                {linked ? (
-                  <button class="btn wide" title="Stop following the frame. The drawing stays, to edit in this block's own canvas." onClick={app.onUnlink}>
-                    Unlink
-                  </button>
-                ) : (
-                  <button class="btn wide" title="Replace this block's drawing with the frame and follow it from now on. Undo brings the old drawing back." onClick={app.onLink}>
-                    Link to this frame
-                  </button>
-                )}
-              </>
-            ) : (
+            {app.frames.length === 0 ? (
               <p class="hint">Nothing in the Freeform app yet. Draw a frame there and it shows up here to link.</p>
+            ) : (
+              <>
+                <p class="hint">
+                  {!linked
+                    ? 'Pick a frame. This block takes its drawing and follows it from then on.'
+                    : app.missing
+                      ? 'The frame this block followed is gone from the Freeform app. The drawing stays: pick another frame, or unlink.'
+                      : 'The highlighted frame is the one this block follows. Pick another to follow it instead.'}
+                </p>
+                <div class="canvas-frames">
+                  {app.frames.map((f) => {
+                    const on = f.key === app.linkedKey;
+                    return (
+                      <button
+                        key={f.key}
+                        class={`canvas-frame ${on ? 'on' : ''}`}
+                        title={on ? `${f.name}: this block follows it. Opens it in the Freeform app.` : `Follow ${f.name}. It replaces this block's drawing; Undo brings the old one back.`}
+                        onClick={() => (on ? app.onOpen(f.key) : app.onLink(f.key))}
+                      >
+                        <span class="canvas-frame-thumb">{on && app.print ? <img src={app.print} alt="" /> : <span dangerouslySetInnerHTML={{ __html: f.thumb }} />}</span>
+                        <span class="canvas-frame-name">{f.name}</span>
+                        <span class="canvas-frame-facts">
+                          {f.width} × {f.height}
+                          {f.printed ? ' · Riso' : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            {linked && (
+              <button class="btn wide" title="Stop following the frame. The drawing stays, to edit in this block's own canvas." onClick={app.onUnlink}>
+                Unlink
+              </button>
             )}
           </div>
         )}
