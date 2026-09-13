@@ -577,6 +577,8 @@ let made = (() => { if (!Project || fromAddress) return null; try { return JSON.
 function keepMade() { try { if (made) sessionStorage.setItem(MADE_KEY, JSON.stringify(made)); else sessionStorage.removeItem(MADE_KEY); } catch (e) {} }
 function forgetProjectPicture() { made = null; keepMade(); syncProject(); }
 const stemOf = p => p.split('/').pop().replace(/\.[^.]+$/, '');
+// A print goes beside its picture: one in a board group's folder is printed into that group.
+const folderOf = p => (p && p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : 'assets');
 const slugOf = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'print';
 function syncProject() {
   const on = Boolean(Project && ['ready', 'view-only', 'asking'].includes(Project.status));
@@ -646,7 +648,7 @@ $('#saveProject').addEventListener('click', async () => {
   if (Project.status !== 'ready' && !(await Project.allow())) { Project.toast(`Chrome did not allow saving into ${Project.name}.`); return; }
   btn.disabled = true;
   try {
-    const output = made && made.output ? made.output : await Project.freePath('assets', `${slugOf(stemOf(made && made.source ? made.source : src.name))}-riso`, '.png');
+    const output = made && made.output ? made.output : await Project.freePath(folderOf(made && made.source), `${slugOf(stemOf(made && made.source ? made.source : src.name))}-riso`, '.png');
     const recipe = made && made.recipe ? made.recipe : await Project.freePath('riso', stemOf(output), '.riso.json');
     const sources = made && made.source ? [made.source] : [];
     const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png'));

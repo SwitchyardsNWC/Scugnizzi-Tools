@@ -17,7 +17,9 @@ import {
 } from '../model/project.ts';
 import type { ProjectPlan } from '../model/project-types.ts';
 import { readRecipe, RECIPE_TOOLS, type RecipeTool, type ToolRecipe } from '../model/tool-recipes.ts';
-import { isImageFile } from '../workspace/workspace.ts';
+import { renameInRecipe, renameSrc } from '../model/asset-moves.ts';
+import { FRAME_EXT, FRAMES_DIR } from '../model/frame-file.ts';
+import { isImageFile, isTemplateFile } from '../workspace/workspace.ts';
 
 type Dir = FileSystemDirectoryHandle;
 
@@ -175,6 +177,93 @@ export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
   };
   if (assets) await walk(assets, '', 3);
   return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// --- groups: folders under assets/ ------------------------------------------------------------------------------
+
+export async function makeGroupFolder(dir: Dir, folder: string): Promise<void> {
+  if (!(await childDir(dir, ['assets', folder], true))) throw new Error(`Could not make assets/${folder}.`);
+}
+
+/** Removes a group's folder when nothing but Finder's leftovers is in it. */
+export async function removeFolderIfEmpty(dir: Dir, folder: string): Promise<boolean> {
+  const assets = await childDir(dir, ['assets']);
+  const at = assets ? await childDir(assets, [folder]) : null;
+  if (!assets || !at || !(await isEmptyDir(at))) return false;
+  try {
+    await assets.removeEntry(folder, { recursive: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Moves a picture under `assets/` and renames it in everything that names it: emails (image blocks and freeform
+ * layers), frame files, and the recipes of the tools that made it or made something from it (model/asset-moves.ts).
+ * The copy is written first and the original removed last, so a move that stops half-way leaves two copies rather
+ * than none. A rewritten frame file is dated now, so every browser keeping the frame takes the new copy. Returns how
+ * many documents were rewritten.
+ */
+export async function movePicture(dir: Dir, from: string, to: string, now = Date.now()): Promise<number> {
+  if (from === to) return 0;
+  const parts = from.split('/');
+  const name = parts.pop()!;
+  const folder = await childDir(dir, ['assets', ...parts]);
+  let file: File | null = null;
+  try {
+    file = folder ? await (await folder.getFileHandle(name)).getFile() : null;
+  } catch {
+    file = null;
+  }
+  if (!file) throw new Error(`assets/${from} is not in the project any more.`);
+  await writeFile(dir, `assets/${to}`, file);
+
+  let rewritten = 0;
+  const rewrite = async (path: string, entry: FileSystemHandle, change: (raw: unknown) => { value: unknown; changed: boolean }) => {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await (await (entry as FileSystemFileHandle).getFile()).text());
+    } catch {
+      return; // Not JSON: nothing in it names the picture.
+    }
+    const { value, changed } = change(raw);
+    if (!changed) return;
+    await writeFile(dir, path, `${JSON.stringify(value, null, 2)}\n`);
+    rewritten += 1;
+  };
+
+  for (const [prefix, sub] of [['', null], ['templates/', 'templates']] as Array<[string, string | null]>) {
+    const at = sub ? await childDir(dir, [sub]) : dir;
+    if (!at) continue;
+    const names: Array<[string, FileSystemHandle]> = [];
+    for await (const item of at.entries()) if (item[1].kind === 'file' && isTemplateFile(item[0])) names.push(item);
+    for (const [fileName, entry] of names) await rewrite(prefix + fileName, entry, (raw) => renameSrc(raw, from, to));
+  }
+
+  const frames = await childDir(dir, [FRAMES_DIR]);
+  if (frames) {
+    const names: Array<[string, FileSystemHandle]> = [];
+    for await (const item of frames.entries()) if (item[1].kind === 'file' && item[0].endsWith(FRAME_EXT)) names.push(item);
+    for (const [fileName, entry] of names) {
+      await rewrite(`${FRAMES_DIR}/${fileName}`, entry, (raw) => {
+        const renamed = renameSrc(raw, from, to);
+        return renamed.changed ? { value: { ...(renamed.value as Record<string, unknown>), savedAt: now }, changed: true } : renamed;
+      });
+    }
+  }
+
+  for (const tool of Object.keys(RECIPE_TOOLS) as RecipeTool[]) {
+    const { dir: sub, ext } = RECIPE_TOOLS[tool];
+    const at = await childDir(dir, [sub]);
+    if (!at) continue;
+    const names: Array<[string, FileSystemHandle]> = [];
+    for await (const item of at.entries()) if (item[1].kind === 'file' && item[0].endsWith(ext)) names.push(item);
+    for (const [fileName, entry] of names) await rewrite(`${sub}/${fileName}`, entry, (raw) => renameInRecipe(raw, from, to));
+  }
+
+  await removeFile(dir, `assets/${from}`);
+  return rewritten;
 }
 
 // --- what tools made --------------------------------------------------------------------------------------------

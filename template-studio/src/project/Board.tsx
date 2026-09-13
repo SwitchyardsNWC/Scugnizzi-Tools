@@ -18,32 +18,42 @@ import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import { projectType } from '../model/project-types.ts';
 import { recipesByOutput, RECIPE_TOOLS, toolAddress, type ToolRecipe } from '../model/tool-recipes.ts';
 import {
+  addGroup,
   BOARD_FILE,
   boardJson,
   CARD_GAP,
   CARD_SIZE,
+  cardFolder,
   emailCardId,
   emptyBoard,
+  folderOfPicture,
   forgetCard,
   frameCardId,
+  groupAt,
+  groupFolderName,
   layoutBoard,
   moveCard,
+  moveGroupWith,
   pictureCardId,
   PROJECT_CHANNEL,
   projectLinks,
   readBoard,
+  removeGroup,
   withPlaces,
   type BoardDoc,
+  type BoardGroup,
   type CardKind,
   type CardSource,
   type PlacedCard,
+  type PlacedGroup,
 } from '../model/project.ts';
+import { freeAssetPath, movedPath } from '../model/asset-moves.ts';
 import type { Template } from '../model/types.ts';
 import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
 import { loadKeptPictures } from '../app/kept-pictures.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
-import { listPictures, listRecipes, readText, writeFile, writePicture } from './folder.ts';
+import { listPictures, listRecipes, makeGroupFolder, movePicture, readText, removeFolderIfEmpty, writeFile, writePicture } from './folder.ts';
 import { copyKeptPictures, syncFrames } from './frame-sync.ts';
 import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
@@ -339,9 +349,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const layout = useMemo(() => layoutBoard(sources, board), [sources, board]);
 
   // A card that just found a place keeps it, so a file added tomorrow does not shuffle today's board.
+  // A group just made for a folder is kept the same way.
   useEffect(() => {
-    if (!files.read || !boardRead || layout.placed.length === 0) return;
-    saveBoard(withPlaces(boardRef.current, layout.cards));
+    if (!files.read || !boardRead || (layout.placed.length === 0 && layout.groupsPlaced.length === 0)) return;
+    saveBoard(withPlaces(boardRef.current, layout.cards, layout.groupsPlaced.length ? layout.groups : undefined));
   }, [files.read, boardRead, layout, saveBoard]);
 
   const emailsById = useMemo(() => new Map(files.emails.map((e) => [e.id, e])), [files.emails]);
@@ -453,7 +464,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   );
 
   const bounds = useMemo<Rect | null>(() => {
-    const all: Rect[] = [...layout.cards, ...layout.missing];
+    const all: Rect[] = [...layout.cards, ...layout.missing, ...layout.groups];
     if (all.length === 0) return null;
     const x = Math.min(...all.map((r) => r.x));
     const y = Math.min(...all.map((r) => r.y));
@@ -519,14 +530,27 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [moving, setMoving] = useState<{ id: string; x: number; y: number } | null>(null);
   const [panning, setPanning] = useState(false);
+  /** A group being moved or resized, as it is drawn until the pointer lets go, with the cards riding along. */
+  const [groupDrag, setGroupDrag] = useState<{ id: string; dx: number; dy: number; dw: number; dh: number; riders: string[] } | null>(null);
+  /** Where a picture being dragged would be filed: a group's id, or `out` for straight into assets/. */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const drag = useRef<
     | { kind: 'pan'; x: number; y: number; view: View; moved: boolean }
     | { kind: 'card'; id: string; x: number; y: number; from: { x: number; y: number }; moved: boolean }
+    | { kind: 'group'; id: string; x: number; y: number; riders: string[]; moved: boolean }
+    | { kind: 'resize'; id: string; x: number; y: number; moved: boolean }
     | null
   >(null);
 
-  const cards = layout.cards.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : c));
-  const missing = layout.missing.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : c));
+  const riding = <T extends { id: string; x: number; y: number }>(c: T): T =>
+    groupDrag && groupDrag.riders.includes(c.id) ? { ...c, x: c.x + groupDrag.dx, y: c.y + groupDrag.dy } : c;
+  const cards = layout.cards.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : riding(c)));
+  const missing = layout.missing.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : riding(c)));
+  const groups = layout.groups.map((g) =>
+    groupDrag?.id === g.id ? { ...g, x: g.x + groupDrag.dx, y: g.y + groupDrag.dy, w: Math.max(276, g.w + groupDrag.dw), h: Math.max(286, g.h + groupDrag.dh) } : g,
+  );
   const rects = new Map<string, Rect>([...cards, ...missing].map((c) => [c.id, c]));
 
   const openCard = useCallback(
@@ -553,16 +577,33 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     [size, emailsById, framesById, picturesById, recipeOf, animateTo],
   );
 
+  /** A point on the screen, on the board. */
+  const worldAt = (clientX: number, clientY: number) => {
+    const r = stage.current?.getBoundingClientRect();
+    const v = viewRef.current;
+    return { x: (clientX - (r?.left ?? 0) - v.x) / v.z, y: (clientY - (r?.top ?? 0) - v.y) / v.z };
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0 && event.button !== 1) return;
     const target = event.target as Element;
     if (target.closest('button, a, input')) return;
-    const cardEl = event.button === 0 ? (target.closest('[data-card]') as HTMLElement | null) : null;
+    const primary = event.button === 0;
+    const cardEl = primary ? (target.closest('[data-card]') as HTMLElement | null) : null;
+    const resizeEl = primary ? (target.closest('[data-group-resize]') as HTMLElement | null) : null;
+    const headEl = primary ? (target.closest('[data-group-head]') as HTMLElement | null) : null;
     const id = cardEl?.dataset['card'];
     const rect = id ? rects.get(id) : undefined;
+    const group = layout.groups.find((g) => g.id === (resizeEl?.dataset['groupResize'] ?? headEl?.dataset['groupHead']));
     cancelAnimationFrame(anim.current);
     if (id && rect) drag.current = { kind: 'card', id, x: event.clientX, y: event.clientY, from: { x: rect.x, y: rect.y }, moved: false };
-    else {
+    else if (group && resizeEl) drag.current = { kind: 'resize', id: group.id, x: event.clientX, y: event.clientY, moved: false };
+    else if (group) {
+      // The group's pictures, and anything else sitting wholly inside it, go where it goes.
+      const inside = (c: Rect) => c.x >= group.x && c.y >= group.y && c.x + c.w <= group.x + group.w && c.y + c.h <= group.y + group.h;
+      const riders = [...layout.cards, ...layout.missing].filter((c) => group.members.includes(c.id) || inside(c)).map((c) => c.id);
+      drag.current = { kind: 'group', id: group.id, x: event.clientX, y: event.clientY, riders, moved: false };
+    } else {
       drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, moved: false };
       setPanning(true);
     }
@@ -577,10 +618,20 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     // opens a card, to the stage instead of the card.
     if (!d.moved) stage.current?.setPointerCapture(event.pointerId);
     d.moved = true;
+    const z = viewRef.current.z;
     if (d.kind === 'pan') setView({ ...d.view, x: d.view.x + dx, y: d.view.y + dy });
+    else if (d.kind === 'group') setGroupDrag({ id: d.id, dx: dx / z, dy: dy / z, dw: 0, dh: 0, riders: d.riders });
+    else if (d.kind === 'resize') setGroupDrag({ id: d.id, dx: 0, dy: 0, dw: dx / z, dh: dy / z, riders: [] });
     else {
-      const z = viewRef.current.z;
       setMoving({ id: d.id, x: d.from.x + dx / z, y: d.from.y + dy / z });
+      // A picture over a group other than its own is filed there on letting go; one out of every group, into assets/.
+      const card = layout.cards.find((c) => c.id === d.id);
+      if (card?.kind === 'picture') {
+        const p = worldAt(event.clientX, event.clientY);
+        const over = groupAt(layout.groups, p.x, p.y);
+        const next = over ? over.folder : null;
+        setDropTarget(next === cardFolder(card) ? null : over ? over.id : 'out');
+      }
     }
   };
   const onPointerUp = () => {
@@ -589,12 +640,29 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     setPanning(false);
     if (!d) return;
     if (d.kind === 'pan') {
-      if (!d.moved) setSelected(null);
+      if (!d.moved) {
+        setSelected(null);
+        setConfirming(null);
+      }
       return;
     }
+    if (d.kind === 'group' || d.kind === 'resize') {
+      const group = layout.groups.find((g) => g.id === d.id);
+      const change = groupDrag;
+      setGroupDrag(null);
+      if (!group || !d.moved || !change) return;
+      saveBoard(moveGroupWith(boardRef.current, { ...group, w: group.w + change.dw, h: group.h + change.dh }, change.dx, change.dy, change.riders));
+      return;
+    }
+    const target = dropTarget;
+    setDropTarget(null);
     if (d.moved && moving) {
-      saveBoard(moveCard(boardRef.current, d.id, moving.x, moving.y));
-      if (!projectRef.current.writable) notify(`${info.name} is open view-only, so the arrangement lasts until the page reloads. Allow editing to keep it.`);
+      const card = layout.cards.find((c) => c.id === d.id);
+      if (card && target) void fileIn(card, target === 'out' ? null : (layout.groups.find((g) => g.id === target) ?? null), moving);
+      else {
+        saveBoard(moveCard(boardRef.current, d.id, moving.x, moving.y));
+        if (!projectRef.current.writable) notify(`${info.name} is open view-only, so the arrangement lasts until the page reloads. Allow editing to keep it.`);
+      }
     }
     setSelected(d.id);
     setMoving(null);
@@ -625,6 +693,131 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, layout, openCard, fit, zoomTo]);
+
+  // --- groups ---
+
+  /** A group as the board stores it, with its place as laid out and any change on top. */
+  const storeGroup = (group: PlacedGroup, patch: Partial<BoardGroup> = {}): BoardDoc => {
+    const { id, name, folder, x, y, w, h } = group;
+    return addGroup(removeGroup(boardRef.current, id), { id, name, folder, x, y, w, h, ...patch });
+  };
+
+  /**
+   * Files a picture where it was dropped: into a group's folder, or back into assets/ when `group` is null. The file
+   * moves, and everything that names it is renamed with it (folder.ts, movePicture).
+   */
+  const fileIn = async (card: PlacedCard, group: PlacedGroup | null, at: { x: number; y: number }) => {
+    saveBoard(moveCard(boardRef.current, card.id, at.x, at.y));
+    if (!projectRef.current.writable) {
+      notify(`${info.name} is open view-only, so ${card.name} stays where its file is. Allow editing to file it.`);
+      return;
+    }
+    const from = card.id.slice('picture:'.length);
+    const to = freeAssetPath(movedPath(from, group ? group.folder : null), files.pictures.map((p) => p.path));
+    try {
+      const rewritten = await movePicture(dir, from, to);
+      const b = boardRef.current;
+      const place = b.cards[card.id] ?? at;
+      saveBoard(moveCard(forgetCard(b, card.id), pictureCardId(to), place.x, place.y));
+      await refresh();
+      const where = group ? `into ${group.name}` : 'out of its group';
+      notify(`Moved ${card.name} ${where}${rewritten ? `, and renamed it in the ${rewritten === 1 ? 'file' : `${rewritten} files`} that show it` : ''}.`);
+    } catch (cause) {
+      notify(cause instanceof Error ? `${card.name} could not be moved: ${cause.message}` : `${card.name} could not be moved.`);
+    }
+  };
+
+  const newGroup = async () => {
+    if (!projectRef.current.writable) {
+      notify(`${info.name} is open view-only. Allow editing to add a group.`);
+      return;
+    }
+    const taken = [...layout.groups.map((g) => g.folder), ...files.pictures.flatMap((p) => folderOfPicture(p.path) ?? [])];
+    const names = new Set(layout.groups.map((g) => g.name.toLowerCase()));
+    let n = 1;
+    while (names.has(`group ${n}`)) n += 1;
+    const name = `Group ${n}`;
+    const folder = groupFolderName(name, taken);
+    try {
+      await makeGroupFolder(dir, folder);
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : 'The group’s folder could not be made.');
+      return;
+    }
+    const v = viewRef.current;
+    const [w, h] = [560, 400];
+    let x = (size.w / 2 - v.x) / v.z - w / 2;
+    let y = (size.h / 2 - v.y) / v.z - h / 2;
+    // Never on top of cards it does not hold, which would look filed and are not: clear of everything, and the view
+    // goes to it.
+    const clash = [...layout.cards, ...layout.missing, ...layout.groups].some((r) => x < r.x + r.w && r.x < x + w && y < r.y + r.h && r.y < y + h);
+    if (clash && bounds) {
+      x = bounds.x + bounds.w + 120;
+      y = bounds.y;
+    }
+    const id = `group:${folder}`;
+    saveBoard(addGroup(boardRef.current, { id, name, folder, x, y, w, h }));
+    setRenaming(id);
+    if (clash && bounds) animateTo({ z: v.z, x: size.w / 2 - (x + w / 2) * v.z, y: size.h / 2 - (y + h / 2) * v.z }, 420);
+  };
+
+  /** A new name. An empty group's folder is renamed to match; a group with pictures keeps its folder, and its links. */
+  const renameGroup = async (group: PlacedGroup, value: string) => {
+    setRenaming(null);
+    const name = value.trim().slice(0, 60);
+    if (!name || name === group.name) return;
+    if (group.members.length === 0 && projectRef.current.writable) {
+      const others = layout.groups.filter((g) => g.id !== group.id).map((g) => g.folder);
+      const folder = groupFolderName(name, [...others, ...files.pictures.flatMap((p) => folderOfPicture(p.path) ?? [])]);
+      if (folder !== group.folder) {
+        try {
+          await makeGroupFolder(dir, folder);
+          await removeFolderIfEmpty(dir, group.folder);
+          saveBoard(storeGroup(group, { id: `group:${folder}`, name, folder }));
+          return;
+        } catch {
+          // The folder keeps its name; the group still takes the new one.
+        }
+      }
+    }
+    saveBoard(storeGroup(group, { name }));
+  };
+
+  /** Takes a group's pictures back out into assets/, then removes the group and its emptied folder. Asks first. */
+  const ungroup = async (group: PlacedGroup) => {
+    if (group.members.length && confirming !== group.id) {
+      setConfirming(group.id);
+      window.setTimeout(() => setConfirming((c) => (c === group.id ? null : c)), 4000);
+      return;
+    }
+    setConfirming(null);
+    if (group.members.length && !projectRef.current.writable) {
+      notify(`${info.name} is open view-only. Allow editing to take pictures out of ${group.name}.`);
+      return;
+    }
+    let taken = files.pictures.map((p) => p.path);
+    let next = boardRef.current;
+    let moved = 0;
+    for (const id of group.members) {
+      const from = id.slice('picture:'.length);
+      const to = freeAssetPath(movedPath(from, null), taken);
+      try {
+        await movePicture(dir, from, to);
+        taken = [...taken.filter((t) => t !== from), to];
+        const place = next.cards[id];
+        next = forgetCard(next, id);
+        if (place) next = moveCard(next, pictureCardId(to), place.x, place.y);
+        moved += 1;
+      } catch (cause) {
+        notify(cause instanceof Error ? `Stopped: ${cause.message}` : 'Stopped moving pictures out.');
+        break;
+      }
+    }
+    saveBoard(removeGroup(next, group.id));
+    if (projectRef.current.writable) await removeFolderIfEmpty(dir, group.folder);
+    await refresh();
+    notify(moved ? `Took ${moved} ${moved === 1 ? 'picture' : 'pictures'} out of ${group.name} and removed the group.` : `Removed ${group.name}.`);
+  };
 
   // --- pictures in ---
   const picker = useRef<HTMLInputElement | null>(null);
@@ -702,6 +895,53 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         }}
       >
         <div class="pb-world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+          {groups.map((g) => {
+            const count = g.members.length;
+            const confirm = confirming === g.id;
+            return (
+              <div key={g.id} class={`pb-group ${dropTarget === g.id ? 'drop' : ''} ${groupDrag?.id === g.id ? 'lifted' : ''}`} style={{ left: g.x, top: g.y, width: g.w, height: g.h }}>
+                <header class="pb-group-head" data-group-head={g.id} title={`Drag to move ${g.name} and everything in it. Its pictures are the files in assets/${g.folder}/.`}>
+                  {renaming === g.id ? (
+                    <input
+                      class="pb-group-input"
+                      defaultValue={g.name}
+                      maxLength={60}
+                      aria-label="Group name"
+                      ref={(el) => {
+                        if (el && document.activeElement !== el) {
+                          el.focus();
+                          el.select();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        const input = e.currentTarget;
+                        if (e.key === 'Escape') input.value = g.name;
+                        if (e.key === 'Enter' || e.key === 'Escape') input.blur();
+                      }}
+                      onBlur={(e) => void renameGroup(g, e.currentTarget.value)}
+                    />
+                  ) : (
+                    <b class="pb-group-name" title="Double-click to rename" onDblClick={() => setRenaming(g.id)}>
+                      {g.name}
+                    </b>
+                  )}
+                  <span class="pb-group-folder">
+                    assets/{g.folder}/ · {count} {count === 1 ? 'picture' : 'pictures'}
+                  </span>
+                  <button
+                    class={`pb-group-x ${confirm ? 'confirm' : ''}`}
+                    title={count ? `Take ${count === 1 ? 'its picture' : `its ${count} pictures`} back out into assets/, and remove ${g.name}` : `Remove ${g.name}`}
+                    aria-label={`Remove ${g.name}`}
+                    onClick={() => void ungroup(g)}
+                  >
+                    {confirm ? `Move ${count} out` : '✕'}
+                  </button>
+                </header>
+                <span class="pb-group-resize" data-group-resize={g.id} title="Drag to resize" />
+              </div>
+            );
+          })}
           <svg class="pb-links" width="1" height="1" aria-hidden="true">
             {links.map((link) => {
               const a = rects.get(link.from);
@@ -775,8 +1015,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         </div>
       </div>
 
+      {dropTarget === 'out' && <div class="pb-drop-out">Let go to take it out of its group, into assets/</div>}
+      {dropTarget && dropTarget !== 'out' && (
+        <div class="pb-drop-out">Let go to file it in {layout.groups.find((g) => g.id === dropTarget)?.name ?? 'the group'}</div>
+      )}
       {!files.read && <div class="pb-empty pb-reading">Reading {dir.name}…</div>}
-      {files.read && cards.length === 0 && missing.length === 0 && (
+      {files.read && cards.length === 0 && missing.length === 0 && groups.length === 0 && (
         <div class="pb-empty">
           <b>{info.name} is empty.</b>
           <span>Make a frame or an email, or drop pictures here. Everything in the folder shows up on this board.</span>
@@ -812,7 +1056,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         </button>
       </div>
 
-      <div class="pb-chrome pb-hint">Drag cards to arrange · double-click to open · drop pictures to add them</div>
+      <div class="pb-chrome pb-hint">Drag cards to arrange · drop a picture in a group to file it there · double-click to open</div>
       <div class="pb-chrome pb-dock">
         <button class="pb-dock-btn" title="Open Template Studio on this project" onClick={() => openTool('index.html')}>
           <span class="pb-dock-icon email" aria-hidden="true">
@@ -840,6 +1084,14 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             </svg>
           </span>
           Add pictures
+        </button>
+        <button class="pb-dock-btn" disabled={!project.writable} title={project.writable ? 'A group is a folder in assets/: drop pictures in to file them there' : 'Allow editing to add a group'} onClick={() => void newGroup()}>
+          <span class="pb-dock-icon group" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+          </span>
+          New group
         </button>
         <span class="fig-sep" aria-hidden="true" />
         <span class="pb-dock-count">{counts}</span>

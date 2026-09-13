@@ -314,12 +314,47 @@ reads and writes its files, offers a picker over its pictures, and tells the boa
 - **Template Studio's frame list** shows the open project's frames only. Loose frames appear only when the
   project takes them in. Any frame the email already follows always stays listed.
 
+### Groups on the board
+
+> "I make a frame and name it 'social media'." (the board plan's B3, called a group on the board so it is not
+> mistaken for a Freeform frame)
+
+A group is a named region of the board that is a folder under `assets/`. It belongs to a group because its file
+is in the group's folder, whatever the region looks like. `board.json` keeps each group's name, folder, place
+and size. The rules are in `template-studio/src/model/project.ts` and `src/model/asset-moves.ts`.
+
+- **Making one.**
+  - **New group.** New group in the dock makes `assets/group-n/`, puts the group in the middle of the view,
+    and opens its name for typing. While a group is empty, renaming it renames its folder too.
+  - **From Finder.** A folder made in Finder or Drive gets a group of its own, sized for its pictures, in a
+    row below everything else.
+- **Filing a picture.**
+  - **Into a group.** Drag the picture over a group; the group lights up, and letting go moves the file into
+    the group's folder.
+  - **Out of a group.** Dragging it out of every group moves it back into `assets/`.
+  - **References follow.** The picture is renamed in every email that shows it (image blocks and freeform
+    layers), in every frame file, and in the recipes of whatever made it or was made from it.
+  - **A safe order.** The copy is written first and the original removed last, so a move that stops half-way
+    leaves two copies rather than none.
+  - **Frames update everywhere.** A rewritten frame file is dated now, so every browser that keeps the frame
+    takes the new copy.
+- **Arranging.**
+  - **Moving.** Drag a group's header to move it, with its pictures and anything else sitting inside it.
+  - **Resizing.** Drag the corner to resize. A group is always drawn big enough for its members.
+- **Removing.** ✕ asks once, then takes the pictures back out into `assets/`, removes the group, and deletes
+  its folder if nothing is left in it.
+- **Tools.** Riso prints into the folder its picture is in, so a photo in Social media prints into Social
+  media.
+
 A type made from an existing project, "save this project as a type", is the natural next step. It needs frames
 and the emails that follow them given new keys on the way, so two projects never share a frame.
 
 **Not yet:**
 - The copy deck (phases 2 to 5).
-- Frames as folders on the board (B3, B4).
+- Saving into a chosen group from the tools (B4). Riso prints beside its picture; ink bleed saves into `assets/`.
+- Renaming a group's folder once it has pictures. The group takes the new name, and its folder keeps the old one.
+- An email open in Template Studio while one of its pictures is moved keeps the old name until it is reopened.
+  Saving it first shows the usual "changed on disk" warning.
 - Image effects and split flap saving into the project. They can load `project.js` the same way.
 - Thumbnails written on save; the board draws live, and only what is in view.
 - Two machines editing the same frame at once is last save wins, with no both-changed prompt.
