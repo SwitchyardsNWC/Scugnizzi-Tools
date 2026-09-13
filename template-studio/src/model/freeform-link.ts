@@ -64,16 +64,27 @@ export function readAppFrame(raw: string | null, key = FREEFORM_APP_FRAME): AppF
  * Every frame the Freeform app keeps, in its order, named as its index names them. A frame whose drawing
  * cannot be read is left out. With no index yet, the one frame kept before there were frames.
  */
-export function readAppFrames(get: (key: string) => string | null): AppFrame[] {
+export function readAppFrames(get: (key: string) => string | null, scope: FrameScope | null = null, keep: string[] = []): AppFrame[] {
   const index = readFrameIndex(get(FRAMES_INDEX));
   if (!index) {
     const one = readAppFrame(get(FREEFORM_APP_FRAME));
     return one ? [{ ...one, name: 'Frame 1' }] : [];
   }
   return index.frames.flatMap((entry) => {
+    if (scope && entry.project !== scope.project && !(scope.adopts && !entry.project) && !keep.includes(entry.key)) return [];
     const frame = readAppFrame(get(entry.key), entry.key);
     return frame ? [{ ...frame, name: entry.name }] : [];
   });
+}
+
+/**
+ * The open project, for the frames Template Studio offers: its own frames, and loose ones when it takes those in
+ * (a folder opened as it was, not one created from a type). `readAppFrames` also keeps any frame an email already
+ * follows, so a link is never hidden by the project it sits in.
+ */
+export interface FrameScope {
+  project: string;
+  adopts: boolean;
 }
 
 /** Every freeform block in a template that follows a Freeform app frame. */

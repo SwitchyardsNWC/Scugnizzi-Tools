@@ -11,6 +11,7 @@
 //
 // Pure, so what the board shows for a folder is decided here and tested on plain data.
 
+import type { ToolRecipe } from './tool-recipes.ts';
 import type { Block, Template } from './types.ts';
 
 export const PROJECT_FILE = 'project.json';
@@ -56,6 +57,63 @@ export const newProjectInfo = (folderName: string, id: string, now = Date.now())
 });
 
 export const projectJson = (info: ProjectInfo): string => `${JSON.stringify(info, null, 2)}\n`;
+
+// --- the launch file ------------------------------------------------------------------------------------------
+//
+// Jared: "is there a way to create a .scug file that lives in a project folder that when clicked on launches
+// the dashboard in a browser."
+//
+// Every project folder gets `<name>.scug`. With the tools installed as a Chrome app, Finder opens the file
+// with the app, and the Project page opens the project it names. The file carries the project's id, not its
+// folder: a page can only reach a folder through a handle Chrome already stored for it, so the id is what the
+// page looks the folder up by, and it asks for the folder once when it has never seen it.
+
+export const LAUNCHER_EXT = '.scug';
+
+export interface Launcher {
+  version: 1;
+  id: string;
+  name: string;
+  /** The Project page on the site that wrote it, for anyone who opens the file without the app. */
+  open: string;
+}
+
+export const LAUNCHER_NOTE =
+  'Double-click this file to open the project in Scugnizzi Tools. It works once the tools are installed as an app from Chrome: open the Project tool and choose Install.';
+
+export const launcherJson = (info: ProjectInfo, open: string): string =>
+  `${JSON.stringify({ scug: 1, id: info.id, name: info.name, open, note: LAUNCHER_NOTE }, null, 2)}\n`;
+
+export function readLauncher(raw: string | null): Launcher | null {
+  type Raw = { scug?: unknown; id?: unknown; name?: unknown; open?: unknown };
+  let value: Raw | null = null;
+  try {
+    value = raw ? (JSON.parse(raw) as Raw) : null;
+  } catch {
+    return null;
+  }
+  if (!value || value.scug !== 1 || typeof value.id !== 'string' || !value.id) return null;
+  return {
+    version: 1,
+    id: value.id,
+    name: (typeof value.name === 'string' ? value.name.trim().slice(0, 80) : '') || 'Project',
+    open: typeof value.open === 'string' ? value.open : '',
+  };
+}
+
+export const isLauncherFile = (fileName: string): boolean => fileName.toLowerCase().endsWith(LAUNCHER_EXT) && !fileName.startsWith('.');
+
+/** `Spring launch.scug`: the project's name as a file name any file system takes. */
+export function launcherFileName(name: string): string {
+  const stem =
+    name
+      .replace(/[\\/:*?"<>|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s.]+|[\s.]+$/g, '')
+      .slice(0, 80)
+      .trim() || 'Project';
+  return stem + LAUNCHER_EXT;
+}
 
 // --- cards --------------------------------------------------------------------------------------------------
 
@@ -221,8 +279,11 @@ export function withPlaces(board: BoardDoc, cards: PlacedCard[]): BoardDoc {
 export interface CardLink {
   from: string;
   to: string;
-  /** `follows`: an email's freeform block is drawn in that frame. `uses`: a picture appears in it. */
-  kind: 'follows' | 'uses';
+  /**
+   * `follows`: an email's freeform block is drawn in that frame. `uses`: a picture appears in it. `made`: a tool made
+   * this picture from that one (model/tool-recipes.ts).
+   */
+  kind: 'follows' | 'uses' | 'made';
 }
 
 function* blocksOf(template: Template): Generator<Block> {
@@ -238,13 +299,14 @@ export function projectLinks(
   emails: Array<{ id: string; template: Template }>,
   frames: Array<{ id: string; key: string; template: Template }>,
   pictures: Array<{ id: string; path: string }>,
+  recipes: ToolRecipe[] = [],
 ): CardLink[] {
   const frameByKey = new Map(frames.map((f) => [f.key, f.id]));
   const pictureByPath = new Map(pictures.map((p) => [p.path, p.id]));
   const out: CardLink[] = [];
   const seen = new Set<string>();
-  const add = (from: string | undefined, to: string, kind: CardLink['kind']) => {
-    if (!from || from === to || seen.has(`${from}>${to}`)) return;
+  const add = (from: string | undefined, to: string | undefined, kind: CardLink['kind']) => {
+    if (!from || !to || from === to || seen.has(`${from}>${to}`)) return;
     seen.add(`${from}>${to}`);
     out.push({ from, to, kind });
   };
@@ -260,5 +322,6 @@ export function projectLinks(
       for (const layer of block.layers ?? []) if (layer.kind === 'image') add(pictureByPath.get(layer.src), holder.id, 'uses');
     }
   }
+  for (const recipe of recipes) for (const source of recipe.sources) add(pictureByPath.get(source), pictureByPath.get(recipe.output), 'made');
   return out;
 }

@@ -260,16 +260,70 @@ board.
 
 "All five" is `templates/`, `frames/`, `assets/`, `design-systems/` and `exports/`.
 
+### Opening a project from Finder
+
+*Added 2026-09-13.*
+
+> "is there a way to create a .scug file that lives in a project folder that when clicked on launches the
+> dashboard in a browser. or better yet a local version of the webtool?"
+
+Every project folder holds `<name>.scug`, and the site installs as a Chrome app that opens that file type.
+Double-clicking the file in Finder opens the app on that project's board.
+
+- **The file.** JSON with the project's id, its name, the Project page's URL, and a line saying what it is for.
+  Create a project writes it, and a folder opened as it was gets one the first time it is open for editing. A
+  file written from the local server still names the live site.
+- **Why the id and not the folder.** A page can only reach a folder through a handle Chrome stored for it. So
+  every project this browser opens is remembered by id as well as as "the" project, and the launch looks the
+  folder up by the file's id. Found: the project opens, with the click Chrome wants after a restart. Not found:
+  the page asks for the folder once, and takes it only if its `project.json` carries the id or it holds the
+  launched file by name.
+- **The app.** `template-studio/public/manifest.webmanifest`, copied into `dist/`, with the whole site as its
+  scope, the dashboard as its start page, and `project.html` as the handler for `.scug`. Every page links it.
+  **Install as an app** is on the Project welcome and in the project menu when Chrome offers it. No service
+  worker: the app is always the site as deployed.
+- **Not the local app.** A real local app (Electron) would get the folder from the file's own path with no
+  permission clicks. It would need an adapter under every File System Access call and a signed build to
+  distribute, so it waits until the clicks are the actual pain.
+
+### Riso and ink bleed save into the project
+
+> "yup and then take whatever the next step is." (after: "Riso and ink bleed save into the project")
+
+The single-file tools load `project.js` from the site's root. It finds the project the board or Template
+Studio opened (the same stored handle), shows it in the tool banner with the one click Chrome may need,
+reads and writes its files, offers a picker over its pictures, and tells the board when something was saved.
+
+- **Riso.** **From the project…** loads a picture from `assets/`. **Save to project** writes the print into
+  `assets/` at the press size, as `<picture>-riso.png`. It writes a recipe beside it,
+  `riso/<name>.riso.json`, naming the picture it was printed from and holding the inks, press and seed.
+  Saving again writes over the same print, so the button says which file it saves to.
+- **Ink bleed.** The project's SVG pictures are stamps. A layer keeps a stamp as `project:assets/…`, so it
+  comes back after a reload, which a stamp dropped from the computer cannot. **Save to project** writes the
+  PNG into `assets/`, with a recipe in `ink-bleed/` naming the stamps it used and holding every setting.
+- **Recipes.** Both are `{ version: 1, tool, output, sources, settings, savedAt }`.
+  `template-studio/src/model/tool-recipes.ts` reads them.
+- **The board.**
+  - **Lines.** A pink line runs from each source picture to its result, and the result's card says which
+    tool made it.
+  - **Opening a result.** ↗ or a double-click opens it in its tool with its recipe (`?recipe=`), so the
+    settings come back.
+  - **Opening any other picture.** It opens in Riso (`?picture=`), or in ink bleed as a stamp for an SVG
+    (`?stamp=`).
+  - **Refreshing.** The board refreshes as soon as a tool saves.
+- **Template Studio's frame list** shows the open project's frames only. Loose frames appear only when the
+  project takes them in. Any frame the email already follows always stays listed.
+
 A type made from an existing project, "save this project as a type", is the natural next step. It needs frames
 and the emails that follow them given new keys on the way, so two projects never share a frame.
 
 **Not yet:**
 - The copy deck (phases 2 to 5).
 - Frames as folders on the board (B3, B4).
-- The single-file tools saving into the project (phase 1).
+- Image effects and split flap saving into the project. They can load `project.js` the same way.
 - Thumbnails written on save; the board draws live, and only what is in view.
 - Two machines editing the same frame at once is last save wins, with no both-changed prompt.
-- Template Studio's frame picker still lists every frame the browser keeps, not only the project's.
+- Riso prints at the press size (900 px on the long side), not the picture's full size.
 
 ## To decide first
 

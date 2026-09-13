@@ -16,6 +16,7 @@ import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import { projectType } from '../model/project-types.ts';
+import { recipesByOutput, RECIPE_TOOLS, toolAddress, type ToolRecipe } from '../model/tool-recipes.ts';
 import {
   BOARD_FILE,
   boardJson,
@@ -28,6 +29,7 @@ import {
   layoutBoard,
   moveCard,
   pictureCardId,
+  PROJECT_CHANNEL,
   projectLinks,
   readBoard,
   withPlaces,
@@ -41,8 +43,9 @@ import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/works
 import { loadKeptPictures } from '../app/kept-pictures.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
-import { listPictures, readText, writeFile, writePicture } from './folder.ts';
+import { listPictures, listRecipes, readText, writeFile, writePicture } from './folder.ts';
 import { copyKeptPictures, syncFrames } from './frame-sync.ts';
+import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
 import type { Project } from './useProject.ts';
 
@@ -117,11 +120,13 @@ interface Files {
   emails: EmailItem[];
   frames: FrameItem[];
   pictures: PictureItem[];
+  /** What Riso and Ink bleed made, and from what. */
+  recipes: ToolRecipe[];
   read: boolean;
 }
 
 function useProjectFiles(project: MutableRef<Project>, notify: (message: string) => void) {
-  const [files, setFiles] = useState<Files>({ emails: [], frames: [], pictures: [], read: false });
+  const [files, setFiles] = useState<Files>({ emails: [], frames: [], pictures: [], recipes: [], read: false });
   const [kept, setKept] = useState<AssetFile[]>([]);
   const cache = useRef({ emails: new Map<string, EmailItem>(), pictures: new Map<string, PictureItem>(), systems: '' });
   const busy = useRef(false);
@@ -139,10 +144,11 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
     busy.current = true;
     try {
       const ws = folderWorkspace(dir, writable);
-      const [list, systems, found] = await Promise.all([
+      const [list, systems, found, recipes] = await Promise.all([
         ws.list().catch(() => []),
         ws.designSystems().catch(() => ({})),
         listPictures(dir).catch(() => []),
+        listRecipes(dir).catch(() => [] as ToolRecipe[]),
       ]);
       const c = cache.current;
 
@@ -209,7 +215,7 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
       }
       for (const name of [...c.emails.keys()]) if (!list.some((f) => f.fileName === name)) c.emails.delete(name);
 
-      setFiles({ emails, frames, pictures, read: true });
+      setFiles({ emails, frames, pictures, recipes, read: true });
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : 'The project folder could not be read.');
     } finally {
@@ -307,6 +313,20 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     };
   }, [refreshAll]);
 
+  // A tool saved into the project (project.js): show it now rather than at the next look.
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(PROJECT_CHANNEL);
+      channel.onmessage = (event: MessageEvent) => {
+        if ((event.data as { type?: string } | null)?.type === 'saved') refreshAll();
+      };
+    } catch {
+      channel = null;
+    }
+    return () => channel?.close();
+  }, [refreshAll]);
+
   // --- layout ---
   const sources = useMemo<CardSource[]>(
     () => [
@@ -337,9 +357,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         files.emails.flatMap((e) => (e.template ? [{ id: e.id, template: e.template }] : [])),
         files.frames.map((f) => ({ id: f.id, key: f.key, template: f.template })),
         files.pictures.filter((p) => !p.rendered).map((p) => ({ id: p.id, path: p.path })),
+        files.recipes,
       ),
     [files],
   );
+  const recipeOf = useMemo(() => recipesByOutput(files.recipes), [files.recipes]);
 
   // --- printed frames ---
   const [prints, setPrints] = useState<Record<string, string>>({});
@@ -517,6 +539,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const frame = framesById.get(card.id);
       if (email) url = `index.html?open=${encodeURIComponent(email.fileName)}`;
       if (frame) url = `freeform.html?frame=${encodeURIComponent(frame.key)}`;
+      // A picture opens in the tool that made it, with its settings; otherwise in Riso, or Ink bleed for an SVG.
+      const picture = picturesById.get(card.id);
+      if (picture) url = toolAddress('../../', picture.path, recipeOf.get(picture.path));
       setSelected(card.id);
       animateTo(to, 420, () => {
         if (!url) return;
@@ -525,7 +550,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         window.setTimeout(() => animateTo(before, 420), 700);
       });
     },
-    [size, emailsById, framesById, animateTo],
+    [size, emailsById, framesById, picturesById, recipeOf, animateTo],
   );
 
   const onPointerDown = (event: PointerEvent) => {
@@ -712,6 +737,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             const email = emailsById.get(card.id);
             const frame = framesById.get(card.id);
             const picture = picturesById.get(card.id);
+            const madeBy = picture ? recipeOf.get(picture.path) : undefined;
             const live = isLive(card);
             const facts = email
               ? `${email.fileName} · saved ${ago(email.modified)}`
@@ -733,11 +759,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   <span class="pb-kind">{KIND_LABEL[card.kind]}</span>
                   <b class="pb-card-name">{card.name}</b>
                   {frame?.frame?.page.effects?.length ? <span class="pb-chip">Riso</span> : null}
-                  {card.kind !== 'picture' && (
-                    <button class="pb-card-open" title={card.kind === 'email' ? 'Open in Template Studio' : 'Open in Freeform'} aria-label={`Open ${card.name}`} onClick={() => openCard(card)}>
-                      ↗
-                    </button>
-                  )}
+                  {madeBy ? <span class={`pb-chip ${madeBy.tool}`}>{RECIPE_TOOLS[madeBy.tool].name}</span> : null}
+                  <button class="pb-card-open" title={openTitle(card, madeBy)} aria-label={`Open ${card.name}`} onClick={() => openCard(card)}>
+                    ↗
+                  </button>
                 </header>
                 <div class="pb-card-body">
                   {email && <EmailBody item={email} assets={assets} live={live} width={card.w} height={card.h - HEAD} />}
@@ -838,6 +863,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
 const KIND_LABEL: Record<CardKind, string> = { email: 'Email', frame: 'Frame', picture: 'Picture' };
 
+function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined): string {
+  if (card.kind === 'email') return 'Open in Template Studio';
+  if (card.kind === 'frame') return 'Open in Freeform';
+  if (madeBy) return `Open in ${RECIPE_TOOLS[madeBy.tool].name}, with the settings that made it`;
+  return /\.svg$/i.test(card.id) ? 'Stamp it in Ink bleed' : 'Open in Riso';
+}
+
 function missingName(id: string, kind: CardKind): string {
   const rest = id.slice(id.indexOf(':') + 1);
   if (kind === 'frame') return 'A frame';
@@ -896,6 +928,7 @@ function FrameBody({ item, assets, print, width, height }: { item: FrameItem; as
 
 function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: string; onCreate(): void }) {
   const [open, setOpen] = useState(false);
+  const install = useInstall();
   useEffect(() => {
     if (!open) return;
     const onDown = (event: PointerEvent) => {
@@ -929,6 +962,16 @@ function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: 
             </span>
           </div>
           <p class="pb-menu-note">Template Studio and Freeform open this folder too, on their own.</p>
+          {install.state === 'installable' && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                void install.install();
+              }}
+            >
+              Install as an app…
+            </button>
+          )}
           <button
             onClick={() => {
               setOpen(false);

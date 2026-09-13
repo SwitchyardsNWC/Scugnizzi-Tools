@@ -120,6 +120,7 @@
 <body>
 <script src="../tool-banner.js" data-tool="Ink bleed"></script>
 <script src="../tool-kit.js"></script>
+<script src="../project.js"></script>
 <div class="app">
   <aside>
     <h1>Ink Bleed</h1>
@@ -135,7 +136,7 @@
           <button id="rescan" class="icon" title="Re-read the assets folder">↻</button>
         </div>
         <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
-        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (↻ after adding files), or drop an .svg onto the paper.</p>
+        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (↻ after adding files), or drop an .svg onto the paper. With a project open, the SVG pictures in its assets are stamps too, and they come back after a reload.</p>
       </div>
     </details>
 
@@ -227,6 +228,7 @@
     <div class="stage fit" id="stage"><canvas id="canvas" width="600" height="1050"></canvas><div id="overlay"></div></div>
     <div class="footer">
       <div class="actions">
+        <button id="saveProject" class="primary" hidden>Save to project</button>
         <button id="download" class="primary">Download PNG</button>
         <button id="downloadGif" title="Six frames, each with a different random seed, looping">Download GIF</button>
         <button id="previewGif" title="Render the six frames and loop them here before saving">Preview GIF</button>
@@ -441,7 +443,12 @@ function getImage(url) {
   if (!img) {
     img = new Image(); imgCache.set(url, img);
     img.onload = () => { for (const L of state.layers) if (L.kind === 'svg' && L.asset === url) dirtyLayers.add(L.id); invalidate(); };
-    img.src = url;
+    if (url.startsWith('project:')) {
+      // A stamp from the project, read from its file once the project allows it. Until then the layer draws nothing.
+      const P = window.ScugnizziProject;
+      if (P) P.ready.then(() => P.readFile(url.slice('project:'.length))).then(f => { if (f) img.src = URL.createObjectURL(f); else imgCache.delete(url); });
+      else imgCache.delete(url);
+    } else img.src = url;
   }
   return img.complete && img.naturalWidth ? img : null;
 }
@@ -450,7 +457,13 @@ async function loadAssets() {
   try { const r = await fetch('assets/index.json?' + Date.now()); if (r.ok) names = await r.json(); } catch (e) {}
   if (!names) names = FALLBACK_ASSETS;
   const dropped = assets.filter(a => a.url.startsWith('blob:'));
-  assets = names.map(n => ({ name: n, url: 'assets/' + n })).concat(dropped);
+  // The open project's SVG pictures, kept on a layer as project:assets/… so they come back after a reload.
+  const P = window.ScugnizziProject;
+  let project = [];
+  if (P && (P.status === 'ready' || P.status === 'view-only')) {
+    try { project = (await P.pictures()).filter(p => /\.svg$/i.test(p.path)).map(p => ({ name: `${P.name} · ${p.path.slice('assets/'.length)}`, url: 'project:' + p.path })); } catch (e) {}
+  }
+  assets = names.map(n => ({ name: n, url: 'assets/' + n })).concat(project, dropped);
   fillAssetSelects();
 }
 function fillAssetSelects() {
@@ -1088,6 +1101,7 @@ function refreshAll() {
 // Export
 function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
 $('#download').addEventListener('click', () => {
+  renderNow();   // the paper as it stands, not as the last frame drew it
   canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ink-bleed-${canvas.width}x${canvas.height}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
 });
 // ---------- Animated GIF: six renders with different seeds so every random element boils ----------
@@ -1189,18 +1203,21 @@ invalidate('fields');
 // ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
 const ZOOMS = ['fit', '0.25', '0.5', '1', '2'];
 function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+// Puts a snapshot on the paper: ToolKit's undo and saved state, and a recipe from the project.
+function applyState(s) {
+  s.layers = (s.layers || []).filter(L => !(L.kind === 'svg' && String(L.asset).startsWith('blob:')));   // dropped files can't come back
+  if (!s.layers.length) s.layers = [newLayer(TEXT_LAYER, { text: DEFAULT_TEXT })];
+  for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s);
+  nextId = Math.max(0, ...state.layers.map(l => l.id)) + 1;
+  if (!state.layers.some(l => l.id === state.selected)) state.selected = state.layers[0].id;
+  refreshAll(); applyZoom(); invalidate('fields');
+}
 ToolKit.init({
   tool: 'ink-bleed', version: 1,
   getState: () => JSON.parse(JSON.stringify(state, (k, v) => k.startsWith('_') ? undefined : v)),
-  setState: s => {
-    s.layers = (s.layers || []).filter(L => !(L.kind === 'svg' && String(L.asset).startsWith('blob:')));   // dropped files can't come back
-    if (!s.layers.length) s.layers = [newLayer(TEXT_LAYER, { text: DEFAULT_TEXT })];
-    for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s);
-    nextId = Math.max(0, ...state.layers.map(l => l.id)) + 1;
-    if (!state.layers.some(l => l.id === state.selected)) state.selected = state.layers[0].id;
-    refreshAll(); applyZoom(); invalidate('fields');
-  },
+  setState: applyState,
   defaults: () => JSON.parse(JSON.stringify(DEFAULT_STATE)),
+  onReset: () => forgetMade(),
 });
 ToolKit.register('mod+s', 'Download PNG', () => $('#download').click(), { group: 'Export' });
 ToolKit.register('mod+shift+s', 'Download animated GIF', () => $('#downloadGif').click(), { group: 'Export' });
@@ -1224,6 +1241,95 @@ PRESETS.forEach((p, i) => ToolKit.register(String(i + 1), `Look: ${p.name}`, () 
 ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
 ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
 ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
+
+// ---------- The project ----------
+// With a project open (../project.js), its SVG pictures are stamps (see loadAssets). Save to project writes the PNG
+// into its assets, with a recipe in ink-bleed/ naming the stamps it used and holding every setting; the project board
+// draws the stamps' lines to the result, and opens the result here again from that recipe.
+// The board's addresses: ?stamp=assets/logo.svg and ?recipe=ink-bleed/card.ink-bleed.json.
+const Project = window.ScugnizziProject;
+const address = new URLSearchParams(location.search);
+const MADE_KEY = 'scuggnizzi.ink-bleed.made';
+// Where this paper is saved in the project. Kept for this tab, so a reload goes on saving over the same file.
+let made = (() => { if (!Project || address.get('recipe')) return null; try { return JSON.parse(sessionStorage.getItem(MADE_KEY) || 'null'); } catch (e) { return null; } })();
+function keepMade() { try { if (made) sessionStorage.setItem(MADE_KEY, JSON.stringify(made)); else sessionStorage.removeItem(MADE_KEY); } catch (e) {} }
+function forgetMade() { made = null; keepMade(); syncProject(); }
+const stemOf = p => p.split('/').pop().replace(/\.[^.]+$/, '');
+const slugOf = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'ink-bleed';
+function syncProject() {
+  const on = Boolean(Project && ['ready', 'view-only', 'asking'].includes(Project.status));
+  const save = $('#saveProject');
+  save.hidden = !on;
+  $('#download').classList.toggle('primary', !on);
+  if (!on) return;
+  save.textContent = made && made.output ? `Save to ${made.output.split('/').pop()}` : 'Save to project';
+  save.title = Project.status !== 'ready' ? `Chrome needs one click to let this page save into ${Project.name}`
+    : made && made.output ? `Save over ${made.output} in ${Project.name}, with its settings in ${made.recipe}`
+    : `Save the PNG into ${Project.name}/assets, with its settings in ink-bleed/`;
+}
+const afterRestore = () => new Promise(r => { const go = () => setTimeout(r, 0); if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true }); else go(); });
+async function openFromAddress() {
+  await afterRestore();
+  const recipePath = address.get('recipe'), stamp = address.get('stamp');
+  history.replaceState(null, '', location.pathname + location.hash);
+  await loadAssets();
+  if (recipePath) {
+    const recipe = await Project.readJson(recipePath);
+    if (!recipe || recipe.tool !== 'ink-bleed' || !recipe.settings || !Array.isArray(recipe.settings.layers)) { Project.toast(`${recipePath} is not an Ink bleed recipe this page can read.`); return; }
+    applyState(JSON.parse(JSON.stringify(recipe.settings)));
+    ToolKit.commit();
+    made = { output: recipe.output || null, recipe: recipePath }; keepMade();
+  } else if (stamp) {
+    const base = sel() || SVG_LAYER;
+    addLayer(newLayer(SVG_LAYER, { asset: 'project:' + stamp, w: Math.min(1.2, state.wIn * 0.4), inkColor: base.inkColor, bleed: base.bleed, copy: base.copy }));
+    Project.toast(`${stamp.split('/').pop()} is on the paper as a stamp.`);
+  }
+  syncProject();
+}
+if (Project) {
+  const wanted = Boolean(address.get('recipe') || address.get('stamp'));
+  let started = false, told = false, was = null;
+  Project.onChange(() => {
+    syncProject();
+    const open = Project.status === 'ready' || Project.status === 'view-only';
+    if (open && !(was === 'ready' || was === 'view-only')) {
+      // The project just became readable: its stamps join the list, and layers waiting on one draw it.
+      loadAssets();
+      for (const L of state.layers) if (L.kind === 'svg' && String(L.asset).startsWith('project:')) { imgCache.delete(L.asset); dirtyLayers.add(L.id); }
+      invalidate('layer');
+    }
+    was = Project.status;
+    if (!wanted || started) return;
+    if (open) { started = true; openFromAddress(); }
+    else if (Project.status === 'asking' && !told) { told = true; Project.toast(`Reopen ${Project.name} in the bar above to bring it in.`); }
+    else if (Project.status === 'none' || Project.status === 'unsupported') { started = true; Project.toast('No project is open, so this address has nothing to load.'); }
+  });
+}
+$('#saveProject').addEventListener('click', async () => {
+  const btn = $('#saveProject');
+  if (!Project || btn.disabled) return;
+  if (Project.status !== 'ready' && !(await Project.allow())) { Project.toast(`Chrome did not allow saving into ${Project.name}.`); return; }
+  btn.disabled = true;
+  try {
+    const words = (state.layers.find(L => L.kind === 'text' && L.text.trim()) || { text: '' }).text.replace(/[()]/g, ' ').trim().split('\n')[0];
+    const output = made && made.output ? made.output : await Project.freePath('assets', slugOf(words.slice(0, 40)), '.png');
+    const recipe = made && made.recipe ? made.recipe : await Project.freePath('ink-bleed', stemOf(output), '.ink-bleed.json');
+    const sources = [...new Set(state.layers.filter(L => L.kind === 'svg' && String(L.asset).startsWith('project:')).map(L => L.asset.slice('project:'.length)))];
+    const settings = JSON.parse(JSON.stringify(state, (k, v) => k.startsWith('_') ? undefined : v));
+    // The paper as it stands now, not as the last frame drew it: a change still waiting on its frame would otherwise
+    // be missing from the file, and a tab in the background draws nothing at all until it is looked at.
+    renderNow();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    await Project.writeFile(output, blob);
+    await Project.writeFile(recipe, JSON.stringify({ version: 1, tool: 'ink-bleed', output, sources, settings, size: [canvas.width, canvas.height], savedAt: Date.now() }, null, 2) + '\n');
+    made = { output, recipe }; keepMade();
+    Project.saved([output, recipe]);
+    const lost = state.layers.some(L => L.kind === 'svg' && String(L.asset).startsWith('blob:'));
+    Project.toast(`Saved ${output.split('/').pop()} into ${Project.name}.${lost ? ' A stamp dropped from the computer is not in the project, so reopening this leaves it out. Put the .svg in the project’s assets to keep it.' : ''}`);
+    syncProject();
+  } catch (e) { Project.toast(`Not saved: ${e && e.message ? e.message : e}`); }
+  finally { btn.disabled = false; }
+});
 </script>
 </body>
 </html>

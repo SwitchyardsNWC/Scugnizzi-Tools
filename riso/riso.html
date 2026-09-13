@@ -105,6 +105,7 @@
 <script src="../tool-banner.js" data-tool="Riso separator"></script>
 <script src="../tool-kit.js"></script>
 <script src="../effects/riso.js"></script>
+<script src="../project.js"></script>
 <div class="app">
   <aside>
     <h1>Riso separator</h1>
@@ -116,6 +117,10 @@
         <div class="drop" id="drop"><b>Drop an image here</b>or click to choose · O</div>
         <input type="file" id="file" accept="image/*" hidden>
         <div class="row" style="margin-top:8px"><label></label><button id="sample">Use the sample image</button></div>
+        <div id="projectRow" hidden>
+          <div class="row"><label></label><button id="fromProject">From the project…</button></div>
+          <p class="hint">Save to project puts the print beside its picture in the project's assets, at the press size, with its settings in riso/.</p>
+        </div>
         <p class="hint">Photos and flat graphics both work. The image is downscaled to 900 px for the press and kept in this browser.</p>
       </div>
     </details>
@@ -193,6 +198,7 @@
     <div class="stage fit" id="stage"><canvas id="canvas" width="600" height="450"></canvas></div>
     <div class="footer">
       <div class="actions">
+        <button id="saveProject" class="primary" hidden>Save to project</button>
         <button id="download" class="primary">Download print</button>
         <button id="downloadSeps" title="One black-on-white PNG per ink, ready for the duplicator">Download separations</button>
         <button id="copyImg">Copy image</button>
@@ -251,6 +257,7 @@ function useImage(img, name, remember, max = MAX) {
 }
 function loadFile(file) {
   if (!file || !file.type.startsWith('image/')) return;
+  forgetProjectPicture();
   const reader = new FileReader();
   reader.onload = e => { const img = new Image(); img.onload = () => useImage(img, file.name, true); img.src = e.target.result; };
   reader.readAsDataURL(file);
@@ -477,7 +484,7 @@ $('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Ma
 $('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
 $('#drop').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
-$('#sample').addEventListener('click', sampleImage);
+$('#sample').addEventListener('click', () => { forgetProjectPicture(); sampleImage(); });
 for (const el of [$('#drop'), $('#stage')]) {
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add(el.id === 'drop' ? 'over' : 'dropping'); });
   el.addEventListener('dragleave', () => el.classList.remove('over', 'dropping'));
@@ -537,7 +544,7 @@ ToolKit.init({
   getState: () => JSON.parse(JSON.stringify(state)),
   setState: s => { for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s); if (!state.inks.length) state.inks = [{ ...INK_DEFAULT }]; state.selected = Math.min(state.selected, state.inks.length - 1); covCache.clear(); refreshAll(); invalidate(); },
   defaults: () => JSON.parse(JSON.stringify(DEFAULTS)),
-  onReset: () => ToolKit.saveAux('image', null),
+  onReset: () => { ToolKit.saveAux('image', null); forgetProjectPicture(); },
 });
 ToolKit.register('o', 'Open an image', () => $('#file').click(), { group: 'Image' });
 for (let i = 1; i <= 3; i++) ToolKit.register(String(i), i === 1 ? 'Select ink 1–3' : `Select ink ${i}`, () => { if (i - 1 < state.inks.length) selectInk(i - 1); }, { group: 'Inks', hidden: i > 1 });
@@ -553,6 +560,105 @@ ToolKit.register('mod+shift+c', 'Copy image', () => $('#copyImg').click(), { gro
 ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
 ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
 ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
+
+// ---------- The project ----------
+// With a project open (../project.js), a picture can come from its assets, and Save to project writes the print
+// back beside it, with a recipe in riso/ naming the picture it was printed from and every setting. The project board
+// draws that as a line from the picture to the print, and opens the print here again with its settings.
+// The board's addresses: ?picture=assets/photo.png and ?recipe=riso/photo-riso.riso.json. A hand-off from Freeform
+// is its own thing and leaves all of this out.
+const Project = handoff ? null : window.ScugnizziProject;
+const address = new URLSearchParams(location.search);
+const fromAddress = Boolean(Project && (address.get('picture') || address.get('recipe')));
+const MADE_KEY = 'scuggnizzi.riso.made';
+// Where the picture on the press came from and where its print is saved. Kept for this tab, so a reload goes on
+// saving over the same file.
+let made = (() => { if (!Project || fromAddress) return null; try { return JSON.parse(sessionStorage.getItem(MADE_KEY) || 'null'); } catch (e) { return null; } })();
+function keepMade() { try { if (made) sessionStorage.setItem(MADE_KEY, JSON.stringify(made)); else sessionStorage.removeItem(MADE_KEY); } catch (e) {} }
+function forgetProjectPicture() { made = null; keepMade(); syncProject(); }
+const stemOf = p => p.split('/').pop().replace(/\.[^.]+$/, '');
+const slugOf = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'print';
+function syncProject() {
+  const on = Boolean(Project && ['ready', 'view-only', 'asking'].includes(Project.status));
+  const save = $('#saveProject');
+  $('#projectRow').hidden = !on; save.hidden = !on;
+  $('#download').classList.toggle('primary', !on);
+  if (!on) return;
+  save.textContent = made && made.output ? `Save to ${made.output.split('/').pop()}` : 'Save to project';
+  save.title = Project.status !== 'ready' ? `Chrome needs one click to let this page save into ${Project.name}`
+    : made && made.output ? `Save over ${made.output} in ${Project.name}, with its settings in ${made.recipe}`
+    : `Save the print into ${Project.name}/assets, with its settings in riso/`;
+}
+function keptOrSample() { const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
+function projectImage(path) {
+  return Project.readFile(path).then(file => new Promise(resolve => {
+    if (!file) { Project.toast(`${path} is not in ${Project.name}.`); resolve(false); return; }
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { useImage(img, file.name, true); URL.revokeObjectURL(url); resolve(true); };
+    img.onerror = () => { URL.revokeObjectURL(url); Project.toast(`${path} could not be read as a picture.`); resolve(false); };
+    img.src = url;
+  }));
+}
+function applySettings(s) {
+  if (!s) return;
+  if (Array.isArray(s.inks) && s.inks.length) state.inks = JSON.parse(JSON.stringify(s.inks)).slice(0, 3);
+  if (s.press) Object.assign(state.press, s.press);
+  if (s.seed) state.seed = Math.max(1, parseInt(s.seed, 10) || 1);
+  state.selected = 0; covCache.clear(); refreshAll(); invalidate();
+}
+// After ToolKit has put back the last session's settings, which it does once the page has loaded: the address wins.
+const afterRestore = () => new Promise(r => { const go = () => setTimeout(r, 0); if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true }); else go(); });
+async function openFromAddress() {
+  await afterRestore();
+  const recipePath = address.get('recipe'), picture = address.get('picture');
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (recipePath) {
+    const recipe = await Project.readJson(recipePath);
+    const source = recipe && recipe.tool === 'riso' && Array.isArray(recipe.sources) ? recipe.sources[0] : null;
+    if (!source) { Project.toast(`${recipePath} is not a Riso recipe that names its picture.`); keptOrSample(); return; }
+    if (!(await projectImage(source))) { keptOrSample(); return; }
+    applySettings(recipe.settings);
+    made = { source, output: recipe.output || null, recipe: recipePath };
+  } else if (await projectImage(picture)) {
+    made = { source: picture, output: null, recipe: null };
+  } else keptOrSample();
+  keepMade(); syncProject();
+}
+if (Project) {
+  let started = false, told = false;
+  Project.onChange(() => {
+    syncProject();
+    if (!fromAddress || started) return;
+    if (Project.status === 'ready' || Project.status === 'view-only') { started = true; openFromAddress(); }
+    else if (Project.status === 'asking' && !told) { told = true; Project.toast(`Reopen ${Project.name} in the bar above to load the picture.`); }
+    else if (Project.status === 'none' || Project.status === 'unsupported') { started = true; Project.toast('No project is open, so the picture this address names cannot be loaded.'); keptOrSample(); }
+  });
+}
+$('#fromProject').addEventListener('click', async () => {
+  if (!Project) return;
+  const pic = await Project.choosePicture({ svg: false, title: `A picture from ${Project.name}` });
+  if (!pic || !(await projectImage(pic.path))) return;
+  made = { source: pic.path, output: null, recipe: null }; keepMade(); syncProject();
+});
+$('#saveProject').addEventListener('click', async () => {
+  const btn = $('#saveProject');
+  if (!Project || !src || btn.disabled) return;
+  if (Project.status !== 'ready' && !(await Project.allow())) { Project.toast(`Chrome did not allow saving into ${Project.name}.`); return; }
+  btn.disabled = true;
+  try {
+    const output = made && made.output ? made.output : await Project.freePath('assets', `${slugOf(stemOf(made && made.source ? made.source : src.name))}-riso`, '.png');
+    const recipe = made && made.recipe ? made.recipe : await Project.freePath('riso', stemOf(output), '.riso.json');
+    const sources = made && made.source ? [made.source] : [];
+    const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png'));
+    await Project.writeFile(output, blob);
+    await Project.writeFile(recipe, JSON.stringify({ version: 1, tool: 'riso', output, sources, settings: { inks: state.inks, press: state.press, seed: state.seed }, size: [src.w, src.h], savedAt: Date.now() }, null, 2) + '\n');
+    made = { source: made ? made.source : null, output, recipe }; keepMade();
+    Project.saved([output, recipe]);
+    Project.toast(`Saved ${output.split('/').pop()} into ${Project.name}.${sources.length ? '' : ' Its picture came from this computer, not the project, so the board shows the print on its own.'}`);
+    syncProject();
+  } catch (e) { Project.toast(`Not saved: ${e && e.message ? e.message : e}`); }
+  finally { btn.disabled = false; }
+});
 
 // ---------- Go ----------
 refreshAll(); updateMeta(); updateHints(); updateRecipe();
@@ -589,7 +695,7 @@ if (handoff) {
     }
   });
   const img = new Image(); img.onload = () => useImage(img, handoff.title || 'Freeform', false, Infinity); img.src = handoff.image;
-} else { const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
+} else if (!fromAddress) keptOrSample();
 </script>
 </body>
 </html>

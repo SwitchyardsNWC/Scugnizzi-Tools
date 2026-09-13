@@ -4,8 +4,19 @@
 // same folder, and the board uses it for those. This is the rest: the files that exist because the folder is
 // a project, not only a place emails are kept.
 
-import { newProjectInfo, PROJECT_FILE, projectJson, readProjectInfo, type ProjectInfo } from '../model/project.ts';
+import {
+  isLauncherFile,
+  launcherFileName,
+  launcherJson,
+  newProjectInfo,
+  PROJECT_FILE,
+  projectJson,
+  readProjectInfo,
+  type Launcher,
+  type ProjectInfo,
+} from '../model/project.ts';
 import type { ProjectPlan } from '../model/project-types.ts';
+import { readRecipe, RECIPE_TOOLS, type RecipeTool, type ToolRecipe } from '../model/tool-recipes.ts';
 import { isImageFile } from '../workspace/workspace.ts';
 
 type Dir = FileSystemDirectoryHandle;
@@ -84,6 +95,53 @@ export async function readProject(dir: Dir, writable: boolean): Promise<ProjectI
   return info;
 }
 
+// --- the launch file -----------------------------------------------------------------------------------------
+
+/** The names of the `.scug` files at the top of the folder. */
+export async function listLaunchers(dir: Dir): Promise<string[]> {
+  const out: string[] = [];
+  try {
+    for await (const [name, entry] of dir.entries()) if (entry.kind === 'file' && isLauncherFile(name)) out.push(name);
+  } catch {
+    return out;
+  }
+  return out.sort();
+}
+
+/**
+ * Makes sure the project has a `.scug` file to open it from Finder. Written once, when a project is open for
+ * editing and has none, so a folder opened as it was gets one as a created project does. A file of any name
+ * counts: the one written on create is named for the project, and one renamed since is still the project's.
+ */
+export async function ensureLauncher(dir: Dir, info: ProjectInfo, openUrl: string): Promise<string | null> {
+  if ((await listLaunchers(dir)).length) return null;
+  const name = launcherFileName(info.name);
+  try {
+    await writeFile(dir, name, launcherJson(info, openUrl));
+  } catch {
+    return null;
+  }
+  return name;
+}
+
+/**
+ * Whether a folder someone chose is the one a launch file came from. Its project.json carrying the launcher's
+ * id settles it. Failing that, holding the launched file by name does: the file was in this folder. Null when
+ * it is, and otherwise what to tell the person.
+ */
+export async function launcherMismatch(dir: Dir, launcher: Launcher, fileName: string): Promise<string | null> {
+  const info = readProjectInfo((await readText(dir, PROJECT_FILE))?.text ?? null);
+  if (info?.id === launcher.id) return null;
+  try {
+    await dir.getFileHandle(fileName);
+    return null;
+  } catch {
+    // Not in this folder.
+  }
+  if (info) return `${dir.name} is “${info.name}”, a different project. Choose the folder that holds ${fileName}.`;
+  return `${dir.name} doesn't hold ${fileName}. Choose the folder the file is in.`;
+}
+
 // --- pictures -----------------------------------------------------------------------------------------------
 
 export interface PictureEntry {
@@ -117,6 +175,28 @@ export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
   };
   if (assets) await walk(assets, '', 3);
   return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// --- what tools made --------------------------------------------------------------------------------------------
+
+/** Every recipe Riso and Ink bleed wrote into the project (model/tool-recipes.ts). One that cannot be read is skipped. */
+export async function listRecipes(dir: Dir): Promise<ToolRecipe[]> {
+  const out: ToolRecipe[] = [];
+  for (const tool of Object.keys(RECIPE_TOOLS) as RecipeTool[]) {
+    const { dir: name, ext } = RECIPE_TOOLS[tool];
+    const folder = await childDir(dir, [name]);
+    if (!folder) continue;
+    for await (const [fileName, entry] of folder.entries()) {
+      if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
+      try {
+        const recipe = readRecipe(await (await (entry as FileSystemFileHandle).getFile()).text(), `${name}/${fileName}`);
+        if (recipe?.tool === tool) out.push(recipe);
+      } catch {
+        // Half-written or unreadable: the rest still count.
+      }
+    }
+  }
+  return out;
 }
 
 // --- creating a project -----------------------------------------------------------------------------------------

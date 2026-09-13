@@ -14,6 +14,7 @@ import {
   isCurrent,
   linkedBlocks,
   readAppFrames,
+  type FrameScope,
   readStudioPresence,
   STUDIO_PRESENCE,
   STUDIO_REQUEST,
@@ -42,6 +43,7 @@ import {
 } from '../workspace/workspace.ts';
 import { Preview, type DropSpot, type PreviewApi, type RowInfo, type RowMenuSpec } from './Preview.tsx';
 import { useProjectFolder } from './useProjectFolder.ts';
+import { readProject } from '../project/folder.ts';
 import { SHORTCUTS } from './slash.ts';
 import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
 import { InboxChrome } from './Inbox.tsx';
@@ -165,6 +167,31 @@ export function App() {
   const allAssets = useMemo(() => [...assets, ...kept.filter((k) => !assets.some((a) => a.name === k.name))], [assets, kept]);
   /** The Freeform app's frames, read from this site's storage (model/frame-store.ts, model/freeform-link.ts). */
   const [appFrames, setAppFrames] = useState<AppFrame[]>(readFreeformFrames);
+  /**
+   * With a project open, the frames it offers are that project's (model/freeform-link.ts): the browser keeps every
+   * project's frames, and a list of all of them was the other projects' clutter.
+   */
+  const [frameScope, setFrameScope] = useState<FrameScope | null>(null);
+  const frameScopeRef = useRef<FrameScope | null>(null);
+  frameScopeRef.current = frameScope;
+  useEffect(() => {
+    const dir = workspace?.handle;
+    if (!dir) {
+      setFrameScope(null);
+      return;
+    }
+    let cancelled = false;
+    readProject(dir, false)
+      .then((info) => {
+        if (!cancelled) setFrameScope({ project: info.id, adopts: !info.type });
+      })
+      .catch(() => {
+        if (!cancelled) setFrameScope(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
   /** Freeform pages with effects, printed, by block id: what the email canvas shows in their place (printed-preview.ts). */
   const [prints, setPrints] = useState<Record<string, { key: string; url: string }>>({});
   const [device, setDevice] = useState<Device>('desktop');
@@ -1129,9 +1156,17 @@ export function App() {
   // The Freeform app's frames, followed live: its tab writes on every change, and this tab hears it.
   const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:${f.name}`).join('|');
   const framesSignature = framesKey(appFrames);
+  // Frames this email already follows stay listed whatever project they belong to, so a link is never hidden.
+  const followedKeys = useRef<string[]>([]);
+  followedKeys.current = linkedBlocks(editor.template).flatMap((b) => (b.source ? [b.source.key] : []));
+  useEffect(() => {
+    const next = readFreeformFrames(frameScope, followedKeys.current);
+    setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameScope]);
   useEffect(() => {
     const read = () => {
-      const next = readFreeformFrames();
+      const next = readFreeformFrames(frameScopeRef.current, followedKeys.current);
       setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
     };
     const onStorage = (event: StorageEvent) => {
@@ -2144,9 +2179,9 @@ function SaveBadge({ editor, workspace }: { editor: ReturnType<typeof useEditor>
 }
 
 /** The Freeform app's frames, from this site's storage; none when it cannot be read. */
-function readFreeformFrames(): AppFrame[] {
+function readFreeformFrames(scope: FrameScope | null = null, keep: string[] = []): AppFrame[] {
   try {
-    return readAppFrames((key) => localStorage.getItem(key));
+    return readAppFrames((key) => localStorage.getItem(key), scope, keep);
   } catch {
     return [];
   }
