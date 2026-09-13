@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { newFrameId } from '../model/frame-store.ts';
 import { folderNote, planProject, PROJECT_TYPES } from '../model/project-types.ts';
 import { createProjectFolder, pickDestination } from './folder.ts';
+import { launcherUrl } from './launch.ts';
 
 type Dir = FileSystemDirectoryHandle;
 
@@ -70,7 +71,7 @@ export function CreateProject({ onClose, onCreated }: CreateProjectProps) {
 
   const plan = useMemo(() => {
     let n = 0;
-    return planProject(type, title, { id: 'preview', newId: () => `preview${(n += 1)}`, now: 0 });
+    return planProject(type, title, { id: 'preview', newId: () => `preview${(n += 1)}`, now: 0, launcherUrl: 'preview' });
   }, [type, title]);
 
   useEffect(() => {
@@ -99,7 +100,7 @@ export function CreateProject({ onClose, onCreated }: CreateProjectProps) {
     }
     setBusy(true);
     try {
-      const real = planProject(type, title, { id: `project:${crypto.randomUUID()}`, newId: () => newFrameId() });
+      const real = planProject(type, title, { id: `project:${crypto.randomUUID()}`, newId: () => newFrameId(), launcherUrl: launcherUrl() });
       const made = await createProjectFolder(dir, real);
       await onCreated(made, real.info.name, made.name === dir.name ? '' : dir.name);
     } catch (cause) {
@@ -110,6 +111,8 @@ export function CreateProject({ onClose, onCreated }: CreateProjectProps) {
   };
 
   const inFolder = (folder: string) => plan.files.filter((f) => f.path.startsWith(`${folder}/`)).map((f) => f.path.slice(folder.length + 1));
+  const atRoot = plan.files.filter((f) => !f.path.includes('/')).map((f) => f.path);
+  const rootNote = (file: string) => (file.endsWith('.scug') ? 'opens it from Finder' : '');
 
   return (
     <div class="cp-backdrop" onPointerDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
@@ -201,12 +204,12 @@ export function CreateProject({ onClose, onCreated }: CreateProjectProps) {
                     )}
                   </li>
                 ))}
-                <li>
-                  <code class="cp-file">project.json</code>
-                </li>
-                <li>
-                  <code class="cp-file">README.md</code>
-                </li>
+                {atRoot.map((file) => (
+                  <li key={file}>
+                    <code class="cp-file">{file}</code>
+                    {rootNote(file) && <span class="cp-note">{rootNote(file)}</span>}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

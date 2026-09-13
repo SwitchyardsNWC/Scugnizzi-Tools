@@ -1,0 +1,24 @@
+{
+  "id": "scugnizzi-tools",
+  "name": "Scugnizzi Tools",
+  "short_name": "Scugnizzi",
+  "description": "The Switchyards design team's tools: the project board, Template Studio, Freeform, and the single-file tools.",
+  "start_url": "../../index.html",
+  "scope": "../../",
+  "display": "standalone",
+  "background_color": "#1e1c19",
+  "theme_color": "#1e1c19",
+  "icons": [
+    { "src": "./icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "file_handlers": [
+    {
+      "action": "./project.html",
+      "accept": { "application/x-scugnizzi-project": [".scug"] },
+      "launch_type": "single-client"
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}

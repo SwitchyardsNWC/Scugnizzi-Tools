@@ -6,9 +6,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
-import { PROJECT_CHANNEL, type ProjectInfo } from '../model/project.ts';
-import { forgetFolderHandle, permissionOf, pickFolderHandle, recallFolderHandle, rememberFolderHandle, supportsFolders } from '../workspace/workspace.ts';
-import { readProject } from './folder.ts';
+import { PROJECT_CHANNEL, type Launcher, type ProjectInfo } from '../model/project.ts';
+import {
+  forgetFolderHandle,
+  permissionOf,
+  pickFolderHandle,
+  recallFolderHandle,
+  recallProjectFolder,
+  rememberFolderHandle,
+  rememberProjectFolder,
+  supportsFolders,
+} from '../workspace/workspace.ts';
+import { ensureLauncher, launcherMismatch, readProject } from './folder.ts';
+import { launcherUrl } from './launch.ts';
 
 type Dir = FileSystemDirectoryHandle;
 
@@ -34,6 +44,16 @@ export interface Project {
   /** The click Chrome needs to open a remembered folder again, or to allow editing one opened view-only. */
   allow(): Promise<boolean>;
   close(): Promise<void>;
+  /**
+   * Opens the project with this id from the folder this browser remembers for it, as a `.scug` launch file
+   * asks. False when no folder is remembered: the file's folder has to be chosen (`openFor`).
+   */
+  openById(id: string): Promise<boolean>;
+  /**
+   * Shows the picker for the folder a launch file came from, and opens it once it is that folder. Null when
+   * it opened or the picker was dismissed; otherwise what was wrong with the folder chosen.
+   */
+  openFor(launcher: Launcher, fileName: string): Promise<string | null>;
 }
 
 type State = Pick<Project, 'status' | 'dir' | 'info' | 'generation'>;
@@ -58,6 +78,11 @@ export function useProject(): Project {
       } catch {
         info = null;
       }
+    }
+    if (info) {
+      // Known by id from now on, so its .scug finds it; and given a .scug, so Finder can open it.
+      await rememberProjectFolder(info.id, dir);
+      if (status === 'ready') await ensureLauncher(dir, info, launcherUrl());
     }
     setState((s) => ({ status: info || status === 'asking' ? status : 'asking', dir, info, generation: s.generation + 1 }));
   }, []);
@@ -123,5 +148,31 @@ export function useProject(): Project {
     tell('closed');
   }, [settle]);
 
-  return { ...state, writable: state.status === 'ready', open, use, allow, close };
+  const openById = useCallback(
+    async (id: string) => {
+      const dir = await recallProjectFolder(id);
+      if (!dir) return false;
+      await rememberFolderHandle(dir);
+      await settle(dir);
+      tell('opened');
+      return true;
+    },
+    [settle],
+  );
+
+  const openFor = useCallback(
+    async (launcher: Launcher, fileName: string) => {
+      const dir = await pickFolderHandle({ remember: false });
+      if (!dir) return null;
+      const problem = await launcherMismatch(dir, launcher, fileName);
+      if (problem) return problem;
+      await rememberFolderHandle(dir);
+      await settle(dir);
+      tell('opened');
+      return null;
+    },
+    [settle],
+  );
+
+  return { ...state, writable: state.status === 'ready', open, use, allow, close, openById, openFor };
 }
