@@ -203,7 +203,14 @@ the selected layers as one picture and keeps them editable underneath.
   Double-click, or Edit in Freeform, opens the app in a new tab. A frame with effects brings the ground it sits on in
   the app, so its print is the same bytes in any email section; the email print and the app's print were checked
   by pixel fingerprint. Template Studio reads the pictures Freeform keeps in IndexedDB (`app/kept-pictures.ts`), so
-  the frame's photographs show. With no folder open, the browser now asks before leaving the page with unsaved edits. It shows the print once the
+  the frame's photographs show. With no folder open, the browser now asks before leaving the page with unsaved edits.
+- **And back** *(2026-09-13)*. "It pulls in the free form frame. but there is no way to go from freeform -> template
+  studio." An open Template Studio writes `scuggnizzi.studio.presence` (its tab id, its email, how many of its blocks
+  follow the frame) every 20 seconds, and takes it away when the tab closes. The Freeform app's pill beside Tools reads it:
+  **In Standard email** selects the linked block in that tab, **Send to Standard email** adds one above the footer, and
+  with no Template Studio open, **Use in Template Studio** opens it with `?freeform=link`, which adds the block on load.
+  Requests go through `scuggnizzi.studio.request`, addressed to one tab by id. Opened from Template Studio, Freeform
+  closes its own tab so you land back in the email. It shows the print once the
   picture is rendered and hosted, the same way Checks already track every freeform picture.
 
 | | Builds | Done when |

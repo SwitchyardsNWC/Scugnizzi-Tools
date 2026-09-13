@@ -126,3 +126,30 @@ describe('a linked print looks the same wherever the email puts it', () => {
     expect(isCurrent(drawn, plain)).toBe(true);
   });
 });
+
+describe('from the Freeform app to Template Studio', () => {
+  it('knows an open Template Studio only while it keeps saying so', async () => {
+    const { readStudioPresence, PRESENCE_FRESH_MS } = await import('../src/model/freeform-link.ts');
+    const raw = JSON.stringify({ tab: 't1', email: 'Standard email', linked: 1, at: 1000 });
+    expect(readStudioPresence(raw, 2000)).toEqual({ tab: 't1', email: 'Standard email', linked: 1, at: 1000 });
+    expect(readStudioPresence(raw, 1000 + PRESENCE_FRESH_MS + 1)).toBeNull();
+    expect(readStudioPresence('nope', 2000)).toBeNull();
+    expect(readStudioPresence(JSON.stringify({ email: 'x', at: 1000 }), 2000)).toBeNull();
+  });
+
+  it('adds the frame above the legal footer, linked, with ids of its own', async () => {
+    const { addFrameBlock } = await import('../src/model/freeform-link.ts');
+    const { blankTemplate } = await import('../src/model/starters.ts');
+    const email = blankTemplate();
+    const frame = readAppFrame(JSON.stringify(doc(appFrame(), 'Freeform')))!;
+    const added = addFrameBlock(email, frame, 'ffx-');
+    expect(added.template.sections).toHaveLength(email.sections.length + 1);
+    expect(added.template.sections[0]!.id).toBe(added.sectionId);
+    expect(added.template.sections.at(-1)!.rows[0]!.columns[0]!.blocks[0]!.type).toBe('legal');
+    const block = added.template.sections[0]!.rows[0]!.columns[0]!.blocks[0] as FreeformBlock;
+    expect(block.id).toBe(added.blockId);
+    expect(block.id.startsWith('ffx-')).toBe(true);
+    expect(block.source).toEqual({ app: 'freeform', key: FREEFORM_APP_FRAME });
+    expect(isCurrent(block, frame)).toBe(true);
+  });
+});

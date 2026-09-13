@@ -8,7 +8,19 @@ import { withPrints } from './printed-preview.ts';
 import { loadKeptPictures } from './kept-pictures.ts';
 import { freeformSvg } from '../compile/freeform.ts';
 import { recipeHash } from '../model/freeform.ts';
-import { FREEFORM_APP_FRAME, followFrame, isCurrent, linkedBlocks, readAppFrame, unlinkFrame, type AppFrame } from '../model/freeform-link.ts';
+import {
+  addFrameBlock,
+  FREEFORM_APP_FRAME,
+  followFrame,
+  isCurrent,
+  linkedBlocks,
+  readAppFrame,
+  readStudioPresence,
+  STUDIO_PRESENCE,
+  STUDIO_REQUEST,
+  unlinkFrame,
+  type AppFrame,
+} from '../model/freeform-link.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
@@ -1206,6 +1218,82 @@ export function App() {
     window.addEventListener('beforeunload', onLeave);
     return () => window.removeEventListener('beforeunload', onLeave);
   }, [workspace, editor.canUndo]);
+
+  // --- the other way: the Freeform app sends its frame here (model/freeform-link.ts) ------------------------
+
+  const studioTab = useRef(Math.random().toString(36).slice(2));
+
+  /** Shows the Freeform app's frame in this email: selects the block that follows it, or adds one above the footer. */
+  const bringFrame = () => {
+    let frame: AppFrame | null = null;
+    try {
+      frame = readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
+    } catch {
+      frame = null;
+    }
+    if (!frame) return notify('The Freeform app has no frame to bring in yet.');
+    const t = editor.template;
+    const already = linkedBlocks(t).find((b) => b.source?.key === frame.key);
+    if (already) {
+      const site = siteOf(t, already.id);
+      if (site) editor.select({ kind: 'block', sectionId: site.section.id, blockId: already.id });
+      return notify(`Your Freeform frame is here, in ${t.name}.`);
+    }
+    const added = addFrameBlock(t, frame, `ff${Date.now().toString(36)}-`);
+    editor.commit('Add Freeform frame', added.template, { select: { kind: 'block', sectionId: added.sectionId, blockId: added.blockId } });
+    notify(`Added your Freeform frame to ${t.name}, above the footer. It follows the frame from now on.`, () => editor.undo());
+  };
+  const bringFrameRef = useRef(bringFrame);
+  bringFrameRef.current = bringFrame;
+
+  // Says this tab is open, which email it holds, and whether that email uses the frame. Every 20 seconds is
+  // enough: a background tab's timers run about once a minute anyway, and presence lasts two.
+  const linkedHere = appFrame ? linkedBlocks(editor.template).filter((b) => b.source?.key === appFrame.key).length : 0;
+  useEffect(() => {
+    const write = () => {
+      try {
+        localStorage.setItem(STUDIO_PRESENCE, JSON.stringify({ tab: studioTab.current, email: editor.template.name, linked: linkedHere, at: Date.now() }));
+      } catch {
+        // Storage full or blocked: the Freeform app offers to open Template Studio instead.
+      }
+    };
+    write();
+    const timer = window.setInterval(write, 20_000);
+    return () => window.clearInterval(timer);
+  }, [editor.template.name, linkedHere]);
+
+  useEffect(() => {
+    const leave = () => {
+      try {
+        if (readStudioPresence(localStorage.getItem(STUDIO_PRESENCE))?.tab === studioTab.current) localStorage.removeItem(STUDIO_PRESENCE);
+      } catch {
+        // Nothing to take back.
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STUDIO_REQUEST || !event.newValue) return;
+      try {
+        const request = JSON.parse(event.newValue) as { action?: string; tab?: string };
+        if (request.action === 'link' && request.tab === studioTab.current) bringFrameRef.current();
+      } catch {
+        // Not a request this tab understands.
+      }
+    };
+    window.addEventListener('pagehide', leave);
+    window.addEventListener('storage', onStorage);
+    // Opened by the Freeform app with ?freeform=link: bring the frame in once, and take the request off the address.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('freeform') === 'link') {
+      params.delete('freeform');
+      const rest = params.toString();
+      window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+      window.setTimeout(() => bringFrameRef.current(), 300);
+    }
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   const rasteriseBlock = useCallback(
     async (blockId: string) => {

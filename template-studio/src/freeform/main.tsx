@@ -20,6 +20,7 @@ import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { canvasBlob, freeformCanvas } from '../app/picture.ts';
 import { keepPicture, loadKeptPictures } from '../app/kept-pictures.ts';
+import { readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, type StudioPresence } from '../model/freeform-link.ts';
 import { Surface, type SurfaceApi } from '../app/Surface.tsx';
 import { useEditor } from '../app/useEditor.ts';
 import '../app/app.css';
@@ -98,6 +99,30 @@ function FreeformTool() {
   // ⌘Z and ⇧⌘Z come with useEditor, which binds them itself. This page once bound them a second time,
   // and every ⌘Z undid two steps.
 
+  // An open Template Studio, if there is one, for the way there (model/freeform-link.ts).
+  const readStudio = () => {
+    try {
+      return readStudioPresence(localStorage.getItem(STUDIO_PRESENCE));
+    } catch {
+      return null;
+    }
+  };
+  const [studio, setStudio] = useState<StudioPresence | null>(readStudio);
+  useEffect(() => {
+    const refresh = () => setStudio(readStudio());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STUDIO_PRESENCE) refresh();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   // The pictures kept from earlier visits, before anything is drawn with them.
   useEffect(() => {
     loadKeptPictures()
@@ -127,6 +152,43 @@ function FreeformTool() {
 
   if (!found) return null;
   const { block } = found;
+
+  /** To Template Studio: the open one, by request, or a new one with the frame already in the email. */
+  const toStudio = () => {
+    let presence: StudioPresence | null = null;
+    try {
+      presence = readStudioPresence(localStorage.getItem(STUDIO_PRESENCE));
+    } catch {
+      presence = null;
+    }
+    if (presence) {
+      try {
+        localStorage.setItem(STUDIO_REQUEST, JSON.stringify({ action: 'link', key: STORE, tab: presence.tab, at: Date.now() }));
+      } catch {
+        return notify('This browser would not pass the frame along. Open Template Studio from the dashboard.');
+      }
+      // Opened from Template Studio: close this tab, and that one is where you land.
+      let opener: Window | null = null;
+      try {
+        opener = window.opener && !window.opener.closed && String(window.opener.location.pathname).endsWith('/index.html') ? window.opener : null;
+      } catch {
+        opener = null;
+      }
+      if (opener) {
+        try {
+          opener.focus();
+        } catch {
+          // Focus is the browser's to give.
+        }
+        window.setTimeout(() => window.close(), 300);
+        return;
+      }
+      return notify(presence.linked ? `Your frame is in ${presence.email}. Switch to the Template Studio tab to see it.` : `Sent to ${presence.email}, above the footer. Switch to the Template Studio tab to see it.`);
+    }
+    const url = new URL('index.html?freeform=link', window.location.href).href;
+    // Freeform saves as it goes, so opening Template Studio in this same tab loses nothing.
+    if (!window.open(url, '_blank')) window.location.href = url;
+  };
   const ds = designSystemOf(editor.template);
 
   // What the page sits on. A plain export keeps a transparent page; a print needs paper under it.
@@ -186,9 +248,26 @@ function FreeformTool() {
           api={api}
           standalone={{
             left: (
-              <a class="fig-pill fig-back" href="../../index.html" title="Back to Scugnizzi tools">
-                <span aria-hidden="true">←</span> Tools
-              </a>
+              <>
+                <a class="fig-pill fig-back" href="../../index.html" title="Back to Scugnizzi tools">
+                  <span aria-hidden="true">←</span> Tools
+                </a>
+                <button
+                  class="fig-pill fig-studio"
+                  title={
+                    studio
+                      ? studio.linked
+                        ? `Template Studio has this frame in ${studio.email}. Go to it.`
+                        : `Template Studio is open with ${studio.email}. Add this frame to it, above the footer.`
+                      : 'Open Template Studio with this frame in the email, above the footer. It follows the frame from then on.'
+                  }
+                  onClick={toStudio}
+                >
+                  <span class={`fig-studio-dot ${studio ? 'live' : ''}`} aria-hidden="true" />
+                  {studio ? (studio.linked ? `In ${studio.email}` : `Send to ${studio.email}`) : 'Use in Template Studio'}
+                  <span aria-hidden="true">↗</span>
+                </button>
+              </>
             ),
             right: (
               <>
