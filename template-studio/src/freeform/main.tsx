@@ -82,6 +82,9 @@ function frameDoc(key: string, name: string): Template {
   return makeFrame(name, key.split('.').pop() || newFrameId());
 }
 
+/** The frame `?new=1` made, which belongs to whatever project is open once it is known. */
+let freshKey: string | null = null;
+
 /**
  * What the address asks for, read once and taken off it: a frame to open (Template Studio's "Edit in
  * Freeform" and the project board say which), or a new frame (the board's New frame).
@@ -106,6 +109,7 @@ function startingFrames(): FrameIndex {
     const id = newFrameId();
     const name = frameName(index);
     index = addFrame(store, index, name, makeFrame(name, id), id);
+    freshKey = index.active;
   }
   return index;
 }
@@ -275,12 +279,26 @@ function FreeformTool() {
         if (!p.dir || !p.info || (p.status !== 'ready' && p.status !== 'view-only')) return;
         try {
           const id = p.info.id;
-          const result = await syncFrames(p.dir, id, store, p.writable);
+          // A project made from a type starts with its own frames only; an existing folder takes in the loose ones.
+          const adopts = !p.info.type;
+          if (freshKey && p.writable) {
+            // The board's New frame: this one is the project's whatever else is loose, and it is numbered among the
+            // project's frames rather than every frame this browser keeps.
+            const before = readFrameIndex(store.getItem(FRAMES_INDEX));
+            const fresh = before?.frames.find((f) => f.key === freshKey);
+            if (before && fresh) {
+              const theirs = projectFrames(before, id, adopts).filter((f) => f.key !== freshKey);
+              renameFrame(store, before, fresh.key, frameName({ ...before, frames: theirs }));
+            }
+            await pushKey(freshKey);
+            freshKey = null;
+          }
+          const result = await syncFrames(p.dir, id, store, p.writable, adopts);
           folder.current = result.folder;
           if (result.failed) notify(result.failed);
           let index = result.index ?? loadFrames(store, makeFrame);
 
-          if (projectFrames(index, id).length === 0) {
+          if (projectFrames(index, id, adopts).length === 0) {
             // A project with no frames of its own yet: one to draw on, written into it.
             const frameId = newFrameId();
             const doc = makeFrame('Frame 1', frameId);
@@ -291,7 +309,7 @@ function FreeformTool() {
               index = tagFrames(store, index, [entry.key], id);
             }
           }
-          const visible = projectFrames(index, id);
+          const visible = projectFrames(index, id, adopts);
           const wanted = pendingFrame.current;
           if (wanted && visible.some((f) => f.key === wanted)) {
             index = openFrame(store, index, wanted);
@@ -321,7 +339,7 @@ function FreeformTool() {
           settled.current = true;
         }
       }),
-    [run, notify, usePictures],
+    [run, notify, usePictures, pushKey],
   );
 
   useEffect(() => {
@@ -443,8 +461,13 @@ function FreeformTool() {
   if (!found) return null;
   const { block } = found;
   const activeEntry = frames.frames.find((f) => f.key === frames.active) ?? frames.frames[0]!;
-  /** The frames the menu lists: with a project open, its own and any not in a project yet. */
-  const listed: FrameIndex = projectId ? { ...frames, frames: projectFrames(frames, projectId) } : frames;
+  const adopts = !project.info?.type;
+  /** The frames the menu lists: with a project open, its own (and loose ones, when it takes those in), and the one on the canvas. */
+  const listed: FrameIndex = projectId
+    ? { ...frames, frames: frames.frames.filter((f) => f.key === frames.active || projectFrames(frames, projectId, adopts).includes(f)) }
+    : frames;
+  /** A frame made while a project is open for editing belongs to it from the start; its file follows a moment later. */
+  const born = (index: FrameIndex, key: string) => (projectId && projectRef.current.writable ? tagFrames(store, index, [key], projectId) : index);
 
   // --- frames ----------------------------------------------------------------------------------------------
 
@@ -461,7 +484,7 @@ function FreeformTool() {
     const id = newFrameId();
     const name = frameName(listed);
     const doc = makeFrame(name, id);
-    show(addFrame(store, frames, name, doc, id), doc);
+    show(born(addFrame(store, frames, name, doc, id), FRAME_PREFIX + id), doc);
     pushLater(FRAME_PREFIX + id);
   };
   const duplicateKey = (key: string) => {
@@ -470,7 +493,7 @@ function FreeformTool() {
     const id = newFrameId();
     const name = frameName(listed, `${entry.name} copy`.replace(/ copy copy$/, ' copy'));
     const doc = copyFrameDoc(key === frames.active ? editor.template : frameDoc(key, entry.name), id, name);
-    show(addFrame(store, frames, name, doc, id), doc);
+    show(born(addFrame(store, frames, name, doc, id), FRAME_PREFIX + id), doc);
     pushLater(FRAME_PREFIX + id);
   };
   const renameKey = (key: string, name: string) => {
@@ -490,7 +513,7 @@ function FreeformTool() {
     const { index, removed } = removeFrame(store, frames, key);
     if (!removed) return notify('The last frame stays: there is always one to draw on.');
     if (key === frames.active) {
-      const shown = projectId ? projectFrames(index, projectId) : index.frames;
+      const shown = projectId ? projectFrames(index, projectId, adopts) : index.frames;
       const target = shown.some((f) => f.key === index.active) ? index : openFrame(store, index, shown[0]!.key);
       const next = target.frames.find((f) => f.key === target.active)!;
       show(target, frameDoc(next.key, next.name));

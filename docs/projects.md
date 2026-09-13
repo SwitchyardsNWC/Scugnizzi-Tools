@@ -223,6 +223,46 @@ canvas code. The code is in `template-studio/src/project/`, and the pure rules a
   project is open for editing. Pictures kept only in the browser from before the project are copied in
   too, so the folder has everything its frames are drawn with.
 
+### Creating a project
+
+> "have a 'create a project' option - prompts to choose a destination and create the project folder
+> structure. this could be a template system for different types of projects."
+
+**Create a project** is on the welcome screen and in the project menu. It asks for a type and a name, and
+shows exactly what will be written. Then it asks where to put the project, makes the folder, and opens its
+board.
+
+- **Types are data.** Each type lives in `template-studio/src/model/project-types.ts`: its folders, the
+  frames it starts with at their sizes, and its starter emails. Adding a type is one entry there.
+- **Starter content.**
+  - A starter frame is a real frame file with its name written on it.
+  - A starter email is a short email that follows `design-systems/switchyards.system.json`, which is
+    written alongside it.
+  - Every project also gets a `README.md` saying what goes in each folder.
+- **Where it goes.** The project is made as a new folder, named for the project, inside the folder chosen.
+  - If the chosen folder already has the project's name and is empty, it is used as it is. That covers
+    making the folder inside the picker first.
+  - A folder with that name that already has things in it is never written into.
+  - Chrome won't let a page choose Desktop or Documents themselves, so the dialog says to pick a folder
+    inside them.
+- **The project's id.** A created project gets an id of its own, and `project.json` records its type.
+- **It starts clean.** A created project does not take in the loose frames this browser kept from before;
+  those wait for an existing folder to be opened. A frame made in Freeform while the project is open belongs
+  to it from the start, and so does one made with the board's New frame.
+
+| Type | Folders | Starts with |
+|---|---|---|
+| Campaign | all five | an email; Email hero 600 × 300, Square post 1080 × 1080, Story 1080 × 1920, Poster 1200 × 1600 |
+| Email | all five | an email; Email hero 600 × 300 |
+| Social media | frames, assets, exports | Square post 1080 × 1080, Portrait post 1080 × 1350, Story 1080 × 1920, Landscape post 1200 × 628 |
+| Print | frames, assets, exports | Poster 1200 × 1600, Flyer 850 × 1100, Postcard 900 × 600 (print proportions, not print resolution) |
+| Blank | templates, frames, assets | nothing |
+
+"All five" is `templates/`, `frames/`, `assets/`, `design-systems/` and `exports/`.
+
+A type made from an existing project, "save this project as a type", is the natural next step. It needs frames
+and the emails that follow them given new keys on the way, so two projects never share a frame.
+
 **Not yet:**
 - The copy deck (phases 2 to 5).
 - Frames as folders on the board (B3, B4).

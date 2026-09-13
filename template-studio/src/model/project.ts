@@ -26,6 +26,8 @@ export interface ProjectInfo {
   id: string;
   name: string;
   createdAt: number;
+  /** The project type it was created as (model/project-types.ts). Absent for a folder opened as it was. */
+  type?: string;
 }
 
 export function readProjectInfo(raw: string | null): ProjectInfo | null {
@@ -36,12 +38,14 @@ export function readProjectInfo(raw: string | null): ProjectInfo | null {
     return null;
   }
   if (!value || value.version !== 1 || typeof value.id !== 'string' || !value.id) return null;
-  return {
+  const info: ProjectInfo = {
     version: 1,
     id: value.id,
     name: (typeof value.name === 'string' ? value.name.trim().slice(0, 80) : '') || 'Project',
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0,
   };
+  if (typeof value.type === 'string' && value.type) info.type = value.type;
+  return info;
 }
 
 export const newProjectInfo = (folderName: string, id: string, now = Date.now()): ProjectInfo => ({

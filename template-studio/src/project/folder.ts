@@ -5,6 +5,7 @@
 // a project, not only a place emails are kept.
 
 import { newProjectInfo, PROJECT_FILE, projectJson, readProjectInfo, type ProjectInfo } from '../model/project.ts';
+import type { ProjectPlan } from '../model/project-types.ts';
 import { isImageFile } from '../workspace/workspace.ts';
 
 type Dir = FileSystemDirectoryHandle;
@@ -116,6 +117,55 @@ export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
   };
   if (assets) await walk(assets, '', 3);
   return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// --- creating a project -----------------------------------------------------------------------------------------
+
+const LEFT_BEHIND = new Set(['.DS_Store', 'desktop.ini', 'Thumbs.db', 'Icon\r']);
+
+/** A folder with nothing in it but what Finder and Windows leave behind. */
+export async function isEmptyDir(dir: Dir): Promise<boolean> {
+  for await (const name of dir.keys()) if (!LEFT_BEHIND.has(name)) return false;
+  return true;
+}
+
+/** Where to put a new project. Null when the picker was dismissed or this browser has none. */
+export async function pickDestination(): Promise<Dir | null> {
+  const picker = (globalThis as Record<string, unknown>)['showDirectoryPicker'] as ((options?: Record<string, string>) => Promise<Dir>) | undefined;
+  if (!picker) return null;
+  try {
+    // The id makes Chrome start where the last project went.
+    return await picker({ id: 'scuggnizzi-projects', mode: 'readwrite', startIn: 'documents' });
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') return null;
+    throw cause;
+  }
+}
+
+export class FolderTaken extends Error {
+  override name = 'FolderTaken';
+}
+
+/**
+ * Writes a planned project into the folder chosen for it, as a new folder named for the project. A chosen folder
+ * that already has the project's name and nothing in it is used as it is: that is someone making the folder in
+ * the picker first. A folder of that name with things in it is never written into.
+ */
+export async function createProjectFolder(parent: Dir, plan: ProjectPlan): Promise<Dir> {
+  let dir: Dir;
+  if (parent.name.toLowerCase() === plan.folder.toLowerCase()) {
+    if (!(await isEmptyDir(parent))) throw new FolderTaken(`“${parent.name}” already has things in it. Choose the folder to put the project in, or give it another name.`);
+    dir = parent;
+  } else {
+    const existing = await childDir(parent, [plan.folder]);
+    if (existing && !(await isEmptyDir(existing))) {
+      throw new FolderTaken(`${parent.name} already has a folder called “${plan.folder}” with things in it. Give the project another name, or choose somewhere else.`);
+    }
+    dir = existing ?? (await parent.getDirectoryHandle(plan.folder, { create: true }));
+  }
+  for (const folder of plan.folders) await childDir(dir, folder.split('/'), true);
+  for (const file of plan.files) await writeFile(dir, file.path, file.text);
+  return dir;
 }
 
 /**

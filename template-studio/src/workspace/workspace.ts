@@ -545,6 +545,9 @@ export async function pickFolderHandle(): Promise<Handle | null> {
 /** The remembered folder, whatever Chrome currently grants on it. */
 export const recallFolderHandle = (): Promise<Handle | null> => recall();
 
+/** Remembers a folder as the project, as picking it would: one Create a project just made, say. */
+export const rememberFolderHandle = (dir: Handle): Promise<void> => remember(dir);
+
 /** Forgets the folder, so no page opens it again until one is picked. */
 export async function forgetFolderHandle(): Promise<void> {
   const db = await idb();

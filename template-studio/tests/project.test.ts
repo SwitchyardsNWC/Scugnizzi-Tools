@@ -212,6 +212,14 @@ describe('frames between this browser and a project', () => {
     expect(planFrameSync(P, [{ key: 'theirs', updatedAt: 1, project: 'folder:autumn' }], [])).toEqual([]);
   });
 
+  it('takes in no loose frames for a project made from a type, and still takes its own', () => {
+    expect(planFrameSync(P, [{ key: 'loose', updatedAt: 1 }], [], false)).toEqual([]);
+    expect(planFrameSync(P, [{ key: 'gone', updatedAt: 1, project: P }], [{ key: 'starter', savedAt: 2 }], false)).toEqual([
+      { op: 'pull', key: 'starter' },
+      { op: 'drop', key: 'gone' },
+    ]);
+  });
+
   it('keeps the browser’s list in step: taken, marked, touched, dropped', () => {
     const store = memory();
     let index = loadFrames(store, makeFrame, 1);
@@ -230,6 +238,7 @@ describe('frames between this browser and a project', () => {
     expect(projectFrames(index, 'folder:autumn').map((f) => f.key)).toEqual([mine]);
     expect(projectFrames(index, P).map((f) => f.key)).toEqual([mine, file.key]);
     expect(projectFrames(index, null)).toHaveLength(2);
+    expect(projectFrames(index, P, false).map((f) => f.key)).toEqual([file.key]);
 
     index = tagFrames(store, index, [mine], P);
     expect(projectFrames(index, 'folder:autumn')).toEqual([]);

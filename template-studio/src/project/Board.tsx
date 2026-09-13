@@ -15,6 +15,7 @@ import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
+import { projectType } from '../model/project-types.ts';
 import {
   BOARD_FILE,
   boardJson,
@@ -164,8 +165,9 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
         setKept(keptRef.current);
       }
 
-      // Frames drawn in this browser join the project's files, so the board shows them from the first look.
-      const synced = await syncFrames(dir, info.id, siteStore(), writable);
+      // Frames drawn in this browser join the project's files, so the board shows them from the first look. Not
+      // into a project made from a type, which starts with its own frames only.
+      const synced = await syncFrames(dir, info.id, siteStore(), writable, !info.type);
       if (synced.failed && synced.failed !== lastFailure.current) notify(synced.failed);
       lastFailure.current = synced.failed ?? '';
       if (writable && keptRef.current.length) {
@@ -227,9 +229,10 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
 export interface BoardProps {
   project: Project;
   notify(message: string): void;
+  onCreateProject(): void;
 }
 
-export function Board({ project, notify }: BoardProps) {
+export function Board({ project, notify, onCreateProject }: BoardProps) {
   const dir = project.dir!;
   const info = project.info!;
   const projectRef = useRef(project);
@@ -759,7 +762,7 @@ export function Board({ project, notify }: BoardProps) {
         <a class="fig-pill" href="../../index.html" title="Back to Scugnizzi tools">
           <span aria-hidden="true">←</span> Tools
         </a>
-        <ProjectMenu project={project} counts={counts} />
+        <ProjectMenu project={project} counts={counts} onCreate={onCreateProject} />
       </div>
 
       <div class="pb-chrome pb-top pb-top-right">
@@ -891,7 +894,7 @@ function FrameBody({ item, assets, print, width, height }: { item: FrameItem; as
 
 // --- the project pill -----------------------------------------------------------------------------------------
 
-function ProjectMenu({ project, counts }: { project: Project; counts: string }) {
+function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: string; onCreate(): void }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -920,9 +923,20 @@ function ProjectMenu({ project, counts }: { project: Project; counts: string }) 
             <span>
               {project.dir?.name} · {status}
             </span>
-            <span>{counts}</span>
+            <span>
+              {projectType(info.type) ? `${projectType(info.type)!.name} project · ` : ''}
+              {counts}
+            </span>
           </div>
           <p class="pb-menu-note">Template Studio and Freeform open this folder too, on their own.</p>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onCreate();
+            }}
+          >
+            Create a project…
+          </button>
           <button
             onClick={() => {
               setOpen(false);
