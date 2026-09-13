@@ -193,7 +193,17 @@ the selected layers as one picture and keeps them editable underneath.
 - **Invert** *(2026-09-13)*. Any layer, or a whole drawing, can be inverted from the mini menu. Every inverted layer points at
   one `feColorMatrix` filter, set to user space so a straight stroke's box having no height cannot swallow it, and to sRGB so
   white inverts to black. It inverts before the print, so a photo can go into the Riso press as its negative.
-- **Not yet:** the email canvas in Template Studio still draws a page with effects plain. It shows the print once the
+- **On the email canvas** *(2026-09-13)*. Every freeform page with effects is printed once its recipe settles, and
+  `app/printed-preview.ts` puts the print in the drawing's place on the preview string. It finds the drawing by
+  producing it again with the compiler's own `freeformSvg` and design system, so the match is exact. The export never
+  passes through it.
+- **Linked to a Freeform app frame** *(2026-09-13)*. A freeform block can follow the frame the Freeform app keeps
+  (`model/freeform-link.ts`). The block's panel shows the frame, with Link to this frame and Unlink. A linked block
+  takes the frame's layers, size, background and effects whenever it changes, one undo step per burst of changes.
+  Double-click, or Edit in Freeform, opens the app in a new tab. A frame with effects brings the ground it sits on in
+  the app, so its print is the same bytes in any email section; the email print and the app's print were checked
+  by pixel fingerprint. Template Studio reads the pictures Freeform keeps in IndexedDB (`app/kept-pictures.ts`), so
+  the frame's photographs show. With no folder open, the browser now asks before leaving the page with unsaved edits. It shows the print once the
   picture is rendered and hosted, the same way Checks already track every freeform picture.
 
 | | Builds | Done when |

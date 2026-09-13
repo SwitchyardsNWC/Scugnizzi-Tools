@@ -426,6 +426,11 @@ export type FreeformLayer =
 export interface FreeformBlock extends BlockBase {
   /** Run on the picture after it is drawn, in order. Part of the recipe, so the hash covers them (docs/freeform-and-effects.md). */
   effects?: EffectStep[];
+  /**
+   * The Freeform app frame this block follows, by the key it is kept under. A linked block takes its layers,
+   * size, background and effects from the frame whenever it changes, and is edited there (model/freeform-link.ts).
+   */
+  source?: { app: 'freeform'; key: string };
   type: 'freeform';
   /** What arrives where images are blocked. Not a HubSpot field: the picture is the template's. */
   alt: string;

@@ -1766,3 +1766,12 @@ button.fig-pill:active { transform: scale(0.96); }
   font: inherit; font-size: 12.5px; color: #1e1c19;
 }
 .fig-fx-name input:focus { outline: 2px solid #7b61ff; }
+
+/* A freeform block following a frame in the Freeform app (Inspector › LayersField). */
+.canvas-link { display: grid; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.canvas-link-head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.canvas-link-badge { margin-left: auto; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, #7b61ff 22%, transparent); color: #c7b9ff; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.canvas-link-badge.stale { background: color-mix(in srgb, #d9a441 22%, transparent); color: #e7bf6f; }
+.canvas-link-thumb { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #f5f3ee; overflow: hidden; cursor: pointer; }
+.canvas-link-thumb:hover { border-color: #7b61ff; }
+.canvas-link-thumb span, .canvas-link-thumb svg, .canvas-link-thumb img { display: block; width: 100%; height: auto; }
