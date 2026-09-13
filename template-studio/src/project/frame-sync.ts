@@ -90,12 +90,15 @@ export interface FrameSyncResult {
   failed: string | null;
 }
 
-/** Brings this browser's frames and the project's frame files together. Writes only when `writable`. */
-export async function syncFrames(dir: Dir, project: string, store: KeyValue, writable: boolean): Promise<FrameSyncResult> {
+/**
+ * Brings this browser's frames and the project's frame files together. Writes only when `writable`. Frames no
+ * project has are taken in only when `adopt` is set (model/frame-file.ts).
+ */
+export async function syncFrames(dir: Dir, project: string, store: KeyValue, writable: boolean, adopt = true): Promise<FrameSyncResult> {
   let folder = await readFolderFrames(dir);
   let index = readFrames(store);
   const local = (index?.frames ?? []).filter((f) => store.getItem(f.key) !== null);
-  const steps = planFrameSync(project, local, folder);
+  const steps = planFrameSync(project, local, folder, adopt);
   const byKey = new Map(folder.map((f) => [f.key, f]));
   const keys = (op: string) => steps.filter((s) => s.op === op).map((s) => s.key);
 

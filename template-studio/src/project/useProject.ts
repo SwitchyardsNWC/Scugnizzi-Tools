@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 import { PROJECT_CHANNEL, type ProjectInfo } from '../model/project.ts';
-import { forgetFolderHandle, permissionOf, pickFolderHandle, recallFolderHandle, supportsFolders } from '../workspace/workspace.ts';
+import { forgetFolderHandle, permissionOf, pickFolderHandle, recallFolderHandle, rememberFolderHandle, supportsFolders } from '../workspace/workspace.ts';
 import { readProject } from './folder.ts';
 
 type Dir = FileSystemDirectoryHandle;
@@ -29,6 +29,8 @@ export interface Project {
   generation: number;
   /** Shows the folder picker. */
   open(): Promise<boolean>;
+  /** Opens a folder already in hand, one Create a project just made, as the project. */
+  use(dir: Dir): Promise<void>;
   /** The click Chrome needs to open a remembered folder again, or to allow editing one opened view-only. */
   allow(): Promise<boolean>;
   close(): Promise<void>;
@@ -92,6 +94,15 @@ export function useProject(): Project {
     return true;
   }, [settle]);
 
+  const use = useCallback(
+    async (dir: Dir) => {
+      await rememberFolderHandle(dir);
+      await settle(dir);
+      tell('opened');
+    },
+    [settle],
+  );
+
   const allow = useCallback(async () => {
     const dir = dirRef.current;
     if (!dir) return false;
@@ -112,5 +123,5 @@ export function useProject(): Project {
     tell('closed');
   }, [settle]);
 
-  return { ...state, writable: state.status === 'ready', open, allow, close };
+  return { ...state, writable: state.status === 'ready', open, use, allow, close };
 }

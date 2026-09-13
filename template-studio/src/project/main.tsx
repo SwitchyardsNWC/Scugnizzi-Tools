@@ -10,6 +10,7 @@ import { render } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 
 import { Board } from './Board.tsx';
+import { CreateProject } from './CreateProject.tsx';
 import { useProject, type Project } from './useProject.ts';
 import '../app/app.css';
 import './project.css';
@@ -17,6 +18,7 @@ import './project.css';
 function ProjectTool() {
   const project = useProject();
   const [toast, setToast] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const notify = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast((t) => (t === message ? null : t)), 4200);
@@ -27,9 +29,23 @@ function ProjectTool() {
     document.title = open && project.info ? `${project.info.name} · Project` : 'Project';
   }, [open, project.info]);
 
+  const created = useCallback(
+    async (dir: FileSystemDirectoryHandle, name: string, where: string) => {
+      await project.use(dir);
+      setCreating(false);
+      notify(where ? `Created ${name} in ${where}.` : `Created ${name}.`);
+    },
+    [project, notify],
+  );
+
   return (
     <div class="pb-app">
-      {open && project.info ? <Board key={project.info.id} project={project} notify={notify} /> : <Welcome project={project} />}
+      {open && project.info ? (
+        <Board key={project.info.id} project={project} notify={notify} onCreateProject={() => setCreating(true)} />
+      ) : (
+        <Welcome project={project} onCreate={() => setCreating(true)} />
+      )}
+      {creating && <CreateProject onClose={() => setCreating(false)} onCreated={created} />}
       {toast && (
         <div class="pb-toast" role="status">
           {toast}
@@ -39,7 +55,7 @@ function ProjectTool() {
   );
 }
 
-function Welcome({ project }: { project: Project }) {
+function Welcome({ project, onCreate }: { project: Project; onCreate(): void }) {
   const remembered = project.status === 'asking' ? project.dir?.name : null;
   return (
     <div class="pb-welcome">
@@ -65,8 +81,9 @@ function Welcome({ project }: { project: Project }) {
         <p class="pb-kicker">Project</p>
         <h1>One folder for every tool.</h1>
         <p class="pb-lede">
-          Open a project folder and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, and the pictures they use,
-          with lines showing what is made from what. Template Studio and Freeform open the same folder on their own from then on.
+          A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, and the pictures they use,
+          with lines showing what is made from what. Create one from a type, or open a folder you already have. Template Studio and Freeform open it on their own
+          from then on.
         </p>
 
         {project.status === 'loading' ? null : project.status === 'unsupported' ? (
@@ -76,14 +93,20 @@ function Welcome({ project }: { project: Project }) {
             <button class="pb-primary" onClick={() => void project.allow()}>
               Reopen {remembered}
             </button>
+            <button class="pb-secondary" onClick={onCreate}>
+              Create a project…
+            </button>
             <button class="pb-secondary" onClick={() => void project.open()}>
               Open a different folder…
             </button>
           </div>
         ) : (
           <div class="pb-actions">
-            <button class="pb-primary" onClick={() => void project.open()}>
-              Open project folder…
+            <button class="pb-primary" onClick={onCreate}>
+              Create a project…
+            </button>
+            <button class="pb-secondary" onClick={() => void project.open()}>
+              Open a folder…
             </button>
           </div>
         )}

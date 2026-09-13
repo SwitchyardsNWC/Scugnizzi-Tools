@@ -105,9 +105,10 @@ export type FrameSyncStep =
  *
  * A frame in this browser that belongs to another project is left alone, so opening a second project does
  * not pour the first one's frames into it. A frame that belongs to no project yet, drawn before any folder
- * was open, is written into this one: it is where the work now lives.
+ * was open, is written into this one when `adopt` is set: it is where the work now lives. A project made
+ * fresh from a type does not adopt, so it starts with its own frames and nothing else.
  */
-export function planFrameSync(project: string, local: LocalFrameState[], folder: FolderFrameState[]): FrameSyncStep[] {
+export function planFrameSync(project: string, local: LocalFrameState[], folder: FolderFrameState[], adopt = true): FrameSyncStep[] {
   const steps: FrameSyncStep[] = [];
   const mine = new Map(local.map((f) => [f.key, f]));
   const there = new Set(folder.map((f) => f.key));
@@ -120,7 +121,7 @@ export function planFrameSync(project: string, local: LocalFrameState[], folder:
   for (const here of local) {
     if (there.has(here.key)) continue;
     if (here.project === project) steps.push({ op: 'drop', key: here.key });
-    else if (!here.project) steps.push({ op: 'push', key: here.key });
+    else if (!here.project && adopt) steps.push({ op: 'push', key: here.key });
   }
   return steps;
 }

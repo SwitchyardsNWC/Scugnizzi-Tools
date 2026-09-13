@@ -187,9 +187,12 @@ export function copyFrameDoc(doc: Template, id: string, name: string): Template 
 
 // --- frames in a project ------------------------------------------------------------------------------------
 
-/** The frames to show while a project is open: its own, and any not in a project yet. With none open, all of them. */
-export const projectFrames = (index: FrameIndex, project: string | null): FrameEntry[] =>
-  project ? index.frames.filter((f) => !f.project || f.project === project) : index.frames;
+/**
+ * The frames to show while a project is open: its own, and any not in a project yet when the project takes those
+ * in (`adopt`, false for a project made from a type). With none open, all of them.
+ */
+export const projectFrames = (index: FrameIndex, project: string | null, adopt = true): FrameEntry[] =>
+  project ? index.frames.filter((f) => f.project === project || (adopt && !f.project)) : index.frames;
 
 /** Marks frames as having their files in a project's folder. */
 export function tagFrames(store: KeyValue, index: FrameIndex, keys: string[], project: string): FrameIndex {
