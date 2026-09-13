@@ -137,13 +137,72 @@ the reason to do the extraction first: one effect (ink bleed, since Jared named 
 the shared module and imported back into its tool, proves the shape before the studio grows a
 panel.
 
-**Phases**
+**Round trips to the tools** *(added 2026-09-13)*. Jared: "what about adding a way to take a freeform
+frame and editing it in inkbleed or riso. or allowing those effects to be used in freeform?" It is
+both, through the same module. The canvas's mini menu gets **Effects**, a few dials for quick
+changes, and **Open in Riso** or **Open in Ink bleed** for every dial. The tool opens with the
+picture already loaded, and **Back to Freeform** sends back the *settings*, not the pixels. The
+settings become a step on the recipe. Sending back a finished PNG would leave pixels that stop
+following the canvas the moment a word changes. Until the project folder exists, the hand-off
+between tabs is the browser's own storage on the one origin, plus a `BroadcastChannel`.
+
+**What reading the two tools showed.**
+
+- **Both are already seeded** (`mulberry32`, "same seed, same result"), so determinism is mostly
+  there already.
+- **Riso is the easy one.** Its input is already any picture (`useImage`), and its pipeline is pixels
+  in, coverage per ink, pixels out. A rendered freeform page is exactly that input. It caps the
+  source at 900px, which has to lift to 2× for a 560px page.
+- **Ink bleed is two things, and only half is a filter.** Bleed, smudge, photocopy rows and paper
+  work on any ink field, so they can apply to a picture. The per-letter jitter and strike weight
+  need to know where each glyph is, which ink bleed only knows because it lays out its own text.
+  On a rendered picture those are lost. Keeping them means a canvas type style, say "Typewriter",
+  whose letters go through ink bleed's glyph rasteriser, rather than an effect on the page.
+- **Both recolour.** Ink bleed turns a picture into one ink, and riso into two or three. That is
+  the look, but a colourful page comes back as its inks. The Effects menu shows it before you commit.
+- **Neither is instant.** Ink bleed blurs full-size noise fields. With an effect on, the canvas
+  draws the plain layers while something is being dragged and runs the effect when it settles.
+
+**Scope.** Start with an effect on the whole page. An effect on a selection comes next: it draws
+the selected layers as one picture and keeps them editable underneath.
+
+**Phases** — 1 to 3 are built (2026-09-13).
+
+- **The press** is `effects/riso.js` at the repo root, a plain script that sets `RisoEngine`. The separator loads it with a
+  `<script>` tag, and Template Studio imports it through `src/effects/riso.ts`. Moving the code changed nothing: all three
+  presets on the sample image fingerprint exactly as they did before the move.
+- **On the canvas**, Effects sits at the bottom of the layers panel. It has the three presets, with their screens at half size
+  (they were tuned on 900px photographs, and drawn lines lose their detail in dots that coarse). It also has the inks, the
+  screen, Misprint, Ink soak, Paper grain, paper, Reshuffle and Open in Riso. The print is laid over the drawing once a change
+  settles, and the drawing stays underneath so clicks still find their layers. The PNG export, the SVG export (the print goes
+  inside as an image) and Template Studio's Render picture all print through `src/app/picture.ts`.
+- **The round trip** stores `scuggnizzi.handoff.riso` (the plain picture at 2×, the settings, a session) and opens the
+  separator with `?handoff=`. The separator loads the picture at its own size with `unit: 2`, saves under its own key, and
+  Back to Freeform writes `scuggnizzi.handoff.riso.return` and closes its tab. The canvas takes the return from a storage
+  event, on focus, or when it opens; it checks every value with `normalizeRiso` and removes both keys.
+- **1:1 both ways** *(2026-09-13)*. The first version didn't match. The shared tool kit restores a tool's saved
+  state after the document loads, which is after the hand-off had been applied, so the previous session's settings
+  overwrote the ones Freeform sent (a 2 px screen came back 4.5 px). A hand-off now clears that session state first. Freeform also sends its
+  zoom, and Riso opens at the same on-screen scale ("As in Freeform · 136%"). Checked by fingerprinting the pixels:
+  Freeform's print, Riso's print and Freeform's print after Back to Freeform are the same bytes.
+- **Saved looks** *(2026-09-13)*. "Save preset" in the Riso tool, or "Save look" on the canvas, writes to
+  `scuggnizzi.project.riso-presets` (`{ version: 1, presets: [{ id, name, inks, press, seed, savedAt }] }`). Every tool on
+  the site reads that list: the Riso tool beside its built-in presets, where each can be deleted, and Freeform under
+  Effects. Freeform refreshes it when the Riso tab saves. Freeform checks each saved look with `normalizeRiso`. Until
+  the project folder exists this storage is the project; the list is shaped to move into it as `presets/riso.json`.
+- **Invert** *(2026-09-13)*. Any layer, or a whole drawing, can be inverted from the mini menu. Every inverted layer points at
+  one `feColorMatrix` filter, set to user space so a straight stroke's box having no height cannot swallow it, and to sRGB so
+  white inverts to black. It inverts before the print, so a photo can go into the Riso press as its negative.
+- **Not yet:** the email canvas in Template Studio still draws a page with effects plain. It shows the print once the
+  picture is rendered and hosted, the same way Checks already track every freeform picture.
 
 | | Builds | Done when |
 |---|---|---|
-| **1 · Extract one** | `effects/ink-bleed.ts`, pure and seeded; the ink bleed tool imports it. | The tool renders exactly what it rendered before the move. |
-| **2 · Steps on a recipe** | `effects` on rendered headings and freeform blocks; the renderer runs them; the hash covers them; the Effects panel with the dials the module declares. | A heading rendered with ink bleed, exported twice, is the same bytes. |
-| **3 · The rest** | Riso, then the image effects, through the same door. | Every effect in the repo is a step here. |
+| **1 · Extract Riso** | `effects/riso.ts`, pure and seeded, source cap lifted; the riso tool imports it. Riso first rather than ink bleed: it is already pixels in and pixels out, so it proves the module's shape without untangling text layout. | The tool renders exactly what it rendered before the move. |
+| **2 · Steps on a recipe** | `effects` on freeform pages (and rendered headings); the renderer runs them; the hash covers them; Effects in the canvas's mini menu with the dials the module declares. | A page with riso, exported twice, is the same bytes. |
+| **3 · Round trip** | Open in Riso with the picture loaded; Back to Freeform returns the settings as a step. | Tune an ink in Riso, go back, and the canvas shows it and keeps following edits. |
+| **4 · Ink bleed** | The filter half (bleed, smudge, photocopy, paper) as a step and a round trip; then the Typewriter canvas type for per-letter strikes. | A freeform headline looks typed, and a rubber stamp on the page looks inked. |
+| **5 · The rest** | Image effects through the same door; effects on a selection. | Every effect in the repo is a step here. |
 
 ## What to decide
 

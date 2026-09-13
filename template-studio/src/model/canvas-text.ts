@@ -64,6 +64,9 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         effectColor: null,
         amount: 0,
       };
+  // A face of its own, from the design system's fonts, over whatever the style or role set.
+  const face = layer.font ? ds.fonts[layer.font] : undefined;
+  if (face) base.font = face;
   if (layer.kind === 'sticky') return layer.size ? { ...base, size: layer.size } : base;
   return {
     ...base,
@@ -108,7 +111,7 @@ export function layerName(l: FreeformLayer): string {
 
 // --- slash commands -----------------------------------------------------------------------------------
 
-export type CommandGroup = 'Style' | 'Size' | 'Spacing' | 'Align' | 'Note' | 'Colour';
+export type CommandGroup = 'Style' | 'Font' | 'Size' | 'Spacing' | 'Align' | 'Note' | 'Colour';
 
 export interface CanvasCommand {
   id: string;
@@ -121,6 +124,8 @@ export interface CanvasCommand {
   /** For the menu's little preview: a canvas type style (null is plain), or a colour swatch. */
   look?: string | null;
   swatch?: string;
+  /** For a font: the stack, so the menu can show the face itself. */
+  fontStack?: string;
 }
 
 const SIZES: Array<[string, string, number | null, string[]]> = [
@@ -169,6 +174,19 @@ export function canvasCommands(layer: TextLayer | StickyLayer, ds: DesignSystem)
       const name = NOTE_NAMES[i] ?? `Note ${i + 1}`;
       out.push({ id: `note-${i}`, label: `${name} note`, group: 'Note', keywords: [name.toLowerCase(), 'paper', 'note', 'colour', 'color'], hint: 'The note’s paper.', patch: { fill: hex }, swatch: hex });
     });
+  }
+  // The design system's installed faces, so a picture never names one the render cannot draw.
+  out.push({
+    id: 'font-style',
+    label: 'Style’s font',
+    group: 'Font',
+    keywords: ['font', 'face', 'typeface', 'reset', 'default'],
+    hint: 'The face the style or role sets.',
+    patch: { font: undefined },
+    fontStack: textStyleOf({ ...layer, font: undefined } as TextLayer | StickyLayer, ds).font,
+  });
+  for (const [key, stack] of Object.entries(ds.fonts)) {
+    out.push({ id: `font-${key}`, label: title(key), group: 'Font', keywords: [key, 'font', 'face', 'typeface'], hint: stack, patch: { font: key }, fontStack: stack });
   }
   for (const name of Object.keys(ds.colors)) {
     const hex = colorOf(ds, name);

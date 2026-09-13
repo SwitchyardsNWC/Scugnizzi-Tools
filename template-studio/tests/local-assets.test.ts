@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { compile } from '../src/compile/compile.ts';
 import { errorsIn, lint } from '../src/compile/lint.ts';
-import { isHostedUrl, localImages, withLocalAssets } from '../src/app/local-assets.ts';
+import { isHostedUrl, localImages, withLocalAssets, withoutMissingPictures } from '../src/app/local-assets.ts';
 import { fileNameFor } from '../src/app/rasterise.ts';
 import { importV1 } from '../src/model/import-v1.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
@@ -210,5 +210,14 @@ describe('naming a rendered picture', () => {
     const name = fileNameFor('Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', 'd5');
     expect(name.length).toBeLessThan(60);
     expect(name.startsWith('rendered/lorem-ipsum')).toBe(true);
+  });
+});
+
+describe('pictures the canvas cannot show yet', () => {
+  it('asks for nothing until a bare file name has a file behind it, and leaves every real source alone', () => {
+    const svg = '<image data-sy-layer="a" href="photo.png" x="0"/><image href="blob:http://x/1"/><image href="https://cdn.test/p.png"/><image href="data:image/png;base64,AA"/><image href=""/>';
+    expect(withoutMissingPictures(svg)).toBe('<image data-sy-layer="a" href="" x="0"/><image href="blob:http://x/1"/><image href="https://cdn.test/p.png"/><image href="data:image/png;base64,AA"/><image href=""/>');
+    const found = withLocalAssets(svg, [{ name: 'photo.png', size: 1, url: 'blob:http://x/2' }]);
+    expect(withoutMissingPictures(found)).toContain('href="blob:http://x/2"');
   });
 });

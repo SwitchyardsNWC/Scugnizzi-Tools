@@ -6,6 +6,7 @@ import { simulateDark } from '../compile/dark.ts';
 import { withLocalAssets } from './local-assets.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
+import { canvasBlob, freeformCanvas } from './picture.ts';
 import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
 import type { Branch } from '../compile/serialize.ts';
@@ -1083,7 +1084,17 @@ export function App() {
           return;
         }
 
-        const shot = await rasterise({
+        // A freeform page with effects is printed from its recipe: a print is pixels, which the page's
+        // markup on the canvas cannot carry.
+        const printed = allBlocks(editor.template).find((b) => b.id === blockId);
+        const shot =
+          printed?.type === 'freeform' && printed.effects?.length
+            ? await (async () => {
+                const canvas = await freeformCanvas(printed, designSystemOf(editor.template), { assets, scale: 2, ground });
+                const blob = await canvasBlob(canvas);
+                return { blob, url: URL.createObjectURL(blob), width: printed.width, height: printed.height };
+              })()
+            : await rasterise({
           // Serialised as XHTML, not `innerHTML`: a `<br>` in the copy is fatal inside the SVG.
           html: xhtmlOf(cell),
           css,
@@ -1132,7 +1143,7 @@ export function App() {
         setRasterising(false);
       }
     },
-    [editor, workspace, notify, refreshAssets, failed],
+    [editor, workspace, notify, refreshAssets, failed, assets],
   );
 
   const exportTemplate = useCallback(async () => {

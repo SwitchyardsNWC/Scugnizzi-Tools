@@ -33,6 +33,18 @@ export function withLocalAssets(html: string, assets: AssetFile[]): string {
   });
 }
 
+/**
+ * Empties the `href` of every SVG `<image>` that still names a bare file after `withLocalAssets`: a
+ * picture the page cannot show yet. The standalone Freeform tool loads its kept pictures a moment after
+ * the canvas first draws, and until then every redraw asked the server for `photo.png` by name and
+ * logged a 404. An empty href asks for nothing; the picture appears when its file arrives.
+ */
+export function withoutMissingPictures(svg: string): string {
+  return svg.replace(/(<image\b[^>]*?\bhref=")([^"]*)"/g, (whole, start: string, value: string) =>
+    !value || isHostedUrl(value) || value.startsWith('blob:') ? whole : `${start}"`,
+  );
+}
+
 /** The image sources in a compiled template that no email client could load. */
 export function localImages(html: string): string[] {
   const out = new Set<string>();

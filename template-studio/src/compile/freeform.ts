@@ -11,12 +11,45 @@
 
 import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { textStyleOf } from '../model/canvas-text.ts';
+import { marksPerChar, runsOf } from '../model/rich-text.ts';
 import { BRUSHES, layerBox } from '../model/freeform.ts';
 import { markOf } from '../model/marks.ts';
-import type { Brush, FreeformBlock, FreeformLayer } from '../model/types.ts';
+import type { Brush, FreeformBlock, FreeformLayer, StyleRange, TextMarks } from '../model/types.ts';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const num = (n: number) => String(Math.round(n * 100) / 100);
+/** The id of the filter every inverted layer points at. Identical wherever it is defined, so two pages on one email can share it. */
+const INVERT = 'sy-invert';
+
+/**
+ * One run's formatting as inline CSS, for the picture and for the canvas's editor alike. False is a
+ * real answer — un-bolded words inside a bold style.
+ */
+export function marksCss(m: TextMarks, ds: DesignSystem): string {
+  const out: string[] = [];
+  if (m.bold !== undefined) out.push(`font-weight:${m.bold ? 'bold' : 'normal'}`);
+  if (m.italic !== undefined) out.push(`font-style:${m.italic ? 'italic' : 'normal'}`);
+  const lines = [m.underline ? 'underline' : '', m.strike ? 'line-through' : ''].filter(Boolean);
+  if (lines.length) out.push(`text-decoration:${lines.join(' ')}`);
+  if (m.color) out.push(`color:${colorOf(ds, m.color) ?? m.color}`);
+  if (m.font && ds.fonts[m.font]) out.push(`font-family:${ds.fonts[m.font]}`);
+  if (m.highlight) {
+    out.push(`background:linear-gradient(transparent 55%, ${m.highlight} 55%, ${m.highlight} 92%, transparent 92%); -webkit-box-decoration-break:clone; box-decoration-break:clone`);
+  }
+  return out.join('; ');
+}
+
+/** A layer's words as markup: exactly as they always were when nothing is formatted, a span per formatted run when something is. */
+function richWords(text: string, styles: StyleRange[] | undefined, ds: DesignSystem): string {
+  if (!styles?.length) return esc(text).replace(/\r?\n/g, '<br/>');
+  return runsOf(text, styles)
+    .map((run) => {
+      const inner = esc(run.text).replace(/\r?\n/g, '<br/>');
+      const css = marksCss(run.marks, ds);
+      return css ? `<span style="${esc(css)}">${inner}</span>` : inner;
+    })
+    .join('');
+}
 
 /** The ink a layer falls back to when it names no colour: the first preset's text. */
 function inkOf(ds: DesignSystem): string {
@@ -39,6 +72,15 @@ export function freeformLayersSvg(block: FreeformBlock, ds: DesignSystem): strin
   const parts: string[] = [];
   const bg = colorOf(ds, block.background);
   if (bg) parts.push(`<rect x="0" y="0" width="${num(w)}" height="${num(h)}" fill="${bg}"/>`);
+  // One filter for every inverted layer. User-space and huge, because the default region is a share of
+  // the element's box, and a straight stroke's box has no height: the filter would draw nothing at all.
+  // sRGB, so white inverts to black rather than to a linear-light grey.
+  if (block.layers.some((l) => l.invert)) {
+    parts.push(
+      `<defs><filter id="${INVERT}" filterUnits="userSpaceOnUse" x="-10000" y="-10000" width="20000" height="20000" color-interpolation-filters="sRGB">` +
+        '<feColorMatrix type="matrix" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/></filter></defs>',
+    );
+  }
   for (const layer of block.layers) parts.push(layerSvg(layer, ds, h));
   return parts.join('');
 }
@@ -52,7 +94,7 @@ function rotationOf(layer: FreeformLayer): string {
 }
 
 function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number): string {
-  const mark = `data-sy-layer="${esc(layer.id)}"${rotationOf(layer)}`;
+  const mark = `data-sy-layer="${esc(layer.id)}"${rotationOf(layer)}${layer.invert ? ` filter="url(#${INVERT})"` : ''}`;
   const ink = inkOf(ds);
   switch (layer.kind) {
     case 'text':
@@ -67,7 +109,7 @@ function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number)
       const style =
         `margin:0; font-family:${t.font}; font-size:${num(t.size)}px; line-height:${t.lineHeight}%; font-weight:${t.weight}; ` +
         `color:${color}; text-align:left; text-transform:none; letter-spacing:normal; font-style:normal; overflow-wrap:break-word; word-wrap:break-word`;
-      const words = esc(layer.text).replace(/\r?\n/g, '<br/>');
+      const words = richWords(layer.text, layer.styles, ds);
       return (
         `<g ${mark}>` +
         `<rect x="${num(layer.x)}" y="${num(layer.y + 3)}" width="${num(layer.width)}" height="${num(layer.height)}" rx="6" fill="#000000" fill-opacity="0.08"/>` +
@@ -144,7 +186,7 @@ function paint(fill: string | null, stroke: string | null, strokeWidth: number, 
  */
 function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSystem, mark: string, surfaceHeight: number): string {
   const look = layer.look ? canvasTypeOf(ds)[layer.look] : undefined;
-  const words = esc(layer.text).replace(/\r?\n/g, '<br/>');
+  const words = richWords(layer.text, layer.styles, ds);
   const height = Math.max(1, surfaceHeight - layer.y);
   const box = (inner: string, style: string) =>
     `<foreignObject ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(Math.max(1, layer.width))}" height="${num(height)}">` +
@@ -193,15 +235,21 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
     }
     case 'wobble': {
       let i = 0;
+      let at = 0;
+      // Each letter is its own span already, so its formatting simply joins that letter's style.
+      const per = layer.styles?.length ? marksPerChar(layer.text.length, layer.styles) : null;
       const inner = [...layer.text]
         .map((ch) => {
+          const index = at;
+          at += ch.length;
           if (ch === '\n') return '<br/>';
           if (ch === '\r') return '';
-          if (ch === ' ') return ' ';
+          const css = per ? esc(marksCss(per[index] ?? {}, ds)) : '';
+          if (ch === ' ') return css ? `<span style="${css}"> </span>` : ' ';
           const n = i++;
           const turn = Math.sin(n * 1.7 + 0.4) * k * 14;
           const lift = Math.cos(n * 2.3) * k * 5;
-          return `<span style="display:inline-block; transform:translateY(${num(lift)}px) rotate(${num(turn)}deg)">${esc(ch)}</span>`;
+          return `<span style="display:inline-block; transform:translateY(${num(lift)}px) rotate(${num(turn)}deg)${css ? `; ${css}` : ''}">${esc(ch)}</span>`;
         })
         .join('');
       return box(inner, base);
@@ -214,11 +262,28 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
       const id = `sy-arc-${esc(layer.id)}-${Math.round(layer.x)}-${Math.round(layer.y)}-${Math.round(w)}`;
       const [offset, anchor] = layer.align === 'left' ? ['0%', 'start'] : layer.align === 'right' ? ['100%', 'end'] : ['50%', 'middle'];
       const d = `M${num(layer.x)} ${num(baseline)} Q${num(layer.x + w / 2)} ${num(baseline - sag * 2)} ${num(layer.x + w)} ${num(baseline)}`;
+      // SVG text on a path: formatted runs become tspans. A highlight has no SVG equivalent and is left out here.
+      const arcWords = layer.styles?.length
+        ? runsOf(layer.text, layer.styles)
+            .map((run) => {
+              const t = esc((s.uppercase ? run.text.toUpperCase() : run.text).replace(/\r?\n/g, ' '));
+              const m = run.marks;
+              const lines = [m.underline ? 'underline' : '', m.strike ? 'line-through' : ''].filter(Boolean).join(' ');
+              const attrs =
+                (m.bold !== undefined ? ` font-weight="${m.bold ? 'bold' : 'normal'}"` : '') +
+                (m.italic !== undefined ? ` font-style="${m.italic ? 'italic' : 'normal'}"` : '') +
+                (lines ? ` text-decoration="${lines}"` : '') +
+                (m.color ? ` fill="${colorOf(ds, m.color) ?? m.color}"` : '') +
+                (m.font && ds.fonts[m.font] ? ` font-family="${esc(ds.fonts[m.font]!)}"` : '');
+              return attrs ? `<tspan${attrs}>${t}</tspan>` : t;
+            })
+            .join('')
+        : esc(line);
       return (
         `<g ${mark}><defs><path id="${id}" d="${d}"/></defs>` +
         `<rect x="${num(layer.x)}" y="${num(layer.y)}" width="${num(w)}" height="${num(s.size * 1.3 + sag)}" fill="none" pointer-events="all"/>` +
         `<text font-family="${esc(font)}" font-size="${num(s.size)}" font-weight="${s.weight}"${s.italic ? ' font-style="italic"' : ''}${s.letterSpacing ? ` letter-spacing="${num(s.letterSpacing)}"` : ''} fill="${color}">` +
-        `<textPath href="#${id}" startOffset="${offset}" text-anchor="${anchor}">${esc(line)}</textPath></text></g>`
+        `<textPath href="#${id}" startOffset="${offset}" text-anchor="${anchor}">${arcWords}</textPath></text></g>`
       );
     }
     default:

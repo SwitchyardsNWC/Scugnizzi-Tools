@@ -18,6 +18,7 @@ import { designSystemOf } from '../model/edit.ts';
 import { blankTemplate } from '../model/starters.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
+import { canvasBlob, freeformCanvas } from '../app/picture.ts';
 import { Surface, type SurfaceApi } from '../app/Surface.tsx';
 import { useEditor } from '../app/useEditor.ts';
 import '../app/app.css';
@@ -52,6 +53,47 @@ function blockOf(t: Template): { block: FreeformBlock; sectionId: string } | nul
       for (const c of r.columns)
         for (const b of c.blocks) if (b.type === 'freeform') return { block: b, sectionId: s.id };
   return null;
+}
+
+// --- pictures kept between visits ---------------------------------------------------------------------
+//
+// IndexedDB rather than the storage the canvas itself lives in: a photograph is megabytes, and that
+// storage holds about five of them for the whole site. Keyed by file name, which is what a layer names.
+
+const PICTURES = 'scuggnizzi-freeform';
+
+function pictureStore(mode: IDBTransactionMode): Promise<IDBObjectStore> {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(PICTURES, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('pictures');
+    open.onsuccess = () => resolve(open.result.transaction('pictures', mode).objectStore('pictures'));
+    open.onerror = () => reject(open.error ?? new Error('IndexedDB would not open.'));
+  });
+}
+
+async function keepPicture(name: string, blob: Blob): Promise<void> {
+  const store = await pictureStore('readwrite');
+  await new Promise<void>((resolve, reject) => {
+    const put = store.put(blob, name);
+    put.onsuccess = () => resolve();
+    put.onerror = () => reject(put.error ?? new Error('The picture could not be kept.'));
+  });
+}
+
+async function loadKeptPictures(): Promise<AssetFile[]> {
+  const store = await pictureStore('readonly');
+  return new Promise((resolve, reject) => {
+    const out: AssetFile[] = [];
+    const cursor = store.openCursor();
+    cursor.onsuccess = () => {
+      const at = cursor.result;
+      if (!at) return resolve(out);
+      const blob = at.value as Blob;
+      out.push({ name: String(at.key), size: blob.size, url: URL.createObjectURL(blob) });
+      at.continue();
+    };
+    cursor.onerror = () => reject(cursor.error ?? new Error('The kept pictures could not be read.'));
+  });
 }
 
 function download(name: string, blob: Blob) {
@@ -93,59 +135,63 @@ function FreeformTool() {
     if (sel.kind !== 'block' || sel.blockId !== found.block.id) editor.select({ kind: 'block', sectionId: found.sectionId, blockId: found.block.id });
   }, [editor, found]);
 
-  // Template Studio's app owns undo; on its own the tool has to.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest('input, textarea, [contenteditable]')) return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) editor.redo();
-        else editor.undo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [editor]);
+  // ⌘Z and ⇧⌘Z come with useEditor, which binds them itself. This page once bound them a second time,
+  // and every ⌘Z undid two steps.
 
-  /** Pictures from the computer, as data URLs so they survive a reload and export without a folder. */
-  const addFiles = useCallback((files: FileList | File[], at: { x: number; y: number } | null) => {
-    for (const file of [...files].filter((f) => f.type.startsWith('image/'))) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const asset: AssetFile = { name: file.name, size: file.size, url: String(reader.result) };
-        setAssets((old) => [...old.filter((a) => a.name !== asset.name), asset]);
-        api.current?.dropAsset(asset, at);
-      };
-      reader.readAsDataURL(file);
-    }
+  // The pictures kept from earlier visits, before anything is drawn with them.
+  useEffect(() => {
+    loadKeptPictures()
+      .then((kept) => setAssets((old) => [...kept.filter((k) => !old.some((a) => a.name === k.name)), ...old]))
+      .catch(() => {
+        // No IndexedDB here (a private window, say): pictures last for this visit only.
+      });
   }, []);
+
+  /**
+   * Pictures from the computer. The layer stores the file's name, the way a picture from a project
+   * folder is stored; the file itself is kept in this browser's IndexedDB under that name, so it is
+   * still there after a reload. The first version kept it only in memory, and a reload left the layer
+   * pointing at nothing.
+   */
+  const addFiles = useCallback(
+    (files: FileList | File[], at: { x: number; y: number } | null) => {
+      for (const file of [...files].filter((f) => f.type.startsWith('image/'))) {
+        const asset: AssetFile = { name: file.name, size: file.size, url: URL.createObjectURL(file) };
+        setAssets((old) => [...old.filter((a) => a.name !== asset.name), asset]);
+        keepPicture(file.name, file).catch(() => notify(`${file.name} is on the canvas, but this browser would not keep it for next time.`));
+        api.current?.dropAsset(asset, at);
+      }
+    },
+    [notify],
+  );
 
   if (!found) return null;
   const { block } = found;
   const ds = designSystemOf(editor.template);
 
-  const svgText = () => freeformSvg(block, ds);
-  const exportSvg = () => download('freeform.svg', new Blob([svgText()], { type: 'image/svg+xml' }));
-  const exportPng = () => {
-    const scale = 2;
-    const image = new Image();
-    image.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = block.width * scale;
-      canvas.height = block.height * scale;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return notify('This browser would not give me a canvas to draw on.');
-      const bg = colorOf(ds, block.background);
-      if (bg) {
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => (blob ? download('freeform@2x.png', blob) : notify('The picture could not be encoded.')), 'image/png');
-    };
-    image.onerror = () => notify('The canvas could not be drawn into a picture.');
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText())}`;
+  // What the page sits on. A plain export keeps a transparent page; a print needs paper under it.
+  const section = editor.template.sections.find((s) => s.id === found.sectionId);
+  const ground = colorOf(ds, block.background) ?? section?.containerColor ?? section?.bandColor ?? '#ffffff';
+  const printed = Boolean(block.effects?.length);
+  const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
+  const exportPng = async () => {
+    try {
+      const canvas = await freeformCanvas(block, ds, { assets, scale: 2, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
+      download('freeform@2x.png', await canvasBlob(canvas));
+    } catch (cause) {
+      failed(cause);
+    }
+  };
+  const exportSvg = async () => {
+    if (!printed) return download('freeform.svg', new Blob([freeformSvg(block, ds)], { type: 'image/svg+xml' }));
+    // A print is pixels, which SVG cannot describe: the printed picture goes inside it as an image.
+    try {
+      const canvas = await freeformCanvas(block, ds, { assets, scale: 2, ground });
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${block.width}" height="${block.height}" viewBox="0 0 ${block.width} ${block.height}"><image href="${canvas.toDataURL('image/png')}" width="${block.width}" height="${block.height}"/></svg>`;
+      download('freeform.svg', new Blob([svg], { type: 'image/svg+xml' }));
+    } catch (cause) {
+      failed(cause);
+    }
   };
   const startOver = () => {
     const before = editor.template;
@@ -192,10 +238,10 @@ function FreeformTool() {
                 <button class="fig-pill" title="Start a fresh canvas. Undo from the message brings this one back." onClick={startOver}>
                   New
                 </button>
-                <button class="fig-pill" title="Download the canvas as SVG" onClick={exportSvg}>
+                <button class="fig-pill" title="Download the canvas as SVG" onClick={() => void exportSvg()}>
                   SVG
                 </button>
-                <button class="fig-pill fig-done" title="Download the canvas as a PNG at 2×" onClick={exportPng}>
+                <button class="fig-pill fig-done" title="Download the canvas as a PNG at 2×, printed through its effects" onClick={() => void exportPng()}>
                   Export PNG
                 </button>
               </>

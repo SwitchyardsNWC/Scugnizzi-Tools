@@ -35,13 +35,17 @@ import {
   type Box,
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
-import { BRUSHES, erasePaths, groupRuns, moveItem, ungroupLayers } from '../model/freeform.ts';
+import { BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
+import { HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects } from '../model/effects.ts';
+import { canvasBlob, freeformCanvas } from './picture.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
 import { MARKS } from '../model/marks.ts';
-import type { Brush, FreeformBlock, FreeformLayer, Template } from '../model/types.ts';
-import { FigBar, FigLayers, FigSlash } from './FigPanel.tsx';
+import type { Brush, FreeformBlock, FreeformLayer, StyleRange, Template, TextMarks } from '../model/types.ts';
+import { FigBar, FigFormat, FigLayers, FigSlash, type FormatState } from './FigPanel.tsx';
+import { editableHtml, keepEnd, readEditable, selectionOffsets, setSelectionOffsets } from './rich-editing.ts';
+import { applyMarks, clearMarks, markState, spliceText, toggleMark, type MarkKey } from '../model/rich-text.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
-import { withLocalAssets } from './local-assets.ts';
+import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
 import { capture, release } from './pointer.ts';
 import type { Editor } from './useEditor.ts';
 
@@ -225,6 +229,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   const [view, setViewState] = useState<View>({ x: 0, y: 0, z: 1 });
   const viewRef = useRef(view);
+  /** Somebody has panned or zoomed. Until then a change of size keeps the page fitted. */
+  const viewTouched = useRef(false);
   const setView = useCallback((next: View) => {
     viewRef.current = next;
     setViewState(next);
@@ -275,7 +281,11 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const [dragging, setDragging] = useState(false);
   /** A `/` typed into the words, and which command the arrows are on. */
   const [slash, setSlash] = useState<{ at: number; query: string; index: number } | null>(null);
-  const textRef = useRef<HTMLTextAreaElement | null>(null);
+  const textRef = useRef<HTMLDivElement | null>(null);
+  /** What the selected words, or all of them, are set in: the format bar's buttons, while typing. */
+  const [fmt, setFmt] = useState<FormatState | null>(null);
+  const editingRef = useRef<string | null>(null);
+  editingRef.current = editingText;
   const blockRef = useRef<FreeformBlock | null>(null);
   if (block?.type === 'freeform') blockRef.current = block;
   const layerRef = useRef(layer);
@@ -405,6 +415,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   const zoomTo = useCallback(
     (z: number, about?: Point, smooth = false) => {
+      viewTouched.current = true;
       const w = work.current?.getBoundingClientRect();
       const v = viewRef.current;
       const next = clampZoom(z);
@@ -434,6 +445,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       if (phaseRef.current !== 'idle') return;
+      viewTouched.current = true;
       const r = el.getBoundingClientRect();
       if (event.ctrlKey || event.metaKey) {
         zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025), { x: event.clientX - r.left, y: event.clientY - r.top });
@@ -446,6 +458,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomTo, setView]);
+
+  // The window, or the room beside the layers panel, changes size before anyone has moved the view —
+  // a tab that opened in the background, a panel folded away: the page stays fitted.
+  useEffect(() => {
+    const el = work.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (viewTouched.current || phaseRef.current !== 'idle') return;
+      const f = fitView();
+      if (f) setView(f);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitView, setView]);
 
   // --- boxes, and the little motions ---------------------------------------------------------------
 
@@ -539,6 +565,146 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     [commit, blockId, onSelectLayer],
   );
   const place = useCallback((label: string, next: Template, pick = true) => placeMany(label, next, 1, pick), [placeMany]);
+
+  // --- effects: the page printed through them, and the round trip to the Riso tool ---------------------
+
+  /** The page printed through its effects, laid over the drawing. The drawing stays underneath to be picked. */
+  const [fx, setFx] = useState<{ key: string; url: string } | null>(null);
+  const fxUrl = useRef<string | null>(null);
+  const [fxNote, setFxNote] = useState<string | null>(null);
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+  const dsRef = useRef(ds);
+  dsRef.current = ds;
+  const fxKey = block?.type === 'freeform' && block.effects?.length ? recipeHash(block) : null;
+  /** What the page sits on. A print needs an opaque ground: it reads a transparent pixel as black ink. */
+  const groundOf = (b: FreeformBlock) => {
+    const s = siteOf(editorRef.current.template, blockId);
+    return colorOf(dsRef.current, b.background) ?? s?.section.containerColor ?? s?.section.bandColor ?? '#ffffff';
+  };
+
+  // Printed again once a change settles — never mid-drag or mid-word, which would stutter.
+  useEffect(() => {
+    if (!fxKey || dragging || editingText) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const b = blockRef.current;
+      if (!b) return;
+      try {
+        const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b) }));
+        if (cancelled) return;
+        if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
+        fxUrl.current = URL.createObjectURL(blob);
+        setFx({ key: fxKey, url: fxUrl.current });
+      } catch {
+        // The plain drawing stays on screen.
+      }
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fxKey, dragging, editingText, assets]);
+  useEffect(() => () => void (fxUrl.current && URL.revokeObjectURL(fxUrl.current)), []);
+
+  /** The plain page and its settings, left for the Riso tool, which opens in a tab of its own. */
+  const openInRiso = async () => {
+    const b = blockRef.current;
+    if (!b) return;
+    try {
+      const canvas = await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b), effects: false });
+      let image = canvas.toDataURL('image/png');
+      if (image.length > 3_500_000) image = canvas.toDataURL('image/jpeg', 0.92);
+      const session = `${blockId}:${Date.now().toString(36)}`;
+      const step = b.effects?.find((e) => e.effect === 'riso') ?? risoStep(0);
+      // `returnUrl`: where Riso goes back to when it opened in this same tab rather than a new one.
+      localStorage.setItem(HANDOFF_RISO, JSON.stringify({ session, blockId, title: b.alt || 'Freeform', image, unit: 2, step, returnUrl: window.location.href, zoom: viewRef.current.z }));
+      const tab = window.open(new URL(`../../riso/riso.html?handoff=${encodeURIComponent(session)}`, window.location.href).href, '_blank');
+      setFxNote(tab ? 'Riso is open in a new tab. Press Back to Freeform there and the settings land here.' : 'The browser blocked the new tab. Allow pop-ups for this page and try again.');
+    } catch {
+      setFxNote('This page is too big to hand to Riso from the browser. Make it smaller and try again.');
+    }
+  };
+
+  // Back from Riso: its settings arrive through the browser's storage, from the other tab.
+  useEffect(() => {
+    const take = () => {
+      let back: { session?: string; blockId?: string; step?: unknown } | null = null;
+      let sent: { session?: string } | null = null;
+      try {
+        back = JSON.parse(localStorage.getItem(HANDOFF_RISO_RETURN) || 'null');
+        sent = JSON.parse(localStorage.getItem(HANDOFF_RISO) || 'null');
+      } catch {
+        return;
+      }
+      if (!back || back.blockId !== blockId || !sent || sent.session !== back.session) return;
+      const step = normalizeRiso(back.step);
+      try {
+        // The picture was only ever for the hand-off; it is the heaviest thing this site stores.
+        localStorage.removeItem(HANDOFF_RISO_RETURN);
+        localStorage.removeItem(HANDOFF_RISO);
+      } catch {
+        // Nothing to clean.
+      }
+      if (!step) return;
+      const ed = editorRef.current;
+      const next = setEffects(ed.template, blockId, [step]);
+      if (next !== ed.template) ed.commit('Riso, from the tool', next);
+      setFxNote('Back from Riso.');
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === HANDOFF_RISO_RETURN) take();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', take);
+    take();
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', take);
+    };
+  }, [blockId]);
+
+  // --- words being typed: a rich editor, so some of them can be bold -------------------------------------
+
+  /** The layer being typed into, as it stands now. */
+  const typingLayer = () => {
+    const l = blockRef.current?.layers.find((x) => x.id === editingRef.current);
+    return l && (l.kind === 'text' || l.kind === 'sticky') ? l : null;
+  };
+
+  const refreshFormat = () => {
+    const el = textRef.current;
+    const l = typingLayer();
+    if (!el || !l) return;
+    const { text, styles } = readEditable(el);
+    const o = selectionOffsets(el);
+    const whole = !o || o.start === o.end;
+    const from = whole ? 0 : Math.min(o.start, o.end);
+    const to = whole ? text.length : Math.max(o.start, o.end);
+    const st = textStyleOf(l, dsRef.current);
+    setFmt({ ...markState(text, styles, from, to, { bold: st.weight === 'bold', italic: st.italic }), scope: whole ? 'all' : 'selection' });
+  };
+
+  // Filled once, when typing starts. From then on the browser owns the caret, and the words and their
+  // formatting are read back out of the editor on every keystroke.
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    const l = typingLayer();
+    if (!editingText || !el || !l) return;
+    el.innerHTML = editableHtml(l.text, l.styles, dsRef.current);
+    el.focus();
+    const doc = el.ownerDocument;
+    const range = doc.createRange();
+    range.selectNodeContents(el);
+    doc.getSelection()?.removeAllRanges();
+    doc.getSelection()?.addRange(range);
+    refreshFormat();
+    const onSelection = () => refreshFormat();
+    doc.addEventListener('selectionchange', onSelection);
+    return () => doc.removeEventListener('selectionchange', onSelection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingText]);
 
   const choosePaint = (color: ColorRef) => {
     setPaint(color);
@@ -698,6 +864,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const key = `surface:${blockId}`;
     switch (state.kind) {
       case 'pan':
+        viewTouched.current = true;
         setView({ ...state.view, x: state.view.x + (event.clientX - state.x), y: state.view.y + (event.clientY - state.y) });
         return;
       case 'move': {
@@ -1040,6 +1207,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const count = block.layers.length;
   const swatch = colorOf(ds, paint);
   const penDef = BRUSHES.find((b) => b.brush === brush) ?? BRUSHES[1]!;
+  // The print shows whenever there is one to show; mid-gesture the live drawing does, so it can be seen moving.
+  const showFx = Boolean(fxKey && fx && !dragging && !typing && !ghost && !pageDrag);
 
   const field = typing
     ? (() => {
@@ -1098,18 +1267,66 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   };
 
   const slashItems: CanvasCommand[] = typing && slash ? filterCommands(canvasCommands(typing, ds), slash.query) : [];
+  /** Words and formatting into the layer and the editor together, with the selection put back where it belongs. */
+  const rewrite = (label: string, next: { text: string; styles: StyleRange[] }, extra: Record<string, unknown>, start: number, end: number, coalesce?: string) => {
+    const el = textRef.current;
+    if (!el || !typing) return;
+    commit(label, updateLayer(tpl(), blockId, typing.id, { ...extra, text: next.text, styles: next.styles.length ? next.styles : undefined }), coalesce);
+    el.innerHTML = editableHtml(next.text, next.styles, ds);
+    setSelectionOffsets(el, start, end);
+    refreshFormat();
+  };
+
   const pickSlash = (item: CanvasCommand) => {
     const el = textRef.current;
     if (!el || !typing || !slash) return;
-    const caret = el.selectionStart ?? el.value.length;
+    const cur = readEditable(el);
+    const caret = selectionOffsets(el)?.end ?? cur.text.length;
     const at = slash.at;
-    const text = el.value.slice(0, at) + el.value.slice(caret);
-    commit(`Text · ${item.label}`, updateLayer(tpl(), blockId, typing.id, { ...item.patch, text }));
+    rewrite(`Text · ${item.label}`, spliceText(cur.text, cur.styles, at, caret, ''), item.patch, at, at);
     setSlash(null);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(at, at);
-    });
+  };
+
+  /** A newline or pasted words, as plain text in the formatting of the letter before them. */
+  const insertPlain = (words: string) => {
+    const el = textRef.current;
+    if (!el || !typing || !words) return;
+    const cur = readEditable(el);
+    const o = selectionOffsets(el) ?? { start: cur.text.length, end: cur.text.length };
+    const from = Math.min(o.start, o.end);
+    const clean = words.replace(/\r\n?/g, '\n');
+    const at = from + clean.length;
+    rewrite('Edit text', spliceText(cur.text, cur.styles, from, Math.max(o.start, o.end), clean), {}, at, at, `surface:${blockId}:text:${typing.id}`);
+  };
+
+  /** The words formatting goes on: the selection, or every word when nothing is selected. */
+  const formatSpan = () => {
+    const el = textRef.current;
+    if (!el || !typing) return null;
+    const cur = readEditable(el);
+    const o = selectionOffsets(el);
+    const whole = !o || o.start === o.end;
+    const from = whole ? 0 : Math.min(o.start, o.end);
+    const to = whole ? cur.text.length : Math.max(o.start, o.end);
+    return from === to ? null : { cur, from, to, keep: o ?? { start: from, end: to } };
+  };
+  const FORMAT_LABELS: Record<MarkKey, string> = { bold: 'Bold', italic: 'Italic', underline: 'Underline', strike: 'Strikethrough' };
+  const toggleFormat = (key: MarkKey) => {
+    const s = formatSpan();
+    if (!s || !typing) return;
+    const st = textStyleOf(typing, ds);
+    const base = key === 'bold' ? st.weight === 'bold' : key === 'italic' ? st.italic : false;
+    rewrite(FORMAT_LABELS[key], { text: s.cur.text, styles: toggleMark(s.cur.text, s.cur.styles, s.from, s.to, key, base) }, {}, s.keep.start, s.keep.end);
+  };
+  const markFormat = (label: string, patch: Partial<TextMarks>) => {
+    const s = formatSpan();
+    if (!s) return;
+    rewrite(label, { text: s.cur.text, styles: applyMarks(s.cur.text, s.cur.styles, s.from, s.to, patch) }, {}, s.keep.start, s.keep.end);
+  };
+  const clearFormat = () => {
+    const s = formatSpan();
+    if (!s) return;
+    rewrite('Clear formatting', { text: s.cur.text, styles: clearMarks(s.cur.text, s.cur.styles, s.from, s.to) }, {}, s.keep.start, s.keep.end);
   };
 
   // Where the mini menu floats: over the picked thing's top edge, or under its bottom when there is no room above.
@@ -1130,6 +1347,17 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const left = Math.max(180, Math.min(width - (panelOpen ? PANEL_ROOM : 0) - 180, view.x + centre.x * view.z));
     return { left, top: below ? view.y + maxY * view.z + 18 : above, below };
   })();
+
+  // The format bar sits over the words being typed, or under them when there is no room above.
+  const formatAt =
+    field && typing
+      ? (() => {
+          const pad = typing.kind === 'sticky' ? 14 * view.z : 0;
+          const above = field.top - pad - 12;
+          const below = above < 120;
+          return { left: Math.max(8, field.left - pad), top: below ? field.top + field.height + pad + 14 : above, below };
+        })()
+      : null;
 
   const slashAtScreen = field
     ? (() => {
@@ -1169,7 +1397,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
             <rect class="surface-page-shadow" x={0} y={0} width={block.width} height={block.height} fill={pageFill} filter="url(#fig-shadow)" />
             <rect x={0} y={0} width={block.width} height={block.height} fill={pageFill} />
-            <g dangerouslySetInnerHTML={{ __html: withLocalAssets(freeformLayersSvg(drawn, ds), assets) }} />
+            {/* Under a print the drawing is invisible but still there, so a click still finds its layer. */}
+            <g style={showFx ? { opacity: 0 } : undefined} dangerouslySetInnerHTML={{ __html: withoutMissingPictures(withLocalAssets(freeformLayersSvg(drawn, ds), assets)) }} />
+            {showFx && fx && <image href={fx.url} x={0} y={0} width={block.width} height={block.height} preserveAspectRatio="none" style={{ pointerEvents: 'none' }} />}
             {idle && (
               <>
                 <rect data-handle="page-e" x={block.width - 3.5 / view.z} y={block.height / 2 - 20 / view.z} width={7 / view.z} height={40 / view.z} rx={3.5 / view.z} class="surface-page-grip" style={{ cursor: 'ew-resize' }} />
@@ -1254,13 +1484,18 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         )}
 
         {field && typing && (
-          <textarea
+          <div
             class={`surface-text ${typing.kind === 'sticky' ? 'on-sticky' : ''}`}
+            contentEditable
+            role="textbox"
+            aria-multiline="true"
+            aria-label={typing.kind === 'sticky' ? 'Note' : 'Text'}
+            data-placeholder={typing.kind === 'sticky' ? 'Type something… or / for styles' : ''}
             style={{
               left: `${field.left}px`,
               top: `${field.top}px`,
               width: `${field.width}px`,
-              height: `${field.height}px`,
+              ...(typing.kind === 'sticky' ? { height: `${field.height}px` } : { minHeight: `${field.height}px` }),
               fontFamily: field.font,
               fontSize: `${field.size}px`,
               lineHeight: `${field.style.lineHeight}%`,
@@ -1272,30 +1507,50 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               letterSpacing: field.style.letterSpacing ? `${field.style.letterSpacing * view.z}px` : undefined,
               transform: typing.rotation ? `rotate(${typing.rotation}deg)` : undefined,
             }}
-            value={typing.text}
-            placeholder={typing.kind === 'sticky' ? 'Type something… or / for styles' : ''}
             ref={(el) => {
               textRef.current = el;
-              if (el && document.activeElement !== el) {
-                el.focus();
-                el.select();
-              }
             }}
-            onInput={(e) => {
-              const el = e.target as HTMLTextAreaElement;
-              if (typing.kind === 'text') {
-                el.style.height = 'auto';
-                el.style.height = `${el.scrollHeight}px`;
-              }
-              commit('Edit text', updateLayer(tpl(), blockId, typing.id, { text: el.value }), `surface:${blockId}:text:${typing.id}`);
-              const found = slashAt(el.value, el.selectionStart ?? el.value.length);
+            onInput={() => {
+              const el = textRef.current;
+              if (!el) return;
+              const { text, styles } = readEditable(el);
+              keepEnd(el, text);
+              commit('Edit text', updateLayer(tpl(), blockId, typing.id, { text, styles: styles.length ? styles : undefined }), `surface:${blockId}:text:${typing.id}`);
+              const found = slashAt(text, selectionOffsets(el)?.end ?? text.length);
               setSlash(found ? { ...found, index: slash && slash.at === found.at && slash.query === found.query ? slash.index : 0 } : null);
+              refreshFormat();
+            }}
+            onPaste={(e) => {
+              // Plain words only: formatting pasted from somewhere else is not something the picture can promise to draw.
+              e.preventDefault();
+              insertPlain(e.clipboardData?.getData('text/plain') ?? '');
             }}
             onBlur={() => {
               setSlash(null);
               setEditingText(null);
             }}
             onKeyDown={(e) => {
+              const meta = e.metaKey || e.ctrlKey;
+              const letter = e.key.toLowerCase();
+              if (meta && !e.altKey && !e.shiftKey && (letter === 'b' || letter === 'i' || letter === 'u')) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFormat(letter === 'b' ? 'bold' : letter === 'i' ? 'italic' : 'underline');
+                return;
+              }
+              if (meta && e.shiftKey && letter === 'x') {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFormat('strike');
+                return;
+              }
+              if (e.key === 'Enter' && !slash) {
+                // A newline through the model, not the browser, which would wrap lines in <div>s of its own.
+                e.preventDefault();
+                e.stopPropagation();
+                insertPlain('\n');
+                return;
+              }
               if (slash) {
                 const n = slashItems.length;
                 if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
@@ -1324,6 +1579,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               e.stopPropagation();
             }}
           />
+        )}
+
+        {typing && fmt && formatAt && !slash && (
+          <FigFormat ds={ds} state={fmt} left={formatAt.left} top={formatAt.top} below={formatAt.below} onToggle={toggleFormat} onMarks={markFormat} onClear={clearFormat} />
         )}
 
         {typing && slash && slashAtScreen && (
@@ -1380,6 +1639,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onUngroup={ungroup}
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
+          onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
+          onOpenRiso={() => void openInRiso()}
+          effectNote={fxNote}
+          effectBusy={Boolean(fxKey && fx?.key !== fxKey)}
           onClose={() => setPanelOpen(false)}
         />
       ) : (

@@ -1691,3 +1691,78 @@ button.fig-pill:active { transform: scale(0.96); }
 .fig-brush b { font-weight: 600; }
 .fig-brush:hover { transform: translateY(-2px) rotate(-2deg); }
 .fig-brush.on { background: #eee9ff; box-shadow: inset 0 0 0 2px #7b61ff; color: #6b4ff6; }
+
+/* Effects on the page (FigPanel.tsx › FigEffects). */
+.fig-effects { display: grid; gap: 9px; padding: 10px 14px 14px; border-top: 1px solid #f0ece4; max-height: 52%; overflow-y: auto; }
+.fig-effects .fig-page-row .grow { flex: 1; }
+.fig-effects .fig-sliders { width: auto; padding: 0; }
+.fig-fx-presets { display: grid; gap: 6px; }
+.fig-fx-preset {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 11px; background: #f6f4ef;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; text-align: left; cursor: pointer;
+  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+}
+.fig-fx-preset:hover { background: #eee9ff; transform: translateX(3px) rotate(-1deg); }
+.fig-fx-inks { display: inline-flex; flex: none; }
+.fig-fx-inks i { width: 16px; height: 16px; margin-right: -5px; border: 2px solid #fff; border-radius: 999px; mix-blend-mode: multiply; }
+.fig-fx-hint { margin: 0; font-size: 11.5px; line-height: 1.4; color: #8d877c; }
+.fig-fx-busy { font-size: 11px; font-weight: 600; color: #6b4ff6; animation: fig-fx-pulse 900ms ease-in-out infinite alternate; }
+@keyframes fig-fx-pulse { from { opacity: 0.35; } to { opacity: 1; } }
+.fig-dot-add { display: grid; place-items: center; padding: 0; background: #f6f4ef; color: #6f6a60; font-size: 14px; font-weight: 700; line-height: 1; }
+.fig-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: #f6f4ef; }
+.fig-seg button { height: 24px; padding: 0 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: #6f6a60; cursor: pointer; text-transform: capitalize; }
+.fig-seg button.on { background: #fff; color: #1e1c19; box-shadow: 0 1px 2px rgb(40 30 10 / 0.12); }
+.fig-fx-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 8px; border-radius: 12px; background: #faf8f4; }
+.fig-fx-actions { display: flex; gap: 6px; }
+.fig-fx-actions .fig-chip { flex: 1; justify-content: center; padding: 0 10px; }
+.fig-chip.primary { background: #7b61ff; color: #fff; }
+.fig-chip.primary:hover { background: #6b4ff6; }
+
+/* Rich words while typing (Surface's editor, FigPanel › FigFormat) and fonts from the design system. */
+.surface-text[contenteditable] { white-space: pre-wrap; overflow-wrap: break-word; cursor: text; }
+.surface-text[contenteditable]:empty::before { content: attr(data-placeholder); color: rgb(0 0 0 / 0.35); pointer-events: none; }
+.fig-format {
+  z-index: 5; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px;
+  transform: translateY(-100%); transform-origin: 0 100%; animation: fig-bar-in 240ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.fig-format.below { flex-direction: column; transform: none; transform-origin: 0 0; }
+.fmt-glyph { font: 700 15px/1 Georgia, "Times New Roman", serif; color: inherit; }
+.fmt-glyph.italic { font-style: italic; }
+.fmt-glyph.underline { text-decoration: underline; text-underline-offset: 2px; }
+.fmt-glyph.strike, .fmt-glyph.clear { text-decoration: line-through; }
+.fmt-hl { padding: 0 2px; font: 700 13px/1 ui-rounded, system-ui, sans-serif; color: #1e1c19; }
+.fig-format-scope { padding: 0 8px 0 4px; font-size: 11px; font-weight: 600; color: #a39d92; white-space: nowrap; }
+.fig-font-list { display: grid; gap: 2px; min-width: 200px; max-height: 260px; overflow-y: auto; }
+.fig-font-item {
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 5px; border: 0; border-radius: 10px;
+  background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; text-align: left; cursor: pointer;
+}
+.fig-font-item:hover { background: #f6f4ef; }
+.fig-font-item.on { background: #eee9ff; }
+.fig-font-item span, .fig-font-aa {
+  display: inline-grid; place-items: center; width: 30px; height: 24px; border-radius: 7px;
+  background: #f6f4ef; font-size: 15px; font-weight: 400; color: #1e1c19;
+}
+.fig-font-item.on span, .fig-chip .fig-font-aa { background: #fff; }
+.fig-slash-preview .glyph.face { font-size: 16px; font-weight: 400; color: #1e1c19; }
+
+/* Looks saved to the project, and swapping looks while a print is on. */
+.fig-fx-sub { margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a39d92; }
+.fig-fx-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.fig-fx-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 9px 0 6px; border: 0; border-radius: 999px;
+  background: #f6f4ef; font: inherit; font-size: 11.5px; font-weight: 600; color: #3d3931; cursor: pointer; white-space: nowrap;
+  transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+}
+.fig-fx-chip:hover { background: #eee9ff; transform: translateY(-1px) rotate(-1deg); }
+.fig-fx-chip.saved { box-shadow: inset 0 0 0 1.5px #d9d0ff; }
+.fig-fx-chip .fig-fx-inks i { width: 12px; height: 12px; margin-right: -4px; }
+.fig-text-btn { margin-left: auto; padding: 4px 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: #6b4ff6; cursor: pointer; }
+.fig-text-btn:hover { background: #eee9ff; }
+.fig-effects .fig-page-row .fig-text-btn + .fig-icon-btn { margin-left: 0; }
+.fig-fx-name { display: flex; gap: 6px; }
+.fig-fx-name input {
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 0; border-radius: 10px; background: #f6f4ef;
+  font: inherit; font-size: 12.5px; color: #1e1c19;
+}
+.fig-fx-name input:focus { outline: 2px solid #7b61ff; }
