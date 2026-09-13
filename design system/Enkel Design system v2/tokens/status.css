@@ -1,0 +1,33 @@
+:root{
+/* semantic status — muted, monochrome-adjacent. Colour means status, not personality. */
+--color-moss:#5b6b4e;--color-moss-soft:#e8ece3;
+--color-amber:#a8782a;--color-amber-soft:#f3ead6;
+--color-brick:#8a3b2e;--color-brick-soft:#f1e0dc;
+--color-slate-soft:#e2e5ec;
+--color-fossil-soft:#eeeeed;
+--status-done:var(--color-moss);--status-done-soft:var(--color-moss-soft);
+--status-progress:var(--color-slate-iris);--status-progress-soft:var(--color-slate-soft);
+--status-risk:var(--color-amber);--status-risk-soft:var(--color-amber-soft);
+--status-blocked:var(--color-brick);--status-blocked-soft:var(--color-brick-soft);
+--status-notstarted:var(--color-graphite);--status-notstarted-soft:var(--color-fossil-soft);
+/* source — where a schedule row comes from */
+--source-warehouse:var(--color-charcoal);--source-warehouse-soft:var(--color-fossil-soft);
+--source-purchase:var(--color-ink-black);--source-purchase-soft:var(--color-paper-white);
+--source-build:var(--color-slate-iris);--source-build-soft:var(--color-slate-soft);
+/* text on a solid source ink — inverts with the theme so light dark-mode inks stay readable */
+--source-on-ink:var(--color-paper-white);
+/* freshness of live document sections */
+--fresh-live:var(--color-moss);--fresh-stale:var(--color-amber);--fresh-frozen:var(--color-charcoal);
+}
+[data-theme="dark"]{
+--status-done:#8fb082;--status-done-soft:#1e261a;
+--status-progress:#8b98c9;--status-progress-soft:#1e2233;
+--status-risk:#d9a54c;--status-risk-soft:#2c2413;
+--status-blocked:#dc7a64;--status-blocked-soft:#301b16;
+--status-notstarted:#9a9c99;--status-notstarted-soft:#222222;
+--source-warehouse:#cfcfcc;--source-warehouse-soft:#222222;
+--source-purchase:#f2f2f0;--source-purchase-soft:#151515;
+--source-build:#8b98c9;--source-build-soft:#1e2233;
+--source-on-ink:#0d0d0d;
+--fresh-live:#8fb082;--fresh-stale:#d9a54c;--fresh-frozen:#cfcfcc;
+}

@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Claude Code: personal permission lists stay on the machine that made them
+.claude/settings.local.json
+**/.claude/settings.local.json
+
+# Output of template-studio/tools/regenerate-v1-export.js
+regen-*.html

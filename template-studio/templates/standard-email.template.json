@@ -1,0 +1,511 @@
+{
+  "designSystem": "switchyards",
+  "forceLight": true,
+  "hubspotLabel": "Switchyards Standard Email",
+  "id": "b01d",
+  "name": "Standard email",
+  "pageBackground": "#f7f6f3",
+  "preview": {
+    "address": "151 Ted Turner Dr SE",
+    "city": "Atlanta",
+    "company": "SWITCHYARDS U.S.A.",
+    "state": "GA",
+    "zip": "30303"
+  },
+  "schema": 6,
+  "sections": [
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "id": "b004",
+      "linkColor": "#fcfff5",
+      "padBottom": 8,
+      "padTop": 12,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "id": "b001",
+                  "lock": {
+                    "editable": true,
+                    "field": "top_bar_tagline",
+                    "label": "Top bar tagline"
+                  },
+                  "text": "\"The world’s first neighborhood work club.\"",
+                  "type": "topbar"
+                }
+              ],
+              "id": "b002",
+              "padBottom": 8,
+              "padTop": 12,
+              "span": 12
+            }
+          ],
+          "id": "b003",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b008",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b005",
+                  "stripes": [
+                    {
+                      "color": "offwhite",
+                      "height": 2
+                    },
+                    {
+                      "color": "redBright",
+                      "height": 4
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b006",
+              "padBottom": 0,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b007",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00c",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "SWITCHYARDS",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b009",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Logo"
+                  },
+                  "mode": "static",
+                  "optional": true,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/SYLogo_Header_Outlined.png?width=350&upscale=true&name=SYLogo_Header_Outlined.png",
+                  "type": "image",
+                  "width": 175
+                }
+              ],
+              "id": "b00a",
+              "padBottom": 20,
+              "padTop": 40,
+              "span": 12
+            }
+          ],
+          "id": "b00b",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00g",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "",
+                  "href": "",
+                  "id": "b00d",
+                  "lock": {
+                    "editable": true,
+                    "field": "hero_image",
+                    "label": "Hero image"
+                  },
+                  "mode": "module",
+                  "optional": true,
+                  "src": "",
+                  "type": "image",
+                  "width": 560
+                }
+              ],
+              "id": "b00e",
+              "padBottom": 20,
+              "padTop": 20,
+              "span": 12
+            }
+          ],
+          "id": "b00f",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00k",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h1>Heading one</h1><p><strong>Lorem ipsum dolor sit amet,</strong> consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris <a href=\"https://www.switchyards.com/\" target=\"_blank\">something linked</a> ea commodo consequat. <strong>Duis aute irure dolor</strong> in reprehenderit in voluptate velit esse cillum dolore eu fugiat.</p>",
+                  "id": "b00h",
+                  "lock": {
+                    "editable": true,
+                    "field": "body",
+                    "label": "Body"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00i",
+              "padBottom": 10,
+              "padTop": 20,
+              "span": 12
+            }
+          ],
+          "id": "b00j",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00o",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "align": "center",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b00l",
+                  "link": {
+                    "editable": true,
+                    "field": "button_link",
+                    "label": "Button link"
+                  },
+                  "lock": {
+                    "editable": true,
+                    "field": "button_text",
+                    "label": "Button text (blank to hide)"
+                  },
+                  "style": "primary",
+                  "text": "CTA Button.",
+                  "type": "button"
+                }
+              ],
+              "id": "b00m",
+              "padBottom": 20,
+              "padTop": 20,
+              "span": 12
+            }
+          ],
+          "id": "b00n",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00s",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "",
+                  "href": "",
+                  "id": "b00p",
+                  "lock": {
+                    "editable": true,
+                    "field": "secondary_image",
+                    "label": "Secondary image"
+                  },
+                  "mode": "module",
+                  "optional": true,
+                  "src": "",
+                  "type": "image",
+                  "width": 560
+                }
+              ],
+              "id": "b00q",
+              "padBottom": 10,
+              "padTop": 10,
+              "span": 12
+            }
+          ],
+          "id": "b00r",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00w",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>See you around the club,</p><p>- Switchyards</p>",
+                  "id": "b00t",
+                  "lock": {
+                    "editable": true,
+                    "field": "closing_text",
+                    "label": "Closing text"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00u",
+              "padBottom": 0,
+              "padTop": 10,
+              "span": 12
+            }
+          ],
+          "id": "b00v",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b010",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "See you around the club",
+                  "href": "",
+                  "id": "b00x",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Sign-off"
+                  },
+                  "mode": "static",
+                  "optional": true,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/Seeyouaroundtheclub.png?width=560&upscale=true&name=Seeyouaroundtheclub.png",
+                  "type": "image",
+                  "width": 280
+                }
+              ],
+              "id": "b00y",
+              "padBottom": 40,
+              "padTop": 40,
+              "span": 12
+            }
+          ],
+          "id": "b00z",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b014",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b011",
+                  "stripes": [
+                    {
+                      "color": "redBright",
+                      "height": 4
+                    },
+                    {
+                      "color": "offwhite",
+                      "height": 2
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b012",
+              "padBottom": 0,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b013",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "domId": "section-legal",
+      "id": "b018",
+      "linkColor": "#fcfff5",
+      "padBottom": 10,
+      "padTop": 80,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "right",
+              "blocks": [
+                {
+                  "id": "b015",
+                  "logoSrc": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=360&upscale=true&name=sy-logo-lockup@2x.png",
+                  "logoWidth": 180,
+                  "note": "Please consider the environment and\ndo not print this email. Nobody prints emails.",
+                  "noteLock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Legal note"
+                  },
+                  "type": "legal"
+                }
+              ],
+              "id": "b016",
+              "padBottom": 10,
+              "padTop": 80,
+              "span": 12
+            }
+          ],
+          "id": "b017",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b01c",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b019",
+                  "stripes": [
+                    {
+                      "color": "redBright",
+                      "height": 23
+                    },
+                    {
+                      "color": "redBright",
+                      "height": 4
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b01a",
+              "padBottom": 0,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b01b",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    }
+  ]
+}

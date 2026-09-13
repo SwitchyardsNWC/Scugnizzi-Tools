@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ink-bleed",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["serve.js"],
+      "port": 8765
+    },
+    {
+      "name": "scugnizzi-tools",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["../serve.js"],
+      "port": 8770
+    }
+  ]
+}

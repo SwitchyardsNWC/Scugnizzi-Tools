@@ -1,0 +1,74 @@
+:root{
+color-scheme:light;
+/* base palette */
+--color-paper-white:#ffffff;
+--color-ink-black:#000000;
+--color-charcoal:#2c2222;
+--color-graphite:#6f726e;
+--color-fossil:#b2b4b1;
+--color-slate-iris:#495472;
+--color-slate-iris-deep:#3f4862;
+/* surfaces — the page is sunken, cards sit on it in paper. Two tints, nothing else. */
+--surface-paper:#ffffff;
+--surface-sunken:#f5f5f4;
+--surface-card:#ffffff;
+--surface-row-hover:#f0f0ef;
+--surface-selected:#e9e9e7;
+--surface-accent:var(--color-slate-iris);
+--surface-slate-iris-surface:var(--color-slate-iris);
+--surface-scrim:rgba(0,0,0,.4);
+/* text */
+--text-primary:#0d0d0d;
+--text-secondary:#3a3a38;
+--text-muted:#6f726e;
+--text-faint:#a8aaa7;
+--text-on-accent:#ffffff;
+/* lines — structure (rail, header) is ink; everything inside a card is soft */
+--border-hairline:#0d0d0d;
+--border-hairline-soft:#2c2222;
+--border-card:#dededc;
+--border-muted:#e6e6e4;
+/* actions */
+--action-primary:var(--color-slate-iris);
+--action-primary-hover:var(--color-slate-iris-deep);
+--action-primary-text:#ffffff;
+--action-disabled-text:#a8aaa7;
+--action-disabled-surface:#ededec;
+--link-default:#6f726e;
+--link-hover:#0d0d0d;
+--focus-ring:#0d0d0d;
+/* data — the one place colour gets to be clear. Series 1 is always the primary bar / line. */
+--data-1:#4a5fa5;--data-2:#5b8a5e;--data-3:#c48a2e;--data-4:#b8412b;--data-5:#7a7d79;--data-6:#3e7d7a;
+--data-track:#e9e9e7;
+--delta-up:#2f7a44;--delta-down:#b8412b;--delta-flat:#6f726e;
+}
+[data-theme="dark"]{
+color-scheme:dark;
+--surface-paper:#151515;
+--surface-sunken:#0e0e0e;
+--surface-card:#1a1a1a;
+--surface-row-hover:#222222;
+--surface-selected:#2a2a2a;
+--surface-accent:#5a67a0;
+--surface-slate-iris-surface:#5a67a0;
+--surface-scrim:rgba(0,0,0,.6);
+--text-primary:#f2f2f0;
+--text-secondary:#cfcfcc;
+--text-muted:#9a9c99;
+--text-faint:#5e605d;
+--text-on-accent:#ffffff;
+--border-hairline:#3a3a38;
+--border-hairline-soft:#454543;
+--border-card:#2a2a29;
+--border-muted:#242423;
+--action-primary:#5a67a0;
+--action-primary-hover:#6b78b3;
+--action-disabled-text:#5e605d;
+--action-disabled-surface:#232323;
+--link-default:#9a9c99;
+--link-hover:#f2f2f0;
+--focus-ring:#f2f2f0;
+--data-1:#7e92d6;--data-2:#86b389;--data-3:#dba64d;--data-4:#e0705a;--data-5:#8f928e;--data-6:#67a9a5;
+--data-track:#2a2a29;
+--delta-up:#6cbf7f;--delta-down:#e0705a;--delta-flat:#9a9c99;
+}

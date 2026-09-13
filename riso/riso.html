@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riso separator</title>
+<style>
+  :root{
+    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
+    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
+  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
+  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
+  .sub{margin:0 0 18px;color:var(--muted)}
+  details.panel{border-top:1px solid var(--line)}
+  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+  details.panel>summary::-webkit-details-marker{display:none}
+  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
+  details.panel[open]>summary::before{transform:rotate(45deg)}
+  details.panel>summary:hover{color:var(--text)}
+  details.panel>summary .t{flex:1}
+  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  details.panel>.body{padding:0 0 10px}
+  h3{font-size:12px;font-weight:600;margin:14px 0 4px;color:var(--text)}
+  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .row>label{flex:0 0 78px;color:var(--muted)}
+  .row select,.row input[type=text],.row input[type=number]{flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
+  .row input[type=number]{flex:0 1 80px}
+  .row input[type=checkbox]{accent-color:var(--accent)}
+  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
+  input:focus,select:focus{border-color:#4a4a50;outline:none}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:#55555c}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.06)}
+  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
+  .seg{display:flex;flex:1}
+  .seg button{flex:1;border-radius:0;padding:5px 0}
+  .seg button:first-child{border-radius:5px 0 0 5px}
+  .seg button:last-child{border-radius:0 5px 5px 0}
+  .seg button.on{background:#3a3a40;color:#fff}
+  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
+  .slider label{color:var(--text)}
+  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
+  .drop{border:1px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);cursor:pointer;background:var(--panel2)}
+  .drop:hover,.drop.over{border-color:var(--sel);color:var(--text)}
+  .drop b{display:block;color:var(--text);margin-bottom:2px}
+  /* Ink list */
+  #inkList{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+  .irow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:pointer}
+  .irow:hover{border-color:#55555c}
+  .irow.on{border-color:var(--sel)}
+  .irow .sw{width:18px;height:18px;border-radius:3px;flex:0 0 18px;border:1px solid rgba(255,255,255,.12)}
+  .irow .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .irow .meta{color:var(--muted);font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
+  .irow .x{color:var(--muted);padding:0 4px}
+  .irow .x:hover{color:#f0b0b0}
+  .swatches{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin:6px 0 4px}
+  .swatches button{padding:0;height:24px;border-radius:4px;border:1px solid rgba(255,255,255,.1)}
+  .swatches button.on{outline:2px solid var(--text);outline-offset:1px}
+  .addrow{display:flex;gap:6px}
+  .addrow button{flex:1}
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
+  .presets button small{display:block;color:var(--muted);font-size:11px}
+  .presets button.on{border-color:var(--accent);color:#fff}
+  main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+  .topbar .spacer{flex:1}
+  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
+  .topbar .seg{flex:0 0 auto;width:300px}
+  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  .stage.fit{overflow:hidden}
+  .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
+  .stage:not(.fit){display:block}
+  .stage:not(.fit) canvas{display:block;margin:0 auto}
+  .stage.dropping::after{content:"Drop an image";position:absolute;inset:12px;border:2px dashed var(--sel);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#cfe0ff;background:rgba(59,130,246,.12);pointer-events:none}
+  canvas{box-shadow:0 24px 60px rgba(0,0,0,.65),0 2px 4px rgba(0,0,0,.5)}
+  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+  .actions{display:flex;flex-direction:column;gap:6px}
+  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
+    aside{max-height:50vh}
+    .footer{grid-template-columns:1fr}
+    .actions{flex-direction:row;flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+<script src="../tool-banner.js" data-tool="Riso separator"></script>
+<script src="../tool-kit.js"></script>
+<div class="app">
+  <aside>
+    <h1>Riso separator</h1>
+    <p class="sub">Split a picture into two or three Riso inks, then print it on paper that isn't perfectly registered.</p>
+
+    <details class="panel" data-panel="image" open>
+      <summary><span class="t">Image</span><span class="v" id="hint-image"></span></summary>
+      <div class="body">
+        <div class="drop" id="drop"><b>Drop an image here</b>or click to choose · O</div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="row" style="margin-top:8px"><label></label><button id="sample">Use the sample image</button></div>
+        <p class="hint">Photos and flat graphics both work. The image is downscaled to 900 px for the press and kept in this browser.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="looks" open>
+      <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
+      <div class="body">
+        <div class="presets" id="presets"></div>
+        <div class="row" style="margin-top:10px"><label></label><button id="resetTool" class="danger">Reset to defaults</button></div>
+        <p class="hint">A preset sets the inks and the press; the image stays. Reset clears everything saved for this tool, image included.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="inks" open>
+      <summary><span class="t">Inks</span><span class="v" id="hint-inks"></span></summary>
+      <div class="body">
+        <div id="inkList"></div>
+        <div class="addrow"><button id="addInk">+ Ink</button><button id="delInk" class="danger">Remove ink</button></div>
+        <h3>Ink colour</h3>
+        <div class="swatches" id="swatches"></div>
+        <div class="row"><label>Custom</label><input type="color" id="inkColor"><span class="hint" id="inkName"></span></div>
+        <h3>Pulls from</h3>
+        <div class="row"><label>Source</label><select id="source">
+          <option value="lum">Darkness (1 − luminance)</option>
+          <option value="shadows">Shadows</option>
+          <option value="mids">Midtones</option>
+          <option value="highlights">Highlights</option>
+          <option value="red">Red channel (cyan-ish)</option>
+          <option value="green">Green channel (magenta-ish)</option>
+          <option value="blue">Blue channel (yellow-ish)</option>
+          <option value="sat">Saturation</option>
+          <option value="flat">Flat fill</option>
+        </select></div>
+        <div class="row"><label></label><label style="color:var(--text)"><input type="checkbox" id="invert"> invert</label></div>
+        <div id="curveSliders"></div>
+        <h3>Screen</h3>
+        <div class="row"><label>Screen</label><div class="seg" id="screenSeg"><button data-v="dot">Dot</button><button data-v="line">Line</button><button data-v="grain">Grain</button></div></div>
+        <div id="screenSliders"></div>
+        <h3>Registration</h3>
+        <div id="regSliders"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="press">
+      <summary><span class="t">Press</span><span class="v" id="hint-press"></span></summary>
+      <div class="body">
+        <div class="row"><label>Paper</label><input type="color" id="paper"><div class="seg" id="paperSeg" style="margin-left:4px"><button data-v="#f6f2e8">Natural</button><button data-v="#ffffff">White</button><button data-v="#e9dcc2">Kraft</button><button data-v="#dfe6e9">Grey</button></div></div>
+        <div id="pressSliders"></div>
+        <div class="row"><label></label><button id="shuffle">Shuffle misregistration · M</button></div>
+        <p class="hint">Inks multiply, so overlaps mix into a third colour, the way they do on the duplicator.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="random">
+      <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
+      <div class="body">
+        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <p class="hint">The seed drives grain, the stochastic screen and shuffled misregistration.</p>
+      </div>
+    </details>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span id="meta"></span>
+      <span class="spacer"></span>
+      <div class="seg" id="viewSeg"><button data-v="composite">Print</button><button data-v="separations">Separations</button><button data-v="compare">Before · after</button></div>
+      <label>Zoom <select id="zoomSel">
+        <option value="fit">Fit</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option>
+      </select></label>
+    </div>
+    <div class="stage fit" id="stage"><canvas id="canvas" width="600" height="450"></canvas></div>
+    <div class="footer">
+      <div class="actions">
+        <button id="download" class="primary">Download print</button>
+        <button id="downloadSeps" title="One black-on-white PNG per ink, ready for the duplicator">Download separations</button>
+        <button id="copyImg">Copy image</button>
+        <button id="copyRecipe">Copy recipe</button>
+      </div>
+      <pre id="recipe"></pre>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- Riso ink swatches (drum colours, approximate sRGB) ----------
+const SWATCHES = [
+  ['Black', '#1d1d1b'], ['Fluorescent pink', '#ff48b0'], ['Blue', '#0078bf'], ['Federal blue', '#3d5588'], ['Teal', '#00838a'], ['Green', '#00a95c'], ['Yellow', '#ffe800'], ['Sunflower', '#ffb511'], ['Orange', '#ff6c2f'],
+  ['Fluorescent orange', '#ff7477'], ['Red', '#ff665e'], ['Burgundy', '#914e72'], ['Purple', '#765ba7'], ['Brown', '#925f52'], ['Cornflower', '#62a8e5'], ['Aqua', '#5ec8e5'], ['Mint', '#82d8d5'], ['Light grey', '#88898a'],
+];
+const inkName = hex => { const s = SWATCHES.find(([, h]) => h === hex.toLowerCase()); return s ? s[0] : hex; };
+const INK_DEFAULT = { color: '#0078bf', source: 'lum', invert: false, density: 1, contrast: 1.15, lift: 0, screen: 'dot', cell: 6, angle: 15, opacity: 1, dx: 0, dy: 0 };
+const DEFAULTS = {
+  inks: [
+    { ...INK_DEFAULT, color: '#0078bf', source: 'lum', contrast: 1.25, angle: 15 },
+    { ...INK_DEFAULT, color: '#ff48b0', source: 'mids', density: 0.9, contrast: 1.1, angle: 75, dx: 0.4, dy: -0.3 },
+  ],
+  selected: 0,
+  press: { paper: '#f6f2e8', grain: 0.3, soak: 0.5, spread: 0.25, dither: 0.35, misreg: 1.2 },
+  view: 'composite', zoom: 'fit', seed: 1,
+};
+const state = JSON.parse(JSON.stringify(DEFAULTS));
+let presetsEl = null;
+const PRESETS = [
+  { name: 'Pink & blue poster', desc: 'the classic two-drum pass, dot screens at 15° and 75°', apply: {
+      inks: [
+        { ...INK_DEFAULT, color: '#0078bf', source: 'lum', contrast: 1.25, angle: 15 },
+        { ...INK_DEFAULT, color: '#ff48b0', source: 'mids', density: 0.9, contrast: 1.1, angle: 75, dx: 0.4, dy: -0.3 },
+      ],
+      press: { paper: '#f6f2e8', grain: 0.3, soak: 0.5, spread: 0.25, dither: 0.35, misreg: 1.2 } } },
+  { name: 'Tri-colour photo', desc: 'blue, pink and yellow pulled from the RGB channels', apply: {
+      inks: [
+        { ...INK_DEFAULT, color: '#0078bf', source: 'red', density: 1, contrast: 1.15, cell: 4.5, angle: 15 },
+        { ...INK_DEFAULT, color: '#ff48b0', source: 'green', density: 1, contrast: 1.15, cell: 4.5, angle: 75, dx: 0.3, dy: 0.2 },
+        { ...INK_DEFAULT, color: '#ffe800', source: 'blue', density: 1.05, contrast: 1.1, cell: 4.5, angle: 0, dx: -0.4, dy: 0.3 },
+      ],
+      press: { paper: '#ffffff', grain: 0.15, soak: 0.35, spread: 0.2, dither: 0.3, misreg: 0.8 } } },
+  { name: 'Zine grain', desc: 'black and fluorescent orange, stochastic screens, kraft paper', apply: {
+      inks: [
+        { ...INK_DEFAULT, color: '#1d1d1b', source: 'shadows', density: 1, contrast: 1.3, screen: 'grain', opacity: 0.95 },
+        { ...INK_DEFAULT, color: '#ff7477', source: 'mids', density: 1.1, contrast: 1.2, screen: 'grain', dx: 0.9, dy: -0.6 },
+      ],
+      press: { paper: '#e9dcc2', grain: 0.55, soak: 0.7, spread: 0.35, dither: 0.85, misreg: 1.8 } } },
+];
+const sel = () => state.inks[state.selected] || null;
+const PX_PER_MM = 5.9;   // the press runs at a nominal 150 dpi
+
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+function resolve(p) { if (p.startsWith('I.')) return [sel(), p.slice(2)]; return [state, p]; }
+function getPath(p) { const [o, q] = resolve(p); return o ? q.split('.').reduce((a, k) => a == null ? a : a[k], o) : undefined; }
+function setPath(p, v) { const [o0, q] = resolve(p); if (!o0) return; const ks = q.split('.'); let o = o0; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; }
+const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const fmt = { pct: v => Math.round(v * 100) + '%', px: v => (+v).toFixed(1) + ' px', mm: v => (+v).toFixed(1) + ' mm', deg: v => Math.round(v) + '°', x: v => (+v).toFixed(2) + '×', int: v => String(Math.round(v)) };
+// Seeded noise and blur, lifted from Ink bleed.
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function valueNoise(w, h, cell, rng, linear) {
+  const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2;
+  const g = new Float32Array(gw * gh); for (let i = 0; i < g.length; i++) g[i] = rng();
+  const out = new Float32Array(w * h);
+  const ixs = new Int32Array(w), fxs = new Float32Array(w);
+  for (let x = 0; x < w; x++) { const u = x / cell, i = Math.floor(u), f = u - i; ixs[x] = i; fxs[x] = linear ? f : f * f * (3 - 2 * f); }
+  for (let y = 0; y < h; y++) {
+    const v = y / cell, j = Math.floor(v); let f = v - j; if (!linear) f = f * f * (3 - 2 * f);
+    const r0 = j * gw, r1 = r0 + gw, o = y * w;
+    for (let x = 0; x < w; x++) {
+      const i = ixs[x], fx = fxs[x];
+      const a = g[r0 + i], b = g[r0 + i + 1], c = g[r1 + i], d = g[r1 + i + 1];
+      const top = a + (b - a) * fx, bot = c + (d - c) * fx;
+      out[o + x] = top + (bot - top) * f;
+    }
+  }
+  return out;
+}
+const cl = (i, n) => i < 0 ? 0 : (i >= n ? n - 1 : i);
+function boxH(s, d, w, h, r) {
+  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
+  for (let y = 0; y < h; y++) {
+    const o = y * w; let sum = 0;
+    for (let k = -ri; k <= ri; k++) sum += s[o + cl(k, w)];
+    for (let x = 0; x < w; x++) {
+      d[o + x] = (sum + fr * (s[o + cl(x - ri - 1, w)] + s[o + cl(x + ri + 1, w)])) * norm;
+      sum += s[o + cl(x + ri + 1, w)] - s[o + cl(x - ri, w)];
+    }
+  }
+}
+function boxV(s, d, w, h, r) {
+  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let k = -ri; k <= ri; k++) sum += s[cl(k, h) * w + x];
+    for (let y = 0; y < h; y++) {
+      d[y * w + x] = (sum + fr * (s[cl(y - ri - 1, h) * w + x] + s[cl(y + ri + 1, h) * w + x])) * norm;
+      sum += s[cl(y + ri + 1, h) * w + x] - s[cl(y - ri, h) * w + x];
+    }
+  }
+}
+function blurField(a, w, h, r, passes) {
+  if (r < 0.2) return a;
+  let src = a, tmp = new Float32Array(a.length), dst = new Float32Array(a.length);
+  for (let p = 0; p < passes; p++) { boxH(src, tmp, w, h, r); boxV(tmp, dst, w, h, r); const t = src; src = dst; dst = (t === a) ? new Float32Array(a.length) : t; }
+  return src;
+}
+
+
+// ---------- Source image ----------
+const MAX = 900;
+let src = null;           // { w, h, data: Uint8ClampedArray RGBA, name }
+let lum = null, satF = null;
+const srcCanvas = document.createElement('canvas'), sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+function useImage(img, name, remember) {
+  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.floor(img.width * scale)), h = Math.max(1, Math.floor(img.height * scale));
+  srcCanvas.width = w; srcCanvas.height = h; sctx.drawImage(img, 0, 0, w, h);
+  src = { w, h, data: sctx.getImageData(0, 0, w, h).data, name };
+  const n = w * h; lum = new Float32Array(n); satF = new Float32Array(n);
+  for (let i = 0, q = 0; i < n; i++, q += 4) {
+    const r = src.data[q] / 255, g = src.data[q + 1] / 255, b = src.data[q + 2] / 255;
+    lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b); satF[i] = mx > 0 ? (mx - mn) / mx : 0;
+  }
+  fields = null;
+  if (remember && window.ToolKit) { const data = srcCanvas.toDataURL('image/jpeg', 0.85); ToolKit.saveAux('image', data.length < 3500000 ? { name, data } : null); }
+  invalidate();
+}
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => { const img = new Image(); img.onload = () => useImage(img, file.name, true); img.src = e.target.result; };
+  reader.readAsDataURL(file);
+}
+// A procedural sample so the tool shows something before a picture is dropped in.
+function sampleImage() {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 640; const x = c.getContext('2d');
+  const bg = x.createLinearGradient(0, 0, 900, 640); bg.addColorStop(0, '#f2f2f2'); bg.addColorStop(1, '#3a3a3a'); x.fillStyle = bg; x.fillRect(0, 0, 900, 640);
+  const sph = x.createRadialGradient(560, 300, 20, 560, 300, 240); sph.addColorStop(0, '#ffffff'); sph.addColorStop(0.55, '#8d8d8d'); sph.addColorStop(1, '#111'); x.fillStyle = sph; x.beginPath(); x.arc(560, 300, 240, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#e63d3d'; x.beginPath(); x.arc(200, 470, 120, 0, Math.PI * 2); x.fill();
+  x.fillStyle = 'rgba(40,120,220,.85)'; x.beginPath(); x.arc(310, 420, 110, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#ffd400'; x.beginPath(); x.arc(250, 330, 90, 0, Math.PI * 2); x.fill();
+  x.save(); x.translate(0, 0); x.rotate(-0.35); x.fillStyle = 'rgba(0,0,0,.55)'; for (let i = -6; i < 14; i++) x.fillRect(i * 70 - 200, 520, 28, 700); x.restore();
+  x.fillStyle = '#111'; x.font = '700 150px "Helvetica Neue",Helvetica,Arial,sans-serif'; x.textBaseline = 'alphabetic'; x.fillText('RISO', 60, 200);
+  x.fillStyle = '#fff'; x.font = '500 28px "Helvetica Neue",Helvetica,Arial,sans-serif'; x.fillText('scuggnizzi tools · sample', 62, 240);
+  const img = new Image(); img.onload = () => useImage(img, 'sample', true); img.src = c.toDataURL();
+}
+
+// ---------- Fields (seeded, cached per image size + seed) ----------
+let fields = null;
+function getFields() {
+  if (fields && fields.seed === state.seed && fields.w === src.w && fields.h === src.h) return fields;
+  const n = src.w * src.h, r = mulberry32(state.seed * 1000 + 7), W = new Float32Array(n); for (let i = 0; i < n; i++) W[i] = r();
+  const P = valueNoise(src.w, src.h, 3, mulberry32(state.seed * 1000 + 17)), P2 = valueNoise(src.w, src.h, 24, mulberry32(state.seed * 1000 + 19));
+  const B = blurField(W, src.w, src.h, 0.8, 1);
+  for (let i = 0; i < n; i++) { P[i] = 0.55 * P[i] + 0.45 * P2[i]; }
+  fields = { seed: state.seed, w: src.w, h: src.h, W, B, P };
+  return fields;
+}
+
+// ---------- Separation ----------
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const smooth = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+function densityAt(ink, i) {
+  const L = lum[i]; let d;
+  switch (ink.source) {
+    case 'lum': d = 1 - L; break;
+    case 'shadows': d = 1 - smooth(0.15, 0.55, L); break;
+    case 'mids': d = smooth(0.15, 0.45, L) * (1 - smooth(0.55, 0.9, L)); break;
+    case 'highlights': d = smooth(0.45, 0.95, L); break;
+    case 'red': d = 1 - src.data[i * 4] / 255; break;
+    case 'green': d = 1 - src.data[i * 4 + 1] / 255; break;
+    case 'blue': d = 1 - src.data[i * 4 + 2] / 255; break;
+    case 'sat': d = satF[i]; break;
+    default: d = 1;
+  }
+  if (ink.invert) d = 1 - d;
+  d = ((d - 0.5) * ink.contrast + 0.5) * ink.density + ink.lift;
+  return clamp01(d);
+}
+// Coverage map for one ink: density run through its screen, then soak and spread.
+function coverage(ink) {
+  const w = src.w, h = src.h, n = w * h, F = getFields(), P = state.press, out = new Float32Array(n);
+  const D = new Float32Array(n); for (let i = 0; i < n; i++) D[i] = densityAt(ink, i);
+  if (ink.screen === 'grain') {
+    // Stochastic screen: a blurred-noise threshold, blended toward smooth tone by the dither amount.
+    for (let i = 0; i < n; i++) { const d = D[i], s = clamp01((d - F.B[i]) * 3 + 0.5); out[i] = d + (s - d) * P.dither; }
+  } else {
+    const c = Math.max(2, ink.cell), th = ink.angle * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th), line = ink.screen === 'line';
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const u = x * cs + y * sn, v = -x * sn + y * cs;
+      const cu = (Math.floor(u / c) + 0.5) * c, cv = (Math.floor(v / c) + 0.5) * c;
+      // Sample the density at the cell centre (mapped back into the image), like a real screen.
+      let sx = Math.round(cu * cs - cv * sn), sy = Math.round(cu * sn + cv * cs);
+      sx = sx < 0 ? 0 : sx >= w ? w - 1 : sx; sy = sy < 0 ? 0 : sy >= h ? h - 1 : sy;
+      const d = D[sy * w + sx]; let cov;
+      if (line) { const half = d * c * 0.5, dist = Math.abs(v - cv); cov = clamp01(half - dist + 0.5); }
+      else { const r = c * Math.sqrt(d / Math.PI) * 1.05, du = u - cu, dv = v - cv, dist = Math.sqrt(du * du + dv * dv); cov = clamp01(r - dist + 0.5); }
+      out[y * w + x] = cov;
+    }
+  }
+  let res = out;
+  if (P.soak > 0) res = blurField(res, w, h, 0.3 + P.soak * 1.6, 1);
+  if (P.spread > 0) { const g = 1 - P.spread * 0.55; for (let i = 0; i < n; i++) res[i] = Math.pow(res[i], g); }
+  return res;
+}
+
+// ---------- Render ----------
+const canvas = $('#canvas'), ctx = canvas.getContext('2d');
+let covCache = new Map();   // ink index → {key, cov}
+function inkKey(ink) { return JSON.stringify([ink.source, ink.invert, ink.density, ink.contrast, ink.lift, ink.screen, ink.cell, ink.angle, state.press.soak, state.press.spread, state.press.dither, state.seed, src.w, src.h, src.name]); }
+function coverages() {
+  const out = [];
+  state.inks.forEach((ink, i) => {
+    const key = inkKey(ink), c = covCache.get(i);
+    if (c && c.key === key) { out.push(c.cov); return; }
+    const cov = coverage(ink); covCache.set(i, { key, cov }); out.push(cov);
+  });
+  for (const k of [...covCache.keys()]) if (k >= state.inks.length) covCache.delete(k);
+  return out;
+}
+function composite(covs) {
+  const w = src.w, h = src.h, n = w * h, F = getFields(), P = state.press, img = ctx.createImageData(w, h), d = img.data, paper = hexToRgb(P.paper);
+  for (let i = 0, q = 0; i < n; i++, q += 4) {
+    const g = 1 + (F.W[i] - 0.5) * P.grain * 0.12 + (F.P[i] - 0.5) * P.grain * 0.1;
+    d[q] = paper[0] * g; d[q + 1] = paper[1] * g; d[q + 2] = paper[2] * g; d[q + 3] = 255;
+  }
+  state.inks.forEach((ink, k) => {
+    const cov = covs[k], col = hexToRgb(ink.color), ox = Math.round(ink.dx * PX_PER_MM), oy = Math.round(ink.dy * PX_PER_MM);
+    const mr = 1 - col[0] / 255, mg = 1 - col[1] / 255, mb = 1 - col[2] / 255, op = ink.opacity;
+    for (let y = 0; y < h; y++) {
+      const sy = y - oy; if (sy < 0 || sy >= h) continue;
+      for (let x = 0; x < w; x++) {
+        const sx = x - ox; if (sx < 0 || sx >= w) continue;
+        const a = cov[sy * w + sx] * op; if (a <= 0.002) continue;
+        const q = (y * w + x) * 4;
+        d[q] *= 1 - a * mr; d[q + 1] *= 1 - a * mg; d[q + 2] *= 1 - a * mb;   // multiply, like ink on paper
+      }
+    }
+  });
+  return img;
+}
+function separationImage(cov) {
+  const w = src.w, h = src.h, img = ctx.createImageData(w, h), d = img.data;
+  for (let i = 0, q = 0; i < w * h; i++, q += 4) { const v = 255 * (1 - cov[i]); d[q] = d[q + 1] = d[q + 2] = v; d[q + 3] = 255; }
+  return img;
+}
+let pending = 0;
+function invalidate() { if (window.ToolKit) ToolKit.commit(); updateHints(); updateRecipe(); if (!pending) pending = requestAnimationFrame(render); }
+function render() {
+  pending = 0; if (!src) return;
+  const t0 = performance.now(), w = src.w, h = src.h, covs = coverages();
+  if (state.view === 'composite') {
+    setSize(w, h); ctx.putImageData(composite(covs), 0, 0);
+  } else if (state.view === 'separations') {
+    const gap = 12, W = w * state.inks.length + gap * (state.inks.length - 1);
+    setSize(W, h + 28); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, W, h + 28);
+    state.inks.forEach((ink, k) => {
+      const x = k * (w + gap); ctx.putImageData(separationImage(covs[k]), x, 0);
+      ctx.fillStyle = ink.color; ctx.fillRect(x, h + 8, 12, 12);
+      ctx.fillStyle = '#cfcfcc'; ctx.font = '12px -apple-system,Helvetica,Arial,sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(`${k + 1} · ${inkName(ink.color)}`, x + 18, h + 14);
+    });
+  } else {
+    const gap = 12; setSize(w * 2 + gap, h); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, w * 2 + gap, h);
+    ctx.drawImage(srcCanvas, 0, 0); ctx.putImageData(composite(covs), w + gap, 0);
+  }
+  updateMeta(Math.round(performance.now() - t0));
+}
+function setSize(w, h) { if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; applyZoom(); } }
+function applyZoom() {
+  const z = state.zoom, stage = $('#stage');
+  if (z === 'fit') { stage.classList.add('fit'); canvas.style.width = ''; canvas.style.height = ''; }
+  else { stage.classList.remove('fit'); canvas.style.width = canvas.width * parseFloat(z) + 'px'; canvas.style.height = canvas.height * parseFloat(z) + 'px'; }
+}
+function updateMeta(ms) { $('#meta').innerHTML = src ? `${src.w} × ${src.h} px &nbsp;·&nbsp; ${src.name}` + (ms != null ? ` &nbsp;·&nbsp; ${ms} ms` : '') : 'No image'; }
+function updateHints() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const I = sel(), P = state.press;
+  set('hint-image', src ? `${src.name} · ${src.w} × ${src.h}` : 'none');
+  set('hint-inks', state.inks.map(i => inkName(i.color)).join(' + '));
+  set('hint-press', `${P.paper} · soak ${Math.round(P.soak * 100)}%`);
+  set('hint-random', `seed ${state.seed}`);
+  set('hint-looks', [...(presetsEl ? presetsEl.children : [])].find(c => c.classList.contains('on'))?.firstChild.textContent || 'custom');
+  if (I) $('#inkName').textContent = inkName(I.color);
+}
+function updateRecipe() {
+  const P = state.press, pct = v => Math.round(v * 100) + '%';
+  const lines = [`Riso print${src ? ` of ${src.name} (${src.w} × ${src.h} px)` : ''} on ${P.paper} paper, ${pct(P.grain)} grain, ${pct(P.soak)} ink soak, ${pct(P.spread)} spread, ${pct(P.dither)} stochastic dither.`];
+  state.inks.forEach((i, k) => lines.push(`Ink ${k + 1} ${inkName(i.color)} (${i.color}) from ${$('#source').querySelector(`[value="${i.source}"]`)?.textContent.toLowerCase() || i.source}${i.invert ? ', inverted' : ''}: density ${pct(i.density)}, contrast ${i.contrast.toFixed(2)}×, lift ${pct(i.lift)}, ${i.screen} screen${i.screen !== 'grain' ? ` ${i.cell} px at ${i.angle}°` : ''}, opacity ${pct(i.opacity)}, offset ${i.dx.toFixed(1)} / ${i.dy.toFixed(1)} mm.`));
+  lines.push(`Seed ${state.seed}.`);
+  $('#recipe').textContent = lines.join('\n');
+}
+
+// ---------- Controls ----------
+const controls = {};
+function addSlider(parent, spec) {
+  const wrap = document.createElement('div'); wrap.className = 'slider';
+  wrap.innerHTML = `<label>${spec.label}</label><output></output><input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
+  const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+  const refresh = () => { const v = getPath(spec.path); if (v == null) return; input.value = v; out.textContent = spec.fmt(+v); };
+  input.addEventListener('input', () => { const v = parseFloat(input.value); setPath(spec.path, v); out.textContent = spec.fmt(v); renderInkList(); clearPreset(); invalidate(); });
+  controls[spec.path] = { refresh }; refresh(); parent.appendChild(wrap);
+}
+const Cs = $('#curveSliders');
+addSlider(Cs, { path: 'I.density', label: 'Density', min: 0, max: 2, step: 0.01, fmt: fmt.pct });
+addSlider(Cs, { path: 'I.contrast', label: 'Contrast', min: 0.2, max: 3, step: 0.01, fmt: fmt.x });
+addSlider(Cs, { path: 'I.lift', label: 'Lift (minimum ink)', min: 0, max: 0.6, step: 0.01, fmt: fmt.pct });
+addSlider(Cs, { path: 'I.opacity', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+const Ss = $('#screenSliders');
+addSlider(Ss, { path: 'I.cell', label: 'Screen size', min: 2, max: 24, step: 0.5, fmt: fmt.px });
+addSlider(Ss, { path: 'I.angle', label: 'Screen angle', min: 0, max: 180, step: 1, fmt: fmt.deg });
+const Rs = $('#regSliders');
+addSlider(Rs, { path: 'I.dx', label: 'Offset across', min: -3, max: 3, step: 0.1, fmt: fmt.mm });
+addSlider(Rs, { path: 'I.dy', label: 'Offset down', min: -3, max: 3, step: 0.1, fmt: fmt.mm });
+const Ps = $('#pressSliders');
+addSlider(Ps, { path: 'press.grain', label: 'Paper grain', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider(Ps, { path: 'press.soak', label: 'Ink soak', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider(Ps, { path: 'press.spread', label: 'Dot gain', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider(Ps, { path: 'press.dither', label: 'Grain screen strength', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider(Ps, { path: 'press.misreg', label: 'Shuffle range', min: 0, max: 3, step: 0.1, fmt: fmt.mm });
+
+// Presets and reset
+presetsEl = $('#presets');
+PRESETS.forEach((p, i) => {
+  const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
+  b.addEventListener('click', () => {
+    const a = JSON.parse(JSON.stringify(p.apply));
+    state.inks = a.inks; state.selected = 0; Object.assign(state.press, a.press); covCache.clear();
+    refreshAll(); [...presetsEl.children].forEach((c, j) => c.classList.toggle('on', i === j)); invalidate();
+  });
+  presetsEl.appendChild(b);
+});
+$('#resetTool').addEventListener('click', () => ToolKit.reset());
+
+// Ink list and per-ink controls
+function renderInkList() {
+  const list = $('#inkList'); list.innerHTML = '';
+  state.inks.forEach((ink, i) => {
+    const row = document.createElement('div'); row.className = 'irow' + (i === state.selected ? ' on' : '');
+    row.innerHTML = `<span class="sw" style="background:${ink.color}"></span><span class="name">${i + 1} · ${inkName(ink.color)}</span><span class="meta">${ink.screen}${ink.screen !== 'grain' ? ' ' + ink.angle + '°' : ''}</span>`;
+    row.addEventListener('click', () => selectInk(i));
+    list.appendChild(row);
+  });
+  $('#delInk').disabled = state.inks.length <= 1; $('#addInk').disabled = state.inks.length >= 3;
+}
+function selectInk(i) { state.selected = i; renderInkList(); refreshInk(); updateHints(); }
+function refreshInk() {
+  const I = sel(); if (!I) return;
+  for (const p in controls) if (p.startsWith('I.')) controls[p].refresh();
+  $('#source').value = I.source; $('#invert').checked = I.invert; $('#inkColor').value = I.color;
+  for (const b of $('#screenSeg').children) b.classList.toggle('on', b.dataset.v === I.screen);
+  for (const b of $('#swatches').children) b.classList.toggle('on', b.dataset.v === I.color);
+  $('#screenSliders').hidden = I.screen === 'grain';
+  $('#inkName').textContent = inkName(I.color);
+}
+function clearPreset() { [...presetsEl.children].forEach(c => c.classList.remove('on')); }
+const sw = $('#swatches');
+SWATCHES.forEach(([name, hex]) => { const b = document.createElement('button'); b.style.background = hex; b.title = name; b.dataset.v = hex; b.addEventListener('click', () => { const I = sel(); if (!I) return; I.color = hex; refreshInk(); renderInkList(); invalidate(); }); sw.appendChild(b); });
+$('#inkColor').addEventListener('input', e => { const I = sel(); if (!I) return; I.color = e.target.value; refreshInk(); renderInkList(); invalidate(); });
+$('#source').addEventListener('change', e => { const I = sel(); if (!I) return; I.source = e.target.value; invalidate(); });
+$('#invert').addEventListener('change', e => { const I = sel(); if (!I) return; I.invert = e.target.checked; invalidate(); });
+$('#screenSeg').addEventListener('click', e => { const b = e.target.closest('button'), I = sel(); if (!b || !I) return; I.screen = b.dataset.v; refreshInk(); renderInkList(); invalidate(); });
+$('#addInk').addEventListener('click', () => {
+  if (state.inks.length >= 3) return;
+  const used = new Set(state.inks.map(i => i.color)), pick = ['#ffe800', '#00a95c', '#ff48b0', '#0078bf', '#1d1d1b'].find(c => !used.has(c)) || '#1d1d1b';
+  const srcs = ['lum', 'mids', 'highlights'], angles = [15, 75, 45];
+  state.inks.push({ ...INK_DEFAULT, color: pick, source: srcs[state.inks.length] || 'lum', angle: angles[state.inks.length] || 0 });
+  selectInk(state.inks.length - 1); invalidate();
+});
+$('#delInk').addEventListener('click', () => { if (state.inks.length <= 1) return; state.inks.splice(state.selected, 1); covCache.clear(); selectInk(Math.max(0, state.selected - 1)); invalidate(); });
+function shuffleMisreg() {
+  const r = mulberry32(state.seed * 77 + state.inks.length * 13 + Date.now() % 100000), m = state.press.misreg;
+  state.inks.forEach((ink, k) => { if (k === 0) { ink.dx = 0; ink.dy = 0; return; } ink.dx = +((r() - 0.5) * 2 * m).toFixed(1); ink.dy = +((r() - 0.5) * 2 * m).toFixed(1); });
+  refreshInk(); invalidate();
+}
+$('#shuffle').addEventListener('click', shuffleMisreg);
+$('#paper').addEventListener('input', e => { state.press.paper = e.target.value; invalidate(); });
+$('#paperSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.press.paper = b.dataset.v; $('#paper').value = b.dataset.v; invalidate(); });
+$('#viewSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; syncView(); invalidate(); });
+function syncView() { for (const b of $('#viewSeg').children) b.classList.toggle('on', b.dataset.v === state.view); }
+$('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate(); });
+$('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate(); });
+$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
+$('#drop').addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+$('#sample').addEventListener('click', sampleImage);
+for (const el of [$('#drop'), $('#stage')]) {
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add(el.id === 'drop' ? 'over' : 'dropping'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over', 'dropping'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over', 'dropping'); loadFile(e.dataTransfer.files[0]); });
+}
+function refreshAll() {
+  for (const p in controls) controls[p].refresh();
+  $('#paper').value = state.press.paper; $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
+  renderInkList(); refreshInk(); syncView(); applyZoom();
+}
+(function () {
+  const KEY = 'riso.panels'; let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  for (const d of document.querySelectorAll('details[data-panel]')) {
+    if (saved && d.dataset.panel in saved) d.open = saved[d.dataset.panel];
+    d.addEventListener('toggle', () => { const o = {}; for (const x of document.querySelectorAll('details[data-panel]')) o[x.dataset.panel] = x.open; try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} });
+  }
+})();
+
+// ---------- Export ----------
+function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
+function downloadCanvas(c, name) { c.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, 'image/png'); }
+function printCanvas() { const c = document.createElement('canvas'); c.width = src.w; c.height = src.h; c.getContext('2d').putImageData(composite(coverages()), 0, 0); return c; }
+$('#download').addEventListener('click', () => { if (src) downloadCanvas(printCanvas(), `riso-print-${src.w}x${src.h}.png`); });
+$('#downloadSeps').addEventListener('click', async () => {
+  if (!src) return; const covs = coverages();
+  for (let k = 0; k < state.inks.length; k++) {
+    const c = document.createElement('canvas'); c.width = src.w; c.height = src.h; c.getContext('2d').putImageData(separationImage(covs[k]), 0, 0);
+    downloadCanvas(c, `riso-ink-${k + 1}-${inkName(state.inks[k].color).toLowerCase().replace(/\s+/g, '-')}.png`);
+    await new Promise(r => setTimeout(r, 350));
+  }
+});
+$('#copyImg').addEventListener('click', async () => {
+  const btn = $('#copyImg'); if (!src) return;
+  try { const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied!'); } catch (e) { flash(btn, 'Clipboard blocked'); }
+});
+$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
+
+// ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
+const ZOOMS = ['fit', '0.5', '1', '2'];
+function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+ToolKit.init({
+  tool: 'riso', version: 1,
+  getState: () => JSON.parse(JSON.stringify(state)),
+  setState: s => { for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s); if (!state.inks.length) state.inks = [{ ...INK_DEFAULT }]; state.selected = Math.min(state.selected, state.inks.length - 1); covCache.clear(); refreshAll(); invalidate(); },
+  defaults: () => JSON.parse(JSON.stringify(DEFAULTS)),
+  onReset: () => ToolKit.saveAux('image', null),
+});
+ToolKit.register('o', 'Open an image', () => $('#file').click(), { group: 'Image' });
+for (let i = 1; i <= 3; i++) ToolKit.register(String(i), i === 1 ? 'Select ink 1–3' : `Select ink ${i}`, () => { if (i - 1 < state.inks.length) selectInk(i - 1); }, { group: 'Inks', hidden: i > 1 });
+ToolKit.register('h', 'Cycle the screen (dot · line · grain)', () => { const I = sel(); if (!I) return; I.screen = { dot: 'line', line: 'grain', grain: 'dot' }[I.screen]; refreshInk(); renderInkList(); invalidate(); }, { group: 'Inks' });
+ToolKit.register('i', 'Invert the selected ink', () => { const I = sel(); if (!I) return; I.invert = !I.invert; refreshInk(); invalidate(); }, { group: 'Inks' });
+ToolKit.register('m', 'Shuffle misregistration', shuffleMisreg, { group: 'Press' });
+ToolKit.register('p', 'Print view', () => { state.view = 'composite'; syncView(); invalidate(); }, { group: 'View' });
+ToolKit.register('s', 'Separations view', () => { state.view = 'separations'; syncView(); invalidate(); }, { group: 'View' });
+ToolKit.register('b', 'Before · after view', () => { state.view = 'compare'; syncView(); invalidate(); }, { group: 'View' });
+ToolKit.register('mod+s', 'Download print', () => $('#download').click(), { group: 'Export' });
+ToolKit.register('mod+shift+s', 'Download separations', () => $('#downloadSeps').click(), { group: 'Export' });
+ToolKit.register('mod+shift+c', 'Copy image', () => $('#copyImg').click(), { group: 'Export' });
+ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
+ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
+ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
+
+// ---------- Go ----------
+refreshAll(); updateMeta(); updateHints(); updateRecipe();
+{ const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Switchyards Design Projects — editorial reference kit
+**Status: editorial reference.** Built before the dashboard pass on the 21/42 editorial rhythm; it inherited the new tokens mechanically and was not redesigned. Use it for long-form, document-like screens (checklists with gates, FF&E schedules, project docs). For anything that displays status at a glance, start from `ui_kits/dashboard` (Cards, Stats, BarList, drill patterns).
+Built from uploads/FEATURES.md (product brief). Screens this pass: Home (my work), Projects dashboard (list + matrix), Checklist (with gate/refusal + inspector), Schedule (FF&E table + gallery, source vs status, shortfall).
+Not yet built: Start a project, Project overview, Board, Document, Spec page, Warehouse, Library, Templates, Calendar.
+Files: index.html, data.js, SyShell.jsx, HomeScreen.jsx, ProjectsScreen.jsx, ChecklistScreen.jsx, ScheduleScreen.jsx, SyApp.jsx. Sample data is visibly placeholder (fictional clubs and vendors).

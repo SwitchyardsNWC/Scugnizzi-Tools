@@ -1,0 +1,352 @@
+{
+  "designSystem": "card",
+  "forceLight": true,
+  "hubspotLabel": "Card email",
+  "id": "b00y",
+  "name": "Card email",
+  "pageBackground": "#ffffff",
+  "preview": {
+    "address": "151 Ted Turner Dr SE",
+    "city": "Atlanta",
+    "company": "SWITCHYARDS U.S.A.",
+    "state": "GA",
+    "zip": "30303"
+  },
+  "schema": 6,
+  "sections": [
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b003",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b001",
+                  "level": "h1",
+                  "lock": {
+                    "editable": true,
+                    "field": "headline",
+                    "label": "Headline"
+                  },
+                  "text": "A card email",
+                  "type": "heading"
+                }
+              ],
+              "id": "b002",
+              "padBottom": 0,
+              "padTop": 24,
+              "span": 12
+            }
+          ],
+          "id": "b004",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b007",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Short copy under the headline. Everything below sits in a card: a box drawn in the palette’s ink, twelve pixels in from the words. The face is monospace, which is a stack the design system names — change it once in Design › Type and every card follows.</p>",
+                  "id": "b005",
+                  "lock": {
+                    "editable": true,
+                    "field": "intro",
+                    "label": "Intro"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b006",
+              "padBottom": 4,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b008",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b00b",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h2>First card</h2><p>A card is a Text block with a border in its Appearance panel. Two blocks in one column share one box, which is how a card gets a button.</p>",
+                  "id": "b009",
+                  "lock": {
+                    "editable": true,
+                    "field": "first_card",
+                    "label": "First card"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "borderColor": "ink",
+              "borderPad": 12,
+              "borderRadius": 0,
+              "borderWidth": 2,
+              "id": "b00a",
+              "padBottom": 8,
+              "padTop": 8,
+              "span": 12
+            }
+          ],
+          "id": "b00c",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b00g",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h2>Second card</h2><p>This one has a button under the copy, inside the same box.</p>",
+                  "id": "b00d",
+                  "lock": {
+                    "editable": true,
+                    "field": "second_card",
+                    "label": "Second card"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "align": "left",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b00e",
+                  "link": {
+                    "editable": true,
+                    "field": "second_card_link",
+                    "label": "Second card link"
+                  },
+                  "lock": {
+                    "editable": true,
+                    "field": "second_card_button_blank_to_hide",
+                    "label": "Second card button (blank to hide)"
+                  },
+                  "style": "primary",
+                  "text": "Read more",
+                  "type": "button"
+                }
+              ],
+              "borderColor": "ink",
+              "borderPad": 12,
+              "borderRadius": 0,
+              "borderWidth": 2,
+              "id": "b00f",
+              "padBottom": 8,
+              "padTop": 8,
+              "span": 12
+            }
+          ],
+          "id": "b00h",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b00k",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h2>Third card</h2><p>Locked, so the template renders it and re-uploading fixes every future send (learnings 1.7).</p><ul><li>Lists keep the same face.</li><li>So do <a href=\"https://www.switchyards.com/\">links</a>.</li></ul>",
+                  "id": "b00i",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Third card"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "borderColor": "ink",
+              "borderPad": 12,
+              "borderRadius": 0,
+              "borderWidth": 2,
+              "id": "b00j",
+              "padBottom": 8,
+              "padTop": 8,
+              "span": 12
+            }
+          ],
+          "id": "b00l",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b00o",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "color": null,
+                  "height": 1,
+                  "id": "b00m",
+                  "type": "divider",
+                  "width": 100
+                }
+              ],
+              "id": "b00n",
+              "padBottom": 4,
+              "padTop": 12,
+              "span": 12
+            }
+          ],
+          "id": "b00p",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#ffffff",
+      "id": "b00s",
+      "linkColor": "#111111",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p><small>A divider above, on the system’s rule colour. Small print here, and the footer on the dark preset below.</small></p>",
+                  "id": "b00q",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Small print"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00r",
+              "padBottom": 16,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b00t",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#111111",
+      "theme": "white"
+    },
+    {
+      "bandColor": "#111111",
+      "containerColor": null,
+      "domId": "section-legal",
+      "id": "b00w",
+      "linkColor": "#ffffff",
+      "padBottom": 10,
+      "padTop": 24,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b00u",
+                  "logoSrc": "",
+                  "logoWidth": 180,
+                  "note": "",
+                  "noteLock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Legal note"
+                  },
+                  "type": "legal"
+                }
+              ],
+              "id": "b00v",
+              "padBottom": 0,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b00x",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#ffffff",
+      "theme": "ink"
+    }
+  ]
+}

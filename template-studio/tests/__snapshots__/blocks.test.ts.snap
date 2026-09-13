@@ -1,0 +1,379 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`button > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "button_text" label="Button text (blank to hide)", value='GO', export_to_template_context=True %}{% text "button_link" label="Button link", value='https://www.switchyards.com/', export_to_template_context=True %}{% if widget_data.button_text.value|trim %}<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate!important"><tbody><tr><td class="sy-btn sy-bg-f7f6f3 sy-text-d10000 sy-link-d10000" align="center" valign="middle" bgcolor="#f7f6f3" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; border-radius:25px; cursor:auto; background-color:#f7f6f3; border:2px solid #d10000; box-sizing:border-box; mso-padding-alt:12px 18px"><a href="{{ widget_data.button_link.value }}" target="_blank" style="color:#d10000; font-size:16px; font-family:Helvetica,Arial,sans-serif; Margin:0; text-transform:none; letter-spacing:0px; text-decoration:none; padding:12px 18px; display:block"><strong style="color:#d10000; font-weight:bold; text-decoration:none; font-style:normal">{{ widget_data.button_text.value }}</strong></a></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`button > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "button_text" label="Button text (blank to hide)", value='GO', export_to_template_context=True %}{% text "button_link" label="Button link", value='https://www.switchyards.com/', export_to_template_context=True %}{% if widget_data.button_text.value|trim %}<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate!important"><tbody><tr><td class="sy-btn sy-bg-f7f6f3 sy-text-d10000 sy-link-d10000" align="center" valign="middle" bgcolor="#f7f6f3" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; border-radius:25px; cursor:auto; background-color:#f7f6f3; border:2px solid #d10000; box-sizing:border-box; mso-padding-alt:12px 18px"><a href="{{ widget_data.button_link.value }}" target="_blank" style="color:#d10000; font-size:16px; font-family:Helvetica,Arial,sans-serif; Margin:0; text-transform:none; letter-spacing:0px; text-decoration:none; padding:12px 18px; display:block"><strong style="color:#d10000; font-weight:bold; text-decoration:none; font-style:normal">{{ widget_data.button_text.value }}</strong></a></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`button > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "button_text" label="Button text (blank to hide)", value='GO', export_to_template_context=True %}{% text "button_link" label="Button link", value='https://www.switchyards.com/', export_to_template_context=True %}{% if widget_data.button_text.value|trim %}<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate!important"><tbody><tr><td class="sy-btn sy-bg-f7f6f3 sy-text-d10000 sy-link-d10000" align="center" valign="middle" bgcolor="#f7f6f3" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; border-radius:25px; cursor:auto; background-color:#f7f6f3; border:2px solid #d10000; box-sizing:border-box; mso-padding-alt:12px 18px"><a href="{{ widget_data.button_link.value }}" target="_blank" style="color:#d10000; font-size:16px; font-family:Helvetica,Arial,sans-serif; Margin:0; text-transform:none; letter-spacing:0px; text-decoration:none; padding:12px 18px; display:block"><strong style="color:#d10000; font-weight:bold; text-decoration:none; font-style:normal">{{ widget_data.button_text.value }}</strong></a></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`divider > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse"><tbody><tr><td height="2" bgcolor="#d10000" style="height:2px; line-height:2px; font-size:0; background-color:#d10000; mso-line-height-rule:exactly" class="sy-bg-d10000">&nbsp;</td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`divider > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse"><tbody><tr><td height="2" bgcolor="#d10000" style="height:2px; line-height:2px; font-size:0; background-color:#d10000; mso-line-height-rule:exactly" class="sy-bg-d10000">&nbsp;</td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`divider > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse"><tbody><tr><td height="2" bgcolor="#d10000" style="height:2px; line-height:2px; font-size:0; background-color:#d10000; mso-line-height-rule:exactly" class="sy-bg-d10000">&nbsp;</td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`heading > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "headline" label="Headline", value='HEADING ONE', export_to_template_context=True %}{% if widget_data.headline.value|trim %}<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-text-011272 sy-link-d10000" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#011272"><h1 class="sy-h1" style="margin:0; line-height:120%; font-family:Helvetica, Arial, sans-serif; font-size:38px; font-weight:bold; text-align:left; color:#011272" align="left">{{ widget_data.headline.value }}</h1></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`heading > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "headline" label="Headline", value='HEADING ONE', export_to_template_context=True %}{% if widget_data.headline.value|trim %}<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-text-fcfff5 sy-link-fcfff5" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#fcfff5"><h1 class="sy-h1" style="margin:0; line-height:120%; font-family:Helvetica, Arial, sans-serif; font-size:38px; font-weight:bold; text-align:left; color:#fcfff5" align="left">{{ widget_data.headline.value }}</h1></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`heading > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "headline" label="Headline", value='HEADING ONE', export_to_template_context=True %}{% if widget_data.headline.value|trim %}<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-text-011272 sy-link-d10000" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#011272"><h1 class="sy-h1" style="margin:0; line-height:120%; font-family:Helvetica, Arial, sans-serif; font-size:38px; font-weight:bold; text-align:left; color:#011272" align="left">{{ widget_data.headline.value }}</h1></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`image > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% module "hero_image" path="@hubspot/image_email", label="Hero image", alignment="center", img={ "src": "", "alt": "", "width": 560 }, export_to_template_context=True %}{% if widget_data.hero_image.img.src %}<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table class="hse-image-wrapper" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" align="center" valign="top" style="font-family:Helvetica, Arial, sans-serif; word-break:break-word; text-align:center; padding:10px 20px 10px; font-size:0px">{% if widget_data.hero_image.link %}<a href="{{ widget_data.hero_image.link }}" target="_blank" style="color:#00a4bd">{% endif %}<img alt="{{ widget_data.hero_image.img.alt }}" src="{{ widget_data.hero_image.img.src }}" style="outline:none; text-decoration:none; border:none; max-width:100%; font-size:16px" width="560" align="middle">{% if widget_data.hero_image.link %}</a>{% endif %}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`image > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% module "hero_image" path="@hubspot/image_email", label="Hero image", alignment="center", img={ "src": "", "alt": "", "width": 560 }, export_to_template_context=True %}{% if widget_data.hero_image.img.src %}<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table class="hse-image-wrapper" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" align="center" valign="top" style="font-family:Helvetica, Arial, sans-serif; word-break:break-word; text-align:center; padding:10px 20px 10px; font-size:0px">{% if widget_data.hero_image.link %}<a href="{{ widget_data.hero_image.link }}" target="_blank" style="color:#00a4bd">{% endif %}<img alt="{{ widget_data.hero_image.img.alt }}" src="{{ widget_data.hero_image.img.src }}" style="outline:none; text-decoration:none; border:none; max-width:100%; font-size:16px" width="560" align="middle">{% if widget_data.hero_image.link %}</a>{% endif %}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`image > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% module "hero_image" path="@hubspot/image_email", label="Hero image", alignment="center", img={ "src": "", "alt": "", "width": 560 }, export_to_template_context=True %}{% if widget_data.hero_image.img.src %}<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table class="hse-image-wrapper" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" align="center" valign="top" style="font-family:Helvetica, Arial, sans-serif; word-break:break-word; text-align:center; padding:10px 20px 10px; font-size:0px">{% if widget_data.hero_image.link %}<a href="{{ widget_data.hero_image.link }}" target="_blank" style="color:#00a4bd">{% endif %}<img alt="{{ widget_data.hero_image.img.alt }}" src="{{ widget_data.hero_image.img.src }}" style="outline:none; text-decoration:none; border:none; max-width:100%; font-size:16px" width="560" align="middle">{% if widget_data.hero_image.link %}</a>{% endif %}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`legal > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section" id="section-legal" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:0px 20px 0px 0px"><table role="presentation" class="hse-footer hse-secondary" width="100%" cellpadding="0" cellspacing="0" style="font-family:Helvetica, Arial, sans-serif; font-size:12px; line-height:135%; margin-bottom:0; padding:0"><tbody><tr><td align="left" valign="top" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; color:#011272; word-break:break-word; text-align:left; margin-bottom:0; line-height:135%; padding:10px 20px" class="sy-text-011272 sy-link-d10000"><p style="margin:0; line-height:115%; color:#011272; font-weight:bold; font-size:12px"><span style="font-size:16px">{{ site_settings.company_name }}</span><br><a href="https://www.google.com/maps/search/?api=1&amp;query={{ (site_settings.company_street_address_1 ~ ", " ~ site_settings.company_city ~ ", " ~ site_settings.company_state ~ " " ~ site_settings.company_zip)|urlencode }}" target="_blank" style="color:#011272 !important; text-decoration:none !important">{{ site_settings.company_street_address_1 }}{% if site_settings.company_street_address_2 %} {{ site_settings.company_street_address_2 }}{% endif %}, {{ site_settings.company_city }}, {{ site_settings.company_state }}&nbsp;{{ site_settings.company_zip }}</a></p><div style="line-height:115%; font-size:12px; color:#011272"><p style="margin:0; line-height:115%; font-size:12px; color:#011272; font-weight:normal">A note.</p></div><p style="margin:0; line-height:100%">&nbsp;</p><p style="margin:0"><span style="color:#011272; font-size:12px"><a href="{{ unsubscribe_link_all }}" style="color:#d10000" data-unsubscribe="true" target="_blank">Unsubscribe</a></span><br><a href="{{ unsubscribe_link }}" style="color:#d10000" data-unsubscribe="true" target="_blank"><span style="font-size:12px">Manage Preferences</span></a></p></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`legal > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-011272" id="section-legal" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:0px 20px 0px 0px"><table role="presentation" class="hse-footer hse-secondary" width="100%" cellpadding="0" cellspacing="0" style="font-family:Helvetica, Arial, sans-serif; font-size:12px; line-height:135%; margin-bottom:0; padding:0"><tbody><tr><td align="left" valign="top" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; color:#fcfff5; word-break:break-word; text-align:left; margin-bottom:0; line-height:135%; padding:10px 20px" class="sy-text-fcfff5 sy-link-fcfff5"><p style="margin:0; line-height:115%; color:#fcfff5; font-weight:bold; font-size:12px"><span style="font-size:16px">{{ site_settings.company_name }}</span><br><a href="https://www.google.com/maps/search/?api=1&amp;query={{ (site_settings.company_street_address_1 ~ ", " ~ site_settings.company_city ~ ", " ~ site_settings.company_state ~ " " ~ site_settings.company_zip)|urlencode }}" target="_blank" style="color:#fcfff5 !important; text-decoration:none !important">{{ site_settings.company_street_address_1 }}{% if site_settings.company_street_address_2 %} {{ site_settings.company_street_address_2 }}{% endif %}, {{ site_settings.company_city }}, {{ site_settings.company_state }}&nbsp;{{ site_settings.company_zip }}</a></p><div style="line-height:115%; font-size:12px; color:#fcfff5"><p style="margin:0; line-height:115%; font-size:12px; color:#fcfff5; font-weight:normal">A note.</p></div><p style="margin:0; line-height:100%">&nbsp;</p><p style="margin:0"><span style="color:#fcfff5; font-size:12px"><a href="{{ unsubscribe_link_all }}" style="color:#fcfff5" data-unsubscribe="true" target="_blank">Unsubscribe</a></span><br><a href="{{ unsubscribe_link }}" style="color:#fcfff5" data-unsubscribe="true" target="_blank"><span style="font-size:12px">Manage Preferences</span></a></p></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`legal > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-fcfff5" id="section-legal" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:0px 20px 0px 0px"><table role="presentation" class="hse-footer hse-secondary" width="100%" cellpadding="0" cellspacing="0" style="font-family:Helvetica, Arial, sans-serif; font-size:12px; line-height:135%; margin-bottom:0; padding:0"><tbody><tr><td align="left" valign="top" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; color:#011272; word-break:break-word; text-align:left; margin-bottom:0; line-height:135%; padding:10px 20px" class="sy-text-011272 sy-link-d10000"><p style="margin:0; line-height:115%; color:#011272; font-weight:bold; font-size:12px"><span style="font-size:16px">{{ site_settings.company_name }}</span><br><a href="https://www.google.com/maps/search/?api=1&amp;query={{ (site_settings.company_street_address_1 ~ ", " ~ site_settings.company_city ~ ", " ~ site_settings.company_state ~ " " ~ site_settings.company_zip)|urlencode }}" target="_blank" style="color:#011272 !important; text-decoration:none !important">{{ site_settings.company_street_address_1 }}{% if site_settings.company_street_address_2 %} {{ site_settings.company_street_address_2 }}{% endif %}, {{ site_settings.company_city }}, {{ site_settings.company_state }}&nbsp;{{ site_settings.company_zip }}</a></p><div style="line-height:115%; font-size:12px; color:#011272"><p style="margin:0; line-height:115%; font-size:12px; color:#011272; font-weight:normal">A note.</p></div><p style="margin:0; line-height:100%">&nbsp;</p><p style="margin:0"><span style="color:#011272; font-size:12px"><a href="{{ unsubscribe_link_all }}" style="color:#d10000" data-unsubscribe="true" target="_blank">Unsubscribe</a></span><br><a href="{{ unsubscribe_link }}" style="color:#d10000" data-unsubscribe="true" target="_blank"><span style="font-size:12px">Manage Preferences</span></a></p></td></tr></tbody></table></td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`richtext > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% rich_text "body" label="Body", html='<p>Copy.</p>', export_to_template_context=True %}{% if widget_data.body.html %}<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-rich sy-rtl-d10000 sy-text-011272 sy-link-d10000" align="left" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#011272; text-align:left">{{ widget_data.body.html }}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`richtext > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% rich_text "body" label="Body", html='<p>Copy.</p>', export_to_template_context=True %}{% if widget_data.body.html %}<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-rich sy-rtl-fcfff5 sy-text-fcfff5 sy-link-fcfff5" align="left" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#fcfff5; text-align:left">{{ widget_data.body.html }}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`richtext > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% rich_text "body" label="Body", html='<p>Copy.</p>', export_to_template_context=True %}{% if widget_data.body.html %}<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="hs_padded sy-rich sy-rtl-d10000 sy-text-011272 sy-link-d10000" align="left" style="font-family:Helvetica, Arial, sans-serif; font-size:18px; word-break:break-word; padding:10px 20px 10px; color:#011272; text-align:left">{{ widget_data.body.html }}</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>{% endif %}
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`spacer > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="24" style="height:24px; line-height:24px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`spacer > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="24" style="height:24px; line-height:24px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`spacer > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="24" style="height:24px; line-height:24px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`stripes > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-d20000" style="padding:0; max-width:600px; margin:0 auto; background-color:#d20000" bgcolor="#d20000"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#d20000"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="4" style="height:4px; line-height:4px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div><div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="2" style="height:2px; line-height:2px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`stripes > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-d20000" style="padding:0; max-width:600px; margin:0 auto; background-color:#d20000" bgcolor="#d20000"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#d20000"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="4" style="height:4px; line-height:4px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div><div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="2" style="height:2px; line-height:2px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`stripes > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+<div class="hse-section sy-bg-d20000" style="padding:0; max-width:600px; margin:0 auto; background-color:#d20000" bgcolor="#d20000"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#d20000"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="4" style="height:4px; line-height:4px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div><div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="2" style="height:2px; line-height:2px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`topbar > renders on the cream theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "top_bar_tagline" label="Top bar tagline", value='"A tagline."', export_to_template_context=True %}<div class="hse-section" style="padding:0; max-width:600px; margin:0 auto"><div class="hse-column-container sy-bg-f7f6f3" style="min-width:280px; max-width:600px; margin:0 auto; background-color:#f7f6f3" bgcolor="#f7f6f3"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600" bgcolor="#f7f6f3"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><div class="sy-text-011272"><h2 class="sy-tagline" style="margin:0; text-align:center; font-size:12px; line-height:110%; font-weight:bold; text-transform:uppercase; color:#011272" align="center"><span style="color:#011272">{{ widget_data.top_bar_tagline.value }}</span></h2></div></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`topbar > renders on the navy theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "top_bar_tagline" label="Top bar tagline", value='"A tagline."', export_to_template_context=True %}<div class="hse-section sy-bg-011272" style="padding:0; max-width:600px; margin:0 auto; background-color:#011272" bgcolor="#011272"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#011272"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><div class="sy-text-fcfff5"><h2 class="sy-tagline" style="margin:0; text-align:center; font-size:12px; line-height:110%; font-weight:bold; text-transform:uppercase; color:#fcfff5" align="center"><span style="color:#fcfff5">{{ widget_data.top_bar_tagline.value }}</span></h2></div></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;
+
+exports[`topbar > renders on the offwhite theme 1`] = `
+"<div id="hs_cos_wrapper_main">
+
+{% text "top_bar_tagline" label="Top bar tagline", value='"A tagline."', export_to_template_context=True %}<div class="hse-section sy-bg-fcfff5" style="padding:0; max-width:600px; margin:0 auto; background-color:#fcfff5" bgcolor="#fcfff5"><!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="600" style="width:600px" bgcolor="#fcfff5"><tbody><tr><td valign="top"><![endif]--><div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto"><!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px;"><![endif]--><div class="hse-column hse-size-12"><div class="sy-text-011272"><h2 class="sy-tagline" style="margin:0; text-align:center; font-size:12px; line-height:110%; font-weight:bold; text-transform:uppercase; color:#011272" align="center"><span style="color:#011272">{{ widget_data.top_bar_tagline.value }}</span></h2></div></div><!--[if (mso)|(IE)]></td></tr></table><![endif]--></div><!--[if gte mso 9]></td></tr></tbody></table><![endif]--></div>
+
+
+
+--- phone ---
+/* Phone sizes for headings and anything typed in the rich text editor. */
+@media only print, only screen and (max-width:639px) {
+  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important } .sy-h5, .sy-rich h5 { font-size:14px !important } .sy-h6, .sy-rich h6 { font-size:12px !important }
+  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }"
+`;

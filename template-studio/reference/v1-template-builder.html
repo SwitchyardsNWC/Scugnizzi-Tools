@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Switchyards Template Builder</title>
+<style>
+  :root {
+    --navy: #011272; --navy-2: #0a1f8f; --red: #d10000; --cream: #f7f6f3; --ink: #17182b; --muted: #6b6f80; --muted-2: #9a9db0;
+    --line: #e5e4de; --line-2: #eeede8; --panel: #ffffff; --bg: #f1f0eb; --sidebar-w: 440px;
+    --r: 10px; --r-s: 7px; --shadow: 0 1px 2px rgba(23,24,43,.05), 0 4px 14px rgba(23,24,43,.05);
+    --chev-navy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5l3.5 3.5 3.5-3.5' fill='none' stroke='%23011272' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --chev-white: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5l3.5 3.5 3.5-3.5' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+
+  /* ---------- top bar ---------- */
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 9px 16px; min-height: 56px; background: var(--navy); color: #fff; flex: 0 0 auto; }
+  .topbar .brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+  .topbar .brand-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--red); color: #fff; font-weight: 800; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; letter-spacing: .02em; }
+  .topbar h1 { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0; white-space: nowrap; }
+  .topbar .group { display: flex; align-items: center; gap: 6px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.18); }
+  .topbar .spacer { flex: 1; }
+  .status { font-size: 12px; opacity: .7; white-space: nowrap; }
+  .topbar select { appearance: none; -webkit-appearance: none; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 30px 7px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08) var(--chev-white) no-repeat right 11px center; color: #fff; max-width: 240px; cursor: pointer; }
+  .topbar select:hover { background-color: rgba(255,255,255,.14); }
+  .topbar select:focus { outline: none; border-color: #fff; }
+  .topbar select option { color: var(--ink); background: #fff; }
+
+  button { appearance: none; border: 1px solid transparent; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; line-height: 1; white-space: nowrap; background: #fff; color: var(--navy); transition: background .12s, color .12s, border-color .12s, box-shadow .12s; }
+  button:hover { background: var(--cream); }
+  button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+  button.primary { background: var(--red); color: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.15); }
+  button.primary:hover { background: #b50000; }
+  button.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.3); }
+  button.ghost:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.5); }
+  button.small { padding: 6px 11px; font-size: 12.5px; }
+  button.active { background: var(--navy); color: #fff; }
+  button.icon { padding: 4px 6px; font-size: 12px; background: transparent; color: var(--muted-2); border-radius: 6px; }
+  button.icon:hover { background: var(--line-2); color: var(--navy); }
+  button.icon.danger:hover { color: var(--red); background: #fdeaea; }
+
+  /* ---------- layout ---------- */
+  .main { flex: 1 1 auto; display: flex; min-height: 0; }
+  .sidebar { flex: 0 0 var(--sidebar-w); width: var(--sidebar-w); min-width: 0; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; }
+  .preview-wrap { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .preview-tools { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--panel); flex: 0 0 auto; }
+  .seg { display: inline-flex; background: var(--line-2); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { border-radius: 999px; border: 0; background: transparent; color: var(--muted); padding: 6px 12px; }
+  .seg button:hover { color: var(--navy); background: rgba(255,255,255,.7); }
+  .seg button.active { background: #fff; color: var(--navy); box-shadow: 0 1px 3px rgba(23,24,43,.12); }
+  .preview-tools .hint { margin-left: auto; }
+  .preview-scroll { flex: 1 1 auto; overflow: auto; padding: 28px 24px 60px; display: flex; justify-content: center; align-items: flex-start; }
+  .preview-scroll.code { padding: 0; }
+  iframe#preview { border: 0; background: #f7f6f3; width: 680px; height: 800px; overflow: hidden; border-radius: 6px; box-shadow: 0 2px 6px rgba(1,18,114,.06), 0 16px 40px rgba(1,18,114,.12); transition: width .2s; }
+  iframe#preview.mobile { width: 375px; }
+  textarea#codeout { width: 100%; height: 100%; min-height: 600px; resize: none; border: 0; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 18px 20px; background: #fff; color: #333; white-space: pre; display: block; }
+
+  /* ---------- sidebar sections ---------- */
+  .side-section { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .side-section > .side-head { padding: 16px 20px 8px; font-weight: 700; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; }
+  .side-head .count { margin-left: auto; font-weight: 500; color: var(--muted-2); letter-spacing: 0; text-transform: none; font-size: 12px; }
+  .fields { padding: 0 20px 10px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+  .field label .count { margin-left: auto; font-weight: 400; color: var(--muted-2); }
+  .field label .count.over { color: var(--red); }
+  .field input[type=text], .field input[type=url], .field input[type=number], .field textarea, .field select {
+    width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-s); background: #fff; color: var(--ink); transition: border-color .12s, box-shadow .12s;
+  }
+  .field input:hover, .field textarea:hover, .field select:hover { border-color: #cfcec7; }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,18,114,.1); }
+  .field select { appearance: none; -webkit-appearance: none; padding-right: 30px; background: #fff var(--chev-navy) no-repeat right 10px center; cursor: pointer; }
+  .field textarea { resize: vertical; min-height: 56px; line-height: 1.45; }
+  .field textarea.rich { min-height: 110px; }
+  .field-info { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: -2px 0 12px; }
+  .row { display: flex; gap: 10px; }
+  .row .field { flex: 1; min-width: 0; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 10px; }
+  .check label { display: flex; gap: 8px; align-items: center; font-weight: 500; cursor: pointer; }
+  .check input { margin: 0; width: 15px; height: 15px; accent-color: var(--navy); }
+
+  /* info tooltips */
+  .tip { display: inline-flex; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted-2); background: #fff; font-size: 10px; font-weight: 700; font-style: normal; align-items: center; justify-content: center; cursor: help; position: relative; flex: 0 0 auto; }
+  .tip:hover, .tip:focus { border-color: var(--navy); color: var(--navy); outline: none; }
+  .tip::after { display: none; content: attr(data-tip); position: absolute; left: -6px; top: calc(100% + 8px); background: var(--ink); color: #fff; padding: 8px 10px; border-radius: 7px; font-size: 12px; font-weight: 400; line-height: 1.45; width: max-content; max-width: 280px; white-space: normal; text-align: left; opacity: 0; transform: translateY(-3px); pointer-events: none; transition: opacity .12s, transform .12s; z-index: 30; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  .tip::before { display: none; content: ""; position: absolute; left: 3px; top: calc(100% + 3px); border: 5px solid transparent; border-bottom-color: var(--ink); opacity: 0; transition: opacity .12s; pointer-events: none; z-index: 31; }
+  .tip:hover::after, .tip:focus::after, .tip:hover::before, .tip:focus::before { display: block; opacity: 1; transform: none; }
+  .tip.right::after { left: auto; right: -6px; } .tip.right::before { left: auto; right: 3px; }
+
+  /* ---------- block cards ---------- */
+  .blocks { padding: 4px 14px 6px; }
+  .block { border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 8px; background: #fff; min-width: 0; transition: box-shadow .12s, border-color .12s; }
+  .block:hover { border-color: #d6d5cf; box-shadow: var(--shadow); }
+  .block.open { border-color: #cfd3ea; box-shadow: var(--shadow); }
+  .block.dragging { opacity: .4; }
+  .block.drop-before { box-shadow: 0 -3px 0 0 var(--red); }
+  .block.drop-after { box-shadow: 0 3px 0 0 var(--red); }
+  .block-head { display: flex; align-items: center; gap: 6px; padding: 9px 8px 9px 10px; cursor: pointer; user-select: none; min-width: 0; }
+  .block-head .grip { cursor: grab; color: #cfcec7; font-size: 14px; letter-spacing: -2px; }
+  .block-head .chev { width: 12px; height: 12px; background: var(--chev-navy) no-repeat center; opacity: .55; transition: transform .15s; flex: 0 0 auto; }
+  .block.open .block-head .chev { transform: rotate(180deg); }
+  .block-head .title { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .block-head .title small { font-weight: 400; color: var(--muted-2); }
+  .block-head .tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 7px; border-radius: 999px; background: #e9eefc; color: var(--navy); }
+  .block-head .tag.fixed { background: var(--line-2); color: var(--muted); }
+  .block-head .icons { display: flex; gap: 1px; opacity: .55; transition: opacity .12s; }
+  .block:hover .block-head .icons, .block.open .block-head .icons { opacity: 1; }
+  .block-body { border-top: 1px solid var(--line-2); padding: 12px 14px 4px; display: none; }
+  .block.open .block-body { display: block; }
+  .editable-box { border: 1px solid #dfe3f3; border-radius: var(--r-s); padding: 10px 12px 2px; margin-bottom: 12px; background: #f6f8ff; }
+
+  .add-label { padding: 12px 20px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .add-menu { padding: 0 14px 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .add-menu button { font-size: 12px; padding: 6px 11px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-weight: 500; }
+  .add-menu button:hover { border-color: var(--navy); color: var(--navy); }
+
+  /* ---------- rich text editor ---------- */
+  .wys-toolbar { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; padding: 4px; background: var(--line-2); border-radius: var(--r-s); }
+  .wys-toolbar button { padding: 5px 8px; font-size: 12px; font-weight: 600; border: 0; border-radius: 5px; background: transparent; color: var(--ink); }
+  .wys-toolbar button:hover { background: #fff; color: var(--navy); }
+  .wys-toolbar button.on { background: var(--navy); color: #fff; }
+  .wys { min-height: 130px; max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-s); padding: 10px 12px; background: #fff; color: var(--navy); font: 15px/1.5 Helvetica, Arial, sans-serif; }
+  .wys:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,18,114,.1); }
+  .wys h1 { font-size: 24px; line-height: 1.2; margin: 0 0 8px; } .wys h2 { font-size: 19px; line-height: 1.25; margin: 0 0 6px; } .wys h3 { font-size: 16px; line-height: 1.3; margin: 0 0 6px; } .wys h4 { font-size: 15px; margin: 0 0 4px; }
+  .wys p { margin: 0 0 10px; } .wys ul, .wys ol { margin: 0 0 10px 22px; padding: 0; } .wys li { margin: 0 0 4px; }
+  .wys a { color: var(--red); } .wys blockquote { margin: 0 0 10px; padding: 2px 0 2px 12px; border-left: 3px solid var(--red); font-style: italic; }
+  .wys-raw { width: 100%; min-height: 130px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---------- toast + dialog ---------- */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 10; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .toast button { background: #fff; color: var(--navy); padding: 5px 12px; font-size: 12px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(23,24,43,.45); display: flex; align-items: center; justify-content: center; z-index: 20; backdrop-filter: blur(2px); }
+  .modal { background: #fff; border-radius: 14px; padding: 20px 22px; width: 380px; max-width: calc(100% - 32px); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .modal h2 { font-size: 15px; margin: 0 0 8px; }
+  .modal p { font-size: 13px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+  .modal input { width: 100%; font: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-s); margin-bottom: 16px; }
+  .modal input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,18,114,.1); }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal button.cancel { border-color: var(--line); }
+  input[type=file] { display: none; }
+
+  @media (max-width: 960px) {
+    .main { flex-direction: column; }
+    .sidebar { flex: 0 0 auto; width: auto; max-height: 50vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    iframe#preview, iframe#preview.mobile { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">SY</span><h1>Template Builder</h1></div>
+  <div class="group">
+    <select id="design-select" title="Switch design"></select>
+    <button class="ghost small" id="btn-new">New</button>
+    <button class="ghost small" id="btn-saveas">Save as…</button>
+    <button class="ghost small" id="btn-delete">Delete</button>
+    <button class="ghost small" id="btn-default" title="New designs start from this one">Set as default</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="status" id="status"></span>
+  <div class="group">
+    <button class="ghost small" id="btn-import">Import design…</button>
+    <button class="ghost small" id="btn-export-json">Export design</button>
+  </div>
+  <button class="primary" id="btn-export">Export HubSpot template</button>
+  <input type="file" id="file-json" accept="application/json,.json">
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <div class="side-section">
+      <div class="side-head">Template</div>
+      <div class="fields" id="settings"></div>
+    </div>
+    <div class="side-section">
+      <div class="side-head">Blocks <span class="count" id="block-count"></span></div>
+      <div class="blocks" id="blocks"></div>
+      <div class="add-label">Add a block</div>
+      <div class="add-menu" id="add-menu"></div>
+    </div>
+    <div class="side-section">
+      <div class="side-head">Preview only</div>
+      <div class="fields" id="preview-settings"></div>
+    </div>
+  </aside>
+
+  <section class="preview-wrap">
+    <div class="preview-tools">
+      <div class="seg">
+        <button class="small active" data-view="desktop">Desktop</button>
+        <button class="small" data-view="mobile">Mobile</button>
+        <button class="small" data-view="code">HubSpot source</button>
+      </div>
+      <span class="hint"><span class="tip right" tabindex="0" data-tip="The preview shows each block's default content. Blocks marked Editable become fields in HubSpot's email editor, in this order.">i</span></span>
+    </div>
+    <div class="preview-scroll" id="preview-scroll">
+      <iframe id="preview" title="Email preview" scrolling="no"></iframe>
+      <textarea id="codeout" readonly hidden spellcheck="false"></textarea>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+'use strict';
+
+/* =============================== helpers =============================== */
+var STORAGE_KEY = 'sy-template-builder';
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function trim(s) { return s.trim(); }
+function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'field'; }
+function fileSlug(s) { return String(s || 'email-template').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'email-template'; }
+function isBlank(v) { return v == null || String(v).trim() === ''; }
+
+// Friendly text -> email HTML. Blank line = paragraph, **bold**, [text](url). Raw HTML passes through.
+function inline(s, linkColor) {
+  s = esc(String(s == null ? '' : s).replace(/\r\n?/g, '\n'));
+  s = s.replace(/\*\*([\s\S]+?)\*\*/g, '<span style="font-weight: bold;">$1</span>');
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" rel="noopener" style="color:' + linkColor + '" target="_blank">$1</a>');
+  return s.replace(/\n/g, '<br>');
+}
+function richHtml(text, linkColor) {
+  text = String(text == null ? '' : text).replace(/\r\n?/g, '\n').trim();
+  if (!text) return '';
+  if (text.charAt(0) === '<') return text;
+  // Plain <p> tags: spacing and line-height come from the .sy-rich styles, same as text the team types in HubSpot.
+  return text.split(/\n[ \t]*\n+/).map(trim).filter(Boolean)
+    .map(function (p) { return '<p>' + inline(p, linkColor) + '</p>'; })
+    .join('');
+}
+
+/* ========================= HubL emitting context ======================== */
+// mode: 'preview' renders default values; 'hubl' emits HubSpot template tags.
+function Ctx(mode) { this.mode = mode; this.decls = []; this.names = {}; this.mobile = []; this.inlineCss = []; this.seq = 0; }
+Ctx.prototype.name = function (base) {
+  var n = slug(base), i = 2, out = n;
+  while (this.names[out]) out = n + '_' + (i++);
+  this.names[out] = true; return out;
+};
+function hublText(s) { return String(s == null ? '' : s).replace(/\r?\n/g, ' ').replace(/'/g, '’'); }
+function hublHtml(s) { return String(s == null ? '' : s).replace(/\r?\n/g, ' ').replace(/'/g, '&#39;'); }
+function hublAttr(s) { return String(s == null ? '' : s).replace(/\r?\n/g, ' ').replace(/"/g, '&quot;'); }
+
+// Single-line text. Returns the value to print inside your own markup. The declaration is
+// queued and emitted just before the block that uses it, so HubSpot's Contents panel lists
+// fields in the same order as the blocks.
+function fText(ctx, base, label, value) {
+  if (ctx.mode !== 'hubl') return esc(value);
+  var n = ctx.name(base);
+  ctx.decls.push('{% text "' + n + '" label="' + hublAttr(label) + '", value=\'' + hublText(value) + '\', export_to_template_context=True %}');
+  return '{{ widget_data.' + n + '.value }}';
+}
+// Wrap markup so it disappears when a text field is blank.
+function fIf(ctx, printed, value, inner) {
+  if (ctx.mode !== 'hubl') return isBlank(value) ? '' : inner;
+  var n = printed.replace('{{ widget_data.', '').replace('.value }}', '');
+  return '{% if widget_data.' + n + '.value|trim %}' + inner + '{% endif %}';
+}
+function fRich(ctx, base, label, html) {
+  if (ctx.mode !== 'hubl') return html;
+  return '{% rich_text "' + ctx.name(base) + '" label="' + hublAttr(label) + '", html=\'' + hublHtml(html) + '\' %}';
+}
+var IMG_STYLE = 'outline:none; text-decoration:none; border:none; max-width:100%; font-size:16px';
+function staticImage(o) {
+  var img = '<img alt="' + esc(o.alt) + '" src="' + esc(o.src) + '" style="' + IMG_STYLE + '" width="' + (o.width || 560) + '" align="middle">';
+  return o.href ? '<a href="' + esc(o.href) + '" target="_blank" style="color:#00a4bd">' + img + '</a>' : img;
+}
+// Editable image. In HubSpot the image field is exported to the template context so the
+// whole block can be skipped when no image is set. Returns { html, wrap } where wrap()
+// wraps the finished section in that condition.
+function fImage(ctx, base, label, o) {
+  if (ctx.mode !== 'hubl') return { html: staticImage(o), wrap: function (s) { return s; } };
+  var n = ctx.name(base), ln = ctx.name(base + ' link');
+  ctx.decls.push('{% linked_image "' + n + '" label="' + hublAttr(label) + '", src="' + hublAttr(o.src) + '", alt="' + hublAttr(o.alt) + '", width="' + (o.width || 560) + '", export_to_template_context=True %}');
+  // HubSpot does not expose the link set on the image picker to templates, so the link is its own
+  // text field, listed right after the image in the editor.
+  ctx.decls.push('{% text "' + ln + '" label="' + hublAttr(label + ' link (paste the URL here)') + '", value=\'' + hublText(o.href) + '\', export_to_template_context=True %}');
+  var w = 'widget_data.' + n, h = n + '_href';
+  // Width comes from the block, not the uploaded file, so a 1300px upload still renders at the column width.
+  var img = '<img alt="{{ ' + w + '.alt }}" src="{{ ' + w + '.src }}" style="' + IMG_STYLE + '" width="' + (o.width || 560) + '" align="middle">';
+  var html = '{% set ' + h + ' = widget_data.' + ln + '.value|trim %}' +
+    '{% if ' + h + ' %}<a href="{{ ' + h + ' }}" target="_blank" style="color:#00a4bd">{% endif %}' + img + '{% if ' + h + ' %}</a>{% endif %}';
+  return { html: html, wrap: function (s) { return '{% if ' + w + '.src %}' + s + '{% endif %}'; } };
+}
+// Static or editable, decided by the block's toggle.
+function txt(ctx, b, base, label, value) { return b.editable ? fText(ctx, base, label, value) : esc(value); }
+function rich(ctx, b, base, label, html) { return b.editable ? fRich(ctx, base, label, html) : html; }
+
+/* ============================ email markup ============================= */
+var THEMES = {
+  cream:    { section: null,      container: '#f7f6f3', text: '#011272', link: '#d10000', button: 'red' },
+  navy:     { section: '#011272', container: null,      text: '#fcfff5', link: '#fcfff5', button: 'white' },
+  offwhite: { section: '#fcfff5', container: null,      text: '#011272', link: '#d10000', button: 'red' }
+};
+var FONT = 'font-family:Helvetica, Arial, sans-serif;';
+
+// Every background / text / link color used gets a class, so the dark-mode override CSS can re-assert it.
+var colorReg = { bg: {}, text: {}, link: {} };
+function regColor(kind, hex) { if (!hex) return ''; var k = hex.replace('#', '').toLowerCase(); colorReg[kind][k] = hex; return ' sy-' + kind + '-' + k; }
+function bgCls(hex) { return regColor('bg', hex); }
+function cCls(hex) { return regColor('text', hex); }
+function linkCls(hex) { return regColor('link', hex); }
+
+function section(inner, o) {
+  o = o || {};
+  // No side padding: sections run edge to edge on phones (the 600px container centers itself on desktop).
+  var secStyle = 'padding:0' + (o.bg ? '; background-color:' + o.bg : '');
+  var conStyle = 'min-width:280px; max-width:600px; margin:0 auto' + (o.containerBg ? '; background-color:' + o.containerBg : '') + (o.padTop ? '; padding-top:' + o.padTop + 'px' : '') + (o.padBottom ? '; padding-bottom:' + o.padBottom + 'px' : '');
+  var tdPad = (o.padTop ? 'padding-top:' + o.padTop + 'px;' : '') + (o.padBottom ? 'padding-bottom:' + o.padBottom + 'px;' : '');
+  var out = '<div class="hse-section' + bgCls(o.bg) + '"' + (o.id ? ' id="' + o.id + '"' : '') + ' style="' + secStyle + '"' + (o.bg ? ' bgcolor="' + o.bg + '"' : '') + '>\n';
+  if (o.bg) out += '<!--[if gte mso 9]><table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%" style="width:100%" bgcolor="' + o.bg + '"><tbody><tr><td valign="top"><![endif]-->\n';
+  out += '<div class="hse-column-container' + (o.twoCol ? ' hse-no-stack-row' : '') + bgCls(o.containerBg) + '" style="' + conStyle + (o.twoCol ? '; border-collapse:separate; display:table; width:100%' : '') + '"' + (o.containerBg ? ' bgcolor="' + o.containerBg + '"' : '') + '>\n';
+  out += '<!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"' + (o.containerBg ? ' bgcolor="' + o.containerBg + '"' : '') + '><tr><td valign="top" style="width:' + (o.twoCol ? 300 : 600) + 'px;' + tdPad + '"><![endif]-->\n';
+  out += o.twoCol ? inner : '<div class="hse-column hse-size-12">\n' + inner + '\n</div>\n';
+  out += '<!--[if (mso)|(IE)]></td></tr></table><![endif]-->\n</div>\n';
+  if (o.bg) out += '<!--[if gte mso 9]></td></tr></tbody></table><![endif]-->\n';
+  return out + '</div>';
+}
+function cell(inner, pad, color, linkColor, cls, align) {
+  var classes = 'hs_padded' + (cls ? ' ' + cls : '') + (color ? cCls(color) : '') + (linkColor ? linkCls(linkColor) : '');
+  return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td class="' + classes + '"' + (align ? ' align="' + align + '"' : '') + ' style="' + FONT + ' font-size:18px; word-break:break-word; padding:' + pad + (color ? '; color:' + color : '') + (align ? '; text-align:' + align : '') + '">' + inner + '</td></tr></tbody></table>';
+}
+function px(v, fallback) { return v == null ? fallback : Math.max(0, v | 0); }   // spacing fields: blank = default, never negative
+function padOf(b, top, bottom) { return px(b.padTop, top) + 'px 20px ' + px(b.padBottom, bottom) + 'px'; }
+function imageCell(inner, pad, align) {
+  return '<table class="hse-image-wrapper" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" align="' + align + '" valign="top" style="' + FONT + ' word-break:break-word; text-align:' + align + '; padding:' + pad + '; font-size:0px">' + inner + '</td></tr></tbody></table>';
+}
+function buttonHtml(label, href, style, align, fontSize, cls) {
+  var red = style === 'red';
+  var bg = red ? '#f7f6f3' : '#011272', border = red ? '#d10000' : '#FFFFFF', color = red ? '#d10000' : '#ffffff';
+  var pad = red ? '12px 18px' : '9px 17px'; fontSize = fontSize || (red ? 16 : 13);
+  var full = align === 'full';
+  return '<table' + (full ? ' width="100%"' : '') + ' align="' + (full ? 'left' : align) + '" border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate!important"><tbody><tr>' +
+    '<td class="sy-btn' + bgCls(bg) + cCls(color) + linkCls(color) + '" align="center" valign="middle" bgcolor="' + bg + '" style="' + FONT + ' font-size:18px; word-break:break-word; border-radius:25px; cursor:auto; background-color:' + bg + '; border:2px solid ' + border + '; box-sizing:border-box; mso-padding-alt:' + pad + '">' +
+    '<a href="' + href + '"' + (cls ? ' class="' + cls + '"' : '') + ' target="_blank" style="color:' + color + '; font-size:' + fontSize + 'px; font-family:Helvetica,Arial,sans-serif; Margin:0; text-transform:none; letter-spacing:0px; text-decoration:none; padding:' + pad + '; display:block">' +
+    '<strong style="color:' + color + '; font-weight:bold; text-decoration:none; font-style:normal">' + label + '</strong></a></td></tr></tbody></table>';
+}
+// Shared pieces for the footer variants.
+var FOOTER_SEP = '<span style="color:#fcfff5">&nbsp;&nbsp;·&nbsp;&nbsp;</span>';
+function inlineLinks(list) {
+  return cityPairs(list).map(function (l) {
+    var label = esc(l.text);
+    // nowrap keeps each item whole; the line wraps between items instead.
+    return l.href ? '<a href="' + esc(l.href) + '" style="color:#fcfff5; font-weight:bold; text-decoration:none; white-space:nowrap" target="_blank">' + label + '</a>' : '<span style="color:#fcfff5; font-weight:bold; white-space:nowrap">' + label + '</span>';
+  }).join(FOOTER_SEP);
+}
+function footerCell(inner, pad, align) {
+  align = align || 'center';
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="sy-rich-footer sy-fpad' + cCls('#fcfff5') + linkCls('#fcfff5') + '" align="' + align + '" style="' + FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; text-align:' + align + '; padding:' + pad + '">' + inner + '</td></tr></tbody></table>';
+}
+// Buttons in one row (each in its own cell); the .sy-stack class stacks them on phones.
+function footerButtonRow(ctx, b) {
+  var cells = (b.buttons || []).map(function (btn, i) {
+    var label = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_text', 'Footer button ' + (i + 1) + ' text (blank to hide)', btn.text) : esc(btn.text);
+    var href = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_link', 'Footer button ' + (i + 1) + ' link', btn.href) : esc(btn.href);
+    var html = '<td align="center" valign="middle" style="padding:0 8px">' + buttonHtml(label, href, 'white', 'center') + '</td>';
+    return b.buttonsEditable ? fIf(ctx, label, btn.text, html) : html;
+  }).join('');
+  return cells ? '<table class="sy-stack" role="presentation" align="center" border="0" cellpadding="0" cellspacing="0"><tbody><tr>' + cells + '</tr></tbody></table>' : '';
+}
+function footerTagline(ctx, b, style) {
+  var cls = 'sy-ftag-' + (++ctx.seq);
+  ctx.mobile.push('.' + cls + ' { font-size:' + (b.taglineMobileSize || 15) + 'px !important; line-height:115% !important }');
+  return { cls: cls, size: b.taglineSize || 17 };
+}
+
+// A fixed-height row that every client honors (Outlook ignores heights on empty divs).
+function spacerRow(h) {
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td height="' + h + '" style="height:' + h + 'px; line-height:' + h + 'px; font-size:0; mso-line-height-rule:exactly">&nbsp;</td></tr></tbody></table>';
+}
+// City pages on switchyards.com. Raleigh and Durham share one page.
+var CITY_URL = 'https://www.switchyards.com/locations?selected-city=';
+var CITY_IDS = { 'ASHEVILLE': 'Yh_R1jdFX', 'ATLANTA': 'utCFguYp7', 'AUSTIN': 'dibZtZ_Ho', 'BIRMINGHAM': 'lPoHAXxSS', 'CHARLESTON': 'RcDGG3yBo', 'CHARLOTTE': 'QyyVB_QWC', 'CHICAGO': 'gFR7s8Uv0', 'COLUMBUS': 'WPn_IrfMZ', 'DALLAS': 'DIMyB7HhV', 'DENVER': 'fWTxT5fVZ', 'DURHAM': 'ZqRrH6gqt', 'GREENVILLE': 'bv8nYOLdW', 'HOUSTON': 'Pt9S9VC8a', 'KANSAS CITY': 'nEHaWgHLc', 'NASHVILLE': 'WibfXC0pf', 'RALEIGH': 'ZqRrH6gqt', 'SAVANNAH': 'MgjicvzFe' };
+function cityHref(name) { var id = CITY_IDS[String(name || '').trim().toUpperCase()]; return id ? CITY_URL + id : ''; }
+function cityList() { return Object.keys(CITY_IDS).map(function (c) { return { text: c, href: cityHref(c) }; }); }
+
+var STRIPE_COLORS = [['#fcfff5', 'Off-white'], ['#d20000', 'Red'], ['#011272', 'Navy'], ['#f7f6f3', 'Cream'], ['#ffffff', 'White'], ['custom', 'Custom hex…']];
+var TEXT_COLORS = [['', 'Background default'], ['#011272', 'Navy'], ['#d10000', 'Red'], ['#fcfff5', 'Off-white'], ['#ffffff', 'White'], ['custom', 'Custom hex…']];
+function pickColor(pick, custom, fallback) { if (!pick) return fallback; return stripeColor(pick, custom) || fallback; }
+var PAD_ROW = { row: [{ k: 'padTop', l: 'Space above (px)', t: 'number' }, { k: 'padBottom', l: 'Space below (px)', t: 'number' }] };
+var COLOR_ROW = { row: [{ k: 'color', l: 'Text color', t: 'select', opts: TEXT_COLORS }, { k: 'colorCustom', l: 'Custom hex', help: 'Used when Custom is picked.' }] };
+function stripeColor(pick, custom) {
+  if (pick !== 'custom') return pick;
+  var hex = String(custom || '').trim(); if (hex && hex.charAt(0) !== '#') hex = '#' + hex;
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex) ? hex.toLowerCase() : '';
+}
+
+var HEADING_STYLE = { h1: 'margin:0; line-height:125%; ' + FONT + ' font-size:38px', h2: 'margin:0; line-height:125%; font-size:22px', h3: 'margin:0; line-height:125%; font-size:17px', h4: 'margin:0; line-height:125%; font-size:15px' };
+
+/* ============================== block types ============================ */
+var THEME_FIELD = { k: 'theme', l: 'Background', t: 'select', opts: [['cream', 'Cream (default)'], ['navy', 'Navy'], ['offwhite', 'Off-white']] };
+var LOGO_IMG = 'https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/SYLogo_Header_Outlined.png?width=350&upscale=true&name=SYLogo_Header_Outlined.png';
+var SIGNOFF_IMG = 'https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/Seeyouaroundtheclub.png?width=560&upscale=true&name=Seeyouaroundtheclub.png';
+var LOCKUP_IMG = 'https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=360&upscale=true&name=sy-logo-lockup@2x.png';
+
+var BLOCKS = {
+  topbar: {
+    name: 'Top bar', canEdit: true,
+    defaults: { text: '"The world’s first neighborhood work club."', size: 12, mobileSize: 10, padTop: 16, padBottom: 12, editable: true, label: 'Top bar tagline' },
+    fields: [
+      { k: 'text', l: 'Text' },
+      { row: [{ k: 'size', l: 'Desktop font size (px)', t: 'number' }, { k: 'mobileSize', l: 'Mobile font size (px)', t: 'number' }] },
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var v = txt(ctx, b, b.label, b.label, b.text);
+      var cls = 'sy-tagline-' + (++ctx.seq);
+      ctx.mobile.push('.' + cls + ' { font-size:' + (b.mobileSize || 10) + 'px !important; line-height:120% !important }');
+      var inner = '<div class="' + cCls('#ffffff').trim() + '"><h2 class="' + cls + '" style="margin:0; text-align:center; font-size:' + (b.size || 12) + 'px; line-height:110%; font-weight:bold; text-transform:uppercase; color:#ffffff" align="center"><span style="color:#ffffff">' + v + '</span></h2></div>';
+      return section(inner, { bg: '#011272', padTop: px(b.padTop, 16), padBottom: px(b.padBottom, 12) });
+    }
+  },
+  stripes: {
+    name: 'Stripes', canEdit: false,
+    defaults: { c1: '#fcfff5', c1Custom: '', h1: 2, c2: '#d20000', c2Custom: '', h2: 4 },
+    fields: [
+      { row: [{ k: 'c1', l: 'Stripe 1 color', t: 'select', opts: STRIPE_COLORS }, { k: 'h1', l: 'Stripe 1 thickness (px)', t: 'number' }] },
+      { k: 'c1Custom', l: 'Stripe 1 custom hex', help: 'Used when the color is set to Custom, e.g. <code>#ff9900</code>.' },
+      { row: [{ k: 'c2', l: 'Stripe 2 color', t: 'select', opts: STRIPE_COLORS }, { k: 'h2', l: 'Stripe 2 thickness (px)', t: 'number' }] },
+      { k: 'c2Custom', l: 'Stripe 2 custom hex' },
+      { k: '_i', t: 'info', help: 'Thickness 0 drops that stripe, so this block also works as a single line. Swap the two colors to flip the order.' }
+    ],
+    render: function (b) {
+      return [[b.c1, b.c1Custom, b.h1], [b.c2, b.c2Custom, b.h2]].map(function (s) {
+        var color = stripeColor(s[0], s[1]), h = s[2] | 0;
+        return (h > 0 && color) ? section(spacerRow(h), { bg: color }) : '';
+      }).filter(Boolean).join('\n');
+    }
+  },
+  spacer: {
+    name: 'Spacer', canEdit: false,
+    defaults: { height: 20, theme: 'cream' },
+    fields: [{ k: 'height', l: 'Height (px)', t: 'number' }, THEME_FIELD],
+    render: function (b) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      return section(spacerRow(b.height || 20), { bg: t.section, containerBg: t.container });
+    }
+  },
+  image: {
+    name: 'Image', canEdit: true,
+    defaults: { src: '', alt: '', href: '', width: 560, align: 'center', padTop: 10, padBottom: 10, theme: 'cream', hsMode: 'module', optional: true, editable: true, label: 'Image' },
+    fields: [
+      { k: 'src', l: 'Image URL', t: 'url', help: 'Upload to HubSpot Files first and paste the URL. Use 2× pixels for sharp retina (1120px wide for a 560px image). Leave blank and the team supplies the image in HubSpot.' },
+      { k: 'hsMode', l: 'When editable in HubSpot', t: 'select', opts: [['module', 'HubSpot image module (recommended)'], ['field', 'Image picker + separate link field']], help: 'HubSpot image module: the team gets HubSpot\'s image picker with its own link and alignment settings, and the block is left out until an image is picked. Image picker + link field: the older approach; the link must go in the separate text field because HubSpot does not expose the picker\'s own link.' },
+      { k: 'optional', l: 'Optional in HubSpot', t: 'check', help: 'The block is left out of the sent email until the team picks an image. Untick to always render it.' },
+      { k: 'alt', l: 'Alt text' }, { k: 'href', l: 'Link (optional)', t: 'url' },
+      { row: [{ k: 'width', l: 'Width (px)', t: 'number' }, { k: 'align', l: 'Align', t: 'select', opts: [['center', 'Center'], ['left', 'Left'], ['right', 'Right']] }] },
+      { row: [{ k: 'padTop', l: 'Space above (px)', t: 'number' }, { k: 'padBottom', l: 'Space below (px)', t: 'number' }] },
+      THEME_FIELD
+    ],
+    render: function (b, ctx) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      var pad = px(b.padTop, 10) + 'px 20px ' + px(b.padBottom, 10) + 'px', align = b.align || 'center';
+      var o = { src: b.src, alt: b.alt, href: b.href, width: b.width };
+      var sec = function (inner) { return section(imageCell(inner, pad, align), { bg: t.section, containerBg: t.container }); };
+      if (!b.editable) return isBlank(b.src) ? '' : sec(staticImage(o));
+      var moduleMode = b.hsMode !== 'field';
+      if (ctx.mode !== 'hubl' && isBlank(b.src)) {
+        // Builder preview only: show where the block sits.
+        var note = moduleMode ? 'Image, link and alignment are set in HubSpot' + (b.optional === false ? '' : '; hidden until an image is picked') : 'Hidden in the email until the team adds an image in HubSpot';
+        return sec('<div style="border:2px dashed ' + t.text + '; opacity:.5; padding:40px 20px; font-size:13px; line-height:1.3; ' + FONT + ' color:' + t.text + '; max-width:' + (b.width || 560) + 'px; margin:0 auto; box-sizing:border-box">' + esc(b.label || 'Image') + '<br><span style="font-size:11px">' + note + '</span></div>');
+      }
+      if (moduleMode) {
+        // HubSpot's own email image module supplies the editor UI (image, link, alignment). It is
+        // declared unconditionally so HubSpot registers it as editable, and its values are exported so
+        // the template can render the image itself and skip the block when no image is set.
+        // (A module inside an {% if %} that starts false never appears in HubSpot's Contents panel.)
+        var n = ctx.name(b.label), w = 'widget_data.' + n;
+        var params = 'path="@hubspot/image_email", label="' + hublAttr(b.label) + '", alignment="' + align + '"';
+        params += ', img={ "src": "' + hublAttr(b.src) + '", "alt": "' + hublAttr(b.alt) + '", "width": ' + (b.width || 560) + ' }';
+        if (!isBlank(b.href)) params += ', link="' + hublAttr(b.href) + '"';
+        params += ', export_to_template_context=True';
+        ctx.decls.push('{% module "' + n + '" ' + params + ' %}');
+        var mimg = '<img alt="{{ ' + w + '.img.alt }}" src="{{ ' + w + '.img.src }}" style="' + IMG_STYLE + '" width="' + (b.width || 560) + '" align="middle">';
+        var mhtml = '{% if ' + w + '.link %}<a href="{{ ' + w + '.link }}" target="_blank" style="color:#00a4bd">{% endif %}' + mimg + '{% if ' + w + '.link %}</a>{% endif %}';
+        var out = sec(mhtml);
+        return b.optional === false ? out : '{% if ' + w + '.img.src %}' + out + '{% endif %}';
+      }
+      var f = fImage(ctx, b.label, b.label, o);
+      return f.wrap(sec(f.html));
+    }
+  },
+  heading: {
+    name: 'Heading', canEdit: true,
+    defaults: { text: 'HEADING 1', level: 'h1', align: 'left', size: 0, mobileSize: 0, color: '', colorCustom: '', padTop: 10, padBottom: 10, theme: 'cream', editable: true, label: 'Headline' },
+    fields: [
+      { k: 'text', l: 'Text' },
+      { row: [{ k: 'level', l: 'Level', t: 'select', opts: [['h1', 'H1 · 38px'], ['h2', 'H2 · 22px'], ['h3', 'H3 · 17px'], ['h4', 'H4 · 15px']] }, { k: 'align', l: 'Align', t: 'select', opts: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] }] },
+      { row: [{ k: 'size', l: 'Font size (px, 0 = level default)', t: 'number' }, { k: 'mobileSize', l: 'Mobile size (px, 0 = default)', t: 'number' }] },
+      COLOR_ROW,
+      PAD_ROW,
+      THEME_FIELD
+    ],
+    render: function (b, ctx) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      var color = pickColor(b.color, b.colorCustom, t.text);
+      var v = txt(ctx, b, b.label, b.label, b.text);
+      var style = HEADING_STYLE[b.level], cls = 'sy-' + b.level;
+      if (b.size > 0) style = style.replace(/font-size:\d+px/, 'font-size:' + (b.size | 0) + 'px');
+      if (b.mobileSize > 0) { cls = 'sy-hd-' + (++ctx.seq); ctx.mobile.push('.' + cls + ' { font-size:' + (b.mobileSize | 0) + 'px !important }'); }
+      var h = '<' + b.level + ' class="' + cls + '" style="' + style + '; text-align:' + b.align + '; color:' + color + '" align="' + b.align + '">' + v + '</' + b.level + '>';
+      var out = section(cell(h, padOf(b, 10, 10), color, t.link), { bg: t.section, containerBg: t.container });
+      // Whole section disappears when the heading is blank, so no empty gap is left behind.
+      if (b.editable) return fIf(ctx, v, b.text, out);
+      return isBlank(b.text) ? '' : out;
+    }
+  },
+  richtext: {
+    name: 'Text', canEdit: true,
+    defaults: { content: '', size: 18, mobileSize: 17, lineHeight: 150, align: 'left', color: '', colorCustom: '', padTop: 10, padBottom: 0, theme: 'cream', editable: true, label: 'Body' },
+    fields: [
+      { k: 'content', l: 'Default content', t: 'wysiwyg', help: 'Pasted text is cleaned to paragraphs, headings, bold, italic, links and lists, so the block\'s size and line height apply. Use HTML for anything else.' },
+      { row: [{ k: 'size', l: 'Font size (px)', t: 'number' }, { k: 'mobileSize', l: 'Mobile size (px)', t: 'number' }] },
+      { row: [{ k: 'lineHeight', l: 'Line height (%)', t: 'number' }, { k: 'align', l: 'Align', t: 'select', opts: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] }] },
+      COLOR_ROW,
+      PAD_ROW,
+      THEME_FIELD
+    ],
+    render: function (b, ctx) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      var color = pickColor(b.color, b.colorCustom, t.text);
+      var size = b.size || 18, lh = b.lineHeight || 150, cls = 'sy-rt-' + (++ctx.seq);
+      // Per-block size and line height, in the same inlined block as the base .sy-rich rules so they win.
+      // Line height is !important so it also beats any line-height left inline on pasted paragraphs.
+      ctx.inlineCss.push('.' + cls + ' p, .' + cls + ' blockquote { font-size:' + size + 'px; line-height:' + lh + '% !important }');
+      ctx.inlineCss.push('.' + cls + ' li, .' + cls + ' ul, .' + cls + ' ol { font-size:' + size + 'px }');   // lists keep their tighter line height
+      ctx.inlineCss.push('.' + cls + ' a { color:' + t.link + ' }');
+      ctx.mobile.push('.' + cls + ' p, .' + cls + ' li, .' + cls + ' blockquote { font-size:' + (b.mobileSize || 17) + 'px !important }');
+      var html = richHtml(b.content, t.link);
+      // Default bottom padding is 0: the last paragraph's own margin provides it.
+      return section(cell(rich(ctx, b, b.label, b.label, html), padOf(b, 10, 0), color, t.link, 'sy-rich ' + cls, b.align), { bg: t.section, containerBg: t.container });
+    }
+  },
+  cities: {
+    name: 'City links', canEdit: true,
+    defaults: {
+      cities: cityList(),
+      layout: 'inline', align: 'center', size: 14, color: '', colorCustom: '', padTop: 20, padBottom: 20, theme: 'cream', editable: false, label: 'City links'
+    },
+    fields: [
+      { k: 'cities', l: 'Cities', t: 'pairs', help: 'One per line: <code>City | https://…</code>. A city without a link is plain text and looks the same.' },
+      { row: [{ k: 'layout', l: 'Layout', t: 'select', opts: [['inline', 'One wrapping line'], ['list', 'Stacked list']] }, { k: 'align', l: 'Align', t: 'select', opts: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] }] },
+      { row: [{ k: 'size', l: 'Font size (px)', t: 'number' }, THEME_FIELD] },
+      COLOR_ROW,
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      var color = pickColor(b.color, b.colorCustom, t.text), size = b.size || 14, align = b.align || 'center';
+      var list = cityPairs(b.cities);
+      if (!list.length) return '';
+      var itemStyle = 'color:' + color + '; font-weight:bold; text-decoration:none; white-space:nowrap';
+      var items = list.map(function (c) {
+        return c.href ? '<a href="' + esc(c.href) + '" style="' + itemStyle + '" target="_blank">' + esc(c.text) + '</a>' : '<span style="' + itemStyle + '">' + esc(c.text) + '</span>';
+      });
+      var html = b.layout === 'list'
+        ? items.map(function (i) { return '<h4 style="margin:0; font-size:' + size + 'px; line-height:140%; text-align:' + align + '; color:' + color + '" align="' + align + '">' + i + '</h4>'; }).join('')
+        : '<p style="margin:0; font-size:' + size + 'px; line-height:170%; text-align:' + align + '; color:' + color + '" align="' + align + '">' + items.join('<span style="color:' + color + '">&nbsp;&nbsp;·&nbsp;&nbsp;</span>') + '</p>';
+      var inner = b.editable ? fRich(ctx, b.label, b.label, html) : html;
+      return section(cell(inner, padOf(b, 20, 20), color, color, 'sy-cities', align), { bg: t.section, containerBg: t.container });
+    }
+  },
+  button: {
+    name: 'Button', canEdit: true,
+    defaults: { text: 'CTA Button.', href: 'https://www.switchyards.com/', style: 'auto', align: 'center', size: 0, mobileSize: 0, padTop: 10, padBottom: 10, theme: 'cream', editable: true, label: 'Button' },
+    fields: [
+      { k: 'text', l: 'Text' }, { k: 'href', l: 'Link', t: 'url' },
+      { row: [{ k: 'style', l: 'Style', t: 'select', opts: [['auto', 'Match background'], ['red', 'Red outline'], ['white', 'White outline']] }, { k: 'align', l: 'Align', t: 'select', opts: [['center', 'Center'], ['left', 'Left'], ['full', 'Full width']] }] },
+      { row: [{ k: 'size', l: 'Text size (px, 0 = default)', t: 'number' }, { k: 'mobileSize', l: 'Mobile text size (px, 0 = same)', t: 'number' }] },
+      PAD_ROW,
+      THEME_FIELD
+    ],
+    render: function (b, ctx) {
+      var t = THEMES[b.theme] || THEMES.cream;
+      var style = b.style === 'auto' ? t.button : b.style;
+      var label = txt(ctx, b, b.label + ' text', b.label + ' text (blank to hide)', b.text);
+      var href = b.editable ? fText(ctx, b.label + ' link', b.label + ' link', b.href) : esc(b.href);
+      var cls = '';
+      if (b.mobileSize > 0) { cls = 'sy-bt-' + (++ctx.seq); ctx.mobile.push('.' + cls + ' { font-size:' + (b.mobileSize | 0) + 'px !important }'); }
+      var html = cell(buttonHtml(label, href, style, b.align, b.size > 0 ? b.size | 0 : 0, cls), padOf(b, 10, 10));
+      if (b.editable) html = fIf(ctx, label, b.text, html);
+      return section(html, { bg: t.section, containerBg: t.container });
+    }
+  },
+  footer: {
+    name: 'Footer (two columns)', canEdit: false,
+    defaults: {
+      buttons: [{ text: 'JOIN NOW', href: 'https://www.switchyards.com/join/checkout-flow' }, { text: 'MANAGE MY MEMBERSHIP', href: 'https://www.switchyards.com/join/checkout-flow' }],
+      buttonsEditable: false, padTop: 40, padBottom: 0,
+      links: '<h2 style="margin:0; line-height:100%; font-size:20px; text-align:left"><span style="color:#fcfff5; text-decoration:underline">GET YOUR FIX</span></h2><p style="line-height:125%">&nbsp;</p><h3 style="font-size:17px; margin:0; line-height:150%"><a href="https://instagram.com/switchyards" style="color:#fcfff5; font-weight:bold; text-decoration:none" target="_blank">INSTAGRAM</a></h3><h3 style="font-size:17px; margin:0; line-height:150%"><a href="https://youtube.com/switchyards" style="color:#fcfff5; font-weight:bold; text-decoration:none" target="_blank">YOUTUBE</a></h3><h3 style="font-size:17px; margin:0; line-height:150%"><a href="https://www.linkedin.com/company/switchyards" style="color:#fcfff5; font-weight:bold; text-decoration:none" target="_blank">LINKEDIN</a></h3>',
+      linksEditable: false,
+      tagline: 'THE BEST PLACE TO WORK IN YOUR NEIGHBORHOOD.', taglineEditable: false, taglineSize: 17, taglineMobileSize: 15,
+      cities: cityList(),
+      citiesEditable: false
+    },
+    fields: [
+      { k: 'buttons', l: 'Buttons (left column)', t: 'pairs', help: 'One per line: <code>Label | https://…</code>' }, { k: 'buttonsEditable', l: 'Buttons editable in HubSpot', t: 'check' },
+      { k: 'links', l: 'Links (left column)', t: 'rich', help: 'Raw HTML or the friendly format.' }, { k: 'linksEditable', l: 'Links editable in HubSpot', t: 'check' },
+      { k: 'tagline', l: 'Tagline (right column)' },
+      { row: [{ k: 'taglineSize', l: 'Tagline desktop size (px)', t: 'number' }, { k: 'taglineMobileSize', l: 'Tagline mobile size (px)', t: 'number' }] },
+      { k: 'taglineEditable', l: 'Tagline editable in HubSpot', t: 'check' },
+      { k: 'cities', l: 'Cities (right column)', t: 'pairs', help: 'One per line: <code>City | https://…</code>. Leave the link off for plain text. Looks the same either way.' }, { k: 'citiesEditable', l: 'Cities editable in HubSpot', t: 'check' },
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var left = '';
+      (b.buttons || []).forEach(function (btn, i) {
+        var label = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_text', 'Footer button ' + (i + 1) + ' text (blank to hide)', btn.text) : esc(btn.text);
+        var href = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_link', 'Footer button ' + (i + 1) + ' link', btn.href) : esc(btn.href);
+        var html = '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-fpad" style="' + FONT + ' font-size:18px; word-break:break-word; padding:10px 20px">' + buttonHtml(label, href, 'white', 'full') + '</td></tr></tbody></table>';
+        left += b.buttonsEditable ? fIf(ctx, label, btn.text, html) : html;
+      });
+      var linksHtml = richHtml(b.links, '#fcfff5');
+      left += '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-rich-footer sy-fpad' + cCls('#fcfff5') + linkCls('#fcfff5') + '" style="' + FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; padding:20px">' + (b.linksEditable ? fRich(ctx, 'footer_links', 'Footer links (left column)', linksHtml) : linksHtml) + '</td></tr></tbody></table>';
+      var tagCls = 'sy-ftag-' + (++ctx.seq);
+      ctx.mobile.push('.' + tagCls + ' { font-size:' + (b.taglineMobileSize || 15) + 'px !important; line-height:110% !important }');
+      var tagHtml = '<h2 class="' + tagCls + '" style="margin:0; line-height:100%; font-size:' + (b.taglineSize || 17) + 'px; text-align:right" align="right"><span style="color:#fcfff5">' + esc(b.tagline) + '</span></h2>';
+      var citiesHtml = cityPairs(b.cities).map(function (c) {
+        var label = '<span style="color:#fcfff5; font-size:14px">' + esc(c.text) + '</span>';
+        if (c.href) label = '<a href="' + esc(c.href) + '" style="color:#fcfff5; font-weight:bold; text-decoration:none" target="_blank">' + label + '</a>';
+        return '<h4 style="font-size:15px; margin:0; line-height:125%; text-align:right" align="right">' + label + '</h4>';
+      }).join('');
+      var right = '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-rich-footer sy-fpad' + cCls('#fcfff5') + linkCls('#fcfff5') + '" style="' + FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; padding:20px">' + (b.taglineEditable ? fRich(ctx, 'footer_tagline', 'Footer tagline (right column)', tagHtml) : tagHtml) + '</td></tr></tbody></table>' +
+        '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-rich-footer sy-fpad' + cCls('#fcfff5') + linkCls('#fcfff5') + '" style="' + FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; padding:0px 20px">' + (b.citiesEditable ? fRich(ctx, 'cities', 'Cities (right column)', citiesHtml) : citiesHtml) + '</td></tr></tbody></table>';
+      var col = function (inner, side) { return '<div class="hse-column hse-size-6 hse-no-stack sy-footer-col sy-footer-' + side + '" style="display:table-cell; vertical-align:top; max-width:300px; width:50%">' + inner + '</div>'; };
+      var inner = '<!--[if gte mso 9]><table role="presentation" width="300" cellpadding="0" cellspacing="0" style="width:300px"><![endif]-->' + col(left, 'left') +
+        '<!--[if gte mso 9]></table><![endif]--><!--[if (mso)|(IE)]></td><td valign="top" style="width:300px;padding-top:40px;"><![endif]--><!--[if gte mso 9]><table role="presentation" width="300" cellpadding="0" cellspacing="0" style="width:300px"><![endif]-->' + col(right, 'right') + '<!--[if gte mso 9]></table><![endif]-->';
+      return section(inner, { bg: '#011272', padTop: px(b.padTop, 40), padBottom: px(b.padBottom, 0), twoCol: true, id: 'section-footer' });
+    }
+  },
+  footer_stack: {
+    name: 'Footer (two columns, stacks on phones)', canEdit: false,
+    defaults: {
+      tagline: 'THE BEST PLACE TO WORK IN YOUR NEIGHBORHOOD.', taglineEditable: false, taglineSize: 17, taglineMobileSize: 15,
+      buttons: [{ text: 'JOIN NOW', href: 'https://www.switchyards.com/join/checkout-flow' }, { text: 'MANAGE MY MEMBERSHIP', href: 'https://www.switchyards.com/join/checkout-flow' }],
+      buttonsEditable: false,
+      cities: cityList(), citiesEditable: false, citiesLayout: 'list',
+      linksHeading: 'GET YOUR FIX',
+      links: [{ text: 'INSTAGRAM', href: 'https://instagram.com/switchyards' }, { text: 'YOUTUBE', href: 'https://youtube.com/switchyards' }, { text: 'LINKEDIN', href: 'https://www.linkedin.com/company/switchyards' }],
+      linksEditable: false,
+      leftAlign: 'left', rightAlign: 'right', rightAlignMobile: 'left', padTop: 40, padBottom: 20
+    },
+    fields: [
+      { k: '_i', t: 'info', help: 'Desktop: tagline and buttons on the left, cities and links on the right. Phones: one column in that order.' },
+      { k: 'tagline', l: 'Tagline' },
+      { row: [{ k: 'taglineSize', l: 'Tagline desktop size (px)', t: 'number' }, { k: 'taglineMobileSize', l: 'Tagline mobile size (px)', t: 'number' }] },
+      { k: 'taglineEditable', l: 'Tagline editable in HubSpot', t: 'check' },
+      { k: 'buttons', l: 'Buttons', t: 'pairs', help: 'One per line: <code>Label | https://…</code>' }, { k: 'buttonsEditable', l: 'Buttons editable in HubSpot', t: 'check' },
+      { k: 'cities', l: 'Cities', t: 'pairs', help: 'One per line: <code>City | https://…</code>' },
+      { row: [{ k: 'citiesLayout', l: 'Cities layout', t: 'select', opts: [['list', 'Stacked list'], ['inline', 'One wrapping line']] }, { k: 'citiesEditable', l: 'Cities editable in HubSpot', t: 'check' }] },
+      { k: 'linksHeading', l: 'Links heading' },
+      { k: 'links', l: 'Links', t: 'pairs', help: 'One per line: <code>Label | https://…</code>' }, { k: 'linksEditable', l: 'Links editable in HubSpot', t: 'check' },
+      { row: [{ k: 'leftAlign', l: 'Left column align', t: 'select', opts: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] }, { k: 'rightAlign', l: 'Right column align (desktop)', t: 'select', opts: [['right', 'Right'], ['center', 'Center'], ['left', 'Left']] }] },
+      { k: 'rightAlignMobile', l: 'Right column align on phones', t: 'select', opts: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] },
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var L = b.leftAlign || 'left', R = b.rightAlign || 'right', RM = b.rightAlignMobile || 'left';
+      // The right column's cells carry a per-block class so phones can realign them.
+      var rcls = 'sy-sr-' + (++ctx.seq);
+      ctx.mobile.push('.' + rcls + ', .' + rcls + ' p, .' + rcls + ' h2, .' + rcls + ' h3, .' + rcls + ' h4 { text-align:' + RM + ' !important }');
+      var td = function (inner, pad, align, extra) {
+        return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-rich-footer sy-fpad' + (extra ? ' ' + extra : '') + cCls('#fcfff5') + linkCls('#fcfff5') + '" align="' + align + '" style="' + FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; text-align:' + align + '; padding:' + pad + '">' + inner + '</td></tr></tbody></table>';
+      };
+      var item = function (l, size) {
+        var label = '<span style="color:#fcfff5; font-size:' + size + 'px">' + esc(l.text) + '</span>';
+        return l.href ? '<a href="' + esc(l.href) + '" style="color:#fcfff5; font-weight:bold; text-decoration:none" target="_blank">' + label + '</a>' : label;
+      };
+      // Left column: tagline, then buttons.
+      var left = '';
+      if (!isBlank(b.tagline) || b.taglineEditable) {
+        var t = footerTagline(ctx, b);
+        var tagHtml = '<h2 class="' + t.cls + '" style="margin:0; line-height:110%; font-size:' + t.size + 'px; text-align:' + L + '; color:#fcfff5" align="' + L + '">' + esc(b.tagline) + '</h2>';
+        left += td(b.taglineEditable ? fRich(ctx, 'footer_tagline', 'Footer tagline', tagHtml) : tagHtml, '0 20px 16px', L);
+      }
+      (b.buttons || []).forEach(function (btn, i) {
+        var label = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_text', 'Footer button ' + (i + 1) + ' text (blank to hide)', btn.text) : esc(btn.text);
+        var href = b.buttonsEditable ? fText(ctx, 'footer_button_' + (i + 1) + '_link', 'Footer button ' + (i + 1) + ' link', btn.href) : esc(btn.href);
+        var html = '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tbody><tr><td class="sy-fpad" style="' + FONT + ' font-size:18px; word-break:break-word; padding:0 20px 12px">' + buttonHtml(label, href, 'white', 'full') + '</td></tr></tbody></table>';
+        left += b.buttonsEditable ? fIf(ctx, label, btn.text, html) : html;
+      });
+      // Right column: cities, then the links heading and links.
+      var right = '', cities = cityPairs(b.cities);
+      if (cities.length) {
+        var citiesHtml = b.citiesLayout === 'inline'
+          ? '<p style="margin:0; font-size:14px; line-height:170%; text-align:' + R + '" align="' + R + '">' + inlineLinks(cities) + '</p>'
+          : cities.map(function (c) { return '<h4 style="font-size:15px; margin:0; line-height:125%; text-align:' + R + '" align="' + R + '">' + item(c, 14) + '</h4>'; }).join('');
+        right += td(b.citiesEditable ? fRich(ctx, 'cities', 'Cities', citiesHtml) : citiesHtml, '0 20px 24px', R, rcls);
+      }
+      if (!isBlank(b.linksHeading) || (b.links || []).length) {
+        var linksHtml = (isBlank(b.linksHeading) ? '' : '<h2 style="margin:0 0 10px 0; line-height:100%; font-size:20px; text-align:' + R + '; color:#fcfff5" align="' + R + '"><span style="text-decoration:underline">' + esc(b.linksHeading) + '</span></h2>') +
+          cityPairs(b.links).map(function (l) { return '<h3 style="font-size:17px; margin:0; line-height:150%; text-align:' + R + '" align="' + R + '">' + item(l, 17) + '</h3>'; }).join('');
+        right += td(b.linksEditable ? fRich(ctx, 'footer_links', 'Footer links', linksHtml) : linksHtml, '0 20px 10px', R, rcls);
+      }
+      var padTop = px(b.padTop, 40);
+      var col = function (inner) { return '<div class="hse-column hse-size-6 sy-stack-col" style="display:table-cell; vertical-align:top; max-width:300px; width:50%">' + inner + '</div>'; };
+      var inner = '<!--[if gte mso 9]><table role="presentation" width="300" cellpadding="0" cellspacing="0" style="width:300px"><![endif]-->' + col(left) +
+        '<!--[if gte mso 9]></table><![endif]--><!--[if (mso)|(IE)]></td><td valign="top" style="width:300px;padding-top:' + padTop + 'px;"><![endif]--><!--[if gte mso 9]><table role="presentation" width="300" cellpadding="0" cellspacing="0" style="width:300px"><![endif]-->' + col(right) + '<!--[if gte mso 9]></table><![endif]-->';
+      return section(inner, { bg: '#011272', padTop: padTop, padBottom: px(b.padBottom, 20), twoCol: true });
+    }
+  },
+  footer_centered: {
+    name: 'Footer (centered)', canEdit: false,
+    defaults: {
+      tagline: 'THE BEST PLACE TO WORK IN YOUR NEIGHBORHOOD.', taglineEditable: false, taglineSize: 20, taglineMobileSize: 16,
+      buttons: [{ text: 'JOIN NOW', href: 'https://www.switchyards.com/join/checkout-flow' }, { text: 'MANAGE MY MEMBERSHIP', href: 'https://www.switchyards.com/join/checkout-flow' }],
+      buttonsEditable: false, padTop: 40, padBottom: 20,
+      linksHeading: 'GET YOUR FIX',
+      links: [{ text: 'INSTAGRAM', href: 'https://instagram.com/switchyards' }, { text: 'YOUTUBE', href: 'https://youtube.com/switchyards' }, { text: 'LINKEDIN', href: 'https://www.linkedin.com/company/switchyards' }],
+      linksEditable: false,
+      cities: cityList(),
+      citiesEditable: false
+    },
+    fields: [
+      { k: 'tagline', l: 'Tagline' },
+      { row: [{ k: 'taglineSize', l: 'Tagline desktop size (px)', t: 'number' }, { k: 'taglineMobileSize', l: 'Tagline mobile size (px)', t: 'number' }] },
+      { k: 'taglineEditable', l: 'Tagline editable in HubSpot', t: 'check' },
+      { k: 'buttons', l: 'Buttons (side by side)', t: 'pairs', help: 'One per line: <code>Label | https://…</code>. Stack on phones.' }, { k: 'buttonsEditable', l: 'Buttons editable in HubSpot', t: 'check' },
+      { k: 'linksHeading', l: 'Links heading' },
+      { k: 'links', l: 'Links (one row)', t: 'pairs', help: 'One per line: <code>Label | https://…</code>' }, { k: 'linksEditable', l: 'Links editable in HubSpot', t: 'check' },
+      { k: 'cities', l: 'Cities (one wrapping line)', t: 'pairs', help: 'One per line: <code>City | https://…</code>. Leave empty to drop the row.' }, { k: 'citiesEditable', l: 'Cities editable in HubSpot', t: 'check' },
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var out = '';
+      if (!isBlank(b.tagline) || b.taglineEditable) {
+        var t = footerTagline(ctx, b);
+        var tagHtml = '<h2 class="' + t.cls + '" style="margin:0; line-height:110%; font-size:' + t.size + 'px; text-align:center; color:#fcfff5" align="center">' + esc(b.tagline) + '</h2>';
+        out += footerCell(b.taglineEditable ? fRich(ctx, 'footer_tagline', 'Footer tagline', tagHtml) : tagHtml, '0 20px 24px');
+      }
+      var btns = footerButtonRow(ctx, b);
+      if (btns) out += footerCell(btns, '0 20px 24px');
+      if (!isBlank(b.linksHeading) || (b.links || []).length) {
+        var linksHtml = (isBlank(b.linksHeading) ? '' : '<h2 style="margin:0 0 8px 0; line-height:100%; font-size:20px; text-align:center; color:#fcfff5" align="center"><span style="text-decoration:underline">' + esc(b.linksHeading) + '</span></h2>') +
+          '<p style="margin:0; text-align:center; font-size:15px; line-height:150%">' + inlineLinks(b.links) + '</p>';
+        out += footerCell(b.linksEditable ? fRich(ctx, 'footer_links', 'Footer links', linksHtml) : linksHtml, '0 20px 24px');
+      }
+      if (cityPairs(b.cities).length) {
+        var citiesHtml = '<p style="margin:0; text-align:center; font-size:13px; line-height:170%">' + inlineLinks(b.cities) + '</p>';
+        out += footerCell(b.citiesEditable ? fRich(ctx, 'cities', 'Cities', citiesHtml) : citiesHtml, '0 20px 10px');
+      }
+      return section(out, { bg: '#011272', padTop: px(b.padTop, 40), padBottom: px(b.padBottom, 20) });
+    }
+  },
+  footer_minimal: {
+    name: 'Footer (minimal)', canEdit: false,
+    defaults: {
+      tagline: 'THE BEST PLACE TO WORK IN YOUR NEIGHBORHOOD.', taglineEditable: false, taglineSize: 13, taglineMobileSize: 12, padTop: 28, padBottom: 28,
+      links: [{ text: 'INSTAGRAM', href: 'https://instagram.com/switchyards' }, { text: 'YOUTUBE', href: 'https://youtube.com/switchyards' }, { text: 'LINKEDIN', href: 'https://www.linkedin.com/company/switchyards' }],
+      linksEditable: false,
+      buttons: [{ text: 'JOIN NOW', href: 'https://www.switchyards.com/join/checkout-flow' }],
+      buttonsEditable: false
+    },
+    fields: [
+      { k: 'tagline', l: 'Tagline (left)' },
+      { row: [{ k: 'taglineSize', l: 'Tagline desktop size (px)', t: 'number' }, { k: 'taglineMobileSize', l: 'Tagline mobile size (px)', t: 'number' }] },
+      { k: 'taglineEditable', l: 'Tagline editable in HubSpot', t: 'check' },
+      { k: 'links', l: 'Links (right)', t: 'pairs', help: 'One per line: <code>Label | https://…</code>' }, { k: 'linksEditable', l: 'Links editable in HubSpot', t: 'check' },
+      { k: 'buttons', l: 'Buttons (below, optional)', t: 'pairs', help: 'One per line: <code>Label | https://…</code>. Leave empty for none.' }, { k: 'buttonsEditable', l: 'Buttons editable in HubSpot', t: 'check' },
+      PAD_ROW
+    ],
+    render: function (b, ctx) {
+      var t = footerTagline(ctx, b);
+      var tag = b.taglineEditable ? fText(ctx, 'footer_tagline', 'Footer tagline', b.tagline) : esc(b.tagline);
+      var tagHtml = '<p class="' + t.cls + '" style="margin:0; font-size:' + t.size + 'px; line-height:130%; font-weight:bold; letter-spacing:0.04em; text-transform:uppercase; color:#fcfff5">' + tag + '</p>';
+      if (b.taglineEditable) tagHtml = fIf(ctx, tag, b.tagline, tagHtml);
+      var linksHtml = '<p style="margin:0; font-size:13px; line-height:150%; letter-spacing:0.04em">' + inlineLinks(b.links) + '</p>';
+      var tdStyle = FONT + ' font-size:18px; color:#fcfff5; word-break:break-word; ';
+      var cellCls = 'sy-rich-footer' + cCls('#fcfff5') + linkCls('#fcfff5');
+      var out = '<table class="sy-stack" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr>' +
+        '<td class="' + cellCls + '" width="50%" valign="middle" align="left" style="' + tdStyle + 'text-align:left; padding:0 10px 0 20px">' + tagHtml + '</td>' +
+        '<td class="' + cellCls + '" width="50%" valign="middle" align="right" style="' + tdStyle + 'text-align:right; padding:0 20px 0 10px">' + (b.linksEditable ? fRich(ctx, 'footer_links', 'Footer links', linksHtml) : linksHtml) + '</td>' +
+        '</tr></tbody></table>';
+      var btns = footerButtonRow(ctx, b);
+      if (btns) out += footerCell(btns, '20px 20px 0');
+      return section(out, { bg: '#011272', padTop: px(b.padTop, 28), padBottom: px(b.padBottom, 28) });
+    }
+  },
+  legal: {
+    name: 'Legal footer', canEdit: false,
+    defaults: { logoSrc: LOCKUP_IMG, logoWidth: 180, note: 'Please consider the environment and\ndo not print this email. Nobody prints emails.', noteEditable: false, padTop: 30, padBottom: 10 },
+    fields: [
+      { k: 'logoSrc', l: 'Logo URL', t: 'url' }, { k: 'logoWidth', l: 'Logo width (px)', t: 'number' },
+      { k: 'note', l: 'Note', t: 'textarea' }, { k: 'noteEditable', l: 'Note editable in HubSpot', t: 'check' },
+      PAD_ROW,
+      { k: '_info', t: 'info', help: 'Company name, address, Unsubscribe and Manage Preferences come from HubSpot (Settings > Marketing > Email > Configuration > Footer). HubSpot requires them.' }
+    ],
+    render: function (b, ctx) {
+      var hubl = ctx.mode === 'hubl', p = state.preview;
+      var company = hubl ? '{{ site_settings.company_name }}' : esc(p.company);
+      // The address is wrapped in its own styled link (to Google Maps) so Gmail and Apple Mail
+      // don't auto-detect it and paint it as a blue underlined link.
+      var addrText = hubl ? '{{ site_settings.company_street_address_1 }}{% if site_settings.company_street_address_2 %} {{ site_settings.company_street_address_2 }}{% endif %}, {{ site_settings.company_city }}, {{ site_settings.company_state }}&nbsp;{{ site_settings.company_zip }}'
+        : esc(p.address) + ', ' + esc(p.city) + ', ' + esc(p.state) + '&nbsp;' + esc(p.zip);
+      var addrQuery = hubl ? '{{ (site_settings.company_street_address_1 ~ ", " ~ site_settings.company_city ~ ", " ~ site_settings.company_state ~ " " ~ site_settings.company_zip)|urlencode }}'
+        : encodeURIComponent(p.address + ', ' + p.city + ', ' + p.state + ' ' + p.zip);
+      var address = '<a href="https://www.google.com/maps/search/?api=1&amp;query=' + addrQuery + '" target="_blank" style="color:#ffffff !important; text-decoration:none !important">' + addrText + '</a>';
+      var unsubAll = hubl ? '{{ unsubscribe_link_all }}' : '#unsubscribe', prefs = hubl ? '{{ unsubscribe_link }}' : '#preferences';
+      var noteHtml = '<p style="line-height:115%; font-size:12px; color:#ffffff; font-weight:normal">' + inline(b.note, '#ffffff') + '</p>';
+      var padTop = px(b.padTop, 30), padBottom = px(b.padBottom, 10);
+      var logo = b.logoSrc ? '<table class="hse-image-wrapper" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" align="right" valign="top" style="' + FONT + ' text-align:right; padding:' + padTop + 'px 20px 0px; font-size:0px"><img alt="' + company + '" src="' + esc(b.logoSrc) + '" style="outline:none; text-decoration:none; border:none; max-width:100%; font-size:16px" width="' + (b.logoWidth || 180) + '" align="middle"></td></tr></tbody></table>' : '';
+      // Space above goes on the logo when there is one, otherwise on the text.
+      var inner = logo + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td style="' + FONT + ' font-size:18px; word-break:break-word; padding:' + (logo ? 0 : padTop) + 'px 0px ' + padBottom + 'px 20px">' +
+        '<table role="presentation" class="hse-footer hse-secondary" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial, sans-serif; font-size:12px; line-height:135%; margin-bottom:0; padding:0"><tbody><tr><td class="' + cCls('#ffffff').trim() + linkCls('#ffffff') + '" align="right" valign="top" style="' + FONT + ' font-size:18px; color:#ffffff; word-break:break-word; text-align:right; margin-bottom:0; line-height:135%; padding:10px 20px">' +
+        '<p style="line-height:115%; color:#ffffff; font-weight:bold; font-size:12px"><span style="font-size:16px">' + company + '</span><br>' + address + '</p>' +
+        '<div style="line-height:115%; font-size:12px; color:#ffffff">' + (b.noteEditable ? fRich(ctx, 'legal_note', 'Legal note', noteHtml) : noteHtml) + '</div>' +
+        '<p style="line-height:100%">&nbsp;</p>' +
+        '<p><span style="color:#ffffff; font-size:12px"><a href="' + unsubAll + '" style="color:#ffffff" data-unsubscribe="true" target="_blank">Unsubscribe</a></span><br><a href="' + prefs + '" style="color:#ffffff" data-unsubscribe="true" target="_blank"><span style="font-size:12px">Manage Preferences</span></a></p>' +
+        '</td></tr></tbody></table></td></tr></tbody></table>';
+      return section(inner, { bg: '#011272', id: 'section-legal' });
+    }
+  }
+};
+var BLOCK_ORDER = ['topbar', 'stripes', 'image', 'heading', 'richtext', 'button', 'cities', 'spacer', 'footer', 'footer_stack', 'footer_centered', 'footer_minimal', 'legal'];
+function isFooter(type) { return type === 'legal' || String(type).indexOf('footer') === 0; }
+
+// Cities used to be plain strings; accept both shapes.
+function cityPairs(list) {
+  return (list || []).map(function (c) { return typeof c === 'string' ? { text: c, href: '' } : c; });
+}
+function normalizeDesign(d) {
+  if (d.forceLight === undefined) d.forceLight = true;
+  if (!d.v) {
+    // v2: footer and legal parts belong to the template by default, so one re-upload updates every send.
+    (d.blocks || []).forEach(function (b) {
+      if (!isFooter(b.type)) return;
+      ['buttonsEditable', 'linksEditable', 'taglineEditable', 'citiesEditable', 'noteEditable'].forEach(function (k) { if (k in b) b[k] = false; });
+    });
+    d.v = 2;
+  }
+  if (!d.pageBg) d.pageBg = '#f7f6f3';
+  (d.blocks || []).forEach(function (b) {
+    if (b.type === 'footer' || b.type === 'footer_centered' || b.type === 'footer_stack' || b.type === 'cities') {
+      // Fill in known city pages where a link is still blank.
+      b.cities = cityPairs(b.cities).map(function (c) { return c.href ? c : { text: c.text, href: cityHref(c.text) }; });
+    }
+    if (b.type === 'image' && !b.hsMode) b.hsMode = 'module';
+    if (b.type === 'image' && b.optional === undefined) b.optional = true;
+    if (b.type === 'richtext' && b.content && b.content.trim().charAt(0) !== '<') {
+      // Content written in the old friendly format becomes HTML for the editor.
+      b.content = richHtml(b.content, (THEMES[b.theme] || THEMES.cream).link);
+    }
+    if (b.type === 'topbar') {
+      if (b.size === 22 && b.mobileSize === 18) { b.size = 12; b.mobileSize = 10; }   // earlier default, moved back to the original sizes
+      if (!b.size) b.size = 12; if (!b.mobileSize) b.mobileSize = 10;
+    }
+    if (b.type === 'footer') { if (!b.taglineSize) b.taglineSize = 17; if (!b.taglineMobileSize) b.taglineMobileSize = 15; }
+    if (b.type === 'stripes' && b.c1 === undefined) {
+      // Older designs stored just an order; translate to the per-stripe fields.
+      var red = b.order === 'red-cream';
+      b.c1 = red ? '#d20000' : '#fcfff5'; b.h1 = red ? 4 : 2;
+      b.c2 = red ? '#fcfff5' : '#d20000'; b.h2 = red ? 2 : 4;
+      b.c1Custom = ''; b.c2Custom = ''; delete b.order;
+    }
+  });
+  return d;
+}
+
+/* ============================ document shell =========================== */
+var HEAD_CSS = [
+  '<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument xmlns:w="urn:schemas-microsoft-com:office:word"><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml><style>ul > li { text-indent: -1em; }</style><![endif]-->',
+  '<!--[if mso]><style type="text/css">body, td { font-family: Arial, Helvetica, sans-serif; } .hse-body-wrapper-table { background-color: __PAGEBG__; }</style><![endif]-->',
+  '<!--[if mso | IE]><style type="text/css">.hse-column-container { border: none !important; padding: 0 !important; }</style><![endif]-->',
+  '<!--[if !((mso)|(IE))]><!-- --><style type="text/css">',
+  '@media only print, only screen and (max-width:639px) { img.stretch-on-mobile { height:auto !important; width:100% !important } .hs_padded { padding-left:20px !important; padding-right:20px !important } .hs-hm, table.hs-hm { display:none } .hs-hd { display:block !important } table.hs-hd { display:table !important } }',
+  '.moz-text-html .hse-column-container { max-width:600px !important; width:600px !important } .moz-text-html .hse-column { display:table-cell; vertical-align:top } .moz-text-html .hse-section .hse-size-6 { max-width:300px !important; width:300px !important } .moz-text-html .hse-section .hse-size-12 { max-width:600px !important; width:600px !important }',
+  '@media only print, only screen and (min-width:640px) { .hse-column-container { max-width:600px !important; width:600px !important } .hse-column { display:table-cell; vertical-align:top } .hse-section .hse-size-6 { max-width:300px !important; width:300px !important } .hse-section .hse-size-12 { max-width:600px !important; width:600px !important } }',
+  '@media only print, only screen and (max-width:639px) { #section-legal .hse-column-container { padding-top:0px !important; padding-bottom:0px !important; background-color:transparent !important } #section-legal { background-color:#011272 !important } }',
+  '/* Two-column footer on phones: wider left column, tighter padding, one size down, so the buttons and tagline stay on one line. */',
+  '@media only print, only screen and (max-width:639px) {',
+  '  .sy-footer-left { width:55% !important } .sy-footer-right { width:45% !important }',
+  '  .sy-fpad { padding-left:12px !important; padding-right:12px !important }',
+  '  .sy-footer-col .sy-btn a { font-size:11px !important; padding:9px 6px !important } .sy-footer-col .sy-btn strong { white-space:nowrap }',
+  '  .sy-footer-left h2 { font-size:18px !important }',
+  '  .sy-stack td { display:block !important; width:100% !important; box-sizing:border-box !important; text-align:center !important; padding:6px 20px !important }',
+  '  .sy-stack-col { display:block !important; width:100% !important; max-width:100% !important }',
+  '}',
+  '/* Phone sizes for headings and anything typed in the rich text editor. */',
+  '@media only print, only screen and (max-width:639px) {',
+  '  .sy-h1, .sy-rich h1 { font-size:30px !important } .sy-h2, .sy-rich h2 { font-size:20px !important } .sy-h3, .sy-rich h3 { font-size:17px !important } .sy-h4, .sy-rich h4 { font-size:15px !important }',
+  '  .sy-rich p, .sy-rich li, .sy-rich blockquote { font-size:17px !important }',
+  '/*__MOBILE__*/',
+  '}',
+  '/* Styles HubSpot\'s own email modules expect, kept from the original export. */',
+  '@media only print, only screen and (max-width:639px) {',
+  '  .hs_rss_email_entries_table img, .hs-stretch-cta .hs-cta-img { height:auto !important; width:100% !important } .display_block_on_small_screens { display:block }',
+  '  .hse-border-m { border-left:1px solid #ccc !important; border-right:1px solid #ccc !important; box-sizing:border-box } .hse-border-bottom-m { border-bottom:1px solid #ccc !important } .hse-border-top-m { border-top:1px solid #ccc !important } .hse-border-top-hm { border-top:none !important } .hse-border-bottom-hm { border-bottom:none !important }',
+  '}',
+  'a.cta_button { -moz-box-sizing:content-box !important; -webkit-box-sizing:content-box !important; box-sizing:content-box !important; vertical-align:middle }',
+  '.hs-breadcrumb-menu { list-style-type:none; margin:0; padding:0 } .hs-breadcrumb-menu-item { float:left; padding:10px 0 10px 10px } .hs-breadcrumb-menu-divider:before { content:\'›\'; padding-left:10px }',
+  '.hs-featured-image-link { border:0 } .hs-featured-image { float:right; margin:0 0 20px 20px; max-width:50% } @media (max-width:568px) { .hs-featured-image { float:none; margin:0; width:100%; max-width:100% } }',
+  '.hs-screen-reader-text { clip:rect(1px, 1px, 1px, 1px); height:1px; overflow:hidden; position:absolute !important; width:1px }',
+  '.ShadowHTML p, .sh-modified-inline p { margin:0 }',
+  '</style><!--<![endif]-->',
+  '<style type="text/css">',
+  '#hs_body #hs_cos_wrapper_main a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; font-size:inherit !important; font-family:inherit !important; font-weight:inherit !important; line-height:inherit !important }',
+  'a { text-decoration:underline } p { margin:0 } body { -ms-text-size-adjust:100%; -webkit-text-size-adjust:100%; -webkit-font-smoothing:antialiased; moz-osx-font-smoothing:grayscale }',
+  'table { border-spacing:0; mso-table-lspace:0; mso-table-rspace:0 } table, td { border-collapse:collapse } img { -ms-interpolation-mode:bicubic } p, a, li, td, blockquote { mso-line-height-rule:exactly }',
+  '</style>',
+  '<!-- HubSpot inlines this block onto matching elements at send time, so formatting the team applies in the rich text editor (headings, lists, quotes, links, rules) keeps these styles in every client, Gmail included. -->',
+  '<style type="text/css" id="hs-inline-css">',
+  '/* Type scale: 1.5 line-height for reading text, tighter for headings, a real margin after every block. */',
+  '.sy-rich h1 { margin:0 0 16px 0; line-height:120%; font-size:38px; font-weight:bold }',
+  '.sy-rich h2 { margin:0 0 12px 0; line-height:125%; font-size:22px; font-weight:bold }',
+  '.sy-rich h3 { margin:0 0 10px 0; line-height:130%; font-size:17px; font-weight:bold }',
+  '.sy-rich h4 { margin:0 0 8px 0; line-height:135%; font-size:15px; font-weight:bold }',
+  '.sy-rich h5 { margin:0 0 8px 0; line-height:135%; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em }',
+  '.sy-rich h6 { margin:0 0 8px 0; line-height:135%; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.06em }',
+  '.sy-rich p { margin:0 0 16px 0; line-height:150%; font-size:18px }',
+  '.sy-rich ul, .sy-rich ol { margin:0 0 16px 22px; padding:0; line-height:135%; font-size:18px }',
+  '.sy-rich li { margin:0 0 4px 0; line-height:135% } .sy-rich li ul, .sy-rich li ol { margin:4px 0 0 22px }',
+  '.sy-rich a { color:#d10000; text-decoration:underline }',
+  '.sy-rich strong, .sy-rich b { font-weight:bold } .sy-rich em, .sy-rich i { font-style:italic } .sy-rich u { text-decoration:underline }',
+  '.sy-rich blockquote { margin:0 0 16px 0; padding:4px 0 4px 16px; border-left:3px solid #d10000; font-style:italic; line-height:150% }',
+  '.sy-rich hr { border:0; border-top:2px solid #d10000; margin:0 0 16px 0; height:0 }',
+  '.sy-rich img { max-width:100%; height:auto; border:0 }',
+  '.sy-rich pre, .sy-rich code { font-family:Menlo, Consolas, monospace; font-size:15px; white-space:pre-wrap }',
+  '.sy-rich small { font-size:14px }',
+  '.sy-rich table { border-collapse:collapse } .sy-rich td, .sy-rich th { padding:4px 8px; border:1px solid #d9d8d3; font-size:16px; line-height:125% }',
+  '.sy-rich-footer h1, .sy-rich-footer h2 { margin:0; line-height:100%; font-size:20px; font-weight:bold; color:#fcfff5 }',
+  '.sy-rich-footer h3 { margin:0; line-height:150%; font-size:17px; font-weight:bold; color:#fcfff5 }',
+  '.sy-rich-footer h4, .sy-rich-footer h5, .sy-rich-footer h6 { margin:0; line-height:125%; font-size:14px; font-weight:bold; color:#fcfff5 }',
+  '.sy-rich-footer p, .sy-rich-footer li { margin:0; line-height:125%; font-size:14px; color:#fcfff5 }',
+  '.sy-rich-footer ul, .sy-rich-footer ol { margin:0 0 0 20px; padding:0 }',
+  '.sy-rich-footer a { color:#fcfff5; font-weight:bold; text-decoration:none }',
+  '/*__RICH__*/',
+  '</style>'
+].join('\n');
+
+// Dark-mode override. Three layers, because clients differ:
+//  1. color-scheme meta + CSS: Apple Mail / iOS Mail honor these and leave the email alone.
+//  2. prefers-color-scheme: dark block: re-asserts every color for clients that apply their own dark styles.
+//  3. [data-ogsc] / [data-ogsb]: Outlook (apps, outlook.com) rewrite colors in dark mode and add these
+//     attributes; selectors on them win the rewrite. Gmail's apps ignore all of this and cannot be forced.
+function forceLightHead(pageBg) {
+  var meta = '<meta name="color-scheme" content="light">\n<meta name="supported-color-schemes" content="light">\n<meta name="color-scheme" content="only light">\n';
+  var rules = ['body, .hse-body-background, .hse-body-wrapper-table, .hse-body-wrapper-td { background-color:' + pageBg + ' !important }'];
+  var ogsc = ['[data-ogsb] body, [data-ogsb] .hse-body-background, [data-ogsb] .hse-body-wrapper-table { background-color:' + pageBg + ' !important }'];
+  Object.keys(colorReg.bg).forEach(function (k) {
+    rules.push('.sy-bg-' + k + ' { background-color:' + colorReg.bg[k] + ' !important }');
+    ogsc.push('[data-ogsb] .sy-bg-' + k + ' { background-color:' + colorReg.bg[k] + ' !important }');
+  });
+  Object.keys(colorReg.text).forEach(function (k) {
+    var sel = ['', ' p', ' span', ' h1', ' h2', ' h3', ' h4', ' strong', ' td'].map(function (s) { return '.sy-text-' + k + s; });
+    rules.push(sel.join(', ') + ' { color:' + colorReg.text[k] + ' !important }');
+    ogsc.push(sel.map(function (s) { return '[data-ogsc] ' + s; }).join(', ') + ' { color:' + colorReg.text[k] + ' !important }');
+  });
+  Object.keys(colorReg.link).forEach(function (k) {
+    rules.push('.sy-link-' + k + ' a, .sy-link-' + k + ' a span, .sy-link-' + k + ' a strong { color:' + colorReg.link[k] + ' !important }');
+    ogsc.push('[data-ogsc] .sy-link-' + k + ' a, [data-ogsc] .sy-link-' + k + ' a span, [data-ogsc] .sy-link-' + k + ' a strong { color:' + colorReg.link[k] + ' !important }');
+  });
+  return meta + '<style type="text/css">\n:root { color-scheme: light; supported-color-schemes: light; }\n' +
+    '@media (prefers-color-scheme: dark) {\n' + rules.join('\n') + '\n}\n' + ogsc.join('\n') + '\n</style>\n';
+}
+
+function generate(mode) {
+  var ctx = new Ctx(mode);
+  colorReg = { bg: {}, text: {}, link: {} };
+  var pageBg = state.pageBg || '#f7f6f3';   // shows around the 600px column on desktop and in any inset a mail app adds on phones
+  regColor('bg', pageBg);
+  var blocks = state.blocks.map(function (b) {
+    var def = BLOCKS[b.type]; if (!def) return '';
+    var html = def.render(b, ctx);
+    var decls = ctx.decls.splice(0);                 // field declarations this block created
+    return (decls.length ? decls.join('\n') + '\n' : '') + html;
+  }).join('\n\n');
+  var title = mode === 'hubl' ? '{{ subject }}' : esc(state.name);
+  var doc = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n' +
+    '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:v="urn:schemas-microsoft-com:vml" lang="en">\n<head>\n<title>' + title + '</title>\n' +
+    '<meta name="x-apple-disable-message-reformatting">\n<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n<meta http-equiv="X-UA-Compatible" content="IE=edge">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+    (state.forceLight ? forceLightHead(pageBg) : '') +
+    HEAD_CSS.replace('/*__MOBILE__*/', ctx.mobile.join('\n')).replace('/*__RICH__*/', ctx.inlineCss.join('\n')).replace(/__PAGEBG__/g, pageBg) + '\n</head>\n' +
+    '<body id="hs_body" class="' + bgCls(pageBg).trim() + '" bgcolor="' + pageBg + '" style="margin:0 !important; padding:0 !important; background-color:' + pageBg + '; ' + FONT + ' font-size:18px; color:#011272; word-break:break-word">\n' +
+    '<!--[if gte mso 9]><v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t"><v:fill type="tile" size="100%,100%" color="' + pageBg + '"/></v:background><![endif]-->\n' +
+    '<div class="hse-body-background" lang="en" style="background-color:' + pageBg + '" bgcolor="' + pageBg + '">\n<table role="presentation" class="hse-body-wrapper-table" cellpadding="0" cellspacing="0" style="margin:0; padding:0; width:100% !important; min-width:320px !important; height:100% !important; background-color:' + pageBg + '" width="100%" height="100%" bgcolor="' + pageBg + '"><tbody><tr>\n' +
+    '<td class="hse-body-wrapper-td" valign="top" style="' + FONT + ' font-size:18px; color:#011272; word-break:break-word">\n<div id="hs_cos_wrapper_main">\n\n' +
+    blocks + '\n\n</div>\n</td></tr></tbody></table>\n</div>\n</body>\n</html>\n';
+  if (mode !== 'hubl') return doc;
+  var head = '<!--\n  templateType: email\n  isAvailableForNewContent: true\n  label: ' + (state.label || state.name || 'Email template').replace(/\n/g, ' ') + '\n-->\n' +
+    '{# Generated by the Switchyards Template Builder on ' + new Date().toISOString().slice(0, 10) + '. Edit the design in the builder and re-export rather than editing this file by hand. #}\n';
+  return head + doc;
+}
+
+/* ============================== starter ================================ */
+function starterDesign() {
+  var mk = function (type, props) { return Object.assign({ id: uid(), type: type }, clone(BLOCKS[type].defaults), props || {}); };
+  return normalizeDesign({
+    name: 'Standard email', label: 'Switchyards Standard Email', forceLight: true, pageBg: '#f7f6f3', v: 2,
+    preview: { company: 'SWITCHYARDS U.S.A.', address: '151 Ted Turner Dr SE', city: 'Atlanta', state: 'GA', zip: '30303' },
+    // Built-in starter: the "standard-v1" design (Sept 2026).
+    blocks: [
+      mk('topbar', { size: 16, mobileSize: 10, padTop: 12, padBottom: 8 }),
+      mk('stripes'),
+      mk('image', { src: LOGO_IMG, alt: 'SWITCHYARDS', href: 'https://www.switchyards.com/', width: 175, padTop: 40, padBottom: 20, editable: false, label: 'Logo' }),
+      mk('image', { src: '', alt: '', width: 560, padTop: 20, padBottom: 20, editable: true, label: 'Hero image' }),
+      mk('richtext', { content: '<h1>Heading one</h1><p><strong>Lorem ipsum dolor sit amet,</strong> consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris <a href="https://www.switchyards.com/" target="_blank">something linked</a> ea commodo consequat. <strong>Duis aute irure dolor</strong> in reprehenderit in voluptate velit esse cillum dolore eu fugiat.</p>', size: 18, mobileSize: 16, lineHeight: 140, padTop: 20, padBottom: 10, editable: true, label: 'Body' }),
+      mk('button', { text: 'CTA Button.', href: 'https://www.switchyards.com/', padTop: 20, padBottom: 20, editable: true, label: 'Button' }),
+      mk('image', { src: '', alt: '', width: 560, padTop: 10, padBottom: 10, editable: true, label: 'Secondary image' }),
+      mk('richtext', { content: '<p>See you around the club,</p><p>- Switchyards</p>', size: 18, mobileSize: 17, lineHeight: 150, padTop: 10, padBottom: 0, editable: true, label: 'Closing text' }),
+      mk('image', { src: SIGNOFF_IMG, alt: 'See you around the club', width: 280, padTop: 30, padBottom: 30, editable: false, label: 'Sign-off' }),
+      mk('stripes', { c1: '#d20000', h1: 4, c2: '#fcfff5', h2: 2 }),
+      mk('footer_stack', { taglineSize: 26, taglineMobileSize: 22 }),
+      mk('legal')
+    ]
+  });
+}
+function uid() { return 'b' + Math.random().toString(36).slice(2, 8); }
+
+/* ============================ persistence ============================== */
+var store = loadStore();
+var state = store.designs[store.current] || starterDesign();
+if (!store.designs[store.current]) { store.current = state.name; store.designs[state.name] = state; }
+
+function loadStore() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s && s.designs && s.current) {
+        Object.keys(s.designs).forEach(function (k) { normalizeDesign(s.designs[k]); });
+        return s;
+      }
+    }
+  } catch (e) {}
+  var d = starterDesign(); var o = { current: d.name, designs: {} }; o.designs[d.name] = d; return o;
+}
+function persist() {
+  store.designs[store.current] = state;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); setStatus('Saved'); } catch (e) { setStatus(''); }
+}
+var statusTimer;
+function setStatus(m) { $('status').textContent = m; clearTimeout(statusTimer); if (m) statusTimer = setTimeout(function () { $('status').textContent = ''; }, 2000); }
+
+/* =============================== forms ================================ */
+// Keep only the tags an email needs. Inline styles, spans, fonts and scripts are dropped;
+// what remains is styled by the block's own controls.
+var WYS_KEEP = { P: 1, BR: 1, STRONG: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, H1: 1, H2: 1, H3: 1, H4: 1, BLOCKQUOTE: 1 };
+var WYS_RENAME = { B: 'STRONG', I: 'EM', DIV: 'P', H5: 'H4', H6: 'H4' };
+function sanitizeHtml(html) {
+  var tpl = document.createElement('template'); tpl.innerHTML = String(html || '');
+  function walk(node) {
+    var out = '';
+    Array.prototype.forEach.call(node.childNodes, function (n) {
+      if (n.nodeType === 3) { out += esc(n.nodeValue); return; }
+      if (n.nodeType !== 1) return;
+      if (n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+      var tag = WYS_RENAME[n.tagName] || n.tagName, inner = walk(n);
+      if (!WYS_KEEP[tag]) { out += inner; return; }
+      if (tag === 'BR') { out += '<br>'; return; }
+      if (tag === 'A') {
+        var href = n.getAttribute('href') || '';
+        if (!/^(https?:|mailto:|tel:|\{\{)/i.test(href)) { out += inner; return; }
+        out += '<a href="' + esc(href) + '" target="_blank">' + inner + '</a>'; return;
+      }
+      var t = tag.toLowerCase();
+      if (t === 'p' && (inner === '' || inner === '<br>')) inner = '&nbsp;';
+      out += '<' + t + '>' + inner + '</' + t + '>';
+    });
+    return out;
+  }
+  var res = walk(tpl.content).replace(/ /g, '&nbsp;').trim();
+  // Loose text or inline tags at the top level get wrapped in paragraphs.
+  var parts = res.split(/(<(?:p|h[1-4]|ul|ol|blockquote)>[\s\S]*?<\/(?:p|h[1-4]|ul|ol|blockquote)>)/i);
+  return parts.map(function (s, i) { return i % 2 ? s : (s.trim() ? '<p>' + s.trim() + '</p>' : ''); }).join('');
+}
+function wysiwygControl(f, value, onChange) {
+  var wrap = document.createElement('div'); wrap.className = 'field';
+  var lab = document.createElement('label'); lab.textContent = f.l; if (f.help) lab.appendChild(tipEl(f.help)); wrap.appendChild(lab);
+  var tb = document.createElement('div'); tb.className = 'wys-toolbar';
+  var ed = document.createElement('div'); ed.className = 'wys'; ed.contentEditable = 'true'; ed.spellcheck = true;
+  ed.innerHTML = value ? String(value) : '<p><br></p>';
+  var raw = document.createElement('textarea'); raw.className = 'wys-raw'; raw.hidden = true; raw.spellcheck = false;
+  var commit = function () { onChange(sanitizeHtml(ed.innerHTML)); };
+  var exec = function (cmd, arg) { ed.focus(); document.execCommand('styleWithCSS', false, false); document.execCommand(cmd, false, arg); commit(); };
+  var tools = [
+    ['P', 'Paragraph', function () { exec('formatBlock', 'P'); }],
+    ['H1', 'Heading 1', function () { exec('formatBlock', 'H1'); }],
+    ['H2', 'Heading 2', function () { exec('formatBlock', 'H2'); }],
+    ['H3', 'Heading 3', function () { exec('formatBlock', 'H3'); }],
+    ['B', 'Bold', function () { exec('bold'); }],
+    ['I', 'Italic', function () { exec('italic'); }],
+    ['U', 'Underline', function () { exec('underline'); }],
+    ['Link', 'Add a link to the selected text', function () {
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !ed.contains(sel.anchorNode)) { toast('Select the words to link first'); return; }
+      var range = sel.getRangeAt(0).cloneRange();
+      dialog({ title: 'Link', input: 'https://', ok: 'Add link', onOk: function (url) {
+        ed.focus(); var s = window.getSelection(); s.removeAllRanges(); s.addRange(range);
+        document.execCommand('createLink', false, url);
+        Array.prototype.forEach.call(ed.querySelectorAll('a'), function (a) { a.target = '_blank'; });
+        commit();
+      } });
+    }],
+    ['Unlink', 'Remove link', function () { exec('unlink'); }],
+    ['• List', 'Bullet list', function () { exec('insertUnorderedList'); }],
+    ['1. List', 'Numbered list', function () { exec('insertOrderedList'); }],
+    ['Clear', 'Clear formatting', function () { exec('removeFormat'); exec('unlink'); exec('formatBlock', 'P'); }],
+    ['HTML', 'Edit the HTML directly', function () {
+      var showing = !raw.hidden;
+      if (showing) { ed.innerHTML = sanitizeHtml(raw.value) || '<p><br></p>'; raw.hidden = true; ed.hidden = false; this.classList.remove('on'); commit(); }
+      else { raw.value = sanitizeHtml(ed.innerHTML); ed.hidden = true; raw.hidden = false; this.classList.add('on'); raw.focus(); }
+    }]
+  ];
+  tools.forEach(function (t) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = t[0]; b.title = t[1];
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });   // keep the editor's selection
+    b.addEventListener('click', function () { t[2].call(b); });
+    tb.appendChild(b);
+  });
+  ed.addEventListener('input', commit);
+  ed.addEventListener('paste', function (e) {
+    e.preventDefault();
+    var html = e.clipboardData.getData('text/html'), text = e.clipboardData.getData('text/plain');
+    var clean = html ? sanitizeHtml(html) : esc(text).replace(/\r?\n/g, '<br>');
+    document.execCommand('insertHTML', false, clean); commit();
+  });
+  raw.addEventListener('input', function () { onChange(raw.value); });
+  wrap.appendChild(tb); wrap.appendChild(ed); wrap.appendChild(raw);
+  return wrap;
+}
+// Help text is shown as a hover tooltip on a small "i" next to the label.
+function tipText(html) { var d = document.createElement('div'); d.innerHTML = html || ''; return d.textContent.replace(/\s+/g, ' ').trim(); }
+function tipEl(html) { var t = document.createElement('span'); t.className = 'tip'; t.tabIndex = 0; t.textContent = 'i'; t.setAttribute('data-tip', tipText(html)); return t; }
+function fieldControl(f, value, onChange) {
+  var wrap = document.createElement('div');
+  if (f.t === 'wysiwyg') return wysiwygControl(f, value, onChange);
+  if (f.t === 'info') { wrap.className = 'field-info'; wrap.appendChild(tipEl(f.help)); wrap.appendChild(document.createTextNode(f.l || 'About this block')); return wrap; }
+  if (f.t === 'check') {
+    wrap.className = 'check';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!value;
+    var lab = document.createElement('label'); lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + f.l)); if (f.help) lab.appendChild(tipEl(f.help));
+    cb.addEventListener('change', function () { onChange(cb.checked); });
+    wrap.appendChild(lab); return wrap;
+  }
+  wrap.className = 'field';
+  var lab2 = document.createElement('label'); lab2.textContent = f.l; if (f.help) lab2.appendChild(tipEl(f.help)); wrap.appendChild(lab2);
+  var el;
+  if (f.t === 'select') {
+    el = document.createElement('select');
+    f.opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op); });
+    el.value = value == null ? f.opts[0][0] : value;
+    el.addEventListener('change', function () { onChange(el.value); });
+  } else if (f.t === 'rich' || f.t === 'textarea' || f.t === 'lines' || f.t === 'pairs') {
+    el = document.createElement('textarea'); el.rows = f.t === 'rich' ? 6 : 3; if (f.t === 'rich') el.className = 'rich';
+    el.value = f.t === 'lines' ? (value || []).join('\n') : f.t === 'pairs' ? (value || []).map(function (p) { return p.text + ' | ' + p.href; }).join('\n') : (value == null ? '' : value);
+    el.addEventListener('input', function () {
+      if (f.t === 'lines') onChange(el.value.split('\n').map(trim).filter(Boolean));
+      else if (f.t === 'pairs') onChange(el.value.split('\n').map(trim).filter(Boolean).map(function (line) { var i = line.indexOf('|'); return i === -1 ? { text: line, href: '' } : { text: trim(line.slice(0, i)), href: trim(line.slice(i + 1)) }; }));
+      else onChange(el.value);
+    });
+  } else {
+    el = document.createElement('input'); el.type = f.t === 'number' ? 'number' : f.t === 'url' ? 'url' : 'text';
+    if (f.t === 'url') el.spellcheck = false;
+    el.value = value == null ? '' : value;
+    el.addEventListener('input', function () { onChange(f.t === 'number' ? (el.value === '' ? 0 : Number(el.value)) : el.value); });
+  }
+  wrap.appendChild(el);
+  return wrap;
+}
+function renderFields(container, fields, obj, after) {
+  fields.forEach(function (f) {
+    if (f.row) {
+      var row = document.createElement('div'); row.className = 'row';
+      f.row.forEach(function (sub) { row.appendChild(fieldControl(sub, obj[sub.k], function (v) { obj[sub.k] = v; after(); })); });
+      container.appendChild(row);
+    } else {
+      container.appendChild(fieldControl(f, obj[f.k], function (v) { obj[f.k] = v; after(); }));
+    }
+  });
+}
+
+function buildSettings() {
+  var c = $('settings'); c.innerHTML = '';
+  renderFields(c, [
+    { k: 'name', l: 'Design name', help: 'How it is listed in this builder.' },
+    { k: 'label', l: 'Template name in HubSpot', help: 'Shown when the team picks a template in Marketing > Email.' },
+    { k: 'pageBg', l: 'Page background', t: 'select', opts: [['#f7f6f3', 'Cream (default)'], ['#011272', 'Navy'], ['#ffffff', 'White']], help: 'The color around the email: beside the 600px column on desktop, and inside the small inset some phone apps (Gmail) add around every message. That inset is the app\'s and cannot be removed by an email, so pick the color you want it to be.' },
+    { k: 'forceLight', l: 'Force light mode', t: 'check' },
+    { k: '_fl', t: 'info', l: 'About light mode', help: 'Keeps the email on its own colors when the reader\'s device is in dark mode. Covers Apple Mail, iOS Mail and Outlook. Gmail\'s apps ignore every known override.' }
+  ], state, function () { refreshDesignSelect(); schedule(); });
+  var p = $('preview-settings'); p.innerHTML = '';
+  renderFields(p, [
+    { k: 'company', l: 'Company name' }, { k: 'address', l: 'Street address' },
+    { row: [{ k: 'city', l: 'City' }, { k: 'state', l: 'State' }, { k: 'zip', l: 'ZIP' }] },
+    { k: '_i', t: 'info', l: 'Preview only', help: 'Only used in this preview. The real template reads these from HubSpot settings.' }
+  ], state.preview, schedule);
+}
+
+var openBlocks = {};
+function headTag(b, def) {
+  if (def.canEdit) return '<span class="tag' + (b.editable ? '' : ' fixed') + '">' + (b.editable ? 'Editable' : 'Fixed') + '</span>';
+  return isFooter(b.type) ? '<span class="tag">Mixed</span>' : '<span class="tag fixed">Fixed</span>';
+}
+// Update one card's header without rebuilding the list, so the field being typed in keeps focus.
+function refreshHead(card, b, def) {
+  card.querySelector('.title').innerHTML = esc(def.canEdit ? (b.label || def.name) : def.name) + ' <small>· ' + def.name + '</small>';
+  card.querySelector('.tag').outerHTML = headTag(b, def);
+}
+function buildBlocks() {
+  var c = $('blocks'); c.innerHTML = '';
+  $('block-count').textContent = state.blocks.length + ' block' + (state.blocks.length === 1 ? '' : 's');
+  state.blocks.forEach(function (b, i) {
+    var def = BLOCKS[b.type]; if (!def) return;
+    var card = document.createElement('div'); card.className = 'block' + (openBlocks[b.id] ? ' open' : ''); card.draggable = true; card.dataset.id = b.id;
+    var summary = def.canEdit ? (b.label || def.name) : def.name;
+    var tag = headTag(b, def);
+    card.innerHTML = '<div class="block-head"><span class="grip" title="Drag to reorder">⋮⋮</span><span class="chev"></span><span class="title">' + esc(summary) + ' <small>· ' + def.name + '</small></span>' + tag +
+      '<span class="icons"><button class="icon" data-act="up" title="Move up">↑</button><button class="icon" data-act="down" title="Move down">↓</button><button class="icon" data-act="dup" title="Duplicate">⧉</button><button class="icon danger" data-act="del" title="Remove">✕</button></span></div>' +
+      '<div class="block-body"></div>';
+    var body = card.querySelector('.block-body');
+    if (def.canEdit) {
+      var box = document.createElement('div'); box.className = 'editable-box';
+      renderFields(box, [
+        { k: 'editable', l: 'Team can edit this in HubSpot', t: 'check' },
+        { k: 'label', l: 'Label in HubSpot editor' }
+      ], b, function () { schedule(); refreshHead(card, b, def); });
+      body.appendChild(box);
+    }
+    renderFields(body, def.fields, b, schedule);
+
+    card.querySelector('.block-head').addEventListener('click', function (e) {
+      if (e.target.closest('button')) return;
+      openBlocks[b.id] = !openBlocks[b.id]; card.classList.toggle('open', !!openBlocks[b.id]);
+    });
+    card.querySelectorAll('[data-act]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var act = btn.dataset.act;
+        if (act === 'up' && i > 0) { state.blocks.splice(i - 1, 0, state.blocks.splice(i, 1)[0]); }
+        else if (act === 'down' && i < state.blocks.length - 1) { state.blocks.splice(i + 1, 0, state.blocks.splice(i, 1)[0]); }
+        else if (act === 'dup') { var copy = clone(b); copy.id = uid(); state.blocks.splice(i + 1, 0, copy); openBlocks[copy.id] = true; }
+        else if (act === 'del') {
+          var removed = state.blocks.splice(i, 1)[0], at = i;
+          buildBlocks(); schedule();
+          toast('Removed ' + (def.canEdit ? (removed.label || def.name) : def.name), 'Undo', function () {
+            state.blocks.splice(Math.min(at, state.blocks.length), 0, removed); buildBlocks(); schedule();
+          });
+          return;
+        }
+        buildBlocks(); schedule();
+      });
+    });
+    // drag & drop reorder
+    card.addEventListener('dragstart', function (e) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', b.id); card.classList.add('dragging'); });
+    card.addEventListener('dragend', function () { card.classList.remove('dragging'); clearDrop(); });
+    card.addEventListener('dragover', function (e) { e.preventDefault(); clearDrop(); var r = card.getBoundingClientRect(); card.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after'); });
+    card.addEventListener('dragleave', function () { card.classList.remove('drop-before', 'drop-after'); });
+    card.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var fromId = e.dataTransfer.getData('text/plain'); if (!fromId || fromId === b.id) { clearDrop(); return; }
+      var from = state.blocks.findIndex(function (x) { return x.id === fromId; }); if (from === -1) return;
+      var moved = state.blocks.splice(from, 1)[0];
+      var to = state.blocks.findIndex(function (x) { return x.id === b.id; });
+      if (card.classList.contains('drop-after')) to += 1;
+      state.blocks.splice(to, 0, moved);
+      buildBlocks(); schedule();
+    });
+    c.appendChild(card);
+  });
+  function clearDrop() { c.querySelectorAll('.drop-before, .drop-after').forEach(function (el) { el.classList.remove('drop-before', 'drop-after'); }); }
+}
+function buildAddMenu() {
+  var m = $('add-menu'); m.innerHTML = '';
+  BLOCK_ORDER.forEach(function (type) {
+    var btn = document.createElement('button'); btn.textContent = '+ ' + BLOCKS[type].name;
+    btn.addEventListener('click', function () {
+      var b = Object.assign({ id: uid(), type: type }, clone(BLOCKS[type].defaults));
+      // insert before legal/footer blocks so new content lands in the body
+      var idx = state.blocks.findIndex(function (x) { return isFooter(x.type); });
+      var before = state.blocks.slice(0, idx === -1 ? state.blocks.length : idx);
+      var stripeIdx = before.map(function (x) { return x.type; }).lastIndexOf('stripes');
+      // Footers go just above the legal block; content blocks go above the closing stripes.
+      var legalIdx = state.blocks.findIndex(function (x) { return x.type === 'legal'; });
+      var insertAt = isFooter(type) ? (type !== 'legal' && legalIdx !== -1 ? legalIdx : state.blocks.length) : (stripeIdx > 0 && idx !== -1 ? stripeIdx : (idx === -1 ? state.blocks.length : idx));
+      state.blocks.splice(insertAt, 0, b);
+      openBlocks[b.id] = true; buildBlocks(); schedule();
+      var card = $('blocks').querySelector('[data-id="' + b.id + '"]'); if (card) card.scrollIntoView({ block: 'nearest' });
+    });
+    m.appendChild(btn);
+  });
+}
+
+/* ============================== preview =============================== */
+var view = 'desktop', timer = null;
+var iframe = $('preview'), codeout = $('codeout'), scroll = $('preview-scroll');
+function schedule() { clearTimeout(timer); timer = setTimeout(update, 150); }
+var keepScroll = null;
+function update() {
+  try {
+    if (view === 'code') codeout.value = generate('hubl');
+    else { keepScroll = scroll.scrollTop; iframe.srcdoc = generate('preview'); }   // remember where the user was; restored after the reload
+    persist();
+  } catch (e) { setStatus('Error: ' + e.message); console.error(e); }
+}
+function setView(v) {
+  view = v;
+  document.querySelectorAll('[data-view]').forEach(function (b) { b.classList.toggle('active', b.dataset.view === v); });
+  iframe.hidden = v === 'code'; codeout.hidden = v !== 'code';
+  iframe.classList.toggle('mobile', v === 'mobile'); scroll.classList.toggle('code', v === 'code');
+  update();
+}
+document.querySelectorAll('[data-view]').forEach(function (b) { b.addEventListener('click', function () { setView(b.dataset.view); }); });
+// Size the frame to the email. The email's own box height is read (not the scroll height, which
+// can never be smaller than the frame), so the frame grows and shrinks without being collapsed first.
+function fitPreview() {
+  try {
+    var d = iframe.contentDocument; if (!d || !d.documentElement) return;
+    var h = Math.ceil(d.documentElement.getBoundingClientRect().height);
+    if (h > 0) iframe.style.height = (h + 2) + 'px';
+  } catch (e) {}
+}
+iframe.addEventListener('load', function () {
+  fitPreview();
+  try {
+    // Refit whenever the email's height changes later, e.g. as images finish loading.
+    var w = iframe.contentWindow;
+    if (w && w.ResizeObserver) new w.ResizeObserver(function () { fitPreview(); }).observe(iframe.contentDocument.documentElement);
+  } catch (e) {}
+  if (keepScroll != null) { scroll.scrollTop = keepScroll; keepScroll = null; }
+});
+
+/* ============================== designs ================================ */
+function refreshDesignSelect() {
+  var sel = $('design-select'); sel.innerHTML = '';
+  Object.keys(store.designs).sort().forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = store.designs[n].name || n; sel.appendChild(o); });
+  sel.value = store.current;
+}
+function switchTo(name) {
+  store.current = name; state = store.designs[name]; openBlocks = {};
+  scroll.scrollTop = 0;   // a different design starts at the top
+  buildSettings(); buildBlocks(); refreshDesignSelect(); update();
+}
+$('design-select').addEventListener('change', function () { switchTo(this.value); });
+// In-page dialog (browser prompt/confirm are blocked in some environments).
+function dialog(o) {
+  var bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal"><h2>' + esc(o.title) + '</h2>' + (o.text ? '<p>' + esc(o.text) + '</p>' : '') +
+    (o.input !== undefined ? '<input type="text" id="dlg-input">' : '') +
+    '<div class="actions"><button class="cancel">Cancel</button>' + (o.alt ? '<button class="cancel" id="dlg-alt">' + esc(o.alt) + '</button>' : '') + '<button class="' + (o.danger ? 'primary' : 'active') + '" id="dlg-ok">' + esc(o.ok || 'OK') + '</button></div></div>';
+  document.body.appendChild(bg);
+  var input = bg.querySelector('#dlg-input');
+  var close = function () { document.removeEventListener('keydown', onKey); bg.remove(); };
+  if (o.alt) bg.querySelector('#dlg-alt').addEventListener('click', function () { close(); o.onAlt(); });
+  var ok = function () { var v = input ? trim(input.value) : true; if (input && !v) { input.focus(); return; } close(); o.onOk(v); };
+  var onKey = function (e) {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Enter' && !(document.activeElement && document.activeElement.classList.contains('cancel'))) ok();
+  };
+  bg.querySelector('.cancel').addEventListener('click', close);
+  bg.querySelector('#dlg-ok').addEventListener('click', ok);
+  bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
+  document.addEventListener('keydown', onKey);
+  if (input) { input.value = o.input || ''; input.focus(); input.select(); }
+}
+function uniqueName(name) { var n = name, i = 2; while (store.designs[n]) n = name + ' ' + (i++); return n; }
+// What "New" starts from: a design saved with "Set as default", else the built-in standard email.
+function newDesignBase() {
+  if (!store.defaultDesign) return starterDesign();
+  var d = normalizeDesign(clone(store.defaultDesign));
+  d.blocks.forEach(function (b) { b.id = uid(); });
+  return d;
+}
+function refreshDefaultButton() { $('btn-default').textContent = store.defaultDesign ? 'Default: ' + store.defaultDesign.name : 'Set as default'; }
+$('btn-new').addEventListener('click', function () {
+  dialog({ title: 'New design', text: 'Starts from ' + (store.defaultDesign ? '"' + store.defaultDesign.name + '" (your default)' : 'the standard email') + '.', input: uniqueName('New email'), ok: 'Create', onOk: function (name) {
+    name = uniqueName(name);
+    var d = newDesignBase(); d.name = name; d.label = 'Switchyards ' + name; store.designs[name] = d; switchTo(name); toast('Created "' + name + '"');
+  } });
+});
+$('btn-default').addEventListener('click', function () {
+  dialog({
+    title: 'Use "' + state.name + '" as the default?',
+    text: 'New designs will start as a copy of this one, with its images and settings. This is saved in this browser. To make it the built-in default for everyone, export the design and send the file to whoever maintains the builder.',
+    ok: 'Set as default',
+    alt: store.defaultDesign ? 'Back to built-in' : undefined,
+    onOk: function () { store.defaultDesign = clone(state); persist(); refreshDefaultButton(); toast('"' + state.name + '" is now the default for New'); },
+    onAlt: function () { delete store.defaultDesign; persist(); refreshDefaultButton(); toast('New designs start from the built-in standard email again'); }
+  });
+});
+$('btn-saveas').addEventListener('click', function () {
+  dialog({ title: 'Save design as', input: uniqueName(state.name + ' copy'), ok: 'Save', onOk: function (name) {
+    name = uniqueName(name);
+    var d = clone(state); d.name = name; store.designs[name] = d; switchTo(name); toast('Saved as "' + name + '"');
+  } });
+});
+$('btn-delete').addEventListener('click', function () {
+  if (Object.keys(store.designs).length === 1) { toast('This is the only design. Create another before deleting it.'); return; }
+  dialog({ title: 'Delete "' + state.name + '"?', text: 'Export it first if you might want it back.', ok: 'Delete', danger: true, onOk: function () {
+    var gone = state, goneKey = store.current;
+    delete store.designs[goneKey]; switchTo(Object.keys(store.designs).sort()[0]);
+    toast('Deleted "' + gone.name + '"', 'Undo', function () { store.designs[goneKey] = gone; switchTo(goneKey); });
+  } });
+});
+
+/* ============================== export ================================ */
+function download(name, content, type) {
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type: type })); a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
+var toastTimer;
+function toast(msg, actionLabel, onAction) {
+  var t = $('toast'); t.textContent = msg;
+  if (actionLabel) {
+    var b = document.createElement('button'); b.textContent = actionLabel;
+    b.addEventListener('click', function () { t.classList.remove('show'); onAction(); });
+    t.appendChild(b);
+  }
+  t.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); }, actionLabel ? 6000 : 2200);
+}
+$('btn-export').addEventListener('click', function () {
+  var f = fileSlug(state.label || state.name) + '.html';
+  download(f, generate('hubl'), 'text/html');
+  toast('Downloaded ' + f + ' — upload it in HubSpot Design Manager');
+});
+$('btn-export-json').addEventListener('click', function () {
+  var f = fileSlug(state.name) + '.design.json'; download(f, JSON.stringify(state, null, 2) + '\n', 'application/json'); toast('Downloaded ' + f);
+});
+$('btn-import').addEventListener('click', function () { $('file-json').click(); });
+$('file-json').addEventListener('change', function () {
+  var file = this.files && this.files[0]; if (!file) return;
+  var r = new FileReader();
+  r.onload = function () {
+    try {
+      var d = JSON.parse(r.result);
+      if (!d || !Array.isArray(d.blocks)) throw new Error('not a design');
+      d.name = d.name || file.name.replace(/\.design\.json$|\.json$/, '');
+      d.preview = d.preview || starterDesign().preview;
+      normalizeDesign(d);
+      d.blocks.forEach(function (b) { if (!b.id) b.id = uid(); });
+      d.name = uniqueName(d.name);
+      store.designs[d.name] = d; switchTo(d.name); toast('Imported "' + d.name + '"');
+    } catch (e) { toast('That file is not a design export from this builder.'); }
+  };
+  r.readAsText(file); this.value = '';
+});
+
+/* ============================== boot ================================== */
+buildSettings(); buildBlocks(); buildAddMenu(); refreshDesignSelect(); refreshDefaultButton(); setView('desktop');
+})();
+</script>
+</body>
+</html>

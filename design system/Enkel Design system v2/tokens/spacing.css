@@ -1,0 +1,18 @@
+:root{
+/* 4-based inner rhythm for dashboards; 21/42/84 survive for editorial pages. */
+--spacing-4:4px;--spacing-8:8px;--spacing-12:12px;--spacing-16:16px;--spacing-24:24px;--spacing-32:32px;
+--spacing-5:5px;--spacing-10:10px;--spacing-21:21px;--spacing-42:42px;--spacing-84:84px;--spacing-147:147px;
+--page-max-width:1440px;--sidebar-width:200px;
+--section-gap:32px;--card-padding:16px;--card-gap:12px;--element-gap:12px;--list-gap:8px;
+--radius-md:4px;--radius-tags:4px;--radius-tags-sm:4px;--radius-cards:0px;--radius-other:4px;--radius-images:6px;--radius-images-sm:4px;--radius-buttons:6px;--radius-buttons-sm:4px; /* softness lives only on things you act on or look at: buttons, labels, photographs. Structure (cards, rows, rules, indicators) stays square */
+--border-width:1px;--border-width-focus:2px;
+--control-height:36px;--control-height-sm:28px;
+--control-line:16px;--control-line-sm:14px; /* @kind other */
+--label-line:14px;--label-line-sm:12px; /* @kind other */
+--label-height:22px;--label-height-sm:18px;
+--optical-nudge:4px; /* @kind other */
+--focus-offset:2px;
+--shadow-none:none;
+--duration-fast:120ms; /* @kind other */
+--ease-standard:linear; /* @kind other */
+}

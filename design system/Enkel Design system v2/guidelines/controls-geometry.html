@@ -1,0 +1,67 @@
+<!-- @dsCard group="Spacing" viewport="760x720" name="Control geometry" subtitle="Top padding = bottom + 4px, at every control size" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Control geometry</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;letter-spacing:.143px}
+.h{color:var(--text-muted);border-bottom:1px solid var(--border-muted);padding-bottom:5px;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:14px;line-height:16px;letter-spacing:.154px;min-height:36px;padding:11px 16px 7px;border:1px solid var(--action-primary);background:var(--action-primary);color:var(--action-primary-text)}
+.btn.o{background:transparent;color:var(--text-primary);border-color:var(--border-hairline)}
+.btn.sm{min-height:28px;padding:7px 10px 3px;font-size:13px;line-height:14px}
+.lab{display:inline-block;width:max-content;max-width:100%;min-height:22px;padding:5px 8px 1px;box-sizing:border-box;font-size:13px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--border-hairline)}
+.tab{display:inline-flex;align-items:center;min-height:18px;padding:4px 5px 0;box-sizing:border-box;font-size:11px;line-height:12px;letter-spacing:.3px;text-transform:uppercase;background:var(--color-charcoal);color:var(--color-paper-white)}
+.btn>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.n{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.top{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:start}
+/* The 44px primary drawn ×3, so a 4px padding difference is actually visible. */
+.an{position:relative;padding-left:26px;padding-right:38px}
+.box{display:flex;flex-direction:column;box-sizing:border-box;width:max-content;border:3px solid var(--action-primary);background:var(--action-primary);color:var(--action-primary-text);font-size:45px;line-height:54px;letter-spacing:.5px}
+.box>*{flex:0 0 auto}
+.band{position:relative;background:rgba(255,255,255,.13);font-size:13px;line-height:1;color:var(--color-paper-white);letter-spacing:.3px}
+.band span{position:absolute;left:12px;top:50%;margin-top:-6px}
+.txt{position:relative;padding:0 63px}
+.txt em{position:absolute;left:12px;top:50%;margin-top:-6px;font-style:normal;font-size:13px;line-height:1;letter-spacing:.3px;color:rgba(255,255,255,.75)}
+.an::before,.an::after{content:'';position:absolute;top:50%;width:22px;height:1px;background:var(--status-blocked)}
+.an::before{left:0}.an::after{right:16px}
+.an .tot{position:absolute;right:0;top:0;bottom:0;width:1px;background:var(--border-muted)}
+.an .tot b{position:absolute;right:-3px;top:50%;margin-top:-9px;width:7px;height:18px;background:var(--surface-paper);font-size:13px;font-weight:400;line-height:18px;color:var(--text-muted);text-align:center}
+.cap{font-size:13px;color:var(--text-muted);margin-top:10px;padding-left:26px}
+.cap u{display:inline-block;width:13px;height:1px;background:var(--status-blocked);margin:0 5px 0 14px;vertical-align:4px}
+.sc{display:grid;grid-template-columns:auto auto 1fr;gap:10px 21px;align-items:center;font-size:15px}
+.sc .hd{font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border-muted);padding-bottom:5px;white-space:nowrap}
+.why{font-size:13px;line-height:1.4;color:var(--text-muted);margin-top:14px;padding-top:10px;border-top:1px solid var(--border-muted)}
+.why b{font-weight:400;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.note{color:var(--text-muted);max-width:70ch;line-height:1.5;text-wrap:pretty;margin-top:21px;padding-top:10px;border-top:1px solid var(--border-muted)}
+.note b{font-weight:400;color:var(--text-secondary)}
+.tight{display:grid;grid-template-columns:110px 150px 90px;gap:14px 21px;align-items:center;margin-top:14px}
+</style></head><body>
+<div class="h">Height is built from padding, not centring</div>
+<div class="top">
+<div>
+<div class="an">
+<div class="box">
+<div class="band" style="height:33px"><span>11</span></div>
+<div class="txt" style="top:0px;font-size:44px;line-height:48px">Add work<em>16</em></div>
+<div class="band" style="height:21px"><span>7</span></div>
+</div>
+<div class="tot"><b>36</b></div>
+</div>
+<div class="cap">36px primary, drawn ×3<u></u>true vertical middle</div>
+<div class="why">Measured HelveticaNeue at 14px: cap height <b>10.0</b>, ascent <b>10.3</b>, descent <b>3.7</b> — so the cap block sits <b>1.86px</b> above the line-box centre, and it takes <b>2 × 1.86 ≈ 4px</b> of extra top padding to bring it back. The same 4px holds at 13px and 16px.</div>
+</div>
+<div>
+<div class="sc">
+<span class="hd">Size</span><span class="hd">Top / line / btm</span><span class="hd">Live</span>
+<span class="n">36</span><span class="n">11 / 16 / 7</span><span><span class="btn"><span>Add work</span></span></span>
+<span class="n">28</span><span class="n">7 / 14 / 3</span><span><span class="btn sm"><span>Save</span></span></span>
+<span class="n">22</span><span class="n">5 / 14 / 1</span><span><span class="lab">In storage</span></span>
+<span class="n">18</span><span class="n">4 / 12 / 0</span><span><span class="tab">Warehouse</span></span>
+</div>
+</div>
+</div>
+<div class="note">Every control is a line box with a padding band above and below, the top band always <b>4px</b> deeper (<b>--optical-nudge</b>). Flex centring centres the line box, not the letters. Never override a control's padding or line-height to make room for something — change what's inside it.</div>
+<div class="h" style="margin-top:21px">In a tight column, a label shrinks and clips — it never stretches, never pushes past</div>
+<div class="tight">
+<span class="n">110px</span><span class="n">150px</span><span class="n">90px</span>
+<span class="btn o sm" title="Reduce to four"><span>Reduce to four</span></span><span class="btn sm" title="Purchase two more"><span>Purchase two more</span></span><span class="btn o sm"><span>Cancel</span></span>
+<span class="lab">In progress</span><span class="lab">Blocked by warehouse</span><span class="lab">On loan</span>
+</div>
+<div class="note" style="margin-top:14px">Labels are sized to their text (<b>max-content</b>) and clipped at their column, so a grid cell can't inflate a badge into a banner. Buttons keep their height and truncate, with the full label on hover; pass <b>wrap</b> where two lines beat an ellipsis.</div>
+</body></html>

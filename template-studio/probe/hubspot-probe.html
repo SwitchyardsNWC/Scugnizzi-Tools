@@ -1,0 +1,226 @@
+<!--
+  templateType: email
+  isAvailableForNewContent: true
+  label: ZZ Probe - Template Studio Phase 0
+-->
+{# Throwaway template. It exists to answer the open HubSpot questions in docs/learnings.md in one
+   send. Upload it, create an email from it, fill in the fields, send to yourself, and record the
+   answers using docs/phase-0-checklist.md. Delete it from Design Manager afterwards. #}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:v="urn:schemas-microsoft-com:vml" lang="en">
+<head>
+<title>{{ subject }}</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- CASE F: does HubSpot inline these at send, and does it reach BOTH the rich-text region
+     and our own static markup? Red text = it reached the rich text. Green = it reached ours. -->
+<style type="text/css" id="hs-inline-css">
+.probe-rich p { color:#d20000 !important; font-weight:bold }
+.probe-rich h2 { color:#d20000 !important; font-size:19px }
+.probe-static p { color:#0a8a00 !important; font-weight:bold }
+</style>
+
+<!-- CASE H: does HubSpot pass these layers through to the sent email untouched?
+     Read the H swatch in the received message:
+       WHITE   = neither layer applied (or the client is in light mode)
+       GREEN   = the prefers-color-scheme layer survived and applied
+       MAGENTA = the [data-ogsb] layer survived and applied (Outlook) -->
+<style type="text/css">
+@media (prefers-color-scheme: dark) { .probe-dark { background-color:#00c853 !important } }
+[data-ogsb] .probe-dark { background-color:#d500f9 !important }
+[data-ogsc] .probe-dark-text { color:#d500f9 !important }
+@media only print, only screen and (max-width:639px) { .probe-phone { display:block !important; max-height:none !important; overflow:visible !important } }
+.probe-phone { display:none; max-height:0; overflow:hidden }
+</style>
+</head>
+
+<body id="hs_body" bgcolor="#ffffff" style="margin:0 !important; padding:0 !important; background-color:#ffffff; font-family:Menlo, Consolas, monospace; font-size:13px; color:#111111; word-break:break-word">
+<div class="hse-body-background" style="background-color:#ffffff" bgcolor="#ffffff">
+<table role="presentation" class="hse-body-wrapper-table" cellpadding="0" cellspacing="0" width="100%" style="width:100% !important; background-color:#ffffff" bgcolor="#ffffff"><tbody><tr>
+<td class="hse-body-wrapper-td" valign="top" style="font-family:Menlo, Consolas, monospace; font-size:13px; color:#111111">
+<div id="hs_cos_wrapper_main">
+
+<div class="hse-section" style="padding:0">
+<div class="hse-column-container" style="min-width:280px; max-width:600px; margin:0 auto">
+<!--[if (mso)|(IE)]><table align="center" style="width:600px;" cellpadding="0" cellspacing="0" role="presentation" width="600"><tr><td valign="top" style="width:600px"><![endif]-->
+<div class="hse-column hse-size-12">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:24px 20px 8px 20px; font-family:Menlo, Consolas, monospace">
+  <div style="font-size:17px; font-weight:bold; margin:0 0 6px">Template Studio &mdash; Phase 0 probe</div>
+  <div style="font-size:12px; line-height:1.5; color:#555555">Every box below answers one open question. Screenshot this email and the HubSpot Contents panel, then fill in <code>docs/phase-0-checklist.md</code>. A value shown between square brackets is the raw thing the template received; empty brackets mean the template got nothing.</div>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE A
+     Does @hubspot/image_email hand its values to the template when exported?
+     This is the question the whole image block depends on (learnings 1.6, 1.13).
+     Declared unconditionally so HubSpot registers it (learnings 1.5).
+     ================================================================= -->
+{% module "probe_a_image" path="@hubspot/image_email", label="A - Image: pick an image AND set a link on it", img={ "src": "", "alt": "probe alt text", "width": 400 }, export_to_template_context=True %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">A &mdash; image_email exported values</div>
+    <div>img.src&nbsp;&nbsp;&nbsp;= [{{ widget_data.probe_a_image.img.src }}]</div>
+    <div>img.alt&nbsp;&nbsp;&nbsp;= [{{ widget_data.probe_a_image.img.alt }}]</div>
+    <div>img.width&nbsp;= [{{ widget_data.probe_a_image.img.width }}]</div>
+    <div>link&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [{{ widget_data.probe_a_image.link }}]</div>
+    <div>link.url&nbsp;&nbsp;= [{{ widget_data.probe_a_image.link.url }}]</div>
+    <div>link.url.href = [{{ widget_data.probe_a_image.link.url.href }}]</div>
+    <div>img.link&nbsp;&nbsp;= [{{ widget_data.probe_a_image.img.link }}]</div>
+    <div style="margin:8px 0 0">whole object, whatever shape it has:</div>
+    <div style="word-break:break-all; color:#444444">[{{ widget_data.probe_a_image }}]</div>
+    <div style="margin:8px 0 0; padding-top:8px; border-top:1px solid #cccccc">The template rendering it itself, at a forced 200px:</div>
+    {% if widget_data.probe_a_image.img.src %}
+      <div style="margin:6px 0">A-CONDITIONAL: <strong>VISIBLE</strong> &mdash; the if saw the src</div>
+      {% if widget_data.probe_a_image.link %}<a href="{{ widget_data.probe_a_image.link }}" target="_blank">{% endif %}<img alt="{{ widget_data.probe_a_image.img.alt }}" src="{{ widget_data.probe_a_image.img.src }}" width="200" style="width:200px; max-width:100%; border:none; outline:none">{% if widget_data.probe_a_image.link %}</a>{% endif %}
+      <div style="font-size:11px; color:#555555">If that image is wrapped in a working link, the whole v2 image block works. If it is not, image blocks need a second text field for the URL.</div>
+    {% endif %}
+    {% if not widget_data.probe_a_image.img.src %}<div style="margin:6px 0; color:#b00">A-CONDITIONAL: HIDDEN &mdash; the template did not receive a src. Go back and pick an image.</div>{% endif %}
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE B
+     A field that is declared but never printed anywhere. Does it still show up
+     in the Contents panel? Answers whether registration follows declaration or use.
+     ================================================================= -->
+{% text "probe_b_unprinted" label="B - Declared but never printed (type anything here)", value='B default', export_to_template_context=True %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">B &mdash; declared, never printed</div>
+    <div>Field "probe_b_unprinted" was declared just above this box and is deliberately never printed. Check the Contents panel: is it there?</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE C
+     Panel order. Three fields declared in source order 1, 2, 3 - but slot 2 sits
+     inside a nested table and slot 3 sits inside a TRUE conditional. v1 verified
+     the flat case only (learnings 1.4); v2 nests everything.
+     ================================================================= -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">C &mdash; declaration order through nesting and conditionals</div>
+
+{% text "probe_c_slot1" label="C1 - order slot 1 (plain, top level)", value='C1 default', export_to_template_context=True %}
+    <div>C1 (plain) = [{{ widget_data.probe_c_slot1.value }}]</div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0"><tbody><tr><td style="font-family:Menlo, Consolas, monospace; font-size:12px">
+{% text "probe_c_slot2" label="C2 - order slot 2 (inside a nested table)", value='C2 default', export_to_template_context=True %}
+      <div>C2 (nested two tables deep) = [{{ widget_data.probe_c_slot2.value }}]</div>
+    </td></tr></tbody></table>
+
+{% if 1 == 1 %}
+{% text "probe_c_slot3" label="C3 - order slot 3 (inside a true if)", value='C3 default', export_to_template_context=True %}
+    <div>C3 (declared inside a true conditional) = [{{ widget_data.probe_c_slot3.value }}]</div>
+{% endif %}
+
+    <div style="margin:8px 0 0; padding-top:8px; border-top:1px solid #cccccc; color:#555555">Expected panel order for the whole email, top to bottom: A, B, C1, C2, C3, D, E. Any other order is the finding.</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE D
+     A text field whose default is blank. Does it still register, and does |trim
+     behave on it? v2 wants optional headings that ship nothing until filled in.
+     ================================================================= -->
+{% text "probe_d_blank" label="D - Blank default: LEAVE THIS ONE EMPTY", value='', export_to_template_context=True %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">D &mdash; blank default</div>
+    <div>raw = [{{ widget_data.probe_d_blank.value }}]</div>
+    {% if widget_data.probe_d_blank.value|trim %}<div style="color:#b00">D-CONDITIONAL: VISIBLE &mdash; trim treated it as content. Wrong: you were meant to leave it empty, or whitespace counts.</div>{% endif %}
+    {% if not widget_data.probe_d_blank.value|trim %}<div style="color:#0a8a00">D-CONDITIONAL: HIDDEN &mdash; correct. A blank field can collapse its block.</div>{% endif %}
+    <div style="color:#555555">Also check: does D appear in the Contents panel at all, given its default is empty?</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE E
+     rich_text with export_to_template_context. v1 never tried this - it emits the
+     tag in place, which means rich text can never be wrapped in our own markup or
+     collapsed when empty. If this works, v2 gains both.
+     ================================================================= -->
+{% rich_text "probe_e_rich" label="E - Rich text (add a heading and a link in the editor)", html='<h2>E default heading</h2><p>E default paragraph.</p>', export_to_template_context=True %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">E &mdash; rich_text exported to the template</div>
+    <div>whole object: <span style="word-break:break-all; color:#444444">[{{ widget_data.probe_e_rich }}]</span></div>
+    <div style="margin:8px 0 0">rendered inside our own div, which is the point:</div>
+    <div class="probe-rich" style="border:1px dashed #999999; padding:8px; margin:6px 0">{{ widget_data.probe_e_rich.html }}</div>
+    {% if widget_data.probe_e_rich.html %}<div style="color:#0a8a00">E-CONDITIONAL: VISIBLE &mdash; the template can read the html, so rich text can collapse when empty.</div>{% endif %}
+    <div style="color:#555555">If the dashed box is empty, rich_text does not export and v2 must emit the tag in place, as v1 does.</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE F
+     How far does the hs-inline-css block reach? Red = it styled the rich text.
+     Green = it also styled our own static markup, which would fight our inline styles.
+     ================================================================= -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">F &mdash; reach of the hs-inline-css block</div>
+    <div>Case E's box above is inside <code>.probe-rich</code>. If its text came out <span style="color:#d20000; font-weight:bold">red and bold</span>, the inlining reached the rich text. That is the mechanism v1's whole type scale relies on.</div>
+    <div class="probe-static" style="border:1px dashed #999999; padding:8px; margin:6px 0">
+      <p style="margin:0">This paragraph is our own static markup inside <code>.probe-static</code>. If it is green and bold, HubSpot inlined onto template markup too, and every generated inline style needs to outrank it.</p>
+    </div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE G
+     HubSpot's own wrapper classes carry padding of their own (learnings 1.11).
+     Two identical rows, one with hs_padded and one without. Compare on a phone.
+     ================================================================= -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">G &mdash; does hs_padded still add padding of its own?</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="hs_padded" bgcolor="#ffe082" style="background-color:#ffe082; padding:0; font-family:Menlo, Consolas, monospace; font-size:12px">WITH hs_padded, our padding is 0</td></tr></tbody></table>
+    <div style="height:6px; font-size:0">&nbsp;</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td bgcolor="#b3e5fc" style="background-color:#b3e5fc; padding:0; font-family:Menlo, Consolas, monospace; font-size:12px">WITHOUT hs_padded, our padding is 0</td></tr></tbody></table>
+    <div style="margin:8px 0 0; color:#555555">On a phone: if the yellow row is inset and the blue row is not, HubSpot is still adding 20px of its own and v2 must account for it rather than stack on top.</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CASE H
+     Do our dark-mode layers survive HubSpot's processing at send?
+     ================================================================= -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 20px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111"><tbody><tr><td style="padding:12px; font-family:Menlo, Consolas, monospace; font-size:12px; line-height:1.7">
+    <div style="font-weight:bold; font-size:14px; margin:0 0 8px">H &mdash; do the dark-mode layers survive the send?</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td class="probe-dark" bgcolor="#ffffff" style="background-color:#ffffff; border:1px solid #111111; padding:14px; font-family:Menlo, Consolas, monospace; font-size:12px"><span class="probe-dark-text">Read this swatch with the device in DARK mode.</span></td></tr></tbody></table>
+    <div style="margin:8px 0 0; line-height:1.7">
+      white&nbsp;&nbsp;&nbsp;= neither layer applied<br>
+      green&nbsp;&nbsp;&nbsp;= the prefers-color-scheme layer survived<br>
+      magenta = the [data-ogsb] layer survived (Outlook)
+    </div>
+    <div class="probe-phone" style="margin:8px 0 0; color:#555555">PHONE-ONLY LINE: the max-width:639px media query survived the send.</div>
+  </td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<!-- ================================================================= CAN-SPAM
+     HubSpot refuses to publish without these (learnings 1.8).
+     ================================================================= -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:16px 20px 32px 20px; font-family:Menlo, Consolas, monospace; font-size:11px; line-height:1.7; color:#555555">
+  <div>{{ site_settings.company_name }}</div>
+  <div>{{ site_settings.company_street_address_1 }} {{ site_settings.company_street_address_2 }}</div>
+  <div>{{ site_settings.company_city }}, {{ site_settings.company_state }} {{ site_settings.company_zip }}</div>
+  <div style="margin:6px 0 0"><a href="{{ unsubscribe_link }}" style="color:#555555">Manage preferences</a> &nbsp;&middot;&nbsp; <a href="{{ unsubscribe_link_all }}" style="color:#555555">Unsubscribe</a></div>
+  <div style="margin:10px 0 0">Throwaway probe template. Delete from Design Manager once the answers are recorded.</div>
+</td></tr></tbody></table>
+
+</div>
+<!--[if (mso)|(IE)]></td></tr></table><![endif]-->
+</div>
+</div>
+
+</div>
+</td></tr></tbody></table>
+</div>
+</body>
+</html>
