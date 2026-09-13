@@ -133,14 +133,18 @@ interface Files {
   /** What Riso and Ink bleed made, and from what. */
   recipes: ToolRecipe[];
   read: boolean;
+  /** How many times the board had changed the folder itself when this was read (see `stale`). */
+  epoch: number;
 }
 
 function useProjectFiles(project: MutableRef<Project>, notify: (message: string) => void) {
-  const [files, setFiles] = useState<Files>({ emails: [], frames: [], pictures: [], recipes: [], read: false });
+  const [files, setFiles] = useState<Files>({ emails: [], frames: [], pictures: [], recipes: [], read: false, epoch: 0 });
   const [kept, setKept] = useState<AssetFile[]>([]);
   const cache = useRef({ emails: new Map<string, EmailItem>(), pictures: new Map<string, PictureItem>(), systems: '' });
   const busy = useRef(false);
   const again = useRef(false);
+  /** Goes up whenever the board itself changes the folder, so a read that started before is not trusted. */
+  const epoch = useRef(0);
   const keptRef = useRef<AssetFile[] | null>(null);
   const lastFailure = useRef('');
 
@@ -152,6 +156,7 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
       return;
     }
     busy.current = true;
+    const started = epoch.current;
     try {
       const ws = folderWorkspace(dir, writable);
       const [list, systems, found, recipes] = await Promise.all([
@@ -225,7 +230,13 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
       }
       for (const name of [...c.emails.keys()]) if (!list.some((f) => f.fileName === name)) c.emails.delete(name);
 
-      setFiles({ emails, frames, pictures, recipes, read: true });
+      // The board moved a file while this read ran, which may have seen both copies or neither: read again rather
+      // than lay out what was. Laying it out put a moved picture's old name back on the board.
+      if (started !== epoch.current) {
+        again.current = true;
+        return;
+      }
+      setFiles({ emails, frames, pictures, recipes, read: true, epoch: started });
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : 'The project folder could not be read.');
     } finally {
@@ -237,7 +248,13 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
     }
   }, [project, notify]);
 
-  return { files, kept, refresh };
+  const stale = useCallback(() => {
+    epoch.current += 1;
+  }, []);
+  /** Whether a read has seen every change the board made to the folder: until one has, what it shows is out of date. */
+  const current = useCallback((read: Files) => read.epoch === epoch.current, []);
+
+  return { files, kept, refresh, stale, current };
 }
 
 // --- the board ------------------------------------------------------------------------------------------------
@@ -253,7 +270,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const info = project.info!;
   const projectRef = useRef(project);
   projectRef.current = project;
-  const { files, kept, refresh } = useProjectFiles(projectRef, notify);
+  const { files, kept, refresh, stale, current } = useProjectFiles(projectRef, notify);
 
   // --- board.json ---
   const [board, setBoard] = useState<BoardDoc>(emptyBoard);
@@ -349,11 +366,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const layout = useMemo(() => layoutBoard(sources, board), [sources, board]);
 
   // A card that just found a place keeps it, so a file added tomorrow does not shuffle today's board.
-  // A group just made for a folder is kept the same way.
+  // A group just made for a folder is kept the same way. Not from a read older than a move the board just made: that
+  // read still has the picture's old name, and writing its places down put a removed group and its old card back.
   useEffect(() => {
-    if (!files.read || !boardRead || (layout.placed.length === 0 && layout.groupsPlaced.length === 0)) return;
+    if (!files.read || !boardRead || !current(files) || (layout.placed.length === 0 && layout.groupsPlaced.length === 0)) return;
     saveBoard(withPlaces(boardRef.current, layout.cards, layout.groupsPlaced.length ? layout.groups : undefined));
-  }, [files.read, boardRead, layout, saveBoard]);
+  }, [files, boardRead, layout, saveBoard, current]);
 
   const emailsById = useMemo(() => new Map(files.emails.map((e) => [e.id, e])), [files.emails]);
   const framesById = useMemo(() => new Map(files.frames.map((f) => [f.id, f])), [files.frames]);
@@ -716,6 +734,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const to = freeAssetPath(movedPath(from, group ? group.folder : null), files.pictures.map((p) => p.path));
     try {
       const rewritten = await movePicture(dir, from, to);
+      stale();
       const b = boardRef.current;
       const place = b.cards[card.id] ?? at;
       saveBoard(moveCard(forgetCard(b, card.id), pictureCardId(to), place.x, place.y));
@@ -803,6 +822,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const to = freeAssetPath(movedPath(from, null), taken);
       try {
         await movePicture(dir, from, to);
+        stale();
         taken = [...taken.filter((t) => t !== from), to];
         const place = next.cards[id];
         next = forgetCard(next, id);
