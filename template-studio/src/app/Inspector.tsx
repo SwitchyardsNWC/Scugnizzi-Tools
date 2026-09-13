@@ -70,6 +70,20 @@ export interface FreeformUi {
   /** The surface is open as a workspace; `onEnter` opens it. */
   open?: boolean;
   onEnter?(blockId: string): void;
+  /** The Freeform app's frame, which this block can follow (model/freeform-link.ts). */
+  app?: FreeformAppUi;
+}
+
+export interface FreeformAppUi {
+  frame: { name: string; width: number; height: number; layers: number; printed: boolean; thumb: string } | null;
+  linked: boolean;
+  /** Linked, and already showing the frame as it is now. */
+  current: boolean;
+  /** The block's printed picture, when it has effects: the thumbnail then shows what the email shows. */
+  print?: string;
+  onLink(): void;
+  onUnlink(): void;
+  onOpen(): void;
 }
 
 export function Inspector({ editor, onRasterise, rasterising, patternInfo, multi, onSpacingHot, freeform }: InspectorProps) {
@@ -545,18 +559,58 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
 
   if (!freeform?.open) {
     const n = block.layers.length;
+    const app = freeform?.app;
+    const linked = Boolean(app?.linked);
     return (
       <div class="field wide canvas-entry">
-        <button
-          class="btn wide canvas-open"
-          title="Zoom into the canvas to draw, drop pictures in, stamp and type. Double-clicking the block does the same."
-          onClick={() => freeform?.onEnter?.(block.id)}
-        >
-          Open canvas
-        </button>
+        {linked ? (
+          <button class="btn wide canvas-open" title="This block follows the frame in the Freeform app. Edit it there and the email updates." onClick={() => app?.onOpen()}>
+            Edit in Freeform ↗
+          </button>
+        ) : (
+          <button
+            class="btn wide canvas-open"
+            title="Zoom into the canvas to draw, drop pictures in, stamp and type. Double-clicking the block does the same."
+            onClick={() => freeform?.onEnter?.(block.id)}
+          >
+            Open canvas
+          </button>
+        )}
         <span class="canvas-facts">
           {n} {n === 1 ? 'layer' : 'layers'} · {block.width} × {block.height}
+          {block.effects?.length ? ' · Riso print' : ''}
         </span>
+
+        {app && (
+          <div class="canvas-link">
+            <div class="canvas-link-head">
+              <b>Freeform app</b>
+              {linked && <span class={`canvas-link-badge ${app.current ? '' : 'stale'}`}>{app.current ? 'Linked · up to date' : 'Linked · updating'}</span>}
+            </div>
+            {app.frame ? (
+              <>
+                <button class="canvas-link-thumb" title={`${app.frame.name}, ${app.frame.width} × ${app.frame.height}. Opens the Freeform app.`} onClick={app.onOpen}>
+                  {linked && app.print ? <img src={app.print} alt="" /> : <span dangerouslySetInnerHTML={{ __html: app.frame.thumb }} />}
+                </button>
+                <span class="canvas-facts">
+                  {app.frame.layers} {app.frame.layers === 1 ? 'layer' : 'layers'} · {app.frame.width} × {app.frame.height}
+                  {app.frame.printed ? ' · Riso print' : ''}
+                </span>
+                {linked ? (
+                  <button class="btn wide" title="Stop following the frame. The drawing stays, to edit in this block's own canvas." onClick={app.onUnlink}>
+                    Unlink
+                  </button>
+                ) : (
+                  <button class="btn wide" title="Replace this block's drawing with the frame and follow it from now on. Undo brings the old drawing back." onClick={app.onLink}>
+                    Link to this frame
+                  </button>
+                )}
+              </>
+            ) : (
+              <p class="hint">Nothing in the Freeform app yet. Draw a frame there and it shows up here to link.</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }

@@ -13,7 +13,7 @@ See [`docs/architecture.md`](docs/architecture.md) §4.
 
 ```bash
 npm install && npm run dev     # the app
-npm test                       # 631 tests
+npm test                       # 640 tests
 ```
 
 The built app is checked in at `dist/` so the tools directory can link to it; `npm run build`
@@ -23,7 +23,7 @@ refreshes it.
 | --- | --- |
 | `npm run dev` | The app on a local dev server |
 | `npm run build` | Builds to `dist/` |
-| `npm test` | 631 tests: the HubSpot contract gate, the v1 import, per-block snapshots in every theme, the linter, branch coverage, migrations, editing, the design system, multi-column rows and groups, the paste sanitiser, local assets, the verified HubSpot facts, and the purity checks |
+| `npm test` | 640 tests: the HubSpot contract gate, the v1 import, per-block snapshots in every theme, the linter, branch coverage, migrations, editing, the design system, multi-column rows and groups, the paste sanitiser, local assets, the verified HubSpot facts, and the purity checks |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run compile -- <file.json>` | Compiles a template to a HubSpot coded email template on stdout. `--preview` for the readable version, `--out <file>` to write one. |
 | `npm run golden` | Regenerates the golden file by driving v1's own compiler |

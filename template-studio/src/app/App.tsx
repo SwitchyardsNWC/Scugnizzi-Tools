@@ -3,7 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { compile } from '../compile/compile.ts';
 import { simulateDark } from '../compile/dark.ts';
-import { withLocalAssets } from './local-assets.ts';
+import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
+import { withPrints } from './printed-preview.ts';
+import { loadKeptPictures } from './kept-pictures.ts';
+import { freeformSvg } from '../compile/freeform.ts';
+import { recipeHash } from '../model/freeform.ts';
+import { FREEFORM_APP_FRAME, followFrame, isCurrent, linkedBlocks, readAppFrame, unlinkFrame, type AppFrame } from '../model/freeform-link.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
@@ -64,10 +69,10 @@ import {
 } from '../model/patterns.ts';
 import { fileSlug, serializeDesignSystem, serializePattern } from '../model/serialize.ts';
 import { tidyTemplate } from '../model/tidy.ts';
-import type { DesignSystem } from '../model/design-system.ts';
+import { colorOf, type DesignSystem } from '../model/design-system.ts';
 import { blankTemplate, cardTemplate } from '../model/starters.ts';
 import { ADDABLE, CATALOG } from '../model/catalog.ts';
-import type { Block, BlockType } from '../model/types.ts';
+import type { Block, BlockType, FreeformBlock } from '../model/types.ts';
 import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
 import { BranchIcon, CopyIcon, DesktopIcon, EyeIcon, glyphFor, InboxIcon, MoonIcon, PhoneIcon, TickIcon } from './icons.tsx';
@@ -143,6 +148,19 @@ export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, setFiles] = useState<TemplateFile[]>([]);
   const [assets, setAssets] = useState<AssetFile[]>([]);
+  /** Pictures the Freeform app keeps (kept-pictures.ts), so a block linked to its frame shows them. The folder's win a clash of names. */
+  const [kept, setKept] = useState<AssetFile[]>([]);
+  const allAssets = useMemo(() => [...assets, ...kept.filter((k) => !assets.some((a) => a.name === k.name))], [assets, kept]);
+  /** The frame the Freeform app keeps, read from this site's storage (model/freeform-link.ts). */
+  const [appFrame, setAppFrame] = useState<AppFrame | null>(() => {
+    try {
+      return readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
+    } catch {
+      return null;
+    }
+  });
+  /** Freeform pages with effects, printed, by block id: what the email canvas shows in their place (printed-preview.ts). */
+  const [prints, setPrints] = useState<Record<string, { key: string; url: string }>>({});
   const [device, setDevice] = useState<Device>('desktop');
   const [dark, setDark] = useState(false);
   /**
@@ -284,8 +302,11 @@ export function App() {
   const enterSurface = useCallback(
     (blockId: string) => {
       const site = siteOf(editor.template, blockId);
-      if (!site || site.column.blocks[site.index]?.type !== 'freeform') return;
+      const block = site?.column.blocks[site.index];
+      if (!site || block?.type !== 'freeform') return;
       editor.select({ kind: 'block', sectionId: site.section.id, blockId });
+      // A block that follows a Freeform app frame is drawn there; its own canvas would only be overwritten.
+      if (block.source?.app === 'freeform') return openFreeformApp();
       setSurfaceOf(blockId);
     },
     [editor],
@@ -294,7 +315,7 @@ export function App() {
   /** Where a freeform block's picture sits on the email canvas, in viewport pixels: where the canvas flies from and back to. */
   const freeformRect = useCallback((blockId: string): DOMRect | null => {
     const f = frame.current;
-    const el = f?.contentDocument?.querySelector(`[data-sy-block="${CSS.escape(blockId)}"] svg[data-sy-freeform]`);
+    const el = f?.contentDocument?.querySelector(`[data-sy-block="${CSS.escape(blockId)}"] [data-sy-freeform]`);
     if (!f || !el) return null;
     const outer = f.getBoundingClientRect();
     const r = el.getBoundingClientRect();
@@ -380,9 +401,10 @@ export function App() {
     // Local assets become blob URLs on the way to the canvas and nowhere else — the export is
     // compiled separately and never passes through here, and `local-image` refuses to let one
     // through Checks. See local-assets.ts.
-    const withAssets = withLocalAssets(preview.html, assets);
+    // A freeform page with effects shows its print in its drawing's place (printed-preview.ts).
+    const withAssets = withLocalAssets(withPrints(preview.html, shownTemplate, prints), allAssets);
     return dark ? simulateDark(withAssets) : withAssets;
-  }, [preview, dark, assets]);
+  }, [preview, dark, allAssets, prints, shownTemplate]);
 
   const errors = findings.filter((f) => f.severity === 'error');
 
@@ -1041,6 +1063,150 @@ export function App() {
    * The padding stays outside the picture — it belongs to the column and has dials of its own, and
    * baking it in would mean moving a dial that no longer moves anything.
    */
+  // --- freeform pages: their prints on the email canvas, and frames from the Freeform app ------------------
+
+  const printsRef = useRef<Record<string, { key: string; url: string }>>({});
+  // Every page with effects is printed once its recipe settles. Jared: "freeform in template studio does
+  // not carry the effect back after hitting done" — the canvas printed it, the email drew it plain.
+  useEffect(() => {
+    const ds = designSystemOf(shownTemplate);
+    const names = allAssets.map((a) => a.name).join('|');
+    const wanted: Array<{ block: FreeformBlock; ground: string; key: string }> = [];
+    for (const s of shownTemplate.sections)
+      for (const r of s.rows)
+        for (const c of r.columns)
+          for (const b of c.blocks) {
+            if (b.type !== 'freeform' || !b.effects?.length) continue;
+            const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
+            wanted.push({ block: b, ground, key: `${recipeHash(b)}|${ground}|${names}` });
+          }
+    if (wanted.length === 0 && Object.keys(printsRef.current).length === 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const next: Record<string, { key: string; url: string }> = {};
+      const made: string[] = [];
+      for (const w of wanted) {
+        const old = printsRef.current[w.block.id];
+        if (old?.key === w.key) {
+          next[w.block.id] = old;
+          continue;
+        }
+        try {
+          const blob = await canvasBlob(await freeformCanvas(w.block, ds, { assets: allAssets, scale: 2, ground: w.ground }));
+          const url = URL.createObjectURL(blob);
+          made.push(url);
+          next[w.block.id] = { key: w.key, url };
+        } catch {
+          // The page stays drawn plain.
+        }
+        if (cancelled) break;
+      }
+      if (cancelled) return made.forEach((url) => URL.revokeObjectURL(url));
+      for (const [id, p] of Object.entries(printsRef.current)) if (next[id]?.url !== p.url) URL.revokeObjectURL(p.url);
+      printsRef.current = next;
+      setPrints(next);
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [shownTemplate, allAssets]);
+
+  // The Freeform app's frame, followed live: its tab writes on every change, and this tab hears it.
+  useEffect(() => {
+    const read = () => {
+      let next: AppFrame | null = null;
+      try {
+        next = readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
+      } catch {
+        next = null;
+      }
+      setAppFrame((old) => (old?.hash === next?.hash && old?.name === next?.name ? old : next));
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === FREEFORM_APP_FRAME) read();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', read);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', read);
+    };
+  }, []);
+
+  // The pictures the Freeform app keeps, read again whenever its frame changes, since that is when one may have been dropped.
+  useEffect(() => {
+    let cancelled = false;
+    loadKeptPictures()
+      .then((list) => {
+        if (cancelled) return list.forEach((p) => URL.revokeObjectURL(p.url));
+        setKept((old) => {
+          old.forEach((p) => URL.revokeObjectURL(p.url));
+          return list;
+        });
+      })
+      .catch(() => {
+        // No IndexedDB here: a linked frame's pictures show as missing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appFrame?.hash]);
+
+  // Linked blocks follow the frame. A burst of changes in the Freeform tab is one undo step here.
+  useEffect(() => {
+    if (!appFrame) return;
+    let next = editor.template;
+    for (const b of linkedBlocks(next)) if (b.source?.key === appFrame.key && !isCurrent(b, appFrame)) next = followFrame(next, b.id, appFrame);
+    if (next !== editor.template) editor.commit('Update from Freeform', next, { coalesce: 'freeform-link' });
+  }, [appFrame, editor]);
+
+  const openFreeformApp = useCallback(() => {
+    const tab = window.open(new URL('freeform.html', window.location.href).href, '_blank');
+    notify(tab ? 'Freeform is open in a new tab. What you change there shows up here.' : 'The browser blocked the new tab. Allow pop-ups for this page, or open Freeform from the dashboard.');
+  }, [notify]);
+
+  /** The Freeform app's frame, for the selected freeform block's panel: see it, link to it, open it. */
+  const freeformApp = useMemo(() => {
+    const sel = editor.selection;
+    if (sel.kind !== 'block') return undefined;
+    const block = allBlocks(editor.template).find((b) => b.id === sel.blockId);
+    if (!block || block.type !== 'freeform') return undefined;
+    const ds = designSystemOf(editor.template);
+    return {
+      frame: appFrame
+        ? {
+            name: appFrame.name,
+            width: appFrame.page.width,
+            height: appFrame.page.height,
+            layers: appFrame.page.layers.length,
+            printed: Boolean(appFrame.page.effects?.length),
+            thumb: withoutMissingPictures(withLocalAssets(freeformSvg(appFrame.page, ds), allAssets)),
+          }
+        : null,
+      linked: block.source?.app === 'freeform',
+      current: Boolean(appFrame && isCurrent(block, appFrame)),
+      ...(prints[block.id] ? { print: prints[block.id]!.url } : {}),
+      onLink: () => {
+        if (appFrame) editor.commit('Link to Freeform', followFrame(editor.template, block.id, appFrame));
+      },
+      onUnlink: () => editor.commit('Unlink from Freeform', unlinkFrame(editor.template, block.id)),
+      onOpen: openFreeformApp,
+    };
+  }, [editor, appFrame, allAssets, prints, openFreeformApp]);
+
+  // With no folder open the email lives only in this tab. Leaving the page — or a browser that opens
+  // Freeform or Riso in this tab rather than a new one — would lose it, so the browser asks first.
+  useEffect(() => {
+    if (workspace || !editor.canUndo) return;
+    const onLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [workspace, editor.canUndo]);
+
   const rasteriseBlock = useCallback(
     async (blockId: string) => {
       const doc = frame.current?.contentDocument;
@@ -1090,7 +1256,7 @@ export function App() {
         const shot =
           printed?.type === 'freeform' && printed.effects?.length
             ? await (async () => {
-                const canvas = await freeformCanvas(printed, designSystemOf(editor.template), { assets, scale: 2, ground });
+                const canvas = await freeformCanvas(printed, designSystemOf(editor.template), { assets: allAssets, scale: 2, ground });
                 const blob = await canvasBlob(canvas);
                 return { blob, url: URL.createObjectURL(blob), width: printed.width, height: printed.height };
               })()
@@ -1143,7 +1309,7 @@ export function App() {
         setRasterising(false);
       }
     },
-    [editor, workspace, notify, refreshAssets, failed, assets],
+    [editor, workspace, notify, refreshAssets, failed, allAssets],
   );
 
   const exportTemplate = useCallback(async () => {
@@ -1514,7 +1680,7 @@ export function App() {
             <Surface
               editor={editor}
               blockId={surfaceOf}
-              assets={assets}
+              assets={allAssets}
               layer={selectedLayer}
               onSelectLayer={setSelectedLayer}
               onDone={() => setSurfaceOf(null)}
@@ -1695,7 +1861,7 @@ export function App() {
             onRasterise={rasteriseBlock}
             rasterising={rasterising}
             onSpacingHot={setSpacingHot}
-            freeform={{ layer: selectedLayer, onSelectLayer: setSelectedLayer, drawing, onDrawing: setDrawing, open: Boolean(surfaceOf), onEnter: enterSurface }}
+            freeform={{ layer: selectedLayer, onSelectLayer: setSelectedLayer, drawing, onDrawing: setDrawing, open: Boolean(surfaceOf), onEnter: enterSurface, app: freeformApp }}
             {...(patternInfo ? { patternInfo } : {})}
             multi={{
               count: selectedIds.length,
