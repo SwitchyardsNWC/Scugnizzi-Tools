@@ -1,0 +1,17 @@
+<!-- @dsCard group="Components" viewport="820x700" name="Panels, gates & empties" subtitle="Panel inspector, Refusal, EmptyState, Progress, KpiStrip" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script><script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script><script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script><style>body{padding:16px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Panel, PanelSection, Field, Refusal, EmptyState, Progress, Kpi, KpiStrip, Button, TextLink, LivesIn, DateStamp, StatusBadge } = window.ArtVentoryDesignSystem_f8dda9;
+ReactDOM.createRoot(document.getElementById('root')).render(<div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:16,fontFamily:'var(--font-helveticaneue)',alignItems:'start'}}>
+<div style={{display:'flex',flexDirection:'column',gap:16}}>
+<KpiStrip columns={4}><Kpi value="7" label="Active"/><Kpi value="2" label="Due this month"/><Kpi value="1" label="Blocked" tone="blocked"/><Kpi value="38" label="Open checklist items" hint="9 required"/></KpiStrip>
+<Progress done={9} total={14} required={2}/><Progress done={6} total={6} required={0}/>
+<Refusal title="2 required items block Design" action={<TextLink href="#" arrow>Show them</TextLink>}><span>Signage plan — not yet linked</span><span>Materials board — not yet linked</span></Refusal>
+<Refusal tone="short" title="Warehouse has 0 free in bin L-08 — this leaves you 2 short" action={<Button size="sm" variant="outline">Switch to purchase</Button>}/>
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><EmptyState ratio="16 / 9" what="Floor plan goes here" action={<Button size="sm" variant="outline">Add plan</Button>}/><EmptyState compact what="No photos yet" action={<TextLink href="#" arrow>Upload</TextLink>}/></div>
+</div>
+<Panel kicker="Checklist item · Concept" title="Signage plan" onClose={()=>{}} footer={<><Button size="sm">Mark done</Button><Button size="sm" variant="ghost">Skip</Button></>} style={{height:398}}>
+<PanelSection title="Lives in"><LivesIn kind="frame" label="Signage plan (board)"/><LivesIn kind="page" label="Concept doc · p.3"/></PanelSection>
+<PanelSection title="Details"><Field label="Status"><StatusBadge status="progress"/></Field><Field label="Owner">Jared</Field><Field label="Due"><DateStamp date="2026-09-12" now="2026-09-04" clock="phase"/></Field><Field label="Required">Yes</Field></PanelSection>
+</Panel></div>);
+</script></body></html>

@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ink Bleed</title>
+<style>
+  :root{
+    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
+    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
+  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
+  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
+  .sub{margin:0 0 18px;color:var(--muted)}
+  /* Collapsible panels: top-level sections, sub-panels inside the layer editor, and a third level for fine control. */
+  details.panel{border-top:1px solid var(--line)}
+  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+  details.panel>summary::-webkit-details-marker{display:none}
+  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
+  details.panel[open]>summary::before{transform:rotate(45deg)}
+  details.panel>summary:hover{color:var(--text)}
+  details.panel>summary .t{flex:1}
+  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  details.panel>.body{padding:0 0 10px}
+  details.sub{border:1px solid var(--line);border-radius:6px;margin:8px 0;background:rgba(255,255,255,.015)}
+  details.sub>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;font-size:12.5px;font-weight:600}
+  details.sub>summary::-webkit-details-marker{display:none}
+  details.sub>summary::before{content:"";width:5px;height:5px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:0 0 5px;margin-left:1px}
+  details.sub[open]>summary::before{transform:rotate(45deg)}
+  details.sub>summary .t{flex:1}
+  details.sub>summary .v{color:var(--muted);font-weight:400;font-size:11.5px;font-family:ui-monospace,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+  details.sub>.body{padding:0 10px 8px}
+  details.sub2>summary{list-style:none;cursor:pointer;color:var(--muted);font-size:12px;padding:6px 0;user-select:none}
+  details.sub2>summary::-webkit-details-marker{display:none}
+  details.sub2>summary .t::before{content:"▸ "}
+  details.sub2[open]>summary .t::before{content:"▾ "}
+  details.sub2>summary:hover{color:var(--text)}
+  textarea{width:100%;resize:vertical;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;
+    padding:8px 10px;font:12.5px/1.45 "Courier New",Courier,monospace;outline:none}
+  textarea:focus,select:focus,input:focus{border-color:#4a4a50}
+  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .row>label{flex:0 0 78px;color:var(--muted)}
+  .row select,.row input[type=number],.row input[type=text]{flex:1;min-width:0;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
+  .row input[type=number]{width:64px;flex:0 1 72px}
+  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
+  button,select.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;
+    font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:#55555c}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.06)}
+  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
+  .seg{display:flex;flex:1}
+  .seg button{flex:1;border-radius:0;padding:5px 0}
+  .seg button:first-child{border-radius:5px 0 0 5px}
+  .seg button:last-child{border-radius:0 5px 5px 0}
+  .seg button.on{background:#3a3a40;color:#fff}
+  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
+  .slider label{color:var(--text)}
+  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
+  .master{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px 8px;margin-bottom:6px}
+  .master .slider label{font-weight:600}
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
+  .presets button small{display:block;color:var(--muted);font-size:11px}
+  .presets button.on{border-color:var(--accent);color:#fff}
+  /* Layer list */
+  #layerList{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+  .lrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:pointer}
+  .lrow:hover{border-color:#55555c}
+  .lrow.on{border-color:var(--sel)}
+  .lrow .kind{flex:0 0 18px;height:18px;border-radius:4px;background:#3a3a40;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:18px}
+  .lrow .kind.svg{background:#5b4a86}
+  .lrow .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lrow .x{color:var(--muted);padding:0 4px}
+  .lrow .x:hover{color:#f0b0b0}
+  .addrow{display:flex;gap:6px}
+  .addrow button,.addrow select{flex:1}
+  .addrow .icon{flex:0 0 32px}
+  main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+  .topbar .spacer{flex:1}
+  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
+  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  .stage.fit{overflow:hidden}
+  .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
+  .stage:not(.fit){display:block}
+  .stage:not(.fit) canvas{display:block;margin:0 auto}
+  .stage.dropping::after{content:"Drop .svg to add a stamp";position:absolute;inset:12px;border:2px dashed var(--sel);border-radius:10px;
+    display:flex;align-items:center;justify-content:center;color:#cfe0ff;background:rgba(59,130,246,.12);pointer-events:none}
+  canvas{filter:drop-shadow(0 18px 28px rgba(0,0,0,.6)) drop-shadow(0 2px 4px rgba(0,0,0,.45));background:transparent}
+  #overlay{position:absolute;pointer-events:none}
+  .tb{position:absolute;pointer-events:auto;cursor:move;border:1px dashed transparent;border-radius:2px;transform-origin:50% 50%}
+  .tb:hover,.tb.drag,.tb.sel{border-color:var(--sel)}
+  .tb.sel{border-style:solid;border-color:rgba(59,130,246,.55)}
+  .tb .tag{position:absolute;left:-1px;top:-18px;background:var(--sel);color:#fff;font-size:10px;line-height:14px;padding:0 5px;border-radius:3px;display:none;user-select:none;white-space:nowrap}
+  .tb:hover .tag,.tb.drag .tag{display:block}
+  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+  .actions{display:flex;flex-direction:column;gap:6px}
+  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
+  .warn{color:#e0a15a}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
+    aside{max-height:50vh}
+    .footer{grid-template-columns:1fr}
+    .actions{flex-direction:row;flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+<script src="../tool-banner.js" data-tool="Ink bleed"></script>
+<script src="../tool-kit.js"></script>
+<div class="app">
+  <aside>
+    <h1>Ink Bleed</h1>
+    <p class="sub">Type on a card or page, then push the ink and paper around.</p>
+
+    <details class="panel" data-panel="layers" open>
+      <summary><span class="t">Layers</span><span class="v" id="hint-layers"></span></summary>
+      <div class="body">
+        <div id="layerList"></div>
+        <div class="addrow">
+          <button id="addText">+ Text</button>
+          <select id="stampSel" class="btn"><option value="">+ Stamp…</option></select>
+          <button id="rescan" class="icon" title="Re-read the assets folder">↻</button>
+        </div>
+        <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
+        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (↻ after adding files), or drop an .svg onto the paper.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="edit" open>
+      <summary><span class="t">Editing</span><span class="v" id="editName"></span></summary>
+      <div class="body">
+        <div id="textContent">
+          <textarea id="layerText" rows="7" spellcheck="false" placeholder="Type here"></textarea>
+          <p class="hint">__double underscores__ underline. Leading spaces are kept, so you can indent by hand.</p>
+        </div>
+        <div id="svgContent">
+          <div class="row"><label>Stamp</label><select id="assetSel"></select></div>
+        </div>
+
+        <details class="sub" data-panel="type" open>
+          <summary><span class="t">Type</span><span class="v" id="hint-type"></span></summary>
+          <div class="body">
+            <div class="row" id="fontRow"><label>Font</label><select id="fontSel"></select></div>
+            <div class="row" id="customFontRow" hidden><label>Family</label><input type="text" id="customFont" placeholder="Any installed font name"></div>
+            <div class="row" id="alignRow"><label>Align</label><div class="seg" id="alignSeg"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div></div>
+            <div class="row"><label>Ink color</label><input type="color" id="inkColor"></div>
+            <div id="textSliders"></div>
+            <div id="svgSliders"></div>
+            <div id="commonSliders"></div>
+          </div>
+        </details>
+        <details class="sub" data-panel="bleed">
+          <summary><span class="t">Ink bleed</span><span class="v" id="hint-bleed"></span></summary>
+          <div class="body">
+            <div class="master" id="bleedMaster"></div>
+            <details class="sub2" data-panel="bleedfine"><summary><span class="t">Fine control</span></summary><div class="body" id="bleedSliders"></div></details>
+          </div>
+        </details>
+        <details class="sub" data-panel="stamp">
+          <summary><span class="t">Stamp</span><span class="v" id="hint-stamp"></span></summary>
+          <div class="body" id="stampSliders"></div>
+        </details>
+        <details class="sub" data-panel="copy">
+          <summary><span class="t">Photocopy</span><span class="v" id="hint-copy"></span></summary>
+          <div class="body" id="copySliders"></div>
+        </details>
+        <div class="row" style="margin-top:12px"><label></label><button id="delLayer" class="danger">Delete layer</button></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="looks">
+      <summary><span class="t">Looks</span><span class="v" id="hint-looks"></span></summary>
+      <div class="body">
+        <div class="presets" id="presets"></div>
+        <p class="hint">A look restyles every layer and the paper. Text, positions and canvas stay put, except Receipt, which also switches to receipt paper.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="canvas">
+      <summary><span class="t">Canvas</span><span class="v" id="hint-canvas"></span></summary>
+      <div class="body">
+        <div class="row"><label>Size</label><select id="sizeSel"></select><button id="rotate" title="Swap width and height">⟳</button></div>
+        <div class="row" id="customRow" hidden><label>Inches</label><input type="number" id="wIn" step="0.25" min="0.5" max="24"> <span class="hint">×</span> <input type="number" id="hIn" step="0.25" min="0.5" max="24"></div>
+        <div class="row"><label>Resolution</label><select id="dpiSel"></select></div>
+        <div id="canvasSliders"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="paper">
+      <summary><span class="t">Paper</span><span class="v" id="hint-paper"></span></summary>
+      <div class="body">
+        <div class="row"><label>Paper color</label><input type="color" id="paperColor"></div>
+        <div id="paperSliders"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="random">
+      <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
+      <div class="body">
+        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <p class="hint">The seed drives jitter, grain, tears and specks. Same seed, same result.</p>
+      </div>
+    </details>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span id="meta"></span>
+      <span class="spacer"></span>
+      <label>Zoom <select id="zoomSel">
+        <option value="fit">Fit</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option>
+      </select></label>
+    </div>
+    <div class="stage fit" id="stage"><canvas id="canvas" width="600" height="1050"></canvas><div id="overlay"></div></div>
+    <div class="footer">
+      <div class="actions">
+        <button id="download" class="primary">Download PNG</button>
+        <button id="downloadGif" title="Six frames, each with a different random seed, looping">Download GIF</button>
+        <button id="previewGif" title="Render the six frames and loop them here before saving">Preview GIF</button>
+        <button id="copyImg">Copy image</button>
+        <button id="copyRecipe">Copy recipe</button>
+      </div>
+      <pre id="recipe"></pre>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- State ----------
+const DEFAULT_TEXT = `(continued:)
+
+INT. STUDIO - NIGHT:
+A cramped office above
+a laundromat on Laight
+Street.
+
+A DOOR opens and a
+PRODUCER enters,
+curly-haired and
+unfussy.
+
+       PRODUCER
+   Want to get hold of
+   me? Leave a note
+   under the door. But
+   that's strictly
+   entre-nous. OK?
+
+He tosses a ROLL-NECK
+SWEATER onto the SOFA.
+
+(continued:)`;
+
+const BLEED_DEFAULT = { master: 45, spread: 0.6, weight: 0.45, rough: 0.35, soft: 0.5, fade: 0.25, grit: 0.3, smudge: 0 };
+const COPY_DEFAULT = { elong: 0.1, jitter: 0.25 };
+const TEXT_LAYER = { kind: 'text', text: '', x: 0, y: 0, size: 8.5, align: 'left', font: 'courier', customFont: '', lineHeight: 1.2, letterSpacing: 0,
+  rotation: 0, jitter: 0.3, jitterRot: 0.6, strikeVar: 0.35, inkColor: '#221f1c', stamp: 0, bleed: { ...BLEED_DEFAULT }, copy: { ...COPY_DEFAULT } };
+const SVG_LAYER = { kind: 'svg', asset: '', x: 0.2, y: 0.2, w: 1, rotation: 0, inkColor: '#221f1c', stamp: 0, bleed: { ...BLEED_DEFAULT }, copy: { ...COPY_DEFAULT } };
+const PAPER_DEFAULT = { color: '#f3f2ee', grain: 0.3, tear: 0.15, receipt: 0, dust: 0.1, streaks: 0.2, speckle: 0.15 };
+
+let nextId = 1;
+const newLayer = (base, over) => structuredClone({ ...base, ...over, bleed: { ...base.bleed, ...(over.bleed || {}) }, copy: { ...base.copy, ...(over.copy || {}) }, id: nextId++ });
+
+const state = {
+  layers: [newLayer(TEXT_LAYER, { text: DEFAULT_TEXT })],
+  selected: 1,
+  wIn: 2, hIn: 3.5, dpi: 300, marginTopIn: 0.2, marginSideIn: 0.2, zoom: 'fit',
+  paper: { ...PAPER_DEFAULT },
+  seed: 1
+};
+const sel = () => state.layers.find(l => l.id === state.selected) || null;
+const DEFAULT_STATE = JSON.parse(JSON.stringify(state));
+
+// [label, width in, height in, forced dpi]
+const SIZES = {
+  'bc-p': ['Business card · 2 × 3.5 in', 2, 3.5],
+  'bc-l': ['Business card · 3.5 × 2 in', 3.5, 2],
+  'receipt': ['Receipt · 3.15 × 8 in', 3.15, 8, 200],
+  'index': ['Index card · 5 × 3 in', 5, 3],
+  'postcard': ['Postcard · 6 × 4 in', 6, 4],
+  'square': ['Square · 4 × 4 in', 4, 4],
+  'half': ['Half letter · 5.5 × 8.5 in', 5.5, 8.5],
+  'letter': ['Letter · 8.5 × 11 in', 8.5, 11],
+  'a4': ['A4 · 8.27 × 11.69 in', 8.27, 11.69],
+  'social': ['Social 9:16 · 1080 × 1920 px', 7.2, 12.8, 150],
+  'social-sq': ['Social square · 1080 × 1080 px', 7.2, 7.2, 150],
+  'custom': ['Custom…', null, null]
+};
+const DPIS = [72, 96, 150, 200, 300];
+const FONTS = {
+  courier: ['Courier', '"Courier Prime","Courier New",Courier,monospace'],
+  typewriter: ['American Typewriter', '"American Typewriter","Courier New",monospace'],
+  times: ['Times', '"Times New Roman",Times,serif'],
+  helvetica: ['Helvetica', 'Helvetica,Arial,sans-serif'],
+  georgia: ['Georgia', 'Georgia,"Times New Roman",serif'],
+  custom: ['Custom…', '']
+};
+
+// A look: `text` applies to text layers, `all` to every layer, `paper` to the sheet, `canvas` optional.
+const PRESETS = [
+  { name: 'Photocopied', desc: 'soft spread, light copier drift',
+    text: { font: 'courier', jitter: 0.3, jitterRot: 0.6, strikeVar: 0.35 },
+    all: { inkColor: '#221f1c', bleed: { ...BLEED_DEFAULT }, copy: { ...COPY_DEFAULT } },
+    paper: { ...PAPER_DEFAULT } },
+  { name: 'Fax transmission', desc: 'hard toner, scan jitter, streaks',
+    text: { font: 'courier', jitter: 0.1, jitterRot: 0.2, strikeVar: 0.15 },
+    all: { inkColor: '#111111', bleed: { master: 55, spread: 0.7, weight: 0.35, rough: 0.65, soft: 0.25, fade: 0.1, grit: 0.5, smudge: 0 }, copy: { elong: 0.3, jitter: 0.7 } },
+    paper: { color: '#f7f7f5', grain: 0.35, tear: 0, receipt: 0, dust: 0.05, streaks: 0.5, speckle: 0.45 } },
+  { name: 'Fresh ribbon', desc: 'clean strike, clean paper',
+    text: { font: 'courier', jitter: 0.15, jitterRot: 0.3, strikeVar: 0.2 },
+    all: { inkColor: '#1a1a1a', bleed: { master: 12, spread: 0.2, weight: 0.35, rough: 0.1, soft: 0.15, fade: 0.05, grit: 0.1, smudge: 0 }, copy: { elong: 0, jitter: 0 } },
+    paper: { color: '#faf8f3', grain: 0.15, tear: 0, receipt: 0, dust: 0, streaks: 0, speckle: 0 } },
+  { name: 'Receipt', desc: 'thermal print, torn from the printer',
+    canvas: [3.15, 8, 200],
+    text: { font: 'courier', jitter: 0.05, jitterRot: 0, strikeVar: 0.2 },
+    all: { inkColor: '#2b2f36', bleed: { master: 25, spread: 0.3, weight: 0.3, rough: 0.2, soft: 0.3, fade: 0.45, grit: 0.35, smudge: 0 }, copy: { elong: 0, jitter: 0.15 } },
+    paper: { color: '#f6f5f1', grain: 0.2, tear: 0, receipt: 0.6, dust: 0.03, streaks: 0.15, speckle: 0.05 } },
+];
+
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+// Paths starting with "L." address the selected layer.
+function resolve(p) { if (p.startsWith('L.')) return [sel(), p.slice(2)]; return [state, p]; }
+function getPath(p) { const [o, q] = resolve(p); return o ? q.split('.').reduce((a, k) => a == null ? a : a[k], o) : undefined; }
+function setPath(p, v) { const [o0, q] = resolve(p); if (!o0) return; const ks = q.split('.'); let o = o0; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; }
+const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const trim0 = s => s.replace(/\.?0+$/, '');
+const fmt = {
+  pt: v => trim0(v.toFixed(2)) + ' pt', pct: v => Math.round(v * 100) + '%', deg: v => v.toFixed(1) + '°',
+  int: v => String(Math.round(v)), in: v => trim0(v.toFixed(2)) + ' in', x: v => trim0(v.toFixed(2)) + '×'
+};
+function fontFamily(L) { return L.font === 'custom' ? `"${L.customFont || 'Courier New'}",monospace` : FONTS[L.font][1]; }
+function fontLabel(L) { return L.font === 'custom' ? (L.customFont || 'Courier New') : FONTS[L.font][0]; }
+function layerName(L) {
+  if (L.kind === 'svg') return (L.asset.split('/').pop() || 'Stamp').replace(/^blob:.*$/, 'Dropped SVG');
+  const t = L.text.trim().split('\n').find(s => s.trim()) || '';
+  return t ? (t.trim().length > 22 ? t.trim().slice(0, 22) + '…' : t.trim()) : 'Text';
+}
+
+// ---------- Noise ----------
+function valueNoise(w, h, cell, rng, linear) {
+  const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2;
+  const g = new Float32Array(gw * gh); for (let i = 0; i < g.length; i++) g[i] = rng();
+  const out = new Float32Array(w * h);
+  const ixs = new Int32Array(w), fxs = new Float32Array(w);
+  for (let x = 0; x < w; x++) { const u = x / cell, i = Math.floor(u), f = u - i; ixs[x] = i; fxs[x] = linear ? f : f * f * (3 - 2 * f); }
+  for (let y = 0; y < h; y++) {
+    const v = y / cell, j = Math.floor(v); let f = v - j; if (!linear) f = f * f * (3 - 2 * f);
+    const r0 = j * gw, r1 = r0 + gw, o = y * w;
+    for (let x = 0; x < w; x++) {
+      const i = ixs[x], fx = fxs[x];
+      const a = g[r0 + i], b = g[r0 + i + 1], c = g[r1 + i], d = g[r1 + i + 1];
+      const top = a + (b - a) * fx, bot = c + (d - c) * fx;
+      out[o + x] = top + (bot - top) * f;
+    }
+  }
+  return out;
+}
+function noise1D(len, cell, rng) {
+  const g = new Float32Array(Math.ceil(len / cell) + 2); for (let i = 0; i < g.length; i++) g[i] = rng();
+  const out = new Float32Array(len);
+  for (let x = 0; x < len; x++) { const u = x / cell, i = Math.floor(u); let f = u - i; f = f * f * (3 - 2 * f); out[x] = g[i] + (g[i + 1] - g[i]) * f; }
+  return out;
+}
+const cl = (i, n) => i < 0 ? 0 : (i >= n ? n - 1 : i);
+function boxH(s, d, w, h, r) {
+  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
+  for (let y = 0; y < h; y++) {
+    const o = y * w; let sum = 0;
+    for (let k = -ri; k <= ri; k++) sum += s[o + cl(k, w)];
+    for (let x = 0; x < w; x++) {
+      d[o + x] = (sum + fr * (s[o + cl(x - ri - 1, w)] + s[o + cl(x + ri + 1, w)])) * norm;
+      sum += s[o + cl(x + ri + 1, w)] - s[o + cl(x - ri, w)];
+    }
+  }
+}
+function boxV(s, d, w, h, r) {
+  const ri = Math.floor(r), fr = r - ri, norm = 1 / (2 * ri + 1 + 2 * fr);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let k = -ri; k <= ri; k++) sum += s[cl(k, h) * w + x];
+    for (let y = 0; y < h; y++) {
+      d[y * w + x] = (sum + fr * (s[cl(y - ri - 1, h) * w + x] + s[cl(y + ri + 1, h) * w + x])) * norm;
+      sum += s[cl(y + ri + 1, h) * w + x] - s[cl(y - ri, h) * w + x];
+    }
+  }
+}
+function blurField(a, w, h, r, passes) {
+  if (r < 0.2) return a;
+  let src = a, tmp = new Float32Array(a.length), dst = new Float32Array(a.length);
+  for (let p = 0; p < passes; p++) { boxH(src, tmp, w, h, r); boxV(tmp, dst, w, h, r); const t = src; src = dst; dst = (t === a) ? new Float32Array(a.length) : t; }
+  return src;
+}
+const IV = 1 / 255;
+function q8(a) { const o = new Uint8Array(a.length); for (let i = 0; i < a.length; i++) { const v = a[i] * 255 + 0.5; o[i] = v < 0 ? 0 : v > 255 ? 255 : v; } return o; }
+function normalizeSD(a, targetSD) {
+  let mean = 0, sq = 0; const n = a.length;
+  for (let i = 0; i < n; i++) { mean += a[i]; sq += a[i] * a[i]; }
+  mean /= n; const sd = Math.sqrt(Math.max(1e-9, sq / n - mean * mean)), sc = targetSD / sd;
+  for (let i = 0; i < n; i++) { const v = 0.5 + (a[i] - mean) * sc; a[i] = v < 0 ? 0 : v > 1 ? 1 : v; }
+  return a;
+}
+function buildFields(w, h) {
+  const s = state.seed, k = state.dpi / 72, n = w * h, c = v => Math.max(2, v * k);
+  const Gf = new Float32Array(n); const r1 = mulberry32(s * 1000 + 11); for (let i = 0; i < n; i++) Gf[i] = r1();
+  const R = normalizeSD(blurField(Gf, w, h, Math.max(0.6, 0.55 * k), 1), 0.26);
+  const LA = valueNoise(w, h, c(6), mulberry32(s * 1000 + 21));
+  const LC = valueNoise(w, h, c(14), mulberry32(s * 1000 + 41));
+  const LS = valueNoise(w, h, c(1.6), mulberry32(s * 1000 + 51));                  // fine blotch field for stamping
+  const T1 = valueNoise(w, h, c(30), mulberry32(s * 1000 + 91)), T2 = valueNoise(w, h, c(8), mulberry32(s * 1000 + 92)), T3 = valueNoise(w, h, c(2), mulberry32(s * 1000 + 93), true);
+  for (let i = 0; i < n; i++) T1[i] = 0.45 * T1[i] + 0.3 * T2[i] + 0.25 * T3[i];
+  return { w, h, G: q8(Gf), R: q8(R), LA: q8(LA), LC: q8(LC), LS: q8(LS), T: q8(T1) };
+}
+// Paper darkness decides which way "wear" goes: light sheets get darker toner, dust and burn;
+// dark sheets get chalky specks, pale worn edges and light streaks.
+const lum = hex => { const [r, g, b] = hexToRgb(hex); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+const isDark = hex => lum(hex) < 0.45;
+const invertHex = hex => '#' + hexToRgb(hex).map(c => (255 - c).toString(16).padStart(2, '0')).join('');
+
+// ---------- Assets (SVG stamps) ----------
+const FALLBACK_ASSETS = ['SY.svg', 'ica.svg', 'nwca.svg', 'scgnzi.svg'];
+let assets = [];                       // [{name, url}]
+const imgCache = new Map();
+function getImage(url) {
+  if (!url) return null;
+  let img = imgCache.get(url);
+  if (!img) {
+    img = new Image(); imgCache.set(url, img);
+    img.onload = () => { for (const L of state.layers) if (L.kind === 'svg' && L.asset === url) dirtyLayers.add(L.id); invalidate(); };
+    img.src = url;
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
+async function loadAssets() {
+  let names = null;
+  try { const r = await fetch('assets/index.json?' + Date.now()); if (r.ok) names = await r.json(); } catch (e) {}
+  if (!names) names = FALLBACK_ASSETS;
+  const dropped = assets.filter(a => a.url.startsWith('blob:'));
+  assets = names.map(n => ({ name: n, url: 'assets/' + n })).concat(dropped);
+  fillAssetSelects();
+}
+function fillAssetSelects() {
+  const stamp = $('#stampSel'), cur = $('#assetSel');
+  stamp.innerHTML = '<option value="">+ Stamp…</option>' + assets.map(a => `<option value="${a.url}">${a.name}</option>`).join('') + '<option value="__file">Choose .svg file…</option>';
+  cur.innerHTML = assets.map(a => `<option value="${a.url}">${a.name}</option>`).join('');
+  const L = sel(); if (L && L.kind === 'svg') cur.value = L.asset;
+}
+function addDroppedSvg(file) {
+  const url = URL.createObjectURL(file);
+  assets.push({ name: file.name, url }); fillAssetSelects();
+  addLayer(newLayer(SVG_LAYER, { asset: url, w: Math.min(1.2, state.wIn * 0.4) }));
+}
+
+// ---------- Text layout & raster ----------
+const tc = document.createElement('canvas'), tctx = tc.getContext('2d', { willReadFrequently: true });
+const dc = document.createElement('canvas'), dctx = dc.getContext('2d', { willReadFrequently: true });
+
+function layout(ctx, text, maxW, ls) {
+  const cache = new Map();
+  const adv = ch => { let a = cache.get(ch); if (a === undefined) { a = ctx.measureText(ch).width + ls; cache.set(ch, a); } return a; };
+  const out = [];
+  for (const raw of text.replace(/\t/g, '    ').split('\n')) {
+    const glyphs = []; let u = false;
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '_' && raw[i + 1] === '_') { u = !u; i++; continue; }
+      glyphs.push({ ch: raw[i], u, adv: adv(raw[i]) });
+    }
+    if (!glyphs.length) { out.push({ glyphs: [], width: 0 }); continue; }
+    let indent = []; for (const g of glyphs) { if (g.ch !== ' ') break; indent.push({ ...g, u: false }); }
+    let indentW = indent.reduce((s, g) => s + g.adv, 0); if (indentW > maxW * 0.6) { indent = []; indentW = 0; }
+    let line = [], lw = 0, i = 0;
+    const flush = () => {
+      while (line.length && line[line.length - 1].ch === ' ') lw -= line.pop().adv;
+      out.push({ glyphs: line, width: lw });
+      line = indent.map(g => ({ ...g })); lw = indent.length ? indentW : 0;
+    };
+    while (i < glyphs.length) {
+      let j = i; const isSpace = glyphs[i].ch === ' ';
+      while (j < glyphs.length && (glyphs[j].ch === ' ') === isSpace) j++;
+      const tok = glyphs.slice(i, j); let tw = 0; for (const g of tok) tw += g.adv;
+      if (!isSpace && lw > indentW && lw + tw > maxW) flush();
+      if (!isSpace && tw > maxW - indentW) {
+        for (const g of tok) { if (lw + g.adv > maxW && lw > indentW) flush(); line.push(g); lw += g.adv; }
+      } else { for (const g of tok) line.push(g); lw += tw; }
+      i = j;
+    }
+    flush();
+  }
+  return out;
+}
+
+// Layer box in canvas pixels. Positions are relative to the margin box; rotation is about the box centre.
+function layerGeom(L, w) {
+  const dpi = state.dpi, k = dpi / 72;
+  const ox = (state.marginSideIn + L.x) * dpi, oy = (state.marginTopIn + L.y) * dpi, right = w - state.marginSideIn * dpi;
+  if (L.kind === 'svg') {
+    const img = getImage(L.asset), wpx = Math.max(4, L.w * dpi), hpx = wpx * (img ? img.naturalHeight / img.naturalWidth : 1);
+    return { ox, oy, bw: wpx, bh: hpx, img };
+  }
+  const px = L.size * k, lineH = px * L.lineHeight, ls = L.letterSpacing * k, maxW = Math.max(px, right - ox);
+  tctx.font = `${px}px ${fontFamily(L)}`;
+  const lines = layout(tctx, L.text, maxW, ls);
+  return { ox, oy, bw: maxW, bh: Math.max(1, lines.length) * lineH, px, lineH, ls, lines };
+}
+
+// Shape layer (black, thickened) and, for text, a density layer with per-glyph strike strength.
+function rasterLayer(L, w, h) {
+  tc.width = w; tc.height = h;
+  const ctx = tctx, dpi = state.dpi, k = dpi / 72, g = layerGeom(L, w), spreadPx = L.bleed.spread * k;
+  const cx = g.ox + g.bw / 2, cy = g.oy + g.bh / 2, rot = L.rotation * Math.PI / 180;
+  const ink = new Float32Array(w * h);
+  if (L.kind === 'svg') {
+    if (!g.img) return { ink, dens: null };
+    ctx.clearRect(0, 0, w, h);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(-cx, -cy);
+    const lw = L.bleed.weight * 1.5 * k + spreadPx * 0.9;          // poor man's dilation: ring of offset copies
+    ctx.drawImage(g.img, g.ox, g.oy, g.bw, g.bh);
+    if (lw > 0.3) for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; ctx.drawImage(g.img, g.ox + Math.cos(t) * lw / 2, g.oy + Math.sin(t) * lw / 2, g.bw, g.bh); }
+    ctx.restore();
+    const d = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 0; i < ink.length; i++) ink[i] = d[i * 4 + 3] / 255;
+    return { ink, dens: null };
+  }
+  dc.width = w; dc.height = h;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); dctx.fillStyle = '#fff'; dctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const { px, ox, oy, bw: maxW, lineH, ls, lines } = g;
+  ctx.font = `${px}px ${fontFamily(L)}`;
+  const lw = L.bleed.weight * 0.09 * px + spreadPx * 0.9; ctx.lineWidth = lw;
+  const jit = L.jitter * k, jrot = L.jitterRot * Math.PI / 180, sv = L.strikeVar, rng = mulberry32(state.seed * 7 + L.id * 101);
+  ctx.save(); dctx.save();
+  ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(-cx, -cy); dctx.translate(cx, cy); dctx.rotate(rot); dctx.translate(-cx, -cy);
+  const underline = (x0, x1, y) => { const t = Math.max(1, px * 0.055) + lw; ctx.fillRect(x0, y + px * 0.19 - lw / 2, x1 - x0, t); };
+  let y = oy + px * 0.85;
+  for (const line of lines) {
+    if (y > h + px) break;
+    let x = L.align === 'left' ? ox : L.align === 'center' ? ox + (maxW - line.width) / 2 : ox + maxW - line.width;
+    let uStart = null;
+    for (const gl of line.glyphs) {
+      if (gl.ch !== ' ') {
+        const dx = (rng() - 0.5) * 2 * jit, dy = (rng() - 0.5) * 2 * jit * 0.7, a = 1 - sv * Math.pow(rng(), 1.5) * 0.85, rr = (rng() - 0.5) * 2 * jrot;
+        ctx.save(); ctx.translate(x + dx, y + dy); ctx.rotate(rr); ctx.fillText(gl.ch, 0, 0); if (lw > 0.05) ctx.strokeText(gl.ch, 0, 0); ctx.restore();
+        const v = Math.round(a * 255); dctx.fillStyle = `rgb(${v},${v},${v})`;
+        dctx.fillRect(x + dx - lw - 1, y + dy - px * 1.05 - lw, gl.adv + 2 * lw + 2, px * 1.5 + 2 * lw);
+      }
+      if (gl.u) { if (uStart === null) uStart = x; } else if (uStart !== null) { underline(uStart, x - ls, y); uStart = null; }
+      x += gl.adv;
+    }
+    if (uStart !== null) underline(uStart, x - ls, y);
+    y += lineH;
+  }
+  ctx.restore(); dctx.restore();
+  const d = ctx.getImageData(0, 0, w, h).data; for (let i = 0; i < ink.length; i++) ink[i] = 1 - d[i * 4] / 255;
+  const dd = dctx.getImageData(0, 0, w, h).data, dens = new Float32Array(w * h); for (let i = 0; i < dens.length; i++) dens[i] = dd[i * 4] / 255;
+  return { ink, dens };
+}
+
+// ---------- Ink pipeline (per layer) ----------
+function stamp(ink, w, h, cx, cy, r, al) {
+  const rr = r + 0.5;
+  const y0 = Math.max(0, Math.floor(cy - rr)), y1 = Math.min(h - 1, Math.ceil(cy + rr));
+  const x0 = Math.max(0, Math.floor(cx - rr)), x1 = Math.min(w - 1, Math.ceil(cx + rr));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); if (d >= rr) continue;
+    const v = al * (1 - d / rr), i = y * w + x; if (v > ink[i]) ink[i] = v;
+  }
+}
+// Photocopier feed: rows are re-sampled. Elongation stretches at a drifting rate; scan jitter shifts
+// rows sideways, thins some rows into dropout lines and adds fine horizontal toner banding.
+function photocopyRows(ink, w, h, L) {
+  const P = L.copy, k = state.dpi / 72;
+  L._rowMap = null;
+  if (P.elong <= 0 && P.jitter <= 0) return ink;
+  const rng = mulberry32(state.seed * 313 + 9 + L.id);
+  const drift = noise1D(h, Math.max(4, 36 * k), rng), bands = noise1D(h, Math.max(2, 3 * k), rng), tone = noise1D(h, Math.max(1.5, 1.2 * k), rng);
+  const out = new Float32Array(w * h), rowMap = new Float32Array(h + 1).fill(h);
+  // Elongation is anchored at this layer's top edge, so the layer stretches in place instead of sliding down the page.
+  const g = layerGeom(L, w), rot = L.rotation * Math.PI / 180, halfH = (g.bh * Math.abs(Math.cos(rot)) + g.bw * Math.abs(Math.sin(rot))) / 2;
+  const anchor = Math.max(0, Math.min(h - 1, Math.round(g.oy + g.bh / 2 - halfH)));
+  let src = 0;
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.floor(src), fy = src - y0;
+    if (y0 < h && rowMap[y0] === h) rowMap[y0] = y;
+    const stretch = y < anchor ? 1 : 1 + 1.1 * P.elong * (0.5 + drift[y]);
+    let shift = P.jitter * ((rng() - 0.5) * 2 * 1.0 * k + (bands[y] - 0.5) * 2 * 2.5 * k);
+    if (rng() < 0.02 * P.jitter) shift += (rng() - 0.5) * 10 * k;
+    let dens = 1 - 0.35 * P.jitter * Math.max(0, tone[y] - 0.5) * 2;
+    if (rng() < 0.012 * P.jitter) dens *= 0.35;
+    src += 1 / stretch;
+    if (y0 >= h - 1) break;
+    const r0 = y0 * w, r1 = (y0 + 1) * w, o = y * w;
+    for (let x = 0; x < w; x++) {
+      const sx = x - shift, x0 = Math.floor(sx), fx = sx - x0; if (x0 < 0 || x0 >= w - 1) continue;
+      const a = ink[r0 + x0] + (ink[r0 + x0 + 1] - ink[r0 + x0]) * fx, b = ink[r1 + x0] + (ink[r1 + x0 + 1] - ink[r1 + x0]) * fx;
+      out[o + x] = (a + (b - a) * fy) * dens;
+    }
+  }
+  L._rowMap = rowMap;
+  return out;
+}
+// Smudges: a thumb dragged across wet ink. Inside each zone the strokes are wiped thin and their
+// ink is dragged out along one direction as a long streaky tail. Zones are wide and, at the top of
+// the slider, wipe text almost completely.
+function smudge(ink, w, h, F, L) {
+  const B = L.bleed, dpi = state.dpi, minDim = Math.min(w, h), R = F.R, LC = F.LC, S = B.smudge;
+  const src = ink.slice(), rng = mulberry32(state.seed * 977 + 5 + L.id), cnt = Math.round(S * 7) + 1, NS = 16;
+  const zs = Math.min(1, minDim / (dpi * 3));
+  for (let s = 0; s < cnt; s++) {
+    const cx = rng() * w, cy = rng() * h, ang = rng() * Math.PI * 2;
+    const rx = (0.4 + rng() * 0.8) * dpi * zs * (0.6 + 0.4 * S), ry = rx * (0.3 + rng() * 0.4), len = (0.15 + 0.7 * S) * dpi * (0.6 + rng() * 0.8) * zs;
+    const strength = (0.6 + 0.4 * rng()) * Math.min(1, 0.35 + S), dx = Math.cos(ang), dy = Math.sin(ang);
+    // Bounding box covers the zone plus the tail it drags out.
+    const ext = Math.max(rx, ry), x0 = Math.max(0, Math.floor(cx - ext - Math.max(0, dx * len))), x1 = Math.min(w - 1, Math.ceil(cx + ext + Math.max(0, dx * len)));
+    const y0 = Math.max(0, Math.floor(cy - ext - Math.max(0, dy * len))), y1 = Math.min(h - 1, Math.ceil(cy + ext + Math.max(0, dy * len)));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * w + x;
+      // Zone weight: an ellipse, extended along the drag direction so the tail can leave it.
+      const px = x - cx, py = y - cy, u = (px * dx + py * dy), v = (-px * dy + py * dx);
+      const uu = u > 0 ? Math.max(0, u - len) : u, q = (uu * uu) / (rx * rx) + (v * v) / (ry * ry);
+      if (q >= 1) continue;
+      const wgt = Math.pow(1 - q, 1.2) * strength * (0.7 + 0.6 * LC[i] * IV);
+      let m = 0;
+      for (let t = 1; t <= NS; t++) {
+        const dist = len * t / NS, sx = Math.round(x - dx * dist), sy = Math.round(y - dy * dist);
+        if (sx < 0 || sy < 0 || sx >= w || sy >= h) break;
+        const val = src[sy * w + sx] * (1 - 0.75 * t / NS); if (val > m) m = val;
+      }
+      m *= 0.35 + 1.3 * (R[i] * IV);                                   // streaky along the drag
+      const wiped = ink[i] * (1 - 0.85 * wgt), tail = Math.min(1, m * wgt * 1.1);
+      ink[i] = wiped > tail ? wiped : tail;
+    }
+  }
+}
+// Rubber stamp: ink squeezes to the rims of each shape and leaves the interiors blotchy and pale,
+// the whole impression is lighter toward one side (uneven pressure), with a gritty texture.
+function stampEffect(ink, w, h, F, L) {
+  const s = L.stamp, k = state.dpi / 72, n = w * h, LS = F.LS, LC = F.LC, G = F.G;
+  const I = blurField(ink, w, h, Math.max(0.6, 0.9 * k), 1);          // ~1 deep inside strokes, lower at rims
+  const g = layerGeom(L, w), ang = mulberry32(state.seed * 71 + L.id)() * Math.PI * 2;
+  const cx = g.ox + g.bw / 2, cy = g.oy + g.bh / 2, ex = Math.max(1, g.bw / 2), ey = Math.max(1, g.bh / 2), dx = Math.cos(ang), dy = Math.sin(ang);
+  for (let i = 0; i < n; i++) {
+    let a = ink[i]; if (a <= 0) continue;
+    const x = i % w, y = (i - x) / w;
+    let p = ((x - cx) * dx / ex + (y - cy) * dy / ey) * 0.5 + 0.5; p = p < 0 ? 0 : p > 1 ? 1 : p;
+    a *= 1 - s * 0.55 * p;                                               // pressure falls off to one side
+    a *= 1 - s * 0.5 * Math.max(0, (LC[i] * IV - 0.4) / 0.6);            // pale patches
+    const interior = Math.max(0, (I[i] - 0.55) / 0.45), hi = Math.max(0, (LS[i] * IV - 0.35) / 0.65);
+    a *= 1 - s * 0.85 * interior * hi;                                   // voids inside, rims stay dark
+    a *= 1 - s * 0.25 * G[i] * IV;
+    ink[i] = a;
+  }
+}
+function computeLayerInk(L, w, h, F) {
+  const B = L.bleed, k = state.dpi / 72, n = w * h;
+  let { ink, dens } = rasterLayer(L, w, h);
+  const spreadPx = B.spread * k;
+  ink = blurField(ink, w, h, Math.max(0.35, spreadPx * 0.9), 2);
+  const rough = B.rough * 0.75, R = F.R, K = 4;
+  for (let i = 0; i < n; i++) {
+    const a = ink[i]; const gate = a * 2.5 < 1 ? a * 2.5 : 1;
+    let v = a + rough * (R[i] * IV - 0.5) * gate;
+    v = (v - 0.5) * K + 0.5; ink[i] = v < 0 ? 0 : v > 1 ? 1 : v;
+  }
+  const softPx = B.soft * k;
+  if (softPx >= 0.2) ink = blurField(ink, w, h, softPx, 1);
+  const LA = F.LA, G = F.G, fade = B.fade * 0.95, grit = B.grit * 0.85;
+  for (let i = 0; i < n; i++) {
+    let a = ink[i]; if (a <= 0) continue; if (dens) a *= dens[i];
+    const f = (LA[i] * IV - 0.3) / 0.7; if (f > 0) a *= 1 - fade * Math.pow(f, 1.6);
+    const g = G[i] * IV; a *= 1 - grit * g * g; ink[i] = a;
+  }
+  if (L.stamp > 0) stampEffect(ink, w, h, F, L);
+  ink = photocopyRows(ink, w, h, L);
+  if (B.smudge > 0) smudge(ink, w, h, F, L);
+  return ink;
+}
+
+// ---------- Paper pipeline ----------
+// Receipt tear profile along x for one edge (px to remove). 0 = clean cutter; small values = the
+// serrated tear bar; high values = ripped by hand: slanted, wavy, toothed and frayed.
+function receiptProfile(w, rng, r, dpi) {
+  const out = new Float32Array(w); if (r <= 0) return out;
+  const n1 = noise1D(w, Math.max(4, 0.45 * dpi), rng), n2 = noise1D(w, Math.max(2, 0.08 * dpi), rng);
+  const slant = (rng() - 0.5) * 2 * r * 0.2 * dpi, pitch = 0.09 * dpi, toothD = r * 0.025 * dpi, big = r * r * 0.35 * dpi, mid = r * 0.06 * dpi, fray = r * 0.012 * dpi;
+  let mn = 1e9;
+  for (let x = 0; x < w; x++) {
+    const ph = (x / pitch) % 1, tooth = (1 - Math.abs(ph * 2 - 1)) * toothD;
+    const v = big * n1[x] + mid * n2[x] + tooth + slant * (x / w - 0.5) + fray * (rng() - 0.5) * 2;
+    out[x] = v; if (v < mn) mn = v;
+  }
+  for (let x = 0; x < w; x++) out[x] -= mn;
+  return out;
+}
+function computePaper(w, h, F) {
+  const A = state.paper, dpi = state.dpi, k = dpi / 72, n = w * h, out = new Uint8ClampedArray(n * 4);
+  const base = hexToRgb(A.color), { G, LC, T, R } = F, minDim = Math.min(w, h), minD = minDim * 0.5;
+  const dark = isDark(A.color), burn = dark ? [205, 200, 190] : [92, 68, 42], streakCol = dark ? [190, 188, 182] : null;
+  const tear = A.tear * 0.1, edge = A.tear * 0.25;
+  const D = tear * Math.min(0.4 * dpi, 0.15 * minDim), th = 0.75 - 0.45 * tear, ith = 1 / (1 - th);
+  const fray = tear * 1.2 * k, cw = D * 1.6, rim = Math.max(1.5, 2.2 * k), band = 0.03 + 0.14 * edge;
+  const rr = mulberry32(state.seed * 557 + 1), topCut = receiptProfile(w, rr, A.receipt, dpi), botCut = receiptProfile(w, rr, A.receipt, dpi);
+  let streak = null;
+  if (A.streaks > 0) {
+    const rng = mulberry32(state.seed * 419 + 3), s1 = noise1D(w, Math.max(3, 4 * k), rng), s2 = noise1D(w, Math.max(1.5, 1 * k), rng);
+    streak = new Float32Array(w);
+    for (let x = 0; x < w; x++) streak[x] = Math.max(0, (0.7 * s1[x] + 0.3 * s2[x] - 0.55) / 0.45) * 0.14 * A.streaks;
+    const lines = Math.round(A.streaks * 3);
+    for (let l = 0; l < lines; l++) { const x = Math.floor(rng() * w), wd = Math.max(1, Math.round(k * (0.3 + rng()))); for (let x2 = x; x2 < Math.min(w, x + wd); x2++) streak[x2] += 0.2 * A.streaks; }
+  }
+  for (let py = 0; py < h; py++) {
+    const dyRaw = Math.min(py, h - 1 - py) + 0.5;
+    for (let px = 0; px < w; px++) {
+      const i = py * w + px, q = i * 4, g0 = G[i] * IV;
+      const dx = Math.min(px, w - 1 - px) + 0.5;
+      // Receipt tears eat into the top and bottom edges only.
+      const dy = Math.min(py + 0.5 - topCut[px], h - 0.5 - py - botCut[px]);
+      let dEff = dx < dy ? dx : dy, torn = A.receipt > 0 && dy < dx;
+      if (D > 0) {
+        const t = T[i] * IV; let e = (t - th) * ith; if (e < 0) e = 0;
+        let er = D * e + fray * (R[i] * IV - 0.5) * 2;
+        const cd = Math.sqrt(dx * dx + dyRaw * dyRaw); if (cd < cw) er += (1 - cd / cw) * D * 0.8 * (0.5 + t);
+        dEff -= er; torn = torn || er > 0.5;
+      }
+      const al = dEff + 0.5; out[q + 3] = al <= 0 ? 0 : al >= 1 ? 255 : al * 255;
+      if (out[q + 3] === 0) continue;
+      let f = 1, wear = streak ? streak[px] * (0.7 + 0.6 * g0) : 0;
+      if (torn && dEff < rim) f *= dark ? 1 + 0.6 * (1 - dEff / rim) : 1 + 0.22 * (1 - dEff / rim);   // exposed fibres read light either way
+      if (!dark && wear) f *= 1 - wear;
+      const gr = (g0 - 0.5) * A.grain * 0.14 * 255;
+      let r = base[0] * f + gr, g = base[1] * f + gr, b = base[2] * f + gr * 0.9;
+      if (dark && wear) { const a = Math.min(1, wear * 1.4); r += (streakCol[0] - r) * a; g += (streakCol[1] - g) * a; b += (streakCol[2] - b) * a; }
+      if (edge > 0) {
+        const bm = band * (0.5 + LC[i] * IV), t = 1 - (dEff / minD) / bm;
+        if (t > 0) { let dk = edge * t * t * (0.75 + 0.5 * g0); if (dk > 1) dk = 1; r += (burn[0] - r) * dk; g += (burn[1] - g) * dk; b += (burn[2] - b) * dk; }
+      }
+      out[q] = r; out[q + 1] = g; out[q + 2] = b;
+    }
+  }
+  if (A.dust > 0) {
+    const r2 = mulberry32(state.seed * 1000 + 61), cnt = Math.floor(A.dust * n / (dpi * dpi) * 70);
+    for (let s = 0; s < cnt; s++) {
+      const cx = r2() * w, cy = r2() * h, rad = (0.4 + r2() * 1.3) * dpi / 150, al = 0.25 + r2() * 0.6, shade = r2(), v1 = r2(), v2 = r2();
+      // Light paper: brown foxing and dark grit. Dark paper: chalky flecks and pale lint.
+      const col = dark ? (shade < 0.7 ? [200 + v1 * 40, 196 + v2 * 35, 185 + v1 * 30] : [235, 233, 228]) : (shade < 0.7 ? [95 + v1 * 40, 60 + v2 * 30, 30 + v1 * 20] : [40, 38, 36]);
+      const rr2 = rad + 0.5, y0 = Math.max(0, Math.floor(cy - rr2)), y1 = Math.min(h - 1, Math.ceil(cy + rr2)), x0 = Math.max(0, Math.floor(cx - rr2)), x1 = Math.min(w - 1, Math.ceil(cx + rr2));
+      for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
+        const d = Math.hypot(px + 0.5 - cx, py + 0.5 - cy); if (d >= rr2) continue;
+        const a = al * (1 - d / rr2), q = (py * w + px) * 4;
+        for (let c = 0; c < 3; c++) out[q + c] += (col[c] - out[q + c]) * a;
+      }
+    }
+  }
+  return out;
+}
+
+// ---------- Render ----------
+const canvas = $('#canvas'), ctx = canvas.getContext('2d');
+const stage = $('#stage'), overlay = $('#overlay');
+let F = null, paperMap = null, imgData = null;
+const inkCache = new Map(), dirtyLayers = new Set();
+const dirty = { fields: true, allInk: true, paper: true };
+let pending = 0;
+function canvasPx() { return { w: Math.max(16, Math.round(state.wIn * state.dpi)), h: Math.max(16, Math.round(state.hIn * state.dpi)) }; }
+// invalidate('fields' | 'ink' | 'paper' | 'layer')
+function invalidate(...what) {
+  if (window.ToolKit) ToolKit.commit();          // every state change lands in undo history and local storage
+  for (const k of what) { if (k === 'ink') dirty.allInk = true; else if (k === 'layer') { if (sel()) dirtyLayers.add(sel().id); } else dirty[k] = true; }
+  if (pending) return;
+  const { w, h } = canvasPx();
+  pending = (w * h > 3e6) ? setTimeout(render, 140) : requestAnimationFrame(render);
+}
+function render() { pending = 0; renderNow(); }
+function renderNow() {
+  const t0 = performance.now();
+  const { w, h } = canvasPx();
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; dirty.fields = true; applyZoom(); }
+  if (dirty.fields) { F = buildFields(w, h); dirty.allInk = dirty.paper = true; dirty.fields = false; }
+  if (dirty.allInk) { inkCache.clear(); dirty.allInk = false; }
+  for (const L of state.layers) if (!inkCache.has(L.id) || dirtyLayers.has(L.id)) inkCache.set(L.id, computeLayerInk(L, w, h, F));
+  dirtyLayers.clear();
+  for (const id of [...inkCache.keys()]) if (!state.layers.some(L => L.id === id)) inkCache.delete(id);
+  if (dirty.paper) { paperMap = computePaper(w, h, F); dirty.paper = false; }
+  composite(w, h);
+  updateMeta(Math.round(performance.now() - t0)); updateRecipe(); updateOverlay(); updateHints();
+}
+// Live one-line summaries in each collapsed panel header, so a closed panel still tells you its state.
+function updateHints() {
+  const L = sel(), A = state.paper, pct = v => Math.round(v * 100) + '%', set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('hint-layers', `${state.layers.length} layer${state.layers.length === 1 ? '' : 's'}`);
+  if (L) {
+    set('editName', layerName(L));
+    set('hint-type', L.kind === 'svg' ? `${trim0(L.w.toFixed(2))} in · ${L.rotation}°` : `${fontLabel(L)} · ${trim0(L.size.toFixed(1))} pt`);
+    set('hint-bleed', `${L.bleed.master}` + (L.bleed.smudge ? ` · smudge ${pct(L.bleed.smudge)}` : ''));
+    set('hint-stamp', L.stamp ? pct(L.stamp) : 'off');
+    set('hint-copy', (L.copy.elong || L.copy.jitter) ? `${pct(L.copy.elong)} · ${pct(L.copy.jitter)}` : 'off');
+  }
+  const on = [...presetsEl.children].find(c => c.classList.contains('on'));
+  set('hint-looks', on ? on.firstChild.textContent : 'custom');
+  set('hint-canvas', `${state.wIn} × ${state.hIn} in · ${state.dpi} dpi`);
+  set('hint-paper', `${A.color}${A.receipt ? ' · receipt' : ''}${A.tear ? ' · torn' : ''}`);
+  set('hint-random', `seed ${state.seed}`);
+}
+// Remember which panels are open, and pop the editor open whenever a layer is picked.
+const PANEL_KEY = 'inkbleed.panels';
+(function restorePanels() {
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(PANEL_KEY) || 'null'); } catch (e) {}
+  for (const d of document.querySelectorAll('details[data-panel]')) {
+    if (saved && d.dataset.panel in saved) d.open = saved[d.dataset.panel];
+    d.addEventListener('toggle', () => {
+      const o = {}; for (const x of document.querySelectorAll('details[data-panel]')) o[x.dataset.panel] = x.open;
+      try { localStorage.setItem(PANEL_KEY, JSON.stringify(o)); } catch (e) {}
+    });
+  }
+})();
+function openEditor() { const d = document.querySelector('details[data-panel="edit"]'); if (d && !d.open) d.open = true; }
+function composite(w, h) {
+  if (!imgData || imgData.width !== w || imgData.height !== h) imgData = ctx.createImageData(w, h);
+  const d = imgData.data, n = w * h;
+  // Paper first, then each layer's ink in its own colour (max-combined where layers overlap).
+  for (let i = 0, q = 0; i < n; i++, q += 4) { d[q] = paperMap[q]; d[q + 1] = paperMap[q + 1]; d[q + 2] = paperMap[q + 2]; d[q + 3] = paperMap[q + 3]; }
+  const combined = new Float32Array(n);
+  for (const L of state.layers) {
+    const ink = inkCache.get(L.id); if (!ink) continue; const ic = hexToRgb(L.inkColor);
+    for (let i = 0, q = 0; i < n; i++, q += 4) {
+      const k = ink[i]; if (k <= 0.002) continue;
+      d[q] += (ic[0] - d[q]) * k; d[q + 1] += (ic[1] - d[q + 1]) * k; d[q + 2] += (ic[2] - d[q + 2]) * k;
+      if (k > combined[i]) combined[i] = k;
+    }
+  }
+  // Toner speckle belongs to the sheet, so it is applied once, over everything.
+  if (state.paper.speckle > 0) {
+    const dpi = state.dpi, rng = mulberry32(state.seed * 131 + 7), cnt = Math.floor(state.paper.speckle * n / (dpi * dpi) * 220), sp = new Float32Array(n);
+    for (let s = 0; s < cnt; s++) { const cx = rng() * w, cy = rng() * h, r = (0.25 + rng() * 0.75) * dpi / 150, al = 0.15 + rng() * 0.7; stamp(sp, w, h, cx, cy, r, al); }
+    const sc = isDark(state.paper.color) ? [225, 222, 215] : [30, 28, 26];
+    for (let i = 0, q = 0; i < n; i++, q += 4) { const k = sp[i]; if (k <= 0) continue; d[q] += (sc[0] - d[q]) * k; d[q + 1] += (sc[1] - d[q + 1]) * k; d[q + 2] += (sc[2] - d[q + 2]) * k; }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+function applyZoom() {
+  const z = state.zoom;
+  if (z === 'fit') { stage.classList.add('fit'); canvas.style.width = ''; canvas.style.height = ''; }
+  else { stage.classList.remove('fit'); canvas.style.width = canvas.width * parseFloat(z) + 'px'; canvas.style.height = canvas.height * parseFloat(z) + 'px'; }
+  updateOverlay();
+}
+function updateMeta(ms) {
+  const { w, h } = canvasPx(), mp = (w * h / 1e6);
+  $('#meta').innerHTML = `${w} × ${h} px &nbsp;·&nbsp; ${state.wIn} × ${state.hIn} in @ ${state.dpi} dpi` + (ms != null ? ` &nbsp;·&nbsp; ${ms} ms` : '') + (mp > 3 ? ` &nbsp;<span class="warn">large canvas, renders may lag</span>` : '');
+}
+function updateRecipe() {
+  const A = state.paper, pct = v => Math.round(v * 100) + '%';
+  const lvl = (v, a, b) => v <= 0.001 ? 'no' : v < a ? 'light' : v < b ? 'moderate' : 'heavy';
+  const lines = [`Canvas ${state.wIn} × ${state.hIn} in at ${state.dpi} dpi, ${state.marginTopIn} in top margin, ${state.marginSideIn} in side margins.`];
+  for (const L of state.layers) {
+    const B = L.bleed, P = L.copy;
+    const what = L.kind === 'svg' ? `Stamp "${layerName(L)}" ${L.w} in wide` : `Text "${layerName(L)}" in ${fontLabel(L)} ${L.size} pt, ${L.align}-aligned, line height ${L.lineHeight}, jitter ${L.jitter} pt / ${L.jitterRot}°, strike variance ${pct(L.strikeVar)}`;
+    lines.push(`${what}${L.rotation ? `, rotated ${L.rotation}°` : ''}, ink ${L.inkColor}: ${lvl(B.spread, 0.4, 1)} bleed (spread ${B.spread} pt, weight ${pct(B.weight)}, roughness ${pct(B.rough)}, softness ${B.soft} pt), ${pct(B.fade)} fade, ${pct(B.grit)} grit, ${pct(B.smudge)} smudge, ${pct(L.stamp)} stamped; photocopy ${pct(P.elong)} elongation, ${pct(P.jitter)} scan jitter.`);
+  }
+  lines.push(`Paper ${A.color}: ${pct(A.grain)} grain, ${pct(A.tear)} torn edge, ${pct(A.receipt)} receipt tear, ${pct(A.dust)} dust and foxing, ${pct(A.streaks)} toner streaks, ${pct(A.speckle)} toner speckle. Seed ${state.seed}.`);
+  $('#recipe').textContent = lines.join('\n');
+}
+
+// ---------- Drag targets on the canvas ----------
+const blockEls = new Map();
+function updateOverlay() {
+  const r = canvas.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  overlay.style.left = (r.left - sr.left + stage.scrollLeft) + 'px'; overlay.style.top = (r.top - sr.top + stage.scrollTop) + 'px';
+  overlay.style.width = r.width + 'px'; overlay.style.height = r.height + 'px';
+  const sc = r.width / canvas.width, seen = new Set();
+  for (const L of state.layers) {
+    seen.add(L.id);
+    let el = blockEls.get(L.id);
+    if (!el) {
+      el = document.createElement('div'); el.className = 'tb'; el.innerHTML = '<span class="tag"></span>';
+      el.addEventListener('pointerdown', e => startDrag(e, L.id)); overlay.appendChild(el); blockEls.set(L.id, el);
+    }
+    const g = layerGeom(L, canvas.width), rm = L._rowMap;
+    const mapY = y => { if (!rm) return y; return rm[Math.max(0, Math.min(rm.length - 1, Math.round(y)))]; };
+    const top = mapY(g.oy), bottom = mapY(g.oy + g.bh);
+    el.style.left = g.ox * sc + 'px'; el.style.top = top * sc + 'px'; el.style.width = g.bw * sc + 'px'; el.style.height = Math.max(4, bottom - top) * sc + 'px';
+    el.style.transform = `rotate(${L.rotation}deg)`;
+    el.querySelector('.tag').textContent = layerName(L);
+    el.classList.toggle('sel', L.id === state.selected);
+  }
+  for (const [id, el] of blockEls) if (!seen.has(id)) { el.remove(); blockEls.delete(id); }
+}
+function startDrag(e, id) {
+  e.preventDefault(); selectLayer(id);
+  const L = sel(), el = blockEls.get(id), dpi = state.dpi, sc = canvas.getBoundingClientRect().width / canvas.width;
+  const sx = e.clientX, sy = e.clientY, x0 = L.x, y0 = L.y;
+  el.classList.add('drag');
+  const move = ev => { L.x = +(x0 + (ev.clientX - sx) / sc / dpi).toFixed(3); L.y = +(y0 + (ev.clientY - sy) / sc / dpi).toFixed(3); updateOverlay(); invalidate('layer'); };
+  const up = () => { el.classList.remove('drag'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+}
+new ResizeObserver(() => updateOverlay()).observe(stage);
+
+// ---------- Layers UI ----------
+function renderLayerList() {
+  const list = $('#layerList'); list.innerHTML = '';
+  for (const L of state.layers) {
+    const row = document.createElement('div'); row.className = 'lrow' + (L.id === state.selected ? ' on' : '');
+    row.innerHTML = `<span class="kind ${L.kind}">${L.kind === 'svg' ? 'S' : 'T'}</span><span class="name">${layerName(L).replace(/</g, '&lt;')}</span><span class="x" title="Delete layer">✕</span>`;
+    row.addEventListener('click', e => { if (e.target.classList.contains('x')) deleteLayer(L.id); else selectLayer(L.id); });
+    list.appendChild(row);
+  }
+}
+function selectLayer(id) {
+  state.selected = id; renderLayerList(); refreshLayerControls(); updateOverlay(); updateHints(); openEditor();
+}
+function addLayer(L) {
+  // Place new layers a little below the previous one so they don't stack exactly.
+  if (state.layers.length) { const last = state.layers[state.layers.length - 1]; if (L.x === 0 && L.y === 0) { L.x = 0; L.y = +(last.y + 0.4).toFixed(2); } }
+  state.layers.push(L); selectLayer(L.id); invalidate('layer'); updateOverlay();
+  if (L.kind === 'text') { $('#layerText').focus(); }
+}
+function deleteLayer(id) {
+  if (state.layers.length <= 1) { flash($('#delLayer'), 'Keep one layer'); return; }
+  const i = state.layers.findIndex(l => l.id === id); if (i < 0) return;
+  state.layers.splice(i, 1); inkCache.delete(id);
+  if (state.selected === id) state.selected = state.layers[Math.max(0, i - 1)].id;
+  renderLayerList(); refreshLayerControls(); invalidate(); updateOverlay();
+}
+function refreshLayerControls() {
+  const L = sel(); if (!L) return;
+  const isText = L.kind === 'text';
+  $('#editName').textContent = layerName(L);
+  $('#textContent').hidden = !isText; $('#svgContent').hidden = isText;
+  $('#fontRow').hidden = !isText; $('#alignRow').hidden = !isText; $('#textSliders').hidden = !isText; $('#svgSliders').hidden = isText;
+  $('#customFontRow').hidden = !isText || L.font !== 'custom';
+  if (isText) { $('#layerText').value = L.text; $('#fontSel').value = L.font; $('#customFont').value = L.customFont; }
+  else { $('#assetSel').value = L.asset; }
+  for (const bt of $('#alignSeg').children) bt.classList.toggle('on', bt.dataset.v === L.align);
+  $('#inkColor').value = L.inkColor;
+  refreshGroup('L.');
+}
+
+// ---------- Controls ----------
+const controls = {};
+function addSlider(parent, spec) {
+  const wrap = document.createElement('div'); wrap.className = 'slider';
+  wrap.innerHTML = `<label>${spec.label}</label><output></output><input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
+  const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+  const refresh = () => { const v = getPath(spec.path); if (v == null) return; input.value = v; out.textContent = spec.fmt(+v); };
+  input.addEventListener('input', () => {
+    const v = parseFloat(input.value); setPath(spec.path, v); out.textContent = spec.fmt(v);
+    if (spec.onChange) spec.onChange(v);
+    if (spec.look) clearPresetHighlight();
+    invalidate(...spec.dirty); updateHints();
+  });
+  controls[spec.path] = { refresh }; refresh(); parent.appendChild(wrap);
+}
+function refreshGroup(prefix) { for (const p in controls) if (p.startsWith(prefix)) controls[p].refresh(); }
+const r2 = v => +v.toFixed(2);
+function applyBleedMaster(m) {
+  const t = m / 100, L = sel(); if (!L) return;
+  Object.assign(L.bleed, { master: m, spread: r2(1.4 * t), weight: r2(0.1 + 0.75 * t), rough: r2(0.8 * t), soft: r2(1.0 * t), fade: r2(0.55 * t), grit: r2(0.6 * t) });
+  refreshGroup('L.bleed.');
+}
+
+// Per-layer
+const Ts = $('#textSliders');
+addSlider(Ts, { path: 'L.size', label: 'Size', min: 4, max: 96, step: 0.5, fmt: fmt.pt, dirty: ['layer'] });
+addSlider(Ts, { path: 'L.lineHeight', label: 'Line height', min: 0.8, max: 2.2, step: 0.05, fmt: fmt.x, dirty: ['layer'] });
+addSlider(Ts, { path: 'L.letterSpacing', label: 'Letter spacing', min: -1, max: 4, step: 0.1, fmt: fmt.pt, dirty: ['layer'] });
+addSlider(Ts, { path: 'L.jitter', label: 'Typewriter jitter', min: 0, max: 2, step: 0.05, fmt: fmt.pt, dirty: ['layer'], look: true });
+addSlider(Ts, { path: 'L.jitterRot', label: 'Letter tilt', min: 0, max: 4, step: 0.1, fmt: fmt.deg, dirty: ['layer'], look: true });
+addSlider(Ts, { path: 'L.strikeVar', label: 'Strike variance', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider($('#svgSliders'), { path: 'L.w', label: 'Width', min: 0.2, max: 12, step: 0.05, fmt: fmt.in, dirty: ['layer'] });
+addSlider($('#commonSliders'), { path: 'L.rotation', label: 'Rotation', min: -180, max: 180, step: 0.5, fmt: fmt.deg, dirty: ['layer'] });
+addSlider($('#bleedMaster'), { path: 'L.bleed.master', label: 'Bleed', min: 0, max: 100, step: 1, fmt: fmt.int, dirty: ['layer'], onChange: applyBleedMaster, look: true });
+const Bp = $('#bleedSliders');
+addSlider(Bp, { path: 'L.bleed.spread', label: 'Spread', min: 0, max: 2.5, step: 0.05, fmt: fmt.pt, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.weight', label: 'Ink weight', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.rough', label: 'Edge roughness', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.soft', label: 'Softness', min: 0, max: 2.5, step: 0.05, fmt: fmt.pt, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.fade', label: 'Uneven fade', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.grit', label: 'Grit', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider(Bp, { path: 'L.bleed.smudge', label: 'Smudge', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider($('#stampSliders'), { path: 'L.stamp', label: 'Stamped', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+const Cp = $('#copySliders');
+addSlider(Cp, { path: 'L.copy.elong', label: 'Elongation', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+addSlider(Cp, { path: 'L.copy.jitter', label: 'Scan jitter', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
+// Global
+addSlider($('#canvasSliders'), { path: 'marginTopIn', label: 'Top margin', min: -1, max: 3, step: 0.05, fmt: fmt.in, dirty: ['ink'] });
+addSlider($('#canvasSliders'), { path: 'marginSideIn', label: 'Side margins', min: -1, max: 2, step: 0.05, fmt: fmt.in, dirty: ['ink'] });
+const Pp = $('#paperSliders');
+addSlider(Pp, { path: 'paper.grain', label: 'Paper grain', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['paper'], look: true });
+addSlider(Pp, { path: 'paper.tear', label: 'Torn edge', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['paper'], look: true });
+addSlider(Pp, { path: 'paper.receipt', label: 'Receipt tear', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['paper'], look: true });
+addSlider(Pp, { path: 'paper.dust', label: 'Dust & foxing', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['paper'], look: true });
+addSlider(Pp, { path: 'paper.streaks', label: 'Toner streaks', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['paper'], look: true });
+addSlider(Pp, { path: 'paper.speckle', label: 'Toner speckle', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: [], look: true });
+
+// Layer content controls
+$('#layerText').addEventListener('input', e => { const L = sel(); if (!L) return; L.text = e.target.value; renderLayerList(); $('#editName').textContent = layerName(L); invalidate('layer'); });
+$('#alignSeg').addEventListener('click', e => { const bt = e.target.closest('button'), L = sel(); if (!bt || !L) return; L.align = bt.dataset.v; refreshLayerControls(); invalidate('layer'); });
+$('#inkColor').addEventListener('input', e => { const L = sel(); if (!L) return; L.inkColor = e.target.value; clearPresetHighlight(); invalidate(); });
+$('#assetSel').addEventListener('change', e => { const L = sel(); if (!L) return; L.asset = e.target.value; renderLayerList(); refreshLayerControls(); invalidate('layer'); });
+$('#addText').addEventListener('click', () => { const base = sel() && sel().kind === 'text' ? sel() : TEXT_LAYER; addLayer(newLayer(TEXT_LAYER, { text: '', font: base.font, inkColor: base.inkColor, bleed: base.bleed, copy: base.copy, jitter: base.jitter, jitterRot: base.jitterRot, strikeVar: base.strikeVar })); });
+$('#stampSel').addEventListener('change', e => {
+  const v = e.target.value; e.target.value = '';
+  if (v === '__file') { $('#svgFile').click(); return; }
+  if (!v) return;
+  const base = sel() || SVG_LAYER;
+  addLayer(newLayer(SVG_LAYER, { asset: v, w: Math.min(1.2, state.wIn * 0.4), inkColor: base.inkColor, bleed: base.bleed, copy: base.copy }));
+});
+$('#svgFile').addEventListener('change', e => { for (const f of e.target.files) addDroppedSvg(f); e.target.value = ''; });
+$('#rescan').addEventListener('click', async () => { await loadAssets(); flash($('#rescan'), '✓'); });
+$('#delLayer').addEventListener('click', () => { if (sel()) deleteLayer(sel().id); });
+stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('dropping'); });
+stage.addEventListener('dragleave', () => stage.classList.remove('dropping'));
+stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('dropping'); for (const f of e.dataTransfer.files) if (/\.svg$/i.test(f.name)) addDroppedSvg(f); });
+
+// Selects, inputs, buttons
+const sizeSel = $('#sizeSel'), dpiSel = $('#dpiSel'), fontSel = $('#fontSel');
+for (const k in SIZES) sizeSel.add(new Option(SIZES[k][0], k));
+for (const d of DPIS) dpiSel.add(new Option(d + ' dpi', d));
+for (const k in FONTS) fontSel.add(new Option(FONTS[k][0], k));
+function syncSizeSel() {
+  const match = Object.keys(SIZES).find(k => SIZES[k][1] === state.wIn && SIZES[k][2] === state.hIn);
+  sizeSel.value = match || 'custom';
+  $('#customRow').hidden = !!match;
+  $('#wIn').value = state.wIn; $('#hIn').value = state.hIn;
+}
+sizeSel.addEventListener('change', () => {
+  const s = SIZES[sizeSel.value];
+  if (sizeSel.value !== 'custom') { state.wIn = s[1]; state.hIn = s[2]; if (s[3]) { state.dpi = s[3]; dpiSel.value = s[3]; } }
+  syncSizeSel(); invalidate('ink', 'paper');
+});
+$('#rotate').addEventListener('click', () => { [state.wIn, state.hIn] = [state.hIn, state.wIn]; syncSizeSel(); invalidate('ink', 'paper'); });
+for (const id of ['wIn', 'hIn']) $('#' + id).addEventListener('change', e => {
+  const v = Math.min(24, Math.max(0.5, parseFloat(e.target.value) || 1)); state[id] = v; e.target.value = v; invalidate('ink', 'paper');
+});
+dpiSel.addEventListener('change', () => { state.dpi = +dpiSel.value; invalidate('ink', 'paper'); });
+fontSel.addEventListener('change', () => { const L = sel(); if (!L) return; L.font = fontSel.value; $('#customFontRow').hidden = L.font !== 'custom'; clearPresetHighlight(); invalidate('layer'); });
+$('#customFont').addEventListener('input', e => { const L = sel(); if (!L) return; L.customFont = e.target.value; invalidate('layer'); });
+$('#paperColor').addEventListener('input', e => {
+  const wasDark = isDark(state.paper.color); state.paper.color = e.target.value;
+  // Crossing between light and dark paper flips any ink that would vanish against the new sheet.
+  if (isDark(state.paper.color) !== wasDark) {
+    for (const L of state.layers) if (Math.abs(lum(L.inkColor) - lum(state.paper.color)) < 0.35) L.inkColor = invertHex(L.inkColor);
+    refreshLayerControls();
+  }
+  clearPresetHighlight(); invalidate('paper');
+});
+$('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate('fields'); });
+$('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate('fields'); });
+$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
+
+// Looks
+const presetsEl = $('#presets');
+PRESETS.forEach((p, i) => {
+  const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
+  b.addEventListener('click', () => {
+    for (const L of state.layers) {
+      if (L.kind === 'text') Object.assign(L, p.text);
+      L.inkColor = p.all.inkColor; L.stamp = 0; Object.assign(L.bleed, p.all.bleed); Object.assign(L.copy, p.all.copy);
+    }
+    Object.assign(state.paper, p.paper);
+    if (p.canvas) { [state.wIn, state.hIn] = p.canvas; state.dpi = p.canvas[2]; }
+    refreshAll(); [...presetsEl.children].forEach((c, j) => c.classList.toggle('on', i === j)); invalidate('ink', 'paper');
+  });
+  presetsEl.appendChild(b);
+});
+function clearPresetHighlight() { [...presetsEl.children].forEach(c => c.classList.remove('on')); updateHints(); }
+
+function refreshAll() {
+  for (const p in controls) controls[p].refresh();
+  renderLayerList(); refreshLayerControls();
+  syncSizeSel(); dpiSel.value = state.dpi;
+  $('#paperColor').value = state.paper.color; $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
+}
+
+// Export
+function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
+$('#download').addEventListener('click', () => {
+  canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ink-bleed-${canvas.width}x${canvas.height}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+});
+// ---------- Animated GIF: six renders with different seeds so every random element boils ----------
+function medianCutPalette(hist, maxColors) {
+  const keys = [...hist.keys()], ch = (k, c) => c === 0 ? (k >> 10) & 31 : c === 1 ? (k >> 5) & 31 : k & 31;
+  let boxes = [keys];
+  while (boxes.length < maxColors) {
+    let bi = -1, bestScore = -1;
+    boxes.forEach((b, i) => { if (b.length < 2) return; let mn = [31, 31, 31], mx = [0, 0, 0]; for (const k of b) for (let c = 0; c < 3; c++) { const v = ch(k, c); if (v < mn[c]) mn[c] = v; if (v > mx[c]) mx[c] = v; } const score = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) * Math.log(b.length + 1); if (score > bestScore) { bestScore = score; bi = i; } });
+    if (bi < 0) break;
+    const b = boxes[bi]; let mn = [31, 31, 31], mx = [0, 0, 0];
+    for (const k of b) for (let c = 0; c < 3; c++) { const v = ch(k, c); if (v < mn[c]) mn[c] = v; if (v > mx[c]) mx[c] = v; }
+    const axis = [0, 1, 2].reduce((a, c) => (mx[c] - mn[c]) > (mx[a] - mn[a]) ? c : a, 0);
+    b.sort((p, q) => ch(p, axis) - ch(q, axis));
+    const total = b.reduce((s, k) => s + hist.get(k), 0); let acc = 0, cut = 1;
+    for (let i = 0; i < b.length - 1; i++) { acc += hist.get(b[i]); if (acc >= total / 2) { cut = i + 1; break; } }
+    boxes.splice(bi, 1, b.slice(0, cut), b.slice(cut));
+  }
+  return boxes.map(b => { let r = 0, g = 0, bb = 0, n = 0; for (const k of b) { const c = hist.get(k); r += (ch(k, 0) * 8 + 4) * c; g += (ch(k, 1) * 8 + 4) * c; bb += (ch(k, 2) * 8 + 4) * c; n += c; } return [Math.round(r / n), Math.round(g / n), Math.round(bb / n)]; });
+}
+function lzwEncode(idx, minCodeSize) {
+  const out = []; let bitBuf = 0, bitCnt = 0;
+  const emit = (code, size) => { bitBuf |= code << bitCnt; bitCnt += size; while (bitCnt >= 8) { out.push(bitBuf & 255); bitBuf >>>= 8; bitCnt -= 8; } };
+  const CLEAR = 1 << minCodeSize, EOI = CLEAR + 1;
+  let codeSize = minCodeSize + 1, next = EOI + 1, dict = new Map();
+  emit(CLEAR, codeSize);
+  let prefix = idx[0];
+  for (let i = 1; i < idx.length; i++) {
+    const c = idx[i], key = (prefix << 8) | c, found = dict.get(key);
+    if (found !== undefined) { prefix = found; continue; }
+    emit(prefix, codeSize);
+    if (next > (1 << codeSize) - 1 && codeSize < 12) codeSize++;
+    if (next < 4096) dict.set(key, next++);
+    else { emit(CLEAR, codeSize); dict = new Map(); next = EOI + 1; codeSize = minCodeSize + 1; }
+    prefix = c;
+  }
+  emit(prefix, codeSize); emit(EOI, codeSize);
+  if (bitCnt > 0) out.push(bitBuf & 255);
+  return out;
+}
+function buildGif(frames, w, h, delayCs) {
+  const hist = new Map();
+  for (const f of frames) for (let q = 0; q < f.length; q += 4) { if (f[q + 3] < 128) continue; const k = ((f[q] >> 3) << 10) | ((f[q + 1] >> 3) << 5) | (f[q + 2] >> 3); hist.set(k, (hist.get(k) || 0) + 1); }
+  const palette = medianCutPalette(hist, 255), transIndex = palette.length;
+  const lookup = new Int16Array(32768).fill(-1);
+  const nearest = k => { let r = ((k >> 10) & 31) * 8 + 4, g = ((k >> 5) & 31) * 8 + 4, b = (k & 31) * 8 + 4, best = 0, bd = 1e9; for (let i = 0; i < palette.length; i++) { const p = palette[i], d = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2; if (d < bd) { bd = d; best = i; } } return best; };
+  const bytes = [], u16 = v => bytes.push(v & 255, (v >> 8) & 255), str = s => { for (const ch of s) bytes.push(ch.charCodeAt(0)); };
+  str('GIF89a'); u16(w); u16(h); bytes.push(0xF7, 0, 0);
+  for (let i = 0; i < 256; i++) { const c = palette[i] || [0, 0, 0]; bytes.push(c[0], c[1], c[2]); }
+  bytes.push(0x21, 0xFF, 0x0B); str('NETSCAPE2.0'); bytes.push(3, 1); u16(0); bytes.push(0);
+  for (const f of frames) {
+    const idx = new Uint8Array(w * h);
+    for (let i = 0, q = 0; i < idx.length; i++, q += 4) {
+      if (f[q + 3] < 128) { idx[i] = transIndex; continue; }
+      const k = ((f[q] >> 3) << 10) | ((f[q + 1] >> 3) << 5) | (f[q + 2] >> 3);
+      if (lookup[k] < 0) lookup[k] = nearest(k); idx[i] = lookup[k];
+    }
+    bytes.push(0x21, 0xF9, 4, 0x09); u16(delayCs); bytes.push(transIndex, 0);           // disposal: restore to background, transparent on
+    bytes.push(0x2C); u16(0); u16(0); u16(w); u16(h); bytes.push(0, 8);
+    const data = lzwEncode(idx, 8);
+    for (let p = 0; p < data.length; p += 255) { const chunk = data.slice(p, p + 255); bytes.push(chunk.length); for (const b of chunk) bytes.push(b); }
+    bytes.push(0);
+  }
+  bytes.push(0x3B);
+  return new Uint8Array(bytes);
+}
+// Six renders with different seeds so every random element boils; shared by Download and Preview.
+async function makeGif(btn) {
+  const label = btn.textContent, seed0 = state.seed, frames = [], { w, h } = canvasPx();
+  if (w * h > 4e6) { flash(btn, 'Canvas too large for GIF'); return null; }
+  try {
+    for (let i = 0; i < 6; i++) {
+      btn.textContent = `Frame ${i + 1} / 6…`; await new Promise(r => setTimeout(r, 0));
+      state.seed = seed0 + i * 7919; dirty.fields = true; renderNow(); frames.push(new Uint8ClampedArray(imgData.data));
+    }
+    btn.textContent = 'Encoding…'; await new Promise(r => setTimeout(r, 0));
+    const gif = buildGif(frames, w, h, 12);
+    return { blob: new Blob([gif], { type: 'image/gif' }), filename: `ink-bleed-${w}x${h}.gif`, note: `${w} × ${h} px · 6 frames at 120 ms · ${(gif.length / 1024).toFixed(0)} KB` };
+  } finally { state.seed = seed0; dirty.fields = true; renderNow(); btn.textContent = label; }
+}
+$('#downloadGif').addEventListener('click', async () => { const g = await makeGif($('#downloadGif')); if (!g) return; const a = document.createElement('a'); a.href = URL.createObjectURL(g.blob); a.download = g.filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
+$('#previewGif').addEventListener('click', async () => { const g = await makeGif($('#previewGif')); if (g) ToolKit.showGif(g); });
+$('#copyImg').addEventListener('click', async () => {
+  const btn = $('#copyImg');
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied!'); }
+  catch (e) { flash(btn, 'Clipboard blocked'); }
+});
+$('#copyRecipe').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); }
+});
+
+refreshAll();
+presetsEl.children[0].classList.add('on');
+applyZoom();
+loadAssets();
+document.fonts && document.fonts.ready.then(() => invalidate('ink'));
+invalidate('fields');
+
+// ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
+const ZOOMS = ['fit', '0.25', '0.5', '1', '2'];
+function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+ToolKit.init({
+  tool: 'ink-bleed', version: 1,
+  getState: () => JSON.parse(JSON.stringify(state, (k, v) => k.startsWith('_') ? undefined : v)),
+  setState: s => {
+    s.layers = (s.layers || []).filter(L => !(L.kind === 'svg' && String(L.asset).startsWith('blob:')));   // dropped files can't come back
+    if (!s.layers.length) s.layers = [newLayer(TEXT_LAYER, { text: DEFAULT_TEXT })];
+    for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s);
+    nextId = Math.max(0, ...state.layers.map(l => l.id)) + 1;
+    if (!state.layers.some(l => l.id === state.selected)) state.selected = state.layers[0].id;
+    refreshAll(); applyZoom(); invalidate('fields');
+  },
+  defaults: () => JSON.parse(JSON.stringify(DEFAULT_STATE)),
+});
+ToolKit.register('mod+s', 'Download PNG', () => $('#download').click(), { group: 'Export' });
+ToolKit.register('mod+shift+s', 'Download animated GIF', () => $('#downloadGif').click(), { group: 'Export' });
+ToolKit.register('g', 'Preview the GIF', () => $('#previewGif').click(), { group: 'Export' });
+ToolKit.register('mod+shift+c', 'Copy image', () => $('#copyImg').click(), { group: 'Export' });
+ToolKit.register('n', 'New text layer', () => $('#addText').click(), { group: 'Layers' });
+ToolKit.register('mod+d', 'Duplicate layer', () => { const L = sel(); if (!L) return; const c = JSON.parse(JSON.stringify(L, (k, v) => k.startsWith('_') ? undefined : v)); c.id = nextId++; c.x += 0.15; c.y += 0.15; state.layers.push(c); selectLayer(c.id); invalidate('layer'); }, { group: 'Layers' });
+ToolKit.register('backspace', 'Delete layer', () => { if (sel()) deleteLayer(sel().id); }, { group: 'Layers' });
+ToolKit.register('delete', 'Delete layer', () => { if (sel()) deleteLayer(sel().id); }, { group: 'Layers', hidden: true });
+ToolKit.register('[', 'Previous layer', () => { const i = state.layers.findIndex(l => l.id === state.selected); selectLayer(state.layers[(i - 1 + state.layers.length) % state.layers.length].id); }, { group: 'Layers' });
+ToolKit.register(']', 'Next layer', () => { const i = state.layers.findIndex(l => l.id === state.selected); selectLayer(state.layers[(i + 1) % state.layers.length].id); }, { group: 'Layers' });
+const nudge = (dx, dy) => e => { const L = sel(); if (!L) return; const st = e.shiftKey ? 0.25 : 0.05; L.x = +(L.x + dx * st).toFixed(3); L.y = +(L.y + dy * st).toFixed(3); updateOverlay(); invalidate('layer'); };
+ToolKit.register('left', 'Nudge layer (⇧ for more)', nudge(-1, 0), { group: 'Layers' });
+ToolKit.register('right', 'Nudge layer', nudge(1, 0), { group: 'Layers', hidden: true });
+ToolKit.register('up', 'Nudge layer', nudge(0, -1), { group: 'Layers', hidden: true });
+ToolKit.register('down', 'Nudge layer', nudge(0, 1), { group: 'Layers', hidden: true });
+ToolKit.register('shift+left', 'Nudge layer', nudge(-1, 0), { hidden: true }); ToolKit.register('shift+right', 'Nudge layer', nudge(1, 0), { hidden: true });
+ToolKit.register('shift+up', 'Nudge layer', nudge(0, -1), { hidden: true }); ToolKit.register('shift+down', 'Nudge layer', nudge(0, 1), { hidden: true });
+ToolKit.register('r', 'Reshuffle seed', () => $('#reshuffle').click(), { group: 'View' });
+PRESETS.forEach((p, i) => ToolKit.register(String(i + 1), `Look: ${p.name}`, () => presetsEl.children[i].click(), { group: 'View' }));
+ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
+ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
+ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "template-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Switchyards email template builder, v2. The compiler is pure, DOM-free and runs under Node.",
+  "scripts": {
+    "test": "vitest run",
+    "watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "compile": "node --experimental-strip-types --no-warnings tools/compile.ts",
+    "golden": "node tools/regenerate-v1-export.js fixture",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "baseline": "node --experimental-strip-types --no-warnings tools/make-baseline.ts",
+    "workspace": "node --experimental-strip-types --no-warnings tools/make-workspace.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "preact": "^10.29.8"
+  }
+}

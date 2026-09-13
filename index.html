@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scuggnizzi tools</title>
+<link rel="stylesheet" href="design system/Enkel Design system v2/styles.css">
+<style>
+  /* Enkel: sunken page, paper cards, one soft hairline, no shadow, no radius on containers. Words in the sans, figures in mono. */
+  html,body{height:100%}
+  body{background:var(--surface-sunken);display:flex;flex-direction:column;min-height:100vh}
+  .shell-header{height:var(--shell-header-height);box-sizing:border-box;display:flex;align-items:center;gap:var(--spacing-24);padding:0 var(--spacing-24);
+    background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-hairline)}
+  .wordmark{font-size:var(--text-heading-sm);letter-spacing:var(--tracking-heading-sm);color:var(--text-primary);text-decoration:none}
+  .shell-header .tagline{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shell-header .spacer{flex:1}
+  .shell-header .count{font-family:var(--font-mono);font-size:var(--text-meta);color:var(--text-muted);letter-spacing:0}
+  main{flex:1;width:100%;box-sizing:border-box;padding:0}
+  /* One clean grid: no gaps, hairlines shared between neighbours (grid draws top/left, each card draws right/bottom). */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0}
+  .tool{display:flex;flex-direction:column;background:var(--surface-card);border-right:var(--border-width) solid var(--border-card);border-bottom:var(--border-width) solid var(--border-card);color:inherit;text-decoration:none;
+    box-shadow:inset 0 0 0 0 var(--border-hairline);transition:box-shadow var(--duration-fast) var(--ease-standard)}
+  .tool:hover{box-shadow:inset 0 0 0 1px var(--border-hairline)}
+  .tool:hover .arrow{opacity:1}
+  .mark{height:160px;display:flex;align-items:center;justify-content:center;background:var(--surface-sunken);border-bottom:var(--border-width) solid var(--border-muted);overflow:hidden}
+  .mark span{font-size:var(--text-display);line-height:var(--leading-display);letter-spacing:var(--tracking-display);color:var(--text-primary);white-space:nowrap}
+  .tool.placeholder{background:transparent}
+  .tool.placeholder .mark{background:transparent}
+  .tool.placeholder .mark span,.tool.placeholder h2{color:var(--text-faint)}
+  .tool.placeholder p{color:var(--text-muted)}
+  .body{padding:var(--card-padding);display:flex;flex-direction:column;gap:var(--spacing-8);flex:1}
+  .kicker{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+  .kicker .n{font-family:var(--font-mono);letter-spacing:0}
+  .dot{width:8px;height:8px;background:var(--delta-flat);flex:0 0 8px}
+  .dot.live{background:var(--delta-up)}
+  .tool h2{margin:0;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);letter-spacing:var(--tracking-heading-sm);font-weight:400;color:var(--text-primary)}
+  .tool p{font-size:var(--text-meta);line-height:var(--leading-prose-tight);letter-spacing:var(--tracking-meta);color:var(--text-secondary);max-width:none}
+  .meta{margin-top:auto;padding-top:var(--spacing-12);display:flex;align-items:center;gap:var(--spacing-12);border-top:var(--border-width) solid var(--border-muted);
+    font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
+  .meta .path{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .arrow{opacity:0;color:var(--text-primary);transition:opacity var(--duration-fast) var(--ease-standard);font-family:var(--font-helveticaneue)}
+  footer{padding:var(--spacing-16) var(--spacing-24);border-top:var(--border-width) solid var(--border-hairline);background:var(--surface-paper);
+    display:flex;gap:var(--spacing-24);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:var(--tracking-caption)}
+  footer .mono{font-family:var(--font-mono-detail);letter-spacing:0}
+  @media (max-width:767px){
+    .shell-header{padding:0 var(--gutter-phone)}
+    .shell-header .tagline{display:none}
+    .grid{grid-template-columns:1fr}
+    .tool p{font-size:var(--text-meta-mobile)}
+  }
+</style>
+</head>
+<body>
+  <header class="shell-header">
+    <a class="wordmark" href="./">Scuggnizzi tools</a>
+    <span class="tagline">Small single-file tools. Each opens in place; each keeps its own folder.</span>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+  </header>
+
+  <main>
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <footer>
+    <span>Interface on the Enkel design system</span>
+    <span class="mono">node serve.js · localhost:8770</span>
+    <span class="spacer" style="flex:1"></span>
+    <span>Press <span class="mono">?</span> for shortcuts</span>
+  </footer>
+
+<script src="tool-kit.js"></script>
+<script>
+// Add a tool: one entry here, one folder (or file) beside index.html.
+const TOOLS = [
+  { n: '01', kicker: 'Type', name: 'Ink bleed', mark: 'ink bleed_', status: 'live',
+    desc: 'Typewriter and photocopy text on paper. Layers of text and SVG stamps, each with its own bleed, smudge, stamp and copier drift. Receipt tears, dark paper, six-frame GIF export.',
+    href: 'text bleed/ink-bleed.html', path: 'text bleed/ink-bleed.html' },
+  { n: '02', kicker: 'Image', name: 'Image effects editor', mark: 'image fx_', status: 'live',
+    desc: 'Photo treatments in the browser: halftone screens, grain, paper and fibre textures, blend modes. Looks for dirty 35mm, film noir, newsprint and screen print.',
+    href: 'image effects/image-effects-editor.html', path: 'image effects/image-effects-editor.html' },
+  { n: '03', kicker: 'Motion', name: 'Split-flap board', mark: 'flap_', status: 'live',
+    desc: 'A Solari departure board. Type messages; every letter clatters through its alphabet and lands in place, staggered across the board. Rest state as PNG, one flip as an animated GIF.',
+    href: 'split flap/split-flap.html', path: 'split flap/split-flap.html' },
+  { n: '04', kicker: 'Print', name: 'Riso separator', mark: 'riso_', status: 'live',
+    desc: 'Split a picture into two or three Riso inks. Real drum colours, per-ink source and curve, dot, line or grain screens, misregistration, ink soak and paper grain. Exports the print and one separation per ink.',
+    href: 'riso/riso.html', path: 'riso/riso.html' },
+  { n: '05', kicker: 'Email', name: 'Template Studio', mark: 'template_', status: 'live',
+    desc: 'Builds HubSpot coded email templates. Opens a folder of designs, compiles each to the real template file, previews it at desktop, phone and dark, walks every branch an optional field creates, and validates against what a live send actually taught us. Read-only so far; editing is next.',
+    href: 'template-studio/dist/index.html', path: 'template-studio/ · npm run build' },
+];
+
+const grid = document.getElementById('grid');
+for (const t of TOOLS) {
+  const a = document.createElement('a'); a.className = 'tool'; a.href = t.href;
+  a.innerHTML = `
+    <div class="mark"><span>${t.mark}</span></div>
+    <div class="body">
+      <div class="kicker"><span class="n">${t.n}</span><span>·</span><span>${t.kicker}</span><span class="spacer" style="flex:1"></span><span class="dot ${t.status}"></span><span>${t.status}</span></div>
+      <h2>${t.name}</h2>
+      <p>${t.desc}</p>
+      <div class="meta"><span class="path">${t.path}</span><span class="arrow">→</span></div>
+    </div>`;
+  grid.appendChild(a);
+}
+// Placeholder for the next tool: a hairline box, as the system prescribes for missing pieces.
+const ph = document.createElement('div'); ph.className = 'tool placeholder';
+ph.innerHTML = `
+  <div class="mark"><span>next_</span></div>
+  <div class="body">
+    <div class="kicker"><span class="n">${String(TOOLS.length + 1).padStart(2, '0')}</span><span>·</span><span>Open</span></div>
+    <h2>Next tool</h2>
+    <p>Drop a folder beside this file, load tool-banner.js after its body tag, and add one entry to the list in index.html.</p>
+    <div class="meta"><span class="path">index.html · TOOLS</span></div>
+  </div>`;
+grid.appendChild(ph);
+document.getElementById('count').textContent = `${TOOLS.length} tool${TOOLS.length === 1 ? '' : 's'}`;
+
+// Shared shortcuts: digits open tools, ? lists the keys. No state to keep here.
+ToolKit.init({ tool: 'index' });
+TOOLS.forEach((t, i) => ToolKit.register(String(i + 1), `Open ${t.name}`, () => { location.href = t.href; }, { group: 'Tools' }));
+
+</script>
+</body>
+</html>

@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split-flap board</title>
+<style>
+  @font-face{font-family:"FlapCondensed";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_MdCn.otf") format("opentype");font-weight:500;font-display:swap}
+  @font-face{font-family:"FlapCondensed";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_BdCn.otf") format("opentype");font-weight:700;font-display:swap}
+  @font-face{font-family:"FlapHelvetica";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_Roman.otf") format("opentype");font-weight:400;font-display:swap}
+  @font-face{font-family:"FlapHelvetica";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_Bd.otf") format("opentype");font-weight:700;font-display:swap}
+  :root{
+    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
+    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
+  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
+  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
+  .sub{margin:0 0 18px;color:var(--muted)}
+  details.panel{border-top:1px solid var(--line)}
+  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+  details.panel>summary::-webkit-details-marker{display:none}
+  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
+  details.panel[open]>summary::before{transform:rotate(45deg)}
+  details.panel>summary:hover{color:var(--text)}
+  details.panel>summary .t{flex:1}
+  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  details.panel>.body{padding:0 0 10px}
+  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .row>label{flex:0 0 78px;color:var(--muted)}
+  .row select,.row input[type=text]{flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
+  .row input[type=number]{width:72px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
+  .row input[type=checkbox]{accent-color:var(--accent)}
+  .row .wrap{display:flex;flex-wrap:wrap;gap:6px 14px;flex:1;min-width:0}
+  .row .wrap label{display:inline-flex;align-items:center;gap:6px;color:var(--text);white-space:nowrap}
+  .row .wrap label.sw{color:var(--muted)}
+  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
+  input:focus,select:focus,textarea:focus{border-color:#4a4a50;outline:none}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:#55555c}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.06)}
+  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
+  button.icon{padding:5px 7px;color:var(--muted)}
+  .seg{display:flex;flex:1}
+  .seg button{flex:1;border-radius:0;padding:5px 0}
+  .seg button:first-child{border-radius:5px 0 0 5px}
+  .seg button:last-child{border-radius:0 5px 5px 0}
+  .seg button.on{background:#3a3a40;color:#fff}
+  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
+  .slider label{color:var(--text)}
+  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
+  /* Messages */
+  .msg{border:1px solid var(--line);border-radius:6px;background:var(--panel2);padding:8px 10px 10px;margin:0 0 8px}
+  .msg.on{border-color:var(--accent)}
+  .msg .head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .msg .head .n{flex:1;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px}
+  .msg.on .head .n{color:var(--accent)}
+  .msg .head .over{color:#e0a15a;font-size:11px;font-variant-numeric:tabular-nums;cursor:help}
+  /* The message box is the board in miniature: one cell per module, the board's own colours and proportions. */
+  .msg .gridwrap{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:5px;padding:6px}
+  .msg .grid{position:absolute;top:6px;pointer-events:none;background-color:var(--flap);background-repeat:repeat;
+    background-image:
+      linear-gradient(to bottom,transparent calc(50% - .5px),var(--hinge) calc(50% - .5px) calc(50% + .5px),transparent calc(50% + .5px)),
+      linear-gradient(to right,var(--gapc) 0 var(--gapw),transparent var(--gapw)),
+      linear-gradient(to bottom,var(--gapc) 0 var(--gapw),transparent var(--gapw));
+    background-position:0 0,calc(var(--gapw) / -2) 0,0 calc(var(--gapw) / -2)}
+  .msg textarea{position:relative;z-index:1;display:block;width:100%;height:60px;margin:0;padding:0;border:0;resize:none;background:transparent;
+    font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;scrollbar-width:none}
+  .msg textarea::-webkit-scrollbar{width:0;height:0}
+  .msg textarea::placeholder{color:currentColor;opacity:.3;letter-spacing:normal}
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
+  .presets button small{display:block;color:var(--muted);font-size:11px}
+  .presets button.on{border-color:var(--accent);color:#fff}
+  .addrow{display:flex;gap:6px;margin-top:4px}
+  .addrow button{flex:1}
+  main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+  .topbar .spacer{flex:1}
+  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
+  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  .stage.fit{overflow:hidden}
+  .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
+  .stage:not(.fit){display:block}
+  .stage:not(.fit) canvas{display:block;margin:0 auto}
+  canvas{box-shadow:0 24px 60px rgba(0,0,0,.65),0 2px 4px rgba(0,0,0,.5);image-rendering:auto}
+  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+  .actions{display:flex;flex-direction:column;gap:6px}
+  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
+  .warn{color:#e0a15a}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
+    aside{max-height:50vh}
+    .footer{grid-template-columns:1fr}
+    .actions{flex-direction:row;flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+<script src="../tool-banner.js" data-tool="Split-flap board"></script>
+<script src="../tool-kit.js"></script>
+<div class="app">
+  <aside>
+    <h1>Split-flap board</h1>
+    <p class="sub">A departure board. Type a message; every letter clatters into place.</p>
+
+    <details class="panel" data-panel="messages" open>
+      <summary><span class="t">Messages</span><span class="v" id="hint-messages"></span></summary>
+      <div class="body">
+        <div id="msgList"></div>
+        <div class="addrow"><button id="addMsg">+ Message</button><button id="flipNext" class="primary">Flip to next</button><button id="reflip" title="Blank the board and flip the current message in again">Re-flip</button></div>
+        <div id="cycleSliders"></div>
+        <div class="row"><label></label><button id="playPause">Play</button><span class="hint" id="cycleState"></span></div>
+        <p class="hint">The highlighted message is on the board. Editing it flips the changed letters live. Cycling pauses while you type. Space flips to the next message, 1–9 jump to one.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="looks" open>
+      <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
+      <div class="body">
+        <div class="presets" id="presets"></div>
+        <div class="row" style="margin-top:10px"><label></label><button id="resetTool" class="danger">Reset to defaults</button></div>
+        <p class="hint">A preset replaces the messages, board, type, motion and export settings. Reset clears everything saved for this tool.</p>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="board">
+      <summary><span class="t">Board</span><span class="v" id="hint-board"></span></summary>
+      <div class="body">
+        <div class="row"><label>Modules</label><input type="number" id="rows" min="1" max="12" step="1"> <span class="hint">rows ×</span> <input type="number" id="cols" min="4" max="48" step="1"> <span class="hint">columns</span></div>
+        <div id="boardSliders"></div>
+        <div class="row"><label>Colours</label><div class="wrap"><label class="sw"><input type="color" id="boardColor">Board</label><label class="sw"><input type="color" id="flapColor">Flaps</label><label class="sw"><input type="color" id="letterColor">Letters</label></div></div>
+        <div class="row"><label>Header</label><input type="text" id="header" placeholder="e.g. DEPARTURES" spellcheck="false"></div>
+        <div class="row"><label>Show</label><div class="wrap"><label><input type="checkbox" id="rowNumbers"> row numbers</label><label><input type="checkbox" id="hinge"> hinge line</label><label><input type="checkbox" id="upper"> upper case</label></div></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="type">
+      <summary><span class="t">Type</span><span class="v" id="hint-type"></span></summary>
+      <div class="body">
+        <div class="row"><label>Font</label><select id="fontSel"></select></div>
+        <div id="typeSliders"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="motion">
+      <summary><span class="t">Motion</span><span class="v" id="hint-motion"></span></summary>
+      <div class="body">
+        <div class="row"><label>Stagger</label><div class="seg" id="staggerSeg"><button data-v="ltr">Left→right</button><button data-v="row">By row</button><button data-v="random">Random</button><button data-v="all">All at once</button></div></div>
+        <div id="motionSliders"></div>
+        <div class="row"><label>Alphabet</label><input type="text" id="alphabet" spellcheck="false"></div>
+        <div class="row"><label></label><label style="color:var(--text)"><input type="checkbox" id="blankFirst"> blank the board before each message</label></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="export">
+      <summary><span class="t">Export</span><span class="v" id="hint-export"></span></summary>
+      <div class="body">
+        <div class="row"><label>GIF shows</label><div class="seg" id="modeSeg"><button data-v="flip">One flip</button><button data-v="cycle">All messages</button></div></div>
+        <div id="exportSliders"></div>
+        <div class="row"><label></label><button id="fitFrames" title="Set the frame count so the whole animation fits">Fit frames</button><span class="hint" id="cycleHint"></span></div>
+      </div>
+    </details>
+
+    <details class="panel" data-panel="random">
+      <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
+      <div class="body">
+        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <p class="hint">The seed drives the random stagger and each module's clatter.</p>
+      </div>
+    </details>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span id="meta"></span>
+      <span class="spacer"></span>
+      <label>Zoom <select id="zoomSel">
+        <option value="fit">Fit</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option>
+      </select></label>
+    </div>
+    <div class="stage fit" id="stage"><canvas id="canvas" width="800" height="300"></canvas></div>
+    <div class="footer">
+      <div class="actions">
+        <button id="download" class="primary">Download PNG</button>
+        <button id="downloadGif" title="Looping GIF of the flip, or of every message in turn">Download GIF</button>
+        <button id="previewGif" title="Render the GIF and loop it here before saving">Preview GIF</button>
+        <button id="copyImg">Copy image</button>
+        <button id="copyRecipe">Copy recipe</button>
+      </div>
+      <pre id="recipe"></pre>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- State ----------
+const DEFAULT_MESSAGES = [
+  'DEPARTURES\n\n07:40  PADDINGTON      ON TIME\n07:52  CARDIFF CENTRAL  DELAYED',
+  'SCUGGNIZZI TOOLS\n\nPLATFORM 3          NOW BOARDING\nMIND THE GAP',
+];
+const DEFAULTS = {
+  messages: DEFAULT_MESSAGES.slice(), active: 0,
+  board: { rows: 4, cols: 32, mw: 34, mh: 54, gap: 4, radius: 3, boardColor: '#141414', flapColor: '#1e1e20', letterColor: '#f3efe4', hinge: true, rowNumbers: false, header: '', upper: true },
+  type: { font: 'condensed', size: 0.74, spacing: 0, baseline: 0 },
+  motion: { stepMs: 60, stagger: 'ltr', staggerMs: 22, clatter: 0.35, bounce: 0.35, alphabet: " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:-/&'!?", blankFirst: false, autoAdvance: 0 },
+  export: { frames: 56, delay: 5, mode: 'flip', hold: 0.8 },
+  zoom: 'fit', seed: 1,
+};
+const state = JSON.parse(JSON.stringify(DEFAULTS));
+let presetsEl = null;
+const FONTS = {
+  condensed: ['Helvetica Neue Condensed', '"FlapCondensed","Helvetica Neue Condensed","Arial Narrow",sans-serif', 500],
+  condensedBold: ['Helvetica Neue Condensed Bold', '"FlapCondensed","Helvetica Neue Condensed","Arial Narrow",sans-serif', 700],
+  helvetica: ['Helvetica Neue', '"FlapHelvetica","Helvetica Neue",Helvetica,Arial,sans-serif', 400],
+  helveticaBold: ['Helvetica Neue Bold', '"FlapHelvetica","Helvetica Neue",Helvetica,Arial,sans-serif', 700],
+  courier: ['Courier', '"Courier New",Courier,monospace', 700],
+  mono: ['System mono', 'ui-monospace,"SF Mono",Menlo,Consolas,monospace', 600],
+};
+
+// Presets replace the whole board (messages included); the image of the board is the point of each.
+const COUNTDOWN = ['5', '4', '3', '2', '1', 'GO'].map(s => s.padStart(3, ' ').padEnd(4, ' '));
+const PRESETS = [
+  { name: 'Departures', desc: 'black board, condensed type, left-to-right clatter', apply: {
+      messages: DEFAULT_MESSAGES.slice(), active: 0,
+      board: { rows: 4, cols: 32, mw: 34, mh: 54, gap: 4, radius: 3, boardColor: '#141414', flapColor: '#1e1e20', letterColor: '#f3efe4', hinge: true, rowNumbers: false, header: '', upper: true },
+      type: { font: 'condensed', size: 0.74, spacing: 0, baseline: 0 },
+      motion: { stepMs: 60, stagger: 'ltr', staggerMs: 22, clatter: 0.35, bounce: 0.35, blankFirst: false, autoAdvance: 0 },
+      export: { frames: 56, delay: 5, mode: 'flip', hold: 0.8 } } },
+  { name: 'Countdown', desc: 'four big digits, 5 → GO, all at once, cycles', apply: {
+      messages: COUNTDOWN, active: 0,
+      board: { rows: 1, cols: 4, mw: 120, mh: 180, gap: 10, radius: 8, boardColor: '#0e0e0e', flapColor: '#232326', letterColor: '#ffffff', hinge: true, rowNumbers: false, header: '', upper: true },
+      type: { font: 'condensedBold', size: 0.92, spacing: 0, baseline: 0.01 },
+      motion: { stepMs: 42, stagger: 'all', staggerMs: 0, clatter: 0.12, bounce: 0.55, blankFirst: false, autoAdvance: 1 },
+      export: { frames: 90, delay: 4, mode: 'cycle', hold: 0.6 } } },
+  { name: 'Menu board', desc: 'white flaps, black type, slow flips by row', apply: {
+      messages: ['SWITCHYARDS CAFE\n\nESPRESSO          3.50\nFLAT WHITE        4.75\nCOLD BREW         5.00\nTOAST + JAM       6.00', 'COLD-COLD.\nBIG ROOM.\nTHE PULL.\n\nOPEN 7 - 7\nEVERY DAY'], active: 0,
+      board: { rows: 6, cols: 24, mw: 30, mh: 46, gap: 3, radius: 2, boardColor: '#cfc8ba', flapColor: '#f6f3ec', letterColor: '#161616', hinge: true, rowNumbers: false, header: 'TODAY', upper: true },
+      type: { font: 'helveticaBold', size: 0.62, spacing: 0, baseline: 0 },
+      motion: { stepMs: 95, stagger: 'row', staggerMs: 14, clatter: 0.45, bounce: 0.2, blankFirst: false, autoAdvance: 0 },
+      export: { frames: 80, delay: 6, mode: 'flip', hold: 1 } } },
+];
+
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+const getPath = p => p.split('.').reduce((o, k) => o[k], state);
+const setPath = (p, v) => { const ks = p.split('.'); let o = state; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; };
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const fmt = { px: v => Math.round(v) + ' px', pct: v => Math.round(v * 100) + '%', ms: v => Math.round(v) + ' ms', int: v => String(Math.round(v)), x: v => (+v).toFixed(2) + '×', cs: v => (v * 10) + ' ms' };
+const fontCSS = () => FONTS[state.type.font] || FONTS.condensed;
+const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const shade = (hex, f) => { const [r, g, b] = hexToRgb(hex); return `rgb(${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)})`; };
+const rgba = (hex, a) => { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; };
+const mix = (a, b, t) => { const x = hexToRgb(a), y = hexToRgb(b); return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`; };
+
+// ---------- Board geometry ----------
+const PAD = 18;
+function geom() {
+  const B = state.board, headerH = B.header.trim() ? Math.round(B.mh * 0.55) : 0, numW = B.rowNumbers ? Math.round(B.mw * 0.9) : 0;
+  const gw = B.cols * (B.mw + B.gap) - B.gap, gh = B.rows * (B.mh + B.gap) - B.gap;
+  return { headerH, numW, gw, gh, w: PAD * 2 + numW + gw, h: PAD * 2 + headerH + gh, x0: PAD + numW, y0: PAD + headerH };
+}
+
+// ---------- Glyph atlas: every alphabet character rendered once per (font, size, colours, module size) ----------
+const atlas = document.createElement('canvas'), actx = atlas.getContext('2d');
+let atlasKey = '';
+function alphabet() { const a = state.motion.alphabet || ' '; return a.includes(' ') ? a : ' ' + a; }
+function buildAtlas() {
+  const B = state.board, T = state.type, A = alphabet(), f = fontCSS();
+  const key = [A, B.mw, B.mh, B.letterColor, T.font, T.size, T.spacing, T.baseline].join('|');
+  if (key === atlasKey) return; atlasKey = key;
+  atlas.width = Math.max(1, A.length * B.mw); atlas.height = B.mh;
+  actx.clearRect(0, 0, atlas.width, atlas.height);
+  const px = Math.max(4, B.mh * T.size);
+  actx.font = `${f[2]} ${px}px ${f[1]}`; actx.fillStyle = B.letterColor; actx.textAlign = 'center'; actx.textBaseline = 'middle';
+  if ('letterSpacing' in actx) actx.letterSpacing = T.spacing + 'px';
+  for (let i = 0; i < A.length; i++) actx.fillText(A[i], i * B.mw + B.mw / 2 + T.spacing / 2, B.mh / 2 + B.mh * T.baseline);
+}
+
+// ---------- Modules (runtime, not saved) ----------
+let mods = [];          // [{cur, target, t, delay, speed, settle}]
+let rafId = 0, lastTs = 0, phase = 'idle', pendingTargets = null;
+function ensureModules() {
+  const n = state.board.rows * state.board.cols;
+  if (mods.length === n) return;
+  const old = mods; mods = [];
+  for (let i = 0; i < n; i++) mods.push(old[i] ? old[i] : { cur: 0, target: 0, t: 0, delay: 0, speed: 1, settle: 0 });
+}
+function targetsFor(text) {
+  const B = state.board, A = alphabet(), lines = (B.upper ? text.toUpperCase() : text).split('\n'), out = new Int16Array(B.rows * B.cols);
+  for (let r = 0; r < B.rows; r++) {
+    const line = lines[r] || '';
+    for (let c = 0; c < B.cols; c++) {
+      let ch = line[c] || ' '; let i = A.indexOf(ch);
+      if (i < 0) i = A.indexOf(ch.toUpperCase()); if (i < 0) i = A.indexOf(ch.toLowerCase()); if (i < 0) i = 0;
+      out[r * B.cols + c] = i;
+    }
+  }
+  return out;
+}
+// Assign targets with stagger delays and per-module clatter, then start the loop.
+function flipTo(targets, opts) {
+  ensureModules();
+  const M = state.motion, B = state.board, rng = mulberry32(state.seed * 131 + (opts && opts.salt || 0));
+  for (let i = 0; i < mods.length; i++) {
+    const m = mods[i], r = Math.floor(i / B.cols), c = i % B.cols;
+    m.target = targets[i]; m.speed = 1 + (rng() - 0.5) * 2 * M.clatter * 0.6;
+    let d = 0;
+    if (M.stagger === 'ltr') d = c * M.staggerMs + r * M.staggerMs * 0.5;
+    else if (M.stagger === 'row') d = r * M.staggerMs * 6 + c * M.staggerMs * 0.25;
+    else if (M.stagger === 'random') d = rng() * B.cols * M.staggerMs;
+    m.delay = m.cur === m.target ? 0 : d;
+  }
+  startLoop();
+}
+function showMessage(index, opts) {
+  const n = state.messages.length; if (!n) return;
+  state.active = ((index % n) + n) % n;
+  const targets = targetsFor(state.messages[state.active]);
+  if (state.motion.blankFirst && !(opts && opts.noBlank)) { pendingTargets = targets; phase = 'blanking'; flipTo(new Int16Array(mods.length || state.board.rows * state.board.cols), { salt: 7 }); }
+  else { pendingTargets = null; phase = 'flipping'; flipTo(targets, opts); }
+  renderMessages(); updateHints(); updateRecipe(); invalidate();
+}
+function reflip() { ensureModules(); for (const m of mods) { m.cur = 0; m.t = 0; m.settle = 0; } showMessage(state.active, { noBlank: true, salt: 3 }); }
+function settleAll() { ensureModules(); for (const m of mods) { m.cur = m.target; m.t = 0; m.delay = 0; m.settle = 0; } if (pendingTargets) { for (let i = 0; i < mods.length; i++) mods[i].cur = mods[i].target = pendingTargets[i]; pendingTargets = null; } phase = 'idle'; }
+
+// One simulation step. Returns true while anything is still moving.
+function tick(dt) {
+  const M = state.motion, A = alphabet().length; let moving = false;
+  for (const m of mods) {
+    if (m.settle > 0) { m.settle = Math.max(0, m.settle - dt / 260); moving = true; }
+    if (m.cur === m.target) continue;
+    moving = true;
+    if (m.delay > 0) { m.delay -= dt; continue; }
+    m.t += dt / (M.stepMs * m.speed);
+    while (m.t >= 1) { m.t -= 1; m.cur = (m.cur + 1) % A; if (m.cur === m.target) { m.t = 0; m.settle = M.bounce; break; } }
+  }
+  if (!moving && phase === 'blanking' && pendingTargets) { phase = 'flipping'; const t = pendingTargets; pendingTargets = null; flipTo(t); return true; }
+  if (!moving && phase !== 'idle') { phase = 'idle'; idleSince = performance.now(); }
+  return moving;
+}
+// Auto-advance: once the board has rested for the set time, flip to the next message.
+let idleSince = performance.now();
+setInterval(() => {
+  const s = state.motion.autoAdvance; if (!s || phase !== 'idle' || state.messages.length < 2 || document.hidden) return;
+  const a = document.activeElement; if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) { idleSince = performance.now(); return; }   // hands off while typing
+  if (performance.now() - idleSince >= s * 1000) showMessage(state.active + 1);
+}, 150);
+function startLoop() { if (rafId) return; lastTs = 0; rafId = requestAnimationFrame(loop); }
+function loop(ts) {
+  rafId = 0;
+  const dt = lastTs ? Math.min(50, ts - lastTs) : 16; lastTs = ts;
+  const moving = tick(dt);
+  draw();
+  if (moving) rafId = requestAnimationFrame(loop);
+}
+
+// ---------- Drawing ----------
+const canvas = $('#canvas'), ctx = canvas.getContext('2d');
+function halfRect(x, y, w, h, r, top) {
+  // Rounded on the outer corners only: a top half rounds its top corners, a bottom half its bottom corners.
+  ctx.beginPath();
+  if (top) { ctx.moveTo(x, y + h); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h); }
+  else { ctx.moveTo(x, y); ctx.lineTo(x, y + h - r); ctx.arcTo(x, y + h, x + r, y + h, r); ctx.lineTo(x + w - r, y + h); ctx.arcTo(x + w, y + h, x + w, y + h - r, r); ctx.lineTo(x + w, y); }
+  ctx.closePath();
+}
+function drawHalf(ci, x, y, top) {
+  const B = state.board, hh = B.mh / 2;
+  ctx.fillStyle = B.flapColor; halfRect(x, top ? y : y + hh, B.mw, hh, B.radius, top); ctx.fill();
+  ctx.save(); halfRect(x, top ? y : y + hh, B.mw, hh, B.radius, top); ctx.clip();
+  ctx.drawImage(atlas, ci * B.mw, top ? 0 : hh, B.mw, hh, x, top ? y : y + hh, B.mw, hh);
+  ctx.restore();
+}
+function draw() {
+  ensureModules(); buildAtlas();
+  const B = state.board, G = geom(), A = alphabet().length, M = state.motion;
+  if (canvas.width !== G.w || canvas.height !== G.h) { canvas.width = G.w; canvas.height = G.h; applyZoom(); }
+  ctx.fillStyle = B.boardColor; ctx.fillRect(0, 0, G.w, G.h);
+  const f = fontCSS();
+  if (G.headerH) { ctx.fillStyle = B.letterColor; ctx.globalAlpha = 0.75; ctx.font = `${f[2]} ${Math.round(G.headerH * 0.5)}px ${f[1]}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(B.upper ? B.header.toUpperCase() : B.header, G.x0, PAD + G.headerH * 0.42); ctx.globalAlpha = 1; }
+  for (let r = 0; r < B.rows; r++) {
+    const y = G.y0 + r * (B.mh + B.gap);
+    if (G.numW) { ctx.fillStyle = B.letterColor; ctx.globalAlpha = 0.45; ctx.font = `500 ${Math.round(B.mh * 0.28)}px ui-monospace,Menlo,monospace`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(r + 1).padStart(2, '0'), PAD + G.numW - 8, y + B.mh / 2); ctx.globalAlpha = 1; }
+    for (let c = 0; c < B.cols; c++) {
+      const m = mods[r * B.cols + c], x = G.x0 + c * (B.mw + B.gap), hh = B.mh / 2, hinge = y + hh;
+      const flipping = m.cur !== m.target && m.delay <= 0 && m.t > 0, next = (m.cur + 1) % A;
+      // Static halves: the top shows what is being revealed, the bottom what is still there.
+      drawHalf(flipping ? next : m.cur, x, y, true);
+      drawHalf(m.cur, x, y, false);
+      if (flipping) {
+        const t = m.t, s = Math.cos(t * Math.PI);          // +1 → 0 → −1 across the flip
+        // Shadow cast on the half the moving flap is passing over.
+        ctx.fillStyle = `rgba(0,0,0,${0.45 * Math.sin(t * Math.PI)})`;
+        if (t < 0.5) { halfRect(x, hinge, B.mw, hh, B.radius, false); ctx.fill(); } else { halfRect(x, y, B.mw, hh, B.radius, true); ctx.fill(); }
+        ctx.save(); ctx.translate(x, hinge);
+        if (t < 0.5) {                                    // top half of the current character folding down
+          ctx.scale(1, Math.max(0.02, s)); ctx.translate(-x, -hinge); drawHalf(m.cur, x, y, true);
+          ctx.fillStyle = `rgba(0,0,0,${0.55 * (1 - s)})`; halfRect(x, y, B.mw, hh, B.radius, true); ctx.fill();
+        } else {                                          // bottom half of the next character swinging into place
+          ctx.scale(1, Math.max(0.02, -s)); ctx.translate(-x, -hinge); drawHalf(next, x, y, false);
+          ctx.fillStyle = `rgba(255,255,255,${0.12 * (1 + s)})`; halfRect(x, y + hh, B.mw, hh, B.radius, false); ctx.fill();
+        }
+        ctx.restore();
+      } else if (m.settle > 0 && M.bounce > 0) {         // landing bounce: the bottom flap wobbles once
+        const k = m.settle / Math.max(0.001, M.bounce), wob = Math.sin(k * Math.PI * 2) * 0.12 * M.bounce * k;
+        ctx.save(); ctx.translate(x, hinge); ctx.scale(1, 1 - Math.abs(wob)); ctx.translate(-x, -hinge); drawHalf(m.cur, x, y, false); ctx.restore();
+      }
+      if (B.hinge) { ctx.fillStyle = B.boardColor; ctx.globalAlpha = 0.9; ctx.fillRect(x, hinge - 0.75, B.mw, 1.5); ctx.globalAlpha = 1; }
+    }
+  }
+}
+
+// ---------- Render scheduling & persistence hooks ----------
+let pendingDraw = 0;
+function invalidate() {
+  if (window.ToolKit) ToolKit.commit();
+  ensureModules();
+  updateMeta(); updateHints(); updateRecipe();
+  if (!rafId && !pendingDraw) pendingDraw = requestAnimationFrame(() => { pendingDraw = 0; draw(); });
+}
+function applyZoom() {
+  const z = state.zoom, stage = $('#stage');
+  if (z === 'fit') { stage.classList.add('fit'); canvas.style.width = ''; canvas.style.height = ''; }
+  else { stage.classList.remove('fit'); canvas.style.width = canvas.width * parseFloat(z) + 'px'; canvas.style.height = canvas.height * parseFloat(z) + 'px'; }
+}
+function updateMeta() { const G = geom(), B = state.board; $('#meta').innerHTML = `${B.rows} × ${B.cols} modules &nbsp;·&nbsp; ${G.w} × ${G.h} px` + (G.w * G.h > 4e6 ? ' &nbsp;<span class="warn">too large for GIF</span>' : ''); }
+function cycleMs() {
+  // Longest module journey for the current message: stagger delay plus steps × step time.
+  ensureModules(); const M = state.motion, B = state.board, A = alphabet().length, t = targetsFor(state.messages[state.active] || '');
+  let worst = 0;
+  for (let i = 0; i < mods.length; i++) {
+    const r = Math.floor(i / B.cols), c = i % B.cols, steps = ((t[i] - 0) % A + A) % A;
+    const d = M.stagger === 'ltr' ? c * M.staggerMs + r * M.staggerMs * 0.5 : M.stagger === 'row' ? r * M.staggerMs * 6 + c * M.staggerMs * 0.25 : M.stagger === 'random' ? B.cols * M.staggerMs : 0;
+    worst = Math.max(worst, d + steps * M.stepMs * (1 + M.clatter * 0.3));
+  }
+  return worst + 300;
+}
+function animationMs() { const E = state.export; return E.mode === 'cycle' ? state.messages.length * (cycleMs() + E.hold * 1000) : cycleMs(); }
+function updateHints() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const B = state.board, T = state.type, M = state.motion, E = state.export;
+  set('hint-messages', `${state.messages.length} · showing ${state.active + 1}`);
+  set('hint-board', `${B.rows} × ${B.cols}`);
+  set('hint-type', `${fontCSS()[0]} · ${Math.round(T.size * 100)}%`);
+  set('hint-motion', `${M.stepMs} ms · ${{ ltr: 'left→right', row: 'by row', random: 'random', all: 'all at once' }[M.stagger]}`);
+  set('hint-export', `${E.frames} frames · ${E.delay * 10} ms`);
+  set('hint-random', `seed ${state.seed}`);
+  const need = Math.ceil(animationMs() / (E.delay * 10)) + 2;
+  set('cycleHint', E.mode === 'cycle' ? `all ${state.messages.length} messages need about ${need} frames` : `a full flip from blank needs about ${need} frames`);
+  set('hint-looks', [...(presetsEl ? presetsEl.children : [])].find(c => c.classList.contains('on'))?.firstChild.textContent || 'custom');
+}
+function updateRecipe() {
+  const B = state.board, T = state.type, M = state.motion, E = state.export;
+  $('#recipe').textContent = [
+    `Split-flap board, ${B.rows} rows × ${B.cols} columns, modules ${B.mw} × ${B.mh} px with ${B.gap} px gaps${B.header.trim() ? `, header "${B.header}"` : ''}${B.rowNumbers ? ', row numbers' : ''}. Board ${B.boardColor}, flaps ${B.flapColor}, letters ${B.letterColor}${B.hinge ? ', hinge line' : ''}.`,
+    `Type: ${fontCSS()[0]} at ${Math.round(T.size * 100)}% of module height, letter spacing ${T.spacing} px. Motion: ${M.stepMs} ms per flap, stagger ${M.stagger} at ${M.staggerMs} ms, clatter ${Math.round(M.clatter * 100)}%, bounce ${Math.round(M.bounce * 100)}%${M.blankFirst ? ', blank between messages' : ''}. Alphabet "${M.alphabet}".`,
+    `${state.messages.length} message${state.messages.length === 1 ? '' : 's'}, showing ${state.active + 1}. GIF ${E.frames} frames at ${E.delay * 10} ms. Seed ${state.seed}.`,
+  ].join('\n');
+}
+
+// ---------- Controls ----------
+const controls = {};
+function addSlider(parent, spec) {
+  const wrap = document.createElement('div'); wrap.className = 'slider';
+  wrap.innerHTML = `<label>${spec.label}</label><output></output><input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
+  const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+  const refresh = () => { const v = getPath(spec.path); input.value = v; out.textContent = spec.fmt(+v); };
+  input.addEventListener('input', () => { const v = parseFloat(input.value); setPath(spec.path, v); out.textContent = spec.fmt(v); if (spec.onChange) spec.onChange(v); invalidate(); });
+  controls[spec.path] = { refresh }; refresh(); parent.appendChild(wrap);
+}
+const retarget = () => { ensureModules(); if (state.messages[state.active] != null) { const t = targetsFor(state.messages[state.active]); for (let i = 0; i < mods.length; i++) { mods[i].target = t[i]; if (mods[i].cur !== t[i] && mods[i].delay <= 0) mods[i].delay = 0; } startLoop(); } };
+const Bs = $('#boardSliders');
+addSlider(Bs, { path: 'board.mw', label: 'Module width', min: 14, max: 80, step: 1, fmt: fmt.px, onChange: layoutAllMsgGrids });
+addSlider(Bs, { path: 'board.mh', label: 'Module height', min: 20, max: 120, step: 1, fmt: fmt.px, onChange: layoutAllMsgGrids });
+addSlider(Bs, { path: 'board.gap', label: 'Gap', min: 0, max: 16, step: 1, fmt: fmt.px, onChange: layoutAllMsgGrids });
+addSlider(Bs, { path: 'board.radius', label: 'Corner radius', min: 0, max: 12, step: 0.5, fmt: fmt.px });
+const Ts = $('#typeSliders');
+addSlider(Ts, { path: 'type.size', label: 'Size', min: 0.3, max: 1.1, step: 0.01, fmt: fmt.pct });
+addSlider(Ts, { path: 'type.spacing', label: 'Letter spacing', min: -4, max: 8, step: 0.5, fmt: fmt.px });
+addSlider(Ts, { path: 'type.baseline', label: 'Baseline nudge', min: -0.15, max: 0.15, step: 0.005, fmt: v => Math.round(v * 100) + '%' });
+const Ms = $('#motionSliders');
+addSlider(Ms, { path: 'motion.stepMs', label: 'Time per flap', min: 15, max: 250, step: 1, fmt: fmt.ms });
+addSlider(Ms, { path: 'motion.staggerMs', label: 'Stagger', min: 0, max: 120, step: 1, fmt: fmt.ms });
+addSlider(Ms, { path: 'motion.clatter', label: 'Clatter', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider(Ms, { path: 'motion.bounce', label: 'Landing bounce', min: 0, max: 1, step: 0.01, fmt: fmt.pct });
+addSlider($('#cycleSliders'), { path: 'motion.autoAdvance', label: 'Cycle every', min: 0, max: 10, step: 0.1, fmt: v => v ? v.toFixed(1) + ' s' : 'off', onChange: syncPlay });
+let lastCycle = 2;
+function syncPlay() {
+  const on = state.motion.autoAdvance > 0; if (on) lastCycle = state.motion.autoAdvance;
+  $('#playPause').textContent = on ? 'Pause' : 'Play';
+  $('#cycleState').textContent = on ? `next message ${state.motion.autoAdvance.toFixed(1)} s after each lands` : 'not cycling';
+}
+$('#playPause').addEventListener('click', () => { state.motion.autoAdvance = state.motion.autoAdvance > 0 ? 0 : lastCycle; controls['motion.autoAdvance'].refresh(); syncPlay(); idleSince = performance.now(); invalidate(); });
+const Es = $('#exportSliders');
+addSlider(Es, { path: 'export.frames', label: 'GIF frames', min: 6, max: 240, step: 1, fmt: fmt.int });
+addSlider(Es, { path: 'export.delay', label: 'Frame delay', min: 2, max: 20, step: 1, fmt: fmt.cs });
+addSlider(Es, { path: 'export.hold', label: 'Hold between messages', min: 0, max: 3, step: 0.1, fmt: v => v.toFixed(1) + ' s' });
+$('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.export.mode = b.dataset.v; syncMode(); invalidate(); });
+function syncMode() { for (const b of $('#modeSeg').children) b.classList.toggle('on', b.dataset.v === state.export.mode); controls['export.hold'] && (document.querySelector('[data-panel=export] .slider:last-of-type').hidden = state.export.mode !== 'cycle'); }
+// Presets and reset
+presetsEl = $('#presets');
+PRESETS.forEach((p, i) => {
+  const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
+  b.addEventListener('click', () => {
+    const a = JSON.parse(JSON.stringify(p.apply));
+    state.messages = a.messages; state.active = a.active; Object.assign(state.board, a.board); Object.assign(state.type, a.type); Object.assign(state.motion, a.motion); Object.assign(state.export, a.export);
+    mods = []; refreshAll(); settleAll(); [...presetsEl.children].forEach((c, j) => c.classList.toggle('on', i === j)); reflip();
+  });
+  presetsEl.appendChild(b);
+});
+$('#resetTool').addEventListener('click', () => ToolKit.reset());
+
+for (const k in FONTS) $('#fontSel').add(new Option(FONTS[k][0], k));
+$('#fontSel').addEventListener('change', e => { state.type.font = e.target.value; invalidate(); });
+$('#rows').addEventListener('change', e => { state.board.rows = Math.max(1, Math.min(12, parseInt(e.target.value) || 1)); e.target.value = state.board.rows; mods = []; renderMessages(); settleAll(); retarget(); invalidate(); });
+$('#cols').addEventListener('change', e => { state.board.cols = Math.max(4, Math.min(48, parseInt(e.target.value) || 4)); e.target.value = state.board.cols; mods = []; settleAll(); retarget(); layoutAllMsgGrids(); invalidate(); });
+for (const id of ['boardColor', 'flapColor', 'letterColor']) $('#' + id).addEventListener('input', e => { state.board[id] = e.target.value; layoutAllMsgGrids(); invalidate(); });
+$('#header').addEventListener('input', e => { state.board.header = e.target.value; invalidate(); });
+for (const id of ['rowNumbers', 'hinge', 'upper']) $('#' + id).addEventListener('change', e => { state.board[id] = e.target.checked; if (id === 'upper') retarget(); layoutAllMsgGrids(); invalidate(); });
+$('#staggerSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.motion.stagger = b.dataset.v; syncSeg(); invalidate(); });
+function syncSeg() { for (const b of $('#staggerSeg').children) b.classList.toggle('on', b.dataset.v === state.motion.stagger); }
+$('#alphabet').addEventListener('change', e => { state.motion.alphabet = e.target.value || ' '; mods.forEach(m => { m.cur = 0; m.t = 0; }); retarget(); invalidate(); });
+$('#blankFirst').addEventListener('change', e => { state.motion.blankFirst = e.target.checked; invalidate(); });
+$('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate(); });
+$('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate(); });
+$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
+$('#fitFrames').addEventListener('click', () => { state.export.frames = Math.min(240, Math.ceil(animationMs() / (state.export.delay * 10)) + 2); controls['export.frames'].refresh(); invalidate(); });
+
+// Messages list — each box is a scale model of the board, so what you type sits where it will flip.
+const MSG_MONO = 'ui-monospace,Menlo,Consolas,monospace';
+const MSG_INSET = 36;   // .msg padding+border (2×11) plus .gridwrap padding+border (2×7)
+let chRatio = 0.6, msgAvailW = 0;
+(() => { const c = document.createElement('canvas').getContext('2d'); c.font = `100px ${MSG_MONO}`; const w = c.measureText('M').width; if (w) chRatio = w / 100; })();
+// Characters that fall outside rows × cols never reach the board; trailing blanks don't count.
+function offBoard(text) {
+  const B = state.board; let n = 0;
+  text.split('\n').forEach((line, r) => { const s = line.replace(/\s+$/, ''); n += r < B.rows ? Math.max(0, s.length - B.cols) : s.length; });
+  return n;
+}
+function markOverflow(el, text) {
+  const n = offBoard(text), s = el.querySelector('.over');
+  s.hidden = !n; s.textContent = n + ' off';
+  s.title = `${n} character${n === 1 ? '' : 's'} sit outside the ${state.board.rows} × ${state.board.cols} board and will not flip`;
+}
+// Letter-spacing stretches each monospace character to one module wide, and half the slack becomes the
+// text's left inset so glyphs sit centred in their cells. Cell width is solved so inset + cols × cell
+// exactly fills the box: cw(cols + ½) = avail + glyph/2, with one pass to settle the font size first.
+function cellMetrics(avail, cols) {
+  const B = state.board;
+  const fit = cw => {
+    let chh = Math.min(34, cw * (B.mh / B.mw));                          // the board's own module proportion
+    const size = Math.max(5.5, Math.min(20, cw / chRatio, chh * 0.95));  // fits the cell both ways
+    return { size, glyph: size * chRatio, chh: Math.max(chh, size + 2) };
+  };
+  const m = fit(avail / cols), cw = (avail + m.glyph / 2) / (cols + 0.5);
+  return { cw, ...fit(cw) };
+}
+function layoutMsgGrid(wrap) {
+  const B = state.board, avail = msgAvailW - MSG_INSET;
+  if (!wrap || avail < 40) return;
+  const { cw, size, glyph, chh } = cellMetrics(avail, B.cols), inset = (cw - glyph) / 2;
+  const ta = wrap.querySelector('textarea'), grid = wrap.querySelector('.grid');
+  ta.style.fontSize = size.toFixed(2) + 'px';
+  ta.style.lineHeight = chh.toFixed(2) + 'px';
+  ta.style.letterSpacing = (cw - glyph).toFixed(3) + 'px';
+  ta.style.paddingLeft = inset.toFixed(2) + 'px';
+  ta.style.height = (chh * B.rows).toFixed(2) + 'px';
+  ta.style.color = B.letterColor; ta.style.caretColor = B.letterColor;
+  ta.style.textTransform = B.upper ? 'uppercase' : 'none';
+  wrap.style.background = B.boardColor;
+  grid.style.left = '6px';   // cell 0 starts at the text origin; the inset centres the glyph inside it
+  grid.style.width = (cw * B.cols).toFixed(2) + 'px';
+  grid.style.height = (chh * B.rows).toFixed(2) + 'px';
+  grid.style.backgroundSize = `${cw.toFixed(3)}px ${chh.toFixed(3)}px`;
+  grid.style.setProperty('--flap', B.flapColor);
+  // Gaps and hinges are the board's own, nudged towards the letter colour so the grid still reads at sidebar scale.
+  grid.style.setProperty('--gapc', mix(B.boardColor, B.letterColor, 0.22));
+  grid.style.setProperty('--gapw', Math.max(1, B.gap * cw / B.mw).toFixed(2) + 'px');
+  grid.style.setProperty('--hinge', B.hinge ? mix(B.boardColor, B.letterColor, 0.1) : 'transparent');
+}
+function layoutAllMsgGrids() {
+  document.querySelectorAll('#msgList .msg').forEach((el, i) => { layoutMsgGrid(el.querySelector('.gridwrap')); markOverflow(el, state.messages[i] || ''); });
+}
+new ResizeObserver(es => { const w = es[0].contentRect.width; if (w && Math.abs(w - msgAvailW) > 0.5) { msgAvailW = w; layoutAllMsgGrids(); } }).observe($('#msgList'));
+
+function renderMessages() {
+  const list = $('#msgList'); list.innerHTML = '';
+  state.messages.forEach((text, i) => {
+    const el = document.createElement('div'); el.className = 'msg' + (i === state.active ? ' on' : '');
+    el.innerHTML = `<div class="head"><span class="n">Message ${i + 1}${i === state.active ? ' · on the board' : ''}</span><span class="over" hidden></span>
+      <button class="icon" data-a="show" title="Flip this message onto the board">Show</button><button class="icon" data-a="up" title="Move up">↑</button><button class="icon" data-a="down" title="Move down">↓</button><button class="icon danger" data-a="del" title="Delete">✕</button></div>
+      <div class="gridwrap"><div class="grid"></div><textarea rows="${Math.min(8, Math.max(2, state.board.rows))}" spellcheck="false" placeholder="One line per row"></textarea></div>`;
+    const ta = el.querySelector('textarea'); ta.value = text;
+    // The grid is painted behind the text, so it has to track the textarea's own scrolling.
+    ta.addEventListener('scroll', () => { el.querySelector('.grid').style.transform = `translate(${-ta.scrollLeft}px,${-ta.scrollTop}px)`; });
+    ta.addEventListener('input', () => { state.messages[i] = ta.value; markOverflow(el, ta.value); if (i === state.active) retarget(); invalidate(); });
+    ta.addEventListener('focus', () => { if (i !== state.active) showMessage(i); });
+    layoutMsgGrid(el.querySelector('.gridwrap')); markOverflow(el, text);
+    el.querySelector('.head').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a;
+      if (a === 'show') showMessage(i);
+      else if (a === 'del') { if (state.messages.length <= 1) return; state.messages.splice(i, 1); if (state.active >= state.messages.length) state.active = state.messages.length - 1; else if (i < state.active) state.active--; renderMessages(); retarget(); invalidate(); }
+      else { const j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= state.messages.length) return; [state.messages[i], state.messages[j]] = [state.messages[j], state.messages[i]]; if (state.active === i) state.active = j; else if (state.active === j) state.active = i; renderMessages(); invalidate(); }
+    });
+    list.appendChild(el);
+  });
+}
+$('#addMsg').addEventListener('click', () => { state.messages.push(''); renderMessages(); showMessage(state.messages.length - 1); const tas = document.querySelectorAll('#msgList textarea'); tas[tas.length - 1].focus(); });
+$('#flipNext').addEventListener('click', () => showMessage(state.active + 1));
+$('#reflip').addEventListener('click', reflip);
+
+function refreshAll() {
+  for (const p in controls) controls[p].refresh();
+  const B = state.board;
+  $('#rows').value = B.rows; $('#cols').value = B.cols;
+  $('#boardColor').value = B.boardColor; $('#flapColor').value = B.flapColor; $('#letterColor').value = B.letterColor;
+  $('#header').value = B.header; $('#rowNumbers').checked = B.rowNumbers; $('#hinge').checked = B.hinge; $('#upper').checked = B.upper;
+  $('#fontSel').value = state.type.font; syncSeg(); $('#alphabet').value = state.motion.alphabet; $('#blankFirst').checked = state.motion.blankFirst;
+  $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
+  renderMessages(); applyZoom(); syncMode(); syncPlay();
+}
+
+// Panels remember their open state (same key pattern as the other tools).
+(function () {
+  const KEY = 'splitflap.panels'; let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  for (const d of document.querySelectorAll('details[data-panel]')) {
+    if (saved && d.dataset.panel in saved) d.open = saved[d.dataset.panel];
+    d.addEventListener('toggle', () => { const o = {}; for (const x of document.querySelectorAll('details[data-panel]')) o[x.dataset.panel] = x.open; try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} });
+  }
+})();
+
+// ---------- Export ----------
+function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
+$('#download').addEventListener('click', () => {
+  settleAll(); draw();
+  canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `split-flap-${canvas.width}x${canvas.height}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+});
+$('#copyImg').addEventListener('click', async () => {
+  settleAll(); draw();
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash($('#copyImg'), 'Copied!'); } catch (e) { flash($('#copyImg'), 'Clipboard blocked'); }
+});
+$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
+
+// GIF encoder, lifted from Ink bleed (median-cut palette + LZW).
+function medianCutPalette(hist, maxColors) {
+  const keys = [...hist.keys()], ch = (k, c) => c === 0 ? (k >> 10) & 31 : c === 1 ? (k >> 5) & 31 : k & 31;
+  let boxes = [keys];
+  while (boxes.length < maxColors) {
+    let bi = -1, bestScore = -1;
+    boxes.forEach((b, i) => { if (b.length < 2) return; let mn = [31, 31, 31], mx = [0, 0, 0]; for (const k of b) for (let c = 0; c < 3; c++) { const v = ch(k, c); if (v < mn[c]) mn[c] = v; if (v > mx[c]) mx[c] = v; } const score = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) * Math.log(b.length + 1); if (score > bestScore) { bestScore = score; bi = i; } });
+    if (bi < 0) break;
+    const b = boxes[bi]; let mn = [31, 31, 31], mx = [0, 0, 0];
+    for (const k of b) for (let c = 0; c < 3; c++) { const v = ch(k, c); if (v < mn[c]) mn[c] = v; if (v > mx[c]) mx[c] = v; }
+    const axis = [0, 1, 2].reduce((a, c) => (mx[c] - mn[c]) > (mx[a] - mn[a]) ? c : a, 0);
+    b.sort((p, q) => ch(p, axis) - ch(q, axis));
+    const total = b.reduce((s, k) => s + hist.get(k), 0); let acc = 0, cut = 1;
+    for (let i = 0; i < b.length - 1; i++) { acc += hist.get(b[i]); if (acc >= total / 2) { cut = i + 1; break; } }
+    boxes.splice(bi, 1, b.slice(0, cut), b.slice(cut));
+  }
+  return boxes.map(b => { let r = 0, g = 0, bb = 0, n = 0; for (const k of b) { const c = hist.get(k); r += (ch(k, 0) * 8 + 4) * c; g += (ch(k, 1) * 8 + 4) * c; bb += (ch(k, 2) * 8 + 4) * c; n += c; } return [Math.round(r / n), Math.round(g / n), Math.round(bb / n)]; });
+}
+function lzwEncode(idx, minCodeSize) {
+  const out = []; let bitBuf = 0, bitCnt = 0;
+  const emit = (code, size) => { bitBuf |= code << bitCnt; bitCnt += size; while (bitCnt >= 8) { out.push(bitBuf & 255); bitBuf >>>= 8; bitCnt -= 8; } };
+  const CLEAR = 1 << minCodeSize, EOI = CLEAR + 1;
+  let codeSize = minCodeSize + 1, next = EOI + 1, dict = new Map();
+  emit(CLEAR, codeSize);
+  let prefix = idx[0];
+  for (let i = 1; i < idx.length; i++) {
+    const c = idx[i], key = (prefix << 8) | c, found = dict.get(key);
+    if (found !== undefined) { prefix = found; continue; }
+    emit(prefix, codeSize);
+    if (next > (1 << codeSize) - 1 && codeSize < 12) codeSize++;
+    if (next < 4096) dict.set(key, next++);
+    else { emit(CLEAR, codeSize); dict = new Map(); next = EOI + 1; codeSize = minCodeSize + 1; }
+    prefix = c;
+  }
+  emit(prefix, codeSize); emit(EOI, codeSize);
+  if (bitCnt > 0) out.push(bitBuf & 255);
+  return out;
+}
+function buildGif(frames, w, h, delayCs) {
+  const hist = new Map();
+  for (const f of frames) for (let q = 0; q < f.length; q += 4) { if (f[q + 3] < 128) continue; const k = ((f[q] >> 3) << 10) | ((f[q + 1] >> 3) << 5) | (f[q + 2] >> 3); hist.set(k, (hist.get(k) || 0) + 1); }
+  const palette = medianCutPalette(hist, 255), transIndex = palette.length;
+  const lookup = new Int16Array(32768).fill(-1);
+  const nearest = k => { let r = ((k >> 10) & 31) * 8 + 4, g = ((k >> 5) & 31) * 8 + 4, b = (k & 31) * 8 + 4, best = 0, bd = 1e9; for (let i = 0; i < palette.length; i++) { const p = palette[i], d = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2; if (d < bd) { bd = d; best = i; } } return best; };
+  const bytes = [], u16 = v => bytes.push(v & 255, (v >> 8) & 255), str = s => { for (const ch of s) bytes.push(ch.charCodeAt(0)); };
+  str('GIF89a'); u16(w); u16(h); bytes.push(0xF7, 0, 0);
+  for (let i = 0; i < 256; i++) { const c = palette[i] || [0, 0, 0]; bytes.push(c[0], c[1], c[2]); }
+  bytes.push(0x21, 0xFF, 0x0B); str('NETSCAPE2.0'); bytes.push(3, 1); u16(0); bytes.push(0);
+  for (const f of frames) {
+    const idx = new Uint8Array(w * h);
+    for (let i = 0, q = 0; i < idx.length; i++, q += 4) {
+      if (f[q + 3] < 128) { idx[i] = transIndex; continue; }
+      const k = ((f[q] >> 3) << 10) | ((f[q + 1] >> 3) << 5) | (f[q + 2] >> 3);
+      if (lookup[k] < 0) lookup[k] = nearest(k); idx[i] = lookup[k];
+    }
+    bytes.push(0x21, 0xF9, 4, 0x09); u16(delayCs); bytes.push(transIndex, 0);           // disposal: restore to background, transparent on
+    bytes.push(0x2C); u16(0); u16(0); u16(w); u16(h); bytes.push(0, 8);
+    const data = lzwEncode(idx, 8);
+    for (let p = 0; p < data.length; p += 255) { const chunk = data.slice(p, p + 255); bytes.push(chunk.length); for (const b of chunk) bytes.push(b); }
+    bytes.push(0);
+  }
+  bytes.push(0x3B);
+  return new Uint8Array(bytes);
+}
+
+
+// Deterministic GIF, stepped at the frame delay: one flip of the current message from blank, or every
+// message in turn with a hold between them. Shared by Download and Preview.
+async function makeGif(btn) {
+  const label = btn.textContent, E = state.export, G = geom();
+  if (G.w * G.h > 4e6) { flash(btn, 'Board too large for GIF'); return null; }
+  const active0 = state.active;
+  try {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    ensureModules(); for (const m of mods) { m.cur = 0; m.t = 0; m.settle = 0; }
+    const cycle = E.mode === 'cycle', order = cycle ? state.messages.map((_, i) => i) : [state.active];
+    let mi = 0, hold = 0;
+    pendingTargets = null; phase = 'flipping'; flipTo(targetsFor(state.messages[order[0]] || ''), { salt: 3 });
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    const frames = [], dt = E.delay * 10;
+    for (let i = 0; i < E.frames; i++) {
+      if (i % 6 === 0) { btn.textContent = `Frame ${i + 1} / ${E.frames}…`; await new Promise(r => setTimeout(r, 0)); }
+      draw(); frames.push(new Uint8ClampedArray(ctx.getImageData(0, 0, canvas.width, canvas.height).data));
+      const moving = tick(dt);
+      if (cycle && !moving) { hold += dt; if (hold >= E.hold * 1000) { hold = 0; mi = (mi + 1) % order.length; phase = 'flipping'; flipTo(targetsFor(state.messages[order[mi]] || ''), { salt: 3 + mi }); if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } } }
+    }
+    btn.textContent = 'Encoding…'; await new Promise(r => setTimeout(r, 0));
+    const gif = buildGif(frames, canvas.width, canvas.height, E.delay);
+    return { blob: new Blob([gif], { type: 'image/gif' }), filename: `split-flap-${canvas.width}x${canvas.height}.gif`, note: `${canvas.width} × ${canvas.height} px · ${E.frames} frames at ${E.delay * 10} ms · ${(gif.length / 1024).toFixed(0)} KB` };
+  } finally { state.active = active0; settleAll(); for (let i = 0; i < mods.length; i++) mods[i].cur = mods[i].target = targetsFor(state.messages[state.active] || '')[i]; draw(); btn.textContent = label; }
+}
+$('#downloadGif').addEventListener('click', async () => { const g = await makeGif($('#downloadGif')); if (!g) return; const a = document.createElement('a'); a.href = URL.createObjectURL(g.blob); a.download = g.filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
+$('#previewGif').addEventListener('click', async () => { const g = await makeGif($('#previewGif')); if (g) ToolKit.showGif(g); });
+
+// ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
+const ZOOMS = ['fit', '0.5', '1', '2'];
+function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+ToolKit.init({
+  tool: 'split-flap', version: 1,
+  getState: () => JSON.parse(JSON.stringify(state)),
+  setState: s => { for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s); state.export = { mode: 'flip', hold: 0.8, ...state.export }; state.motion = { autoAdvance: 0, ...state.motion }; if (!state.messages.length) state.messages = ['']; state.active = Math.min(state.active, state.messages.length - 1); mods = []; refreshAll(); settleAll(); retarget(); invalidate(); },
+  defaults: () => JSON.parse(JSON.stringify(DEFAULTS)),
+});
+ToolKit.register('space', 'Flip to next message', () => showMessage(state.active + 1), { group: 'Board' });
+ToolKit.register('enter', 'Flip to next message', () => showMessage(state.active + 1), { group: 'Board', hidden: true });
+for (let i = 1; i <= 9; i++) ToolKit.register(String(i), i === 1 ? 'Flip to message 1–9' : `Flip to message ${i}`, () => { if (i - 1 < state.messages.length) showMessage(i - 1); }, { group: 'Board', hidden: i > 1 });
+ToolKit.register('r', 'Re-flip the current message', reflip, { group: 'Board' });
+ToolKit.register('n', 'New message', () => $('#addMsg').click(), { group: 'Board' });
+ToolKit.register('mod+s', 'Download PNG', () => $('#download').click(), { group: 'Export' });
+ToolKit.register('mod+shift+s', 'Download animated GIF', () => $('#downloadGif').click(), { group: 'Export' });
+ToolKit.register('g', 'Preview the GIF', () => $('#previewGif').click(), { group: 'Export' });
+ToolKit.register('mod+shift+c', 'Copy image', () => $('#copyImg').click(), { group: 'Export' });
+ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
+ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
+ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
+
+// ---------- Go ----------
+refreshAll();
+ensureModules(); settleAll(); draw(); invalidate();
+document.fonts.load('500 40px FlapCondensed').then(() => { atlasKey = ''; draw(); });
+document.fonts.ready.then(() => { atlasKey = ''; draw(); });
+// First impression: the opening message clatters in once the page is up.
+setTimeout(() => { if (phase === 'idle') reflip(); }, 250);
+</script>
+</body>
+</html>

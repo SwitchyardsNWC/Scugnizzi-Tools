@@ -1,0 +1,156 @@
+{
+  "blockGap": 16,
+  "buttons": {
+    "primary": {
+      "border": "ink",
+      "borderWidth": 2,
+      "fill": "ink",
+      "ink": "white",
+      "mobileSize": 0,
+      "padX": 16,
+      "padY": 10,
+      "radius": 0,
+      "size": 13
+    },
+    "secondary": {
+      "border": "ink",
+      "borderWidth": 2,
+      "fill": "white",
+      "ink": "ink",
+      "mobileSize": 0,
+      "padX": 16,
+      "padY": 10,
+      "radius": 0,
+      "size": 13
+    }
+  },
+  "colors": {
+    "grey": "#555555",
+    "ink": "#111111",
+    "rule": "#cccccc",
+    "white": "#ffffff"
+  },
+  "containerWidth": 600,
+  "fontStack": "Menlo, Consolas, Courier New, monospace",
+  "fonts": {
+    "arial": "Arial, Helvetica, sans-serif",
+    "courier": "Courier New, Courier, monospace",
+    "georgia": "Georgia, Times New Roman, serif",
+    "helvetica": "Helvetica, Arial, sans-serif",
+    "mono": "Menlo, Consolas, Courier New, monospace",
+    "tahoma": "Tahoma, Verdana, sans-serif",
+    "times": "Times New Roman, Times, serif",
+    "verdana": "Verdana, Geneva, sans-serif"
+  },
+  "image": {
+    "borderColor": "ink",
+    "borderWidth": 2,
+    "defaultWidth": 560,
+    "radius": 0
+  },
+  "mobileBreakpoint": 639,
+  "pageBackground": "#ffffff",
+  "pageBorderColor": "ink",
+  "pageBorderWidth": 0,
+  "pageMargin": 0,
+  "pagePadding": 20,
+  "richText": {
+    "listGap": 4,
+    "listIndent": 22,
+    "listLineHeight": 150,
+    "quoteBar": 2,
+    "quoteColor": "ink",
+    "quoteInset": 12,
+    "quoteItalic": false,
+    "ruleColor": "rule",
+    "ruleWidth": 1
+  },
+  "space": {
+    "l": 40,
+    "m": 20,
+    "s": 10
+  },
+  "themes": {
+    "ink": {
+      "band": "ink",
+      "button": "secondary",
+      "container": null,
+      "link": "white",
+      "text": "white"
+    },
+    "white": {
+      "band": null,
+      "button": "primary",
+      "container": "white",
+      "link": "ink",
+      "text": "ink"
+    }
+  },
+  "type": {
+    "body": {
+      "lineHeight": 170,
+      "marginBottom": 8,
+      "mobileSize": 13,
+      "size": 13,
+      "weight": "normal"
+    },
+    "h1": {
+      "lineHeight": 130,
+      "marginBottom": 6,
+      "mobileSize": 17,
+      "size": 17,
+      "weight": "bold"
+    },
+    "h2": {
+      "lineHeight": 130,
+      "marginBottom": 8,
+      "mobileSize": 14,
+      "size": 14,
+      "weight": "bold"
+    },
+    "h3": {
+      "lineHeight": 140,
+      "marginBottom": 6,
+      "mobileSize": 13,
+      "size": 13,
+      "weight": "bold"
+    },
+    "h4": {
+      "letterSpacing": 0.5,
+      "lineHeight": 140,
+      "marginBottom": 6,
+      "mobileSize": 12,
+      "size": 12,
+      "uppercase": true,
+      "weight": "bold"
+    },
+    "h5": {
+      "letterSpacing": 0.5,
+      "lineHeight": 140,
+      "marginBottom": 6,
+      "mobileSize": 12,
+      "size": 12,
+      "uppercase": true,
+      "weight": "bold"
+    },
+    "h6": {
+      "letterSpacing": 0.5,
+      "lineHeight": 140,
+      "marginBottom": 6,
+      "mobileSize": 11,
+      "size": 11,
+      "uppercase": true,
+      "weight": "bold"
+    },
+    "topbar": {
+      "letterSpacing": 1,
+      "lineHeight": 110,
+      "marginBottom": 0,
+      "mobileSize": 10,
+      "size": 11,
+      "uppercase": true,
+      "weight": "bold"
+    }
+  },
+  "version": 1
+}

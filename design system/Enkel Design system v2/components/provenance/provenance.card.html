@@ -1,0 +1,11 @@
+<!-- @dsCard group="Components" viewport="700x230" name="Provenance & time" subtitle="LivesIn glyph-links, unlinked state, DateStamp two clocks" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script><script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script><script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script><style>body{padding:16px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { LivesIn, DateStamp } = window.ArtVentoryDesignSystem_f8dda9;
+const now='2026-09-04';
+ReactDOM.createRoot(document.getElementById('root')).render(<div style={{display:'flex',flexDirection:'column',gap:16,fontFamily:'var(--font-helveticaneue)'}}>
+<div style={{display:'flex',gap:16,flexWrap:'wrap'}}><LivesIn kind="frame" label="Signage plan"/><LivesIn kind="page" label="Handoff doc · p.4"/><LivesIn kind="row" label="Schedule · Booth 2×"/><LivesIn kind="embed" label="Matterport scan"/><LivesIn kind="file" label="permit-set.pdf"/><LivesIn kind="spec" label="Spec · Display cabinet"/></div>
+<div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'center'}}><LivesIn unlinked/><LivesIn unlinked required/><span style={{fontSize:13,color:'var(--text-muted)'}}>unlinked · unlinked + required</span></div>
+<div style={{borderTop:'1px solid #000',paddingTop:21,display:'flex',gap:42,flexWrap:'wrap'}}><DateStamp date="2026-09-12" now={now}/><DateStamp date="2026-09-12" now={now} clock="phase"/><DateStamp date="2026-09-01" now={now} clock="phase"/><DateStamp date="2026-12-15" now={now}/><DateStamp date="2026-09-04" now={now}/></div>
+</div>);
+</script></body></html>

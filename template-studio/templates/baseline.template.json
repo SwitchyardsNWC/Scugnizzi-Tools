@@ -1,0 +1,1603 @@
+{
+  "forceLight": true,
+  "hubspotLabel": "Switchyards Baseline — every block and style",
+  "id": "b042",
+  "name": "Baseline",
+  "pageBackground": "#f7f6f3",
+  "preview": {
+    "address": "151 Ted Turner Dr SE",
+    "city": "Atlanta",
+    "company": "SWITCHYARDS U.S.A.",
+    "state": "GA",
+    "zip": "30303"
+  },
+  "schema": 6,
+  "sections": [
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "id": "b003",
+      "linkColor": "#fcfff5",
+      "padBottom": 12,
+      "padTop": 16,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "center",
+              "blocks": [
+                {
+                  "id": "b001",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Tagline"
+                  },
+                  "text": "EVERY BLOCK, EVERY STYLE.",
+                  "type": "topbar"
+                }
+              ],
+              "id": "b002",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b004",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b007",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b005",
+                  "stripes": [
+                    {
+                      "color": "redBright",
+                      "height": 4
+                    },
+                    {
+                      "color": "offwhite",
+                      "height": 2
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b006",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b008",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00c",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b009",
+                  "level": "h1",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H1 heading"
+                  },
+                  "text": "Heading one",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>The first paragraph, at the body role. Everything below is rendered by the design system, so changing a token in the panel moves it here.</p>",
+                  "id": "b00a",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00b",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b00d",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00k",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b00e",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Heading two",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "id": "b00f",
+                  "level": "h3",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H3 heading"
+                  },
+                  "text": "Heading three",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "id": "b00g",
+                  "level": "h4",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H4 heading"
+                  },
+                  "text": "Heading four",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "id": "b00h",
+                  "level": "h5",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H5 heading"
+                  },
+                  "text": "Heading five",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "id": "b00i",
+                  "level": "h6",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H6 heading"
+                  },
+                  "text": "Heading six",
+                  "type": "heading"
+                }
+              ],
+              "id": "b00j",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b00l",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00o",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h2>What the team can type</h2><p>Body copy with <strong>bold</strong>, <em>italic</em>, <u>underline</u> and <a href=\"https://www.switchyards.com/\">a link</a> in it. This paragraph is deliberately long enough to wrap two or three times, because line height and measure only show themselves at length — a single line tells you nothing about either.</p><h3>A bulleted list</h3><ul><li>First item, short.</li><li>Second item, long enough to wrap onto a second line so the hanging indent is visible.</li><li>Third item, with a nested list under it:<ul><li>Nested one</li><li>Nested two</li></ul></li></ul><h3>A numbered list</h3><ol><li>Step one</li><li>Step two, also long enough to wrap so the indent can be judged.</li><li>Step three</li></ol><blockquote>A block quote. The bar down the side, the inset and whether it leans are all design-system tokens, which they were not until this page existed to show them.</blockquote><hr><p><small>Small print, for the line nobody reads until it matters.</small></p>",
+                  "id": "b00m",
+                  "lock": {
+                    "editable": true,
+                    "field": "body_copy",
+                    "label": "Body copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00n",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b00p",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "id": "b00s",
+      "linkColor": "#fcfff5",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<h2>The same, on navy</h2><p>Text and links resolve from the preset, so this paragraph and its <a href=\"https://www.switchyards.com/\">link</a> should both be legible without anybody setting a colour on the block.</p><ul><li>A list on navy</li><li>Second item</li></ul><blockquote>And a quote, whose bar is a palette colour rather than a hard-coded red.</blockquote>",
+                  "id": "b00q",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b00r",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b00t",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b00z",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b00u",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Buttons",
+                  "type": "heading"
+                },
+                {
+                  "align": "center",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b00v",
+                  "link": {
+                    "editable": false,
+                    "field": "",
+                    "label": "primary link"
+                  },
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "primary button"
+                  },
+                  "style": "primary",
+                  "text": "Primary button",
+                  "type": "button"
+                },
+                {
+                  "height": 8,
+                  "id": "b00w",
+                  "type": "spacer"
+                },
+                {
+                  "align": "full",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b00x",
+                  "link": {
+                    "editable": false,
+                    "field": "",
+                    "label": "primary link"
+                  },
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "primary button"
+                  },
+                  "style": "primary",
+                  "text": "Full width primary",
+                  "type": "button"
+                }
+              ],
+              "id": "b00y",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b010",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "id": "b015",
+      "linkColor": "#fcfff5",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b011",
+                  "link": {
+                    "editable": false,
+                    "field": "",
+                    "label": "secondary link"
+                  },
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "secondary button"
+                  },
+                  "style": "secondary",
+                  "text": "Secondary button",
+                  "type": "button"
+                },
+                {
+                  "height": 8,
+                  "id": "b012",
+                  "type": "spacer"
+                },
+                {
+                  "align": "left",
+                  "href": "https://www.switchyards.com/",
+                  "id": "b013",
+                  "link": {
+                    "editable": false,
+                    "field": "",
+                    "label": "secondary link"
+                  },
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "secondary button"
+                  },
+                  "style": "secondary",
+                  "text": "Secondary, left",
+                  "type": "button"
+                }
+              ],
+              "id": "b014",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b016",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b01e",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b017",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Images",
+                  "type": "heading"
+                },
+                {
+                  "align": "center",
+                  "alt": "Full width image",
+                  "href": "",
+                  "id": "b018",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Full width image"
+                  },
+                  "mode": "static",
+                  "optional": false,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "image",
+                  "width": 560
+                },
+                {
+                  "height": 6,
+                  "id": "b019",
+                  "type": "spacer"
+                },
+                {
+                  "align": "left",
+                  "alt": "Half width, left",
+                  "href": "",
+                  "id": "b01a",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Half width, left"
+                  },
+                  "mode": "static",
+                  "optional": false,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "image",
+                  "width": 280
+                },
+                {
+                  "height": 6,
+                  "id": "b01b",
+                  "type": "spacer"
+                },
+                {
+                  "align": "right",
+                  "alt": "Small, right",
+                  "href": "",
+                  "id": "b01c",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Small, right"
+                  },
+                  "mode": "static",
+                  "optional": false,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "image",
+                  "width": 160
+                }
+              ],
+              "id": "b01d",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b01f",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#fcfff5",
+      "containerColor": null,
+      "id": "b01j",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Below is an optional image. Until somebody picks one in HubSpot the block is not in the send at all — no placeholder, no gap.</p>",
+                  "id": "b01g",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "align": "center",
+                  "alt": "",
+                  "href": "",
+                  "id": "b01h",
+                  "lock": {
+                    "editable": true,
+                    "field": "optional_image",
+                    "label": "Optional image"
+                  },
+                  "mode": "module",
+                  "optional": true,
+                  "src": "",
+                  "type": "image",
+                  "width": 560
+                }
+              ],
+              "id": "b01i",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b01k",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "offwhite"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b01n",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b01l",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Two even columns",
+                  "type": "heading"
+                }
+              ],
+              "id": "b01m",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b01o",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b01t",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Left column. Even split, stacking on a phone.</p>",
+                  "id": "b01p",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b01q",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 6
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Right column, the same width.</p>",
+                  "id": "b01r",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b01s",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 6
+            }
+          ],
+          "id": "b01u",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b01x",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b01v",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Two uneven columns",
+                  "type": "heading"
+                }
+              ],
+              "id": "b01w",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b01y",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b023",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Eight twelfths. The wide side, where the copy goes.</p>",
+                  "id": "b01z",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b020",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 8
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "Narrow",
+                  "href": "",
+                  "id": "b021",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Narrow"
+                  },
+                  "mode": "static",
+                  "optional": false,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "image",
+                  "width": 160
+                }
+              ],
+              "id": "b022",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 4
+            }
+          ],
+          "id": "b024",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b027",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b025",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Three columns, side by side on phones",
+                  "type": "heading"
+                }
+              ],
+              "id": "b026",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b028",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#fcfff5",
+      "containerColor": null,
+      "id": "b02f",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>One</p>",
+                  "id": "b029",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b02a",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 4
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Two</p>",
+                  "id": "b02b",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b02c",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 4
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>Three</p>",
+                  "id": "b02d",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b02e",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 4
+            }
+          ],
+          "id": "b02g",
+          "mobile": "side-by-side"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "offwhite"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b02j",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b02h",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "A column that leaves on a phone",
+                  "type": "heading"
+                }
+              ],
+              "id": "b02i",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b02k",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b02p",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "html": "<p>This column stays.</p>",
+                  "id": "b02l",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b02m",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 8
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "Decoration",
+                  "href": "",
+                  "id": "b02n",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Decoration"
+                  },
+                  "mode": "static",
+                  "optional": false,
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "image",
+                  "width": 160
+                }
+              ],
+              "hideOnPhone": true,
+              "id": "b02o",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 4
+            }
+          ],
+          "id": "b02q",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b02w",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b02r",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Spacers and stripes",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>A 40px spacer follows this paragraph.</p>",
+                  "id": "b02s",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "height": 40,
+                  "id": "b02t",
+                  "type": "spacer"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>And stripes follow that.</p>",
+                  "id": "b02u",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b02v",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b02x",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b030",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b02y",
+                  "stripes": [
+                    {
+                      "color": "redBright",
+                      "height": 6
+                    },
+                    {
+                      "color": "navy",
+                      "height": 3
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b02z",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b031",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b038",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b032",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Dividers",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>A full-width divider on the system’s rule colour follows this paragraph.</p>",
+                  "id": "b033",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "align": "center",
+                  "color": null,
+                  "height": 2,
+                  "id": "b034",
+                  "type": "divider",
+                  "width": 100
+                },
+                {
+                  "align": "left",
+                  "html": "<p>And a short navy one, set left.</p>",
+                  "id": "b035",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "align": "left",
+                  "color": "navy",
+                  "height": 4,
+                  "id": "b036",
+                  "type": "divider",
+                  "width": 30
+                }
+              ],
+              "id": "b037",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b039",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b03e",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b03a",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Freeform",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>A drawing surface the email carries as one picture. The canvas draws the recipe; the file carries the PNG.</p>",
+                  "id": "b03b",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                },
+                {
+                  "align": "center",
+                  "alt": "A card drawn by hand",
+                  "background": "offwhite",
+                  "height": 200,
+                  "id": "b03c",
+                  "layers": [
+                    {
+                      "fill": null,
+                      "height": 168,
+                      "id": "l1",
+                      "kind": "rect",
+                      "radius": 8,
+                      "stroke": "navy",
+                      "strokeWidth": 2,
+                      "width": 528,
+                      "x": 16,
+                      "y": 16
+                    },
+                    {
+                      "id": "l2",
+                      "kind": "line",
+                      "stroke": "red",
+                      "strokeWidth": 3,
+                      "x1": 40,
+                      "x2": 520,
+                      "y1": 120,
+                      "y2": 120
+                    },
+                    {
+                      "align": "left",
+                      "color": "navy",
+                      "id": "l3",
+                      "kind": "text",
+                      "role": "h2",
+                      "text": "Drawn, not typed.",
+                      "width": 480,
+                      "x": 40,
+                      "y": 44
+                    },
+                    {
+                      "fill": "red",
+                      "height": 40,
+                      "id": "l4",
+                      "kind": "ellipse",
+                      "stroke": null,
+                      "strokeWidth": 0,
+                      "width": 40,
+                      "x": 440,
+                      "y": 132
+                    }
+                  ],
+                  "renderedHash": "uthroj",
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "freeform",
+                  "width": 560
+                }
+              ],
+              "id": "b03d",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b03f",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b03i",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b03g",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Brand marks",
+                  "type": "heading"
+                }
+              ],
+              "id": "b03h",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b03j",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "id": "b03s",
+      "linkColor": "#fcfff5",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "SY",
+                  "color": null,
+                  "id": "b03k",
+                  "mark": "sy",
+                  "renderedHash": "2jh1my",
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "brand",
+                  "width": 96
+                }
+              ],
+              "id": "b03l",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 3
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "SCGNZI",
+                  "color": null,
+                  "id": "b03m",
+                  "mark": "scgnzi",
+                  "renderedHash": "86pyto",
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "brand",
+                  "width": 96
+                }
+              ],
+              "id": "b03n",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 3
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "ICA",
+                  "color": null,
+                  "id": "b03o",
+                  "mark": "ica",
+                  "renderedHash": "zf9w6j",
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "brand",
+                  "width": 96
+                }
+              ],
+              "id": "b03p",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 3
+            },
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "center",
+                  "alt": "NWCA",
+                  "color": null,
+                  "id": "b03q",
+                  "mark": "nwca",
+                  "renderedHash": "ilo2x3",
+                  "src": "https://hs-50604449.f.hubspotemail.net/hub/50604449/hubfs/sy-logo-lockup@2x.png?width=720&upscale=true&name=sy-logo-lockup@2x.png",
+                  "type": "brand",
+                  "width": 96
+                }
+              ],
+              "id": "b03r",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 3
+            }
+          ],
+          "id": "b03t",
+          "mobile": "side-by-side"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": "#011272",
+      "containerColor": null,
+      "domId": "section-legal",
+      "id": "b03w",
+      "linkColor": "#fcfff5",
+      "padBottom": 10,
+      "padTop": 30,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "right",
+              "blocks": [
+                {
+                  "id": "b03u",
+                  "logoSrc": "",
+                  "logoWidth": 180,
+                  "note": "A note in the legal footer, which is locked so that re-uploading the template fixes every future send.",
+                  "noteLock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Legal note"
+                  },
+                  "type": "legal"
+                }
+              ],
+              "id": "b03v",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 0,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b03x",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#fcfff5",
+      "theme": "navy"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b040",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b03y",
+                  "stripes": [
+                    {
+                      "color": "redBright",
+                      "height": 4
+                    },
+                    {
+                      "color": "offwhite",
+                      "height": 2
+                    }
+                  ],
+                  "type": "stripes"
+                }
+              ],
+              "id": "b03z",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b041",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    }
+  ]
+}

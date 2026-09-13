@@ -1,0 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@300;400&display=swap");
+/* Helvetica Neue LT Std — self-hosted (fonts/). Normal-width weights wired; condensed Light/Roman/Medium wired as the detail face; extended cuts unused. */
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_UltLt.otf") format("opentype");font-weight:200;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_UltLtIt.otf") format("opentype");font-weight:200;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_Lt.otf") format("opentype");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_LtIt.otf") format("opentype");font-weight:300;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_Roman.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_It.otf") format("opentype");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_Md.otf") format("opentype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_MdIt.otf") format("opentype");font-weight:500;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_Bd.otf") format("opentype");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue";src:url("../fonts/HelveticaNeueLTStd_BdIt.otf") format("opentype");font-weight:700;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Light";src:url("../fonts/HelveticaNeueLTStd_Lt.otf") format("opentype");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Light";src:url("../fonts/HelveticaNeueLTStd_LtIt.otf") format("opentype");font-weight:300;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_LtCn.otf") format("opentype");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_LtCnO.otf") format("opentype");font-weight:300;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_Cn.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_CnO.otf") format("opentype");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_MdCn.otf") format("opentype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"HelveticaNeue-Condensed";src:url("../fonts/HelveticaNeueLTStd_MdCnO.otf") format("opentype");font-weight:500;font-style:italic;font-display:swap}
+:root{
+--font-helveticaneue:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,ui-sans-serif,system-ui,sans-serif;
+--font-helveticaneue-light:"HelveticaNeue-Light","HelveticaNeue","Helvetica Neue",Helvetica,Arial,ui-sans-serif,system-ui,sans-serif;
+--font-sans:var(--font-helveticaneue);
+--font-helveticaneue-condensed:"HelveticaNeue-Condensed","Helvetica Neue Condensed","Arial Narrow",var(--font-helveticaneue);
+--font-detail:var(--font-helveticaneue-condensed); /* secondary face for dense detail: metadata rows, table notes, captions, drawer specs. ~18% narrower than the sans at the same size, so detail text fits without dropping below the 12px floor. Use at --text-meta and below; never for headings, body prose, or figures (those stay mono). */
+--tracking-detail:0.02em; /* condensed cuts need a touch more air */
+--font-mono-detail:"JetBrains Mono","IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace; /* mono detail face: codes, IDs, SKUs, bin refs, timestamps, hashes — anything a person copies or scans character by character. Light 300 / Regular 400 via Google Fonts. Distinct from --font-mono so figures (Plex, 400/500) and reference strings (JetBrains, 300/400) don't read the same. Use at --text-meta and below. */
+--tracking-mono-detail:0;
+--font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace; /* pinned: IBM Plex Mono 400/500 via Google Fonts so Stat figures match Mac/Windows. Figures only — KPI values, table numbers, codes. Never labels. To self-host, drop the Plex Mono woff2 files into fonts/, add matching @font-face rules (400 + 500), and remove the @import above. */
+--font-weight-light:300;
+--font-weight-regular:400;
+}

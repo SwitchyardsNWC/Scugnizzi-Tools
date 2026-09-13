@@ -1,0 +1,16 @@
+:root{
+/* breakpoints (reference values — use in media queries via the literal px) */
+--bp-phone:480px;--bp-tablet:768px;--bp-desktop:1024px;--bp-wide:1440px;
+/* gutters per tier */
+--gutter-phone:16px;--gutter-tablet:24px;--gutter-desktop:32px;
+/* chrome */
+--topbar-height:48px;--bottomtabs-height:56px;--shell-header-height:56px;--drawer-width:440px;--sidebar-width-tablet:160px;
+/* touch */
+--touch-target:44px;--touch-target-lg:56px;--touch-gap:8px;
+/* safe areas */
+--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+/* mobile type: floor 16px body so 13px meta is never body on phones */
+--text-body-mobile:16px;--text-meta-mobile:14px;
+/* sheet */
+--sheet-max-height:85vh;
+}

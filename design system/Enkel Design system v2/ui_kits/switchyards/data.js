@@ -1,0 +1,29 @@
+window.SY={now:'2026-09-04',user:{name:'Jared Erickson',role:'Design lead',market:'Atlanta'},
+phases:['Brief','Concept','Design','FF&E','Install','Handoff'],
+projects:[
+{id:'p1',name:'Ponce City club',folder:'New clubs',type:'New club build-out',status:'blocked',phase:2,lead:'Jared',due:'2026-12-15',cells:['done','done','blocked','notstarted','notstarted','notstarted'],dates:['2026-06-10','2026-07-20','2026-09-12','2026-10-20','2026-11-30','2026-12-15'],note:'2 required items block Design'},
+{id:'p2',name:'Westside lobby refresh',folder:'Refreshes',type:'Club refresh',status:'progress',phase:3,lead:'Maya',due:'2026-10-02',cells:['done','done','done','progress','notstarted','notstarted'],dates:['2026-07-01','2026-07-15','2026-08-10','2026-09-12','2026-09-26','2026-10-02']},
+{id:'p3',name:'Fall merch drop',folder:'Campaigns',type:'Campaign',status:'risk',phase:2,lead:'Sam',due:'2026-09-20',cells:['done','done','risk','notstarted','notstarted','notstarted'],dates:['2026-08-01','2026-08-14','2026-09-06','2026-09-13','2026-09-18','2026-09-20'],note:'Print run vendor not confirmed'},
+{id:'p4',name:'Display cabinet · big room',folder:'In-house builds',type:'Custom build',status:'build',phase:3,lead:'Jared',due:'2026-09-28',cells:['done','done','done','build','notstarted','notstarted'],dates:['2026-08-05','2026-08-12','2026-08-26','2026-09-15','2026-09-25','2026-09-28']},
+{id:'p5',name:'Member app · booking flow',folder:'Digital',type:'Digital product',status:'ontrack',phase:1,lead:'Maya',due:'2026-11-10',cells:['done','progress','notstarted','notstarted','notstarted','notstarted'],dates:['2026-08-20','2026-09-18','2026-10-09','2026-10-23','2026-11-03','2026-11-10']},
+{id:'p6',name:'Decatur signage package',folder:'Signage',type:'Signage package',status:'done',phase:5,lead:'Sam',due:'2026-08-28',cells:['done','done','done','done','done','done'],dates:['2026-06-01','2026-06-20','2026-07-10','2026-08-01','2026-08-20','2026-08-28']}
+],
+tasks:[
+{id:'t1',title:'Link signage plan to checklist',project:'p1',lives:{kind:'frame',label:'Signage plan'},owner:'Jared',due:'2026-09-01',required:true,done:false},
+{id:'t2',title:'Approve oak finish proposal',project:'p2',lives:{kind:'page',label:'Library · White oak, rift'},owner:'Jared',due:'2026-09-02',required:false,done:false},
+{id:'t3',title:'Review materials board',project:'p1',lives:null,owner:'Jared',due:'2026-09-05',required:true,done:false},
+{id:'t4',title:'Sign off cut list',project:'p4',lives:{kind:'spec',label:'Spec · Display cabinet'},owner:'Jared',due:'2026-09-08',required:true,done:false},
+{id:'t5',title:'Confirm booth count with ops',project:'p2',lives:{kind:'row',label:'Schedule · Booths 6×'},owner:'Jared',due:'2026-09-10',required:false,done:false},
+{id:'t6',title:'Write handoff next steps',project:'p6',lives:{kind:'page',label:'Handoff doc · p.8'},owner:'Jared',due:'2026-09-16',required:false,done:false},
+{id:'t7',title:'Pick launch screens for preview',project:'p5',lives:{kind:'embed',label:'Figma · Booking v3'},owner:'Jared',due:'2026-09-24',required:false,done:false}
+],
+checklist:[
+{phase:1,items:[{id:'c1',title:'Site survey photos uploaded',done:true,required:true,owner:'Maya',due:'2026-07-08',lives:{kind:'file',label:'survey-0708.zip'}},{id:'c2',title:'Room direction · big room',done:true,required:true,owner:'Jared',due:'2026-07-15',lives:{kind:'frame',label:'Room direction · Big room'}},{id:'c3',title:'Room direction · cold-cold',done:true,required:false,owner:'Jared',due:'2026-07-15',lives:{kind:'frame',label:'Room direction · Cold-cold'}},{id:'c4',title:'Concept doc shared with ops',done:true,required:true,owner:'Sam',due:'2026-07-20',lives:{kind:'page',label:'Concept doc'}}]},
+{phase:2,items:[{id:'c5',title:'Signage plan',done:false,required:true,owner:'Jared',due:'2026-09-01',lives:null},{id:'c6',title:'Materials board',done:false,required:true,owner:'Jared',due:'2026-09-05',lives:null},{id:'c7',title:'Booth layout',done:true,required:true,owner:'Maya',due:'2026-08-22',lives:{kind:'frame',label:'Booth layout'}},{id:'c8',title:'Lighting plan',done:false,required:false,owner:'Maya',due:'2026-09-10',lives:{kind:'frame',label:'Lighting plan'}},{id:'c9',title:'Permit set to landlord',done:true,required:true,owner:'Sam',due:'2026-08-30',lives:{kind:'file',label:'permit-set.pdf'}},{id:'c10',title:'Design doc · next steps',done:false,required:false,owner:'Jared',due:'2026-09-12',lives:{kind:'page',label:'Design doc · p.6'}}]},
+{phase:3,items:[{id:'c11',title:'Furniture schedule complete',done:false,required:true,owner:'Maya',due:'2026-10-01',lives:{kind:'row',label:'Schedule'}},{id:'c12',title:'Warehouse pull reserved',done:false,required:true,owner:'Ops',due:'2026-10-08',lives:null},{id:'c13',title:'Display cabinet spec approved',done:false,required:true,owner:'Jared',due:'2026-09-28',lives:{kind:'spec',label:'Spec · Display cabinet'}}]}
+],
+schedule:[
+{room:'Big room',rows:[{id:'s1',tag:'BR-01',item:'Booth, 4-seat, oak',qty:6,source:'warehouse',detail:'Bin C-01 · 4 free',unit:0,status:'risk',short:2},{id:'s2',tag:'BR-02',item:'Pendant, brass, 18"',qty:8,source:'purchase',detail:'Schoolhouse',unit:340,status:'progress'},{id:'s3',tag:'BR-03',item:'Display cabinet',qty:1,source:'build',detail:'Spec · Display cabinet',unit:1850,status:'build'},{id:'s4',tag:'BR-04',item:'Café chair, black',qty:24,source:'warehouse',detail:'Bin L-08 · 30 free',unit:0,status:'done'}]},
+{room:'Cold-cold',rows:[{id:'s5',tag:'CC-01',item:'Reach-in cooler, 2-door',qty:1,source:'purchase',detail:'True Mfg',unit:4200,status:'progress'},{id:'s6',tag:'CC-02',item:'Shelf, wire, 48"',qty:4,source:'warehouse',detail:'Bin W-02 · 6 free',unit:0,status:'notstarted'}]},
+{room:'Lobby',rows:[{id:'s7',tag:'LB-01',item:'Bench, oak, 72"',qty:2,source:'build',detail:'Spec · Lobby bench',unit:920,status:'notstarted'},{id:'s8',tag:'LB-02',item:'Rug, wool, 8×10',qty:1,source:'purchase',detail:'Armadillo',unit:1600,status:'done'}]}
+]};

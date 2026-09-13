@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Effects Editor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d0d;
+  --surface: #141414;
+  --surface2: #1c1c1c;
+  --border: #282828;
+  --text: #e8e8e8;
+  --text-dim: #777;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.12);
+  --active: #4ade80;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: calc(100vh - var(--tool-banner, 0px));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.header h1 { font-size: 13px; font-weight: 600; letter-spacing: 0.03em; }
+
+.badge {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  letter-spacing: 0.04em;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Controls ── */
+.controls {
+  width: 288px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.controls::-webkit-scrollbar { width: 3px; }
+.controls::-webkit-scrollbar-track { background: transparent; }
+.controls::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.upload-zone {
+  margin: 10px;
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.upload-zone .upload-icon { font-size: 22px; margin-bottom: 5px; }
+.upload-zone p { font-size: 11px; color: var(--text-dim); }
+
+.upload-zone .filename {
+  font-size: 10px;
+  color: var(--active);
+  margin-top: 5px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
+}
+
+/* Presets */
+.presets-section {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.section-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.preset-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.preset-pill {
+  font-size: 11px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 20px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.preset-pill:hover { border-color: var(--accent); color: var(--text); }
+
+.preset-pill.active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: #a5b4fc;
+}
+
+/* Effect sections */
+.effect-section { border-bottom: 1px solid var(--border); }
+
+.effect-header {
+  display: flex;
+  align-items: center;
+  padding: 9px 10px;
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+}
+
+.effect-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: 1;
+  color: var(--text-dim);
+  transition: color 0.15s;
+}
+
+.effect-section.enabled .effect-name { color: var(--text); }
+
+.chevron {
+  font-size: 9px;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.effect-section.open .chevron { transform: rotate(90deg); }
+
+.toggle {
+  width: 30px;
+  height: 17px;
+  background: var(--border);
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle.on { background: var(--active); }
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 13px; height: 13px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle.on .toggle-thumb { transform: translateX(13px); }
+
+.effect-body {
+  padding: 2px 10px 12px;
+  display: none;
+}
+
+.effect-section.open .effect-body { display: block; }
+
+/* Controls */
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.control-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  width: 68px;
+  flex-shrink: 0;
+}
+
+.control-row input[type="range"] {
+  flex: 1;
+  height: 3px;
+  -webkit-appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  background: var(--text);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb:hover { background: var(--accent); }
+
+.control-value {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-dim);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+
+.color-label { font-size: 11px; color: var(--text-dim); flex: 1; min-width: 50px; }
+
+.color-swatch {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.color-swatch:hover { border-color: var(--accent); }
+
+.color-swatch input[type="color"] {
+  position: absolute;
+  top: -4px; left: -4px;
+  width: 140%; height: 140%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+/* Download */
+.actions {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.btn {
+  width: 100%;
+  padding: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); background: var(--accent-glow); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Preview area ── */
+.preview-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #090909;
+}
+
+.canvas-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.canvas-container.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -12px;
+  background: var(--accent-glow);
+}
+
+#canvas {
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: 0 8px 60px rgba(0,0,0,0.8);
+  display: none;
+}
+
+.drop-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-dim);
+  pointer-events: none;
+  text-align: center;
+}
+
+.drop-placeholder .big-icon { font-size: 40px; opacity: 0.25; }
+.drop-placeholder h2 { font-size: 14px; font-weight: 500; color: #444; }
+.drop-placeholder p { font-size: 12px; color: #333; }
+
+/* Processing indicator */
+.processing {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  display: none;
+  font-family: monospace;
+}
+
+/* Prompt */
+.prompt-area {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.prompt-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.prompt-text {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text);
+  font-family: monospace;
+  min-height: 36px;
+}
+
+.copy-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.copy-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.control-select {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23777' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.control-select:hover { border-color: var(--accent); }
+.control-select option { background: #1c1c1c; }
+
+/* Zoom bar */
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.zoom-btn {
+  width: 22px; height: 22px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.zoom-level {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-dim);
+  width: 42px;
+  text-align: center;
+}
+
+.zoom-fit {
+  width: auto;
+  padding: 0 8px;
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.zoom-hint {
+  margin-left: auto;
+  font-size: 10px;
+  color: #333;
+}
+</style>
+</head>
+<body>
+<script src="../tool-banner.js" data-tool="Image effects editor"></script>
+<script src="../tool-kit.js"></script>
+
+<div class="header">
+  <h1>Image Effects Editor</h1>
+  <span class="badge">Canvas</span>
+</div>
+
+<div class="layout">
+
+  <!-- ── Controls panel ── -->
+  <div class="controls">
+
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">⬆</div>
+      <p>Drop image here or click to upload</p>
+      <div class="filename" id="filename"></div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+    </div>
+
+    <!-- Presets -->
+    <div class="presets-section">
+      <div class="section-label">Presets</div>
+      <div class="preset-pills" id="presetPills">
+        <button class="preset-pill active" data-preset="Original">Original</button>
+        <button class="preset-pill" data-preset="Film Noir">Film Noir</button>
+        <button class="preset-pill" data-preset="Newsprint">Newsprint</button>
+        <button class="preset-pill" data-preset="Dirty 35mm">Dirty 35mm</button>
+        <button class="preset-pill" data-preset="Screen Print">Screen Print</button>
+      </div>
+    </div>
+
+    <!-- GRAIN -->
+    <div class="effect-section open" id="sect-grain">
+      <div class="effect-header" onclick="toggleSection('grain')">
+        <div class="effect-name">Grain</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-grain" onclick="event.stopPropagation(); toggleEffect('grain')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Intensity</span>
+          <input type="range" min="1" max="100" value="40" id="grain-intensity">
+          <span class="control-value" id="val-grain-intensity">40</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Monochrome</span>
+          <input type="range" min="0" max="100" value="80" id="grain-mono">
+          <span class="control-value" id="val-grain-mono">80</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HALFTONE -->
+    <div class="effect-section open" id="sect-halftone">
+      <div class="effect-header" onclick="toggleSection('halftone')">
+        <div class="effect-name">Halftone</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-halftone" onclick="event.stopPropagation(); toggleEffect('halftone')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Dot size</span>
+          <input type="range" min="3" max="24" value="8" id="halftone-spacing">
+          <span class="control-value" id="val-halftone-spacing">8</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Angle</span>
+          <input type="range" min="0" max="179" value="45" id="halftone-angle">
+          <span class="control-value" id="val-halftone-angle">45°</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Contrast</span>
+          <input type="range" min="1" max="10" value="5" id="halftone-contrast">
+          <span class="control-value" id="val-halftone-contrast">5</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Shape</span>
+          <select id="halftone-shape" class="control-select">
+            <option value="circle">● Circle</option>
+            <option value="square">■ Square</option>
+            <option value="diamond">◆ Diamond</option>
+            <option value="line">▬ Line screen</option>
+            <option value="ellipse">◯ Ellipse</option>
+          </select>
+        </div>
+        <div class="color-row">
+          <span class="color-label">Dots</span>
+          <div class="color-swatch" id="swatch-halftone-color" style="background:#000000">
+            <input type="color" value="#000000" id="halftone-color">
+          </div>
+          <span class="color-label">Background</span>
+          <div class="color-swatch" id="swatch-halftone-bg" style="background:#ffffff">
+            <input type="color" value="#ffffff" id="halftone-bg">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIGNETTE -->
+    <div class="effect-section open" id="sect-vignette">
+      <div class="effect-header" onclick="toggleSection('vignette')">
+        <div class="effect-name">Vignette</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-vignette" onclick="event.stopPropagation(); toggleEffect('vignette')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Intensity</span>
+          <input type="range" min="1" max="100" value="70" id="vignette-intensity">
+          <span class="control-value" id="val-vignette-intensity">70</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Spread</span>
+          <input type="range" min="40" max="130" value="85" id="vignette-spread">
+          <span class="control-value" id="val-vignette-spread">85</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLUR -->
+    <div class="effect-section open" id="sect-blur">
+      <div class="effect-header" onclick="toggleSection('blur')">
+        <div class="effect-name">Blur</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-blur" onclick="event.stopPropagation(); toggleEffect('blur')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Radius</span>
+          <input type="range" min="1" max="20" value="3" id="blur-radius">
+          <span class="control-value" id="val-blur-radius">3px</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUOTONE -->
+    <div class="effect-section open" id="sect-duotone">
+      <div class="effect-header" onclick="toggleSection('duotone')">
+        <div class="effect-name">Duotone</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-duotone" onclick="event.stopPropagation(); toggleEffect('duotone')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="color-row">
+          <span class="color-label">Shadows</span>
+          <div class="color-swatch" id="swatch-duotone-shadow" style="background:#1a0533">
+            <input type="color" value="#1a0533" id="duotone-shadow">
+          </div>
+          <span class="color-label">Highlights</span>
+          <div class="color-swatch" id="swatch-duotone-highlight" style="background:#e8e0d8">
+            <input type="color" value="#e8e0d8" id="duotone-highlight">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POSTERIZE -->
+    <div class="effect-section open" id="sect-posterize">
+      <div class="effect-header" onclick="toggleSection('posterize')">
+        <div class="effect-name">Posterize</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-posterize" onclick="event.stopPropagation(); toggleEffect('posterize')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Levels</span>
+          <input type="range" min="2" max="8" value="4" id="posterize-levels">
+          <span class="control-value" id="val-posterize-levels">4</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Gamma</span>
+          <input type="range" min="1" max="10" value="5" id="posterize-gamma">
+          <span class="control-value" id="val-posterize-gamma">5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEXTURE -->
+    <div class="effect-section open" id="sect-texture">
+      <div class="effect-header" onclick="toggleSection('texture')">
+        <div class="effect-name">Texture</div>
+        <span class="chevron">▶</span>
+        <div class="toggle" id="toggle-texture" onclick="event.stopPropagation(); toggleEffect('texture')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="effect-body">
+        <div class="control-row">
+          <span class="control-label">Type</span>
+          <select id="texture-type" class="control-select">
+            <option value="paper">Paper</option>
+            <option value="canvas">Canvas</option>
+            <option value="fibers">Fibers</option>
+            <option value="concrete">Concrete</option>
+            <option value="crosshatch">Crosshatch</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Intensity</span>
+          <input type="range" min="1" max="100" value="35" id="texture-intensity">
+          <span class="control-value" id="val-texture-intensity">35</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Scale</span>
+          <input type="range" min="5" max="100" value="50" id="texture-scale">
+          <span class="control-value" id="val-texture-scale">50</span>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Blend</span>
+          <select id="texture-blend" class="control-select">
+            <option value="multiply">Multiply</option>
+            <option value="overlay">Overlay</option>
+            <option value="soft-light">Soft Light</option>
+            <option value="screen">Screen</option>
+            <option value="hard-light">Hard Light</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="downloadBtn" onclick="downloadImage()" disabled>↓ Download PNG</button>
+    </div>
+
+  </div>
+
+  <!-- ── Preview area ── -->
+  <div class="preview-area" id="previewArea">
+    <div class="zoom-bar">
+      <button class="zoom-btn" onclick="changeZoom(-0.25)">−</button>
+      <span class="zoom-level" id="zoomLevel">100%</span>
+      <button class="zoom-btn" onclick="changeZoom(0.25)">+</button>
+      <button class="zoom-btn zoom-fit" onclick="resetZoom()">Fit</button>
+      <span class="zoom-hint">scroll to zoom · drag to pan</span>
+    </div>
+    <div class="canvas-container" id="canvasContainer">
+      <div class="drop-placeholder" id="dropPlaceholder">
+        <div class="big-icon">🖼</div>
+        <h2>Drop an image to get started</h2>
+        <p>or use the upload button on the left</p>
+      </div>
+      <canvas id="canvas"></canvas>
+      <div class="processing" id="processing">rendering…</div>
+    </div>
+
+    <div class="prompt-area">
+      <div class="prompt-label">
+        Generated Prompt
+        <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+      </div>
+      <div class="prompt-text" id="promptText">Upload an image and apply effects to generate a prompt.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+
+const state = {
+  grain:    { enabled: false, intensity: 40, mono: 80 },
+  halftone: { enabled: false, spacing: 8, color: '#000000', bgColor: '#ffffff', angle: 45, shape: 'circle', contrast: 5 },
+  vignette: { enabled: false, intensity: 70, spread: 85 },
+  blur:     { enabled: false, radius: 3 },
+  duotone:  { enabled: false, shadow: '#1a0533', highlight: '#e8e0d8' },
+  posterize: { enabled: false, levels: 4, gamma: 5 },
+  texture:   { enabled: false, type: 'paper', intensity: 35, scale: 50, blend: 'multiply' },
+};
+
+const PRESETS = {
+  'Original': {
+    grain:    { enabled: false, intensity: 40, mono: 80 },
+    halftone:  { enabled: false, spacing: 8,  color: '#000000', bgColor: '#ffffff', angle: 45, shape: 'circle', contrast: 5 },
+    vignette:  { enabled: false, intensity: 70, spread: 85 },
+    blur:      { enabled: false, radius: 3 },
+    duotone:   { enabled: false, shadow: '#1a0533', highlight: '#e8e0d8' },
+    posterize: { enabled: false, levels: 4, gamma: 5 },
+    texture:   { enabled: false, type: 'paper',    intensity: 35, scale: 50, blend: 'multiply' },
+  },
+  'Film Noir': {
+    grain:     { enabled: true,  intensity: 55, mono: 90 },
+    halftone:  { enabled: false, spacing: 8,  color: '#000000', bgColor: '#ffffff', angle: 45, shape: 'circle', contrast: 5 },
+    vignette:  { enabled: true,  intensity: 80, spread: 90 },
+    blur:      { enabled: false, radius: 1 },
+    duotone:   { enabled: true,  shadow: '#080808', highlight: '#ddd4c4' },
+    posterize: { enabled: false, levels: 4, gamma: 5 },
+    texture:   { enabled: true,  type: 'paper',    intensity: 18, scale: 60, blend: 'multiply' },
+  },
+  'Newsprint': {
+    grain:     { enabled: true,  intensity: 18, mono: 100 },
+    halftone:  { enabled: true,  spacing: 5,  color: '#1a1410', bgColor: '#f2ead8', angle: 45, shape: 'circle', contrast: 7 },
+    vignette:  { enabled: false, intensity: 50, spread: 80 },
+    blur:      { enabled: true,  radius: 1 },
+    duotone:   { enabled: false, shadow: '#1a1410', highlight: '#f2ead8' },
+    posterize: { enabled: false, levels: 6, gamma: 5 },
+    texture:   { enabled: true,  type: 'paper',    intensity: 28, scale: 45, blend: 'multiply' },
+  },
+  'Dirty 35mm': {
+    grain:     { enabled: true,  intensity: 78, mono: 60 },
+    halftone:  { enabled: false, spacing: 8,  color: '#000000', bgColor: '#ffffff', angle: 45, shape: 'circle', contrast: 5 },
+    vignette:  { enabled: true,  intensity: 62, spread: 80 },
+    blur:      { enabled: false, radius: 2 },
+    duotone:   { enabled: false, shadow: '#1a0a00', highlight: '#ffe8c0' },
+    posterize: { enabled: false, levels: 4, gamma: 5 },
+    texture:   { enabled: true,  type: 'concrete', intensity: 22, scale: 35, blend: 'overlay' },
+  },
+  'Screen Print': {
+    grain:     { enabled: false, intensity: 20, mono: 80 },
+    halftone:  { enabled: true,  spacing: 7,  color: '#0d1a33', bgColor: '#f0c040', angle: 30, shape: 'circle', contrast: 8 },
+    vignette:  { enabled: false, intensity: 40, spread: 80 },
+    blur:      { enabled: false, radius: 1 },
+    duotone:   { enabled: true,  shadow: '#0d1a33', highlight: '#f0c040' },
+    posterize: { enabled: true,  levels: 4, gamma: 6 },
+    texture:   { enabled: false, type: 'canvas',   intensity: 25, scale: 40, blend: 'multiply' },
+  },
+};
+
+let currentImage = null;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// ─── Image loading ───────────────────────────────────────────────────────────
+
+function useImage(img, name, remember) {
+  currentImage = img;
+  const MAX = 900;
+  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+  canvas.width  = Math.floor(img.width  * scale);
+  canvas.height = Math.floor(img.height * scale);
+  canvas.style.display = 'block';
+  document.getElementById('dropPlaceholder').style.display = 'none';
+  const fn = document.getElementById('filename');
+  fn.textContent = name;
+  fn.style.display = 'block';
+  document.getElementById('downloadBtn').disabled = false;
+  texCache = null; texCacheKey = '';
+  resetZoom();
+  renderEffects();
+  if (remember && window.ToolKit) {
+    // Keep the working-size image in local storage so it is back on reload (skipped when too large).
+    const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const data = c.toDataURL('image/jpeg', 0.85);
+    ToolKit.saveAux('image', data.length < 3500000 ? { name, data } : null);
+  }
+}
+
+function loadImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => useImage(img, file.name, true);
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── Effect pipeline ─────────────────────────────────────────────────────────
+
+function hexToRgb(hex) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : null;
+}
+
+let renderPending = false;
+
+function renderEffects() {
+  if (window.ToolKit) ToolKit.commit();
+  if (!currentImage) return;
+  if (renderPending) return;
+  renderPending = true;
+  document.getElementById('processing').style.display = 'block';
+  requestAnimationFrame(() => {
+    renderPending = false;
+    _doRender();
+    document.getElementById('processing').style.display = 'none';
+    updatePrompt();
+  });
+}
+
+function _doRender() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. Draw image — apply blur during draw to avoid edge haloes
+  if (state.blur.enabled) {
+    const r = state.blur.radius;
+    ctx.filter = `blur(${r}px)`;
+    ctx.drawImage(currentImage, -r * 2, -r * 2, W + r * 4, H + r * 4);
+    ctx.filter = 'none';
+  } else {
+    ctx.drawImage(currentImage, 0, 0, W, H);
+  }
+
+  // 2. Pixel-level: duotone → posterize
+  let imgData = ctx.getImageData(0, 0, W, H);
+  if (state.duotone.enabled)   applyDuotone(imgData);
+  if (state.posterize.enabled) applyPosterize(imgData);
+  ctx.putImageData(imgData, 0, 0);
+
+  // 3. Halftone — reads canvas then replaces it with dot pattern
+  if (state.halftone.enabled) applyHalftone(W, H);
+
+  // 4. Texture overlay (physical medium, under grain)
+  if (state.texture.enabled) applyTextureOverlay(W, H);
+
+  // 5. Grain on top of texture/halftone
+  if (state.grain.enabled) {
+    imgData = ctx.getImageData(0, 0, W, H);
+    applyGrain(imgData);
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // 6. Vignette — always last
+  if (state.vignette.enabled) applyVignetteOverlay(W, H);
+}
+
+function applyDuotone(imageData) {
+  const sh = hexToRgb(state.duotone.shadow);
+  const hi = hexToRgb(state.duotone.highlight);
+  if (!sh || !hi) return;
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const t = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) / 255;
+    d[i]   = Math.round(sh.r + (hi.r - sh.r) * t);
+    d[i+1] = Math.round(sh.g + (hi.g - sh.g) * t);
+    d[i+2] = Math.round(sh.b + (hi.b - sh.b) * t);
+  }
+}
+
+function applyHalftone(W, H) {
+  const { spacing, color, bgColor, angle, shape, contrast } = state.halftone;
+  const srcData = ctx.getImageData(0, 0, W, H);
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = color;
+
+  const rad   = (angle * Math.PI) / 180;
+  const cosA  = Math.cos(rad);
+  const sinA  = Math.sin(rad);
+  const cx    = W / 2, cy = H / 2;
+  // enough steps to cover the full rotated canvas in both axes
+  const halfDiag = Math.ceil(Math.sqrt(W * W + H * H) / 2 / spacing) + 2;
+  // contrast: slider 1-10 → power curve 0.2-2.0  (5 = linear)
+  const contrastPow = contrast / 5;
+
+  ctx.save();
+  for (let gi = -halfDiag; gi <= halfDiag; gi++) {
+    for (let gj = -halfDiag; gj <= halfDiag; gj++) {
+      // rotate grid coordinates to screen space
+      const gx = gi * spacing;
+      const gy = gj * spacing;
+      const sx = gx * cosA - gy * sinA + cx;
+      const sy = gx * sinA + gy * cosA + cy;
+
+      if (sx < -spacing || sx > W + spacing || sy < -spacing || sy > H + spacing) continue;
+
+      const brightness  = sampleBilinear(srcData.data, W, H, sx, sy);
+      const t           = Math.pow(brightness / 255, contrastPow);
+      const radius      = (1 - t) * spacing * 0.56;
+
+      if (radius > 0.4) drawHalftoneDot(sx, sy, radius, spacing, shape);
+    }
+  }
+  ctx.restore();
+}
+
+function sampleBilinear(data, W, H, x, y) {
+  const x0 = Math.max(0, Math.min(W - 1, Math.floor(x)));
+  const y0 = Math.max(0, Math.min(H - 1, Math.floor(y)));
+  const x1 = Math.min(W - 1, x0 + 1);
+  const y1 = Math.min(H - 1, y0 + 1);
+  const fx = x - Math.floor(x), fy = y - Math.floor(y);
+  const luma = (i) => data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+  return luma((y0*W+x0)*4) * (1-fx)*(1-fy)
+       + luma((y0*W+x1)*4) * fx   *(1-fy)
+       + luma((y1*W+x0)*4) * (1-fx)*fy
+       + luma((y1*W+x1)*4) * fx   *fy;
+}
+
+function drawHalftoneDot(x, y, radius, spacing, shape) {
+  switch (shape) {
+    case 'circle':
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'square': {
+      const s = radius * Math.SQRT2;
+      ctx.fillRect(x - s/2, y - s/2, s, s);
+      break;
+    }
+    case 'diamond': {
+      const d = radius * 1.3;
+      ctx.beginPath();
+      ctx.moveTo(x,     y - d);
+      ctx.lineTo(x + d, y    );
+      ctx.lineTo(x,     y + d);
+      ctx.lineTo(x - d, y    );
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'line': {
+      // horizontal bar — full cell width, height proportional to darkness
+      ctx.fillRect(x - spacing/2, y - radius, spacing, radius * 2);
+      break;
+    }
+    case 'ellipse': {
+      // wider than tall, creating a more organic feel
+      ctx.beginPath();
+      ctx.ellipse(x, y, radius * 1.4, radius * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+}
+
+function applyGrain(imageData) {
+  const d = imageData.data;
+  const amount = (state.grain.intensity / 100) * 70;
+  const monoMix = state.grain.mono / 100;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * amount;
+    if (monoMix >= 0.99) {
+      // pure monochromatic grain (same noise on all channels)
+      d[i]   = Math.max(0, Math.min(255, d[i]   + n));
+      d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+      d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+    } else {
+      // colour grain: independent noise per channel
+      const nr = (Math.random() - 0.5) * amount;
+      const ng = (Math.random() - 0.5) * amount;
+      const nb = (Math.random() - 0.5) * amount;
+      const mono = n;
+      d[i]   = Math.max(0, Math.min(255, d[i]   + mono * monoMix + nr * (1 - monoMix)));
+      d[i+1] = Math.max(0, Math.min(255, d[i+1] + mono * monoMix + ng * (1 - monoMix)));
+      d[i+2] = Math.max(0, Math.min(255, d[i+2] + mono * monoMix + nb * (1 - monoMix)));
+    }
+  }
+}
+
+function applyVignetteOverlay(W, H) {
+  const intensity = state.vignette.intensity / 100;
+  const spread    = state.vignette.spread    / 100;
+  const cx = W / 2, cy = H / 2;
+  const outerR = Math.sqrt(W * W + H * H) / 2 * spread;
+  const innerR = outerR * 0.25;
+  const g = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, `rgba(0,0,0,${intensity})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ─── Posterize ───────────────────────────────────────────────────────────────
+
+function applyPosterize(imageData) {
+  const { levels, gamma } = state.posterize;
+  const d = imageData.data;
+  const step = 255 / (levels - 1);
+  const g = gamma / 5; // 1-10 → 0.2-2.0 power curve
+
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.round(Math.round(Math.pow(d[i]   / 255, g) * (levels - 1)) * step);
+    d[i+1] = Math.round(Math.round(Math.pow(d[i+1] / 255, g) * (levels - 1)) * step);
+    d[i+2] = Math.round(Math.round(Math.pow(d[i+2] / 255, g) * (levels - 1)) * step);
+  }
+}
+
+// ─── Texture ─────────────────────────────────────────────────────────────────
+
+let texCache = null, texCacheKey = '';
+
+function applyTextureOverlay(W, H) {
+  const { type, intensity, scale, blend } = state.texture;
+  const key = `${type}-${scale}-${W}-${H}`;
+  if (texCacheKey !== key) {
+    texCache    = buildTextureTile(type, 256, scale);
+    texCacheKey = key;
+  }
+  const pat = ctx.createPattern(texCache, 'repeat');
+  ctx.save();
+  ctx.globalCompositeOperation = blend;
+  ctx.globalAlpha = intensity / 100;
+  ctx.fillStyle = pat;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+function buildTextureTile(type, size, scale) {
+  const tc = document.createElement('canvas');
+  tc.width = tc.height = size;
+  const tx = tc.getContext('2d');
+  const img = tx.createImageData(size, size);
+  const d   = img.data;
+  const freq = 8 / scale; // scale 5-100 → freq 1.6-0.08
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      let v = texPixel(type, x, y, freq, size);
+      v = Math.max(0, Math.min(255, v));
+      d[i] = d[i+1] = d[i+2] = v;
+      d[i+3] = 255;
+    }
+  }
+  tx.putImageData(img, 0, 0);
+  return tc;
+}
+
+function texPixel(type, x, y, freq, size) {
+  switch (type) {
+    case 'paper':
+      return fbm(x * freq, y * freq, 4) * 255;
+    case 'canvas': {
+      const cell = Math.max(2, Math.round(6 / freq));
+      const half = Math.floor(cell / 2);
+      const xi = x % cell, yi = y % cell;
+      const weft = yi < half;
+      const v = weft ? (xi < half ? 180 : 130) : (xi < half ? 130 : 180);
+      return v + (smoothNoise(x * freq * 4, y * freq * 4) - 0.5) * 20;
+    }
+    case 'fibers': {
+      const streak = fbm(x * freq * 0.15, y * freq * 3, 3);
+      return streak * 255;
+    }
+    case 'concrete': {
+      const n  = fbm(x * freq * 1.5, y * freq * 1.5, 3);
+      const n2 = smoothNoise(x * freq * 5, y * freq * 5);
+      return (n * 0.7 + n2 * 0.3) * 255;
+    }
+    case 'crosshatch': {
+      const cell = Math.max(3, Math.round(8 / freq));
+      const xi = x % cell, yi = y % cell;
+      const onH = yi === 0 || yi === 1;
+      const onV = xi === 0 || xi === 1;
+      const onD = (x - y + 1024) % cell < 2;
+      return (onH || onV || onD) ? 80 : 220;
+    }
+    default: return 128;
+  }
+}
+
+// Value noise helpers
+function hash2(x, y) {
+  return Math.abs(Math.sin(x * 127.1 + y * 311.7) * 43758.5453) % 1;
+}
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uy = fy * fy * (3 - 2 * fy);
+  const a = hash2(ix,   iy),   b = hash2(ix+1, iy);
+  const c = hash2(ix, iy+1),   d2 = hash2(ix+1, iy+1);
+  return a*(1-ux)*(1-uy) + b*ux*(1-uy) + c*(1-ux)*uy + d2*ux*uy;
+}
+
+function fbm(x, y, oct) {
+  let v = 0, amp = 0.5, f = 1, tot = 0;
+  for (let i = 0; i < oct; i++) {
+    v += smoothNoise(x * f, y * f) * amp;
+    tot += amp; amp *= 0.5; f *= 2;
+  }
+  return v / tot;
+}
+
+// ─── Prompt generation ───────────────────────────────────────────────────────
+
+function updatePrompt() {
+  const el = document.getElementById('promptText');
+  if (!currentImage) {
+    el.textContent = 'Upload an image and apply effects to generate a prompt.';
+    return;
+  }
+  const parts = [];
+  if (state.grain.enabled) {
+    const lvl = state.grain.intensity < 30 ? 'light' : state.grain.intensity < 60 ? 'medium' : 'heavy';
+    const type = state.grain.mono > 80 ? 'film grain' : 'coloured film grain';
+    parts.push(`${lvl} ${type}`);
+  }
+  if (state.halftone.enabled) {
+    const sz = state.halftone.spacing <= 5 ? 'fine' : state.halftone.spacing <= 10 ? 'medium' : 'coarse';
+    const shapeLabel = { circle: 'round dots', square: 'square dots', diamond: 'diamond dots', line: 'line screen', ellipse: 'ellipse dots' };
+    parts.push(`${sz} halftone ${shapeLabel[state.halftone.shape]} at ${state.halftone.angle}° (${state.halftone.spacing}px grid, dots: ${state.halftone.color}, bg: ${state.halftone.bgColor})`);
+  }
+  if (state.vignette.enabled) {
+    const lvl = state.vignette.intensity < 40 ? 'subtle' : state.vignette.intensity < 70 ? 'medium' : 'deep';
+    parts.push(`${lvl} vignette`);
+  }
+  if (state.blur.enabled) {
+    parts.push(`${state.blur.radius}px gaussian blur`);
+  }
+  if (state.duotone.enabled) {
+    parts.push(`duotone — shadows ${state.duotone.shadow}, highlights ${state.duotone.highlight}`);
+  }
+  if (state.posterize.enabled) {
+    parts.push(`posterize to ${state.posterize.levels} tonal levels`);
+  }
+  if (state.texture.enabled) {
+    const lvl = state.texture.intensity < 25 ? 'subtle' : state.texture.intensity < 55 ? 'medium' : 'heavy';
+    parts.push(`${lvl} ${state.texture.type} texture (${state.texture.blend} blend)`);
+  }
+  if (parts.length === 0) {
+    el.textContent = 'No effects active. Enable effects to generate a prompt.';
+    return;
+  }
+  const list = parts.length === 1
+    ? parts[0]
+    : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+  el.textContent = `Apply ${list} to this image.`;
+}
+
+// ─── UI helpers ──────────────────────────────────────────────────────────────
+
+function toggleSection(name) {
+  document.getElementById(`sect-${name}`).classList.toggle('open');
+}
+
+function toggleEffect(name) {
+  state[name].enabled = !state[name].enabled;
+  refreshToggleUI(name);
+  renderEffects();
+  markPresetDirty();
+}
+
+function refreshToggleUI(name) {
+  const t  = document.getElementById(`toggle-${name}`);
+  const s  = document.getElementById(`sect-${name}`);
+  const on = state[name].enabled;
+  t.classList.toggle('on', on);
+  s.classList.toggle('enabled', on);
+}
+
+function refreshAllToggles() {
+  ['grain','halftone','vignette','blur','duotone','posterize','texture'].forEach(refreshToggleUI);
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  Object.keys(p).forEach(k => Object.assign(state[k], p[k]));
+  syncAllControls();
+  renderEffects();
+  setActivePreset(name);
+}
+
+function setActivePreset(name) {
+  document.querySelectorAll('.preset-pill').forEach(b =>
+    b.classList.toggle('active', b.dataset.preset === name));
+}
+
+function markPresetDirty() { setActivePreset(null); }
+
+function syncAllControls() {
+  setSlider('grain-intensity',     state.grain.intensity,    'val-grain-intensity');
+  setSlider('grain-mono',          state.grain.mono,         'val-grain-mono');
+  setSlider('halftone-spacing',    state.halftone.spacing,   'val-halftone-spacing');
+  setSlider('halftone-angle',      state.halftone.angle,     'val-halftone-angle',    v => v + '°');
+  setSlider('halftone-contrast',   state.halftone.contrast,  'val-halftone-contrast');
+  document.getElementById('halftone-shape').value = state.halftone.shape;
+  setSlider('vignette-intensity',  state.vignette.intensity, 'val-vignette-intensity');
+  setSlider('vignette-spread',     state.vignette.spread,    'val-vignette-spread');
+  setSlider('blur-radius',         state.blur.radius,        'val-blur-radius', v => v + 'px');
+  setColor('halftone-color',    'swatch-halftone-color',    state.halftone.color);
+  setColor('halftone-bg',       'swatch-halftone-bg',       state.halftone.bgColor);
+  setColor('duotone-shadow',    'swatch-duotone-shadow',    state.duotone.shadow);
+  setColor('duotone-highlight', 'swatch-duotone-highlight', state.duotone.highlight);
+  setSlider('posterize-levels', state.posterize.levels, 'val-posterize-levels');
+  setSlider('posterize-gamma',  state.posterize.gamma,  'val-posterize-gamma');
+  setSlider('texture-intensity', state.texture.intensity, 'val-texture-intensity');
+  setSlider('texture-scale',     state.texture.scale,     'val-texture-scale');
+  document.getElementById('texture-type').value  = state.texture.type;
+  document.getElementById('texture-blend').value = state.texture.blend;
+  refreshAllToggles();
+}
+
+function setSlider(id, val, valId, fmt = v => String(v)) {
+  document.getElementById(id).value = val;
+  document.getElementById(valId).textContent = fmt(val);
+}
+
+function setColor(inputId, swatchId, val) {
+  document.getElementById(inputId).value = val;
+  document.getElementById(swatchId).style.background = val;
+}
+
+// ─── Wire sliders and color pickers ─────────────────────────────────────────
+
+function wireSlider(id, stateKey, subKey, valId, fmt = v => String(v), parse = parseInt) {
+  document.getElementById(id).addEventListener('input', function () {
+    state[stateKey][subKey] = parse(this.value);
+    document.getElementById(valId).textContent = fmt(parse(this.value));
+    renderEffects();
+    markPresetDirty();
+  });
+}
+
+function wireColor(inputId, swatchId, stateKey, subKey) {
+  document.getElementById(inputId).addEventListener('input', function () {
+    state[stateKey][subKey] = this.value;
+    document.getElementById(swatchId).style.background = this.value;
+    renderEffects();
+    markPresetDirty();
+  });
+}
+
+wireSlider('grain-intensity',    'grain',    'intensity',  'val-grain-intensity');
+wireSlider('grain-mono',         'grain',    'mono',       'val-grain-mono');
+wireSlider('halftone-spacing',   'halftone', 'spacing',    'val-halftone-spacing');
+wireSlider('halftone-angle',     'halftone', 'angle',      'val-halftone-angle',    v => v + '°');
+wireSlider('halftone-contrast',  'halftone', 'contrast',   'val-halftone-contrast');
+document.getElementById('halftone-shape').addEventListener('change', function () {
+  state.halftone.shape = this.value;
+  renderEffects();
+  markPresetDirty();
+});
+wireSlider('vignette-intensity', 'vignette', 'intensity',  'val-vignette-intensity');
+wireSlider('vignette-spread',    'vignette', 'spread',     'val-vignette-spread');
+wireSlider('blur-radius',        'blur',     'radius',     'val-blur-radius', v => v + 'px');
+
+wireColor('halftone-color',    'swatch-halftone-color',    'halftone', 'color');
+wireColor('halftone-bg',       'swatch-halftone-bg',       'halftone', 'bgColor');
+wireColor('duotone-shadow',    'swatch-duotone-shadow',    'duotone',  'shadow');
+wireColor('duotone-highlight', 'swatch-duotone-highlight', 'duotone',  'highlight');
+
+wireSlider('posterize-levels', 'posterize', 'levels', 'val-posterize-levels');
+wireSlider('posterize-gamma',  'posterize', 'gamma',  'val-posterize-gamma');
+wireSlider('texture-intensity', 'texture', 'intensity', 'val-texture-intensity');
+wireSlider('texture-scale',     'texture', 'scale',     'val-texture-scale', v => String(v), v => {
+  texCache = null; texCacheKey = ''; return parseInt(v);
+});
+
+document.getElementById('texture-type').addEventListener('change', function () {
+  state.texture.type = this.value; texCache = null; texCacheKey = '';
+  renderEffects(); markPresetDirty();
+});
+document.getElementById('texture-blend').addEventListener('change', function () {
+  state.texture.blend = this.value; renderEffects(); markPresetDirty();
+});
+
+document.querySelectorAll('.preset-pill').forEach(btn =>
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+
+// ─── Upload / drag-and-drop ──────────────────────────────────────────────────
+
+const uploadZone      = document.getElementById('uploadZone');
+const fileInput       = document.getElementById('fileInput');
+const canvasContainer = document.getElementById('canvasContainer');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
+
+uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', ()  => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop',      e  => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over'); loadImage(e.dataTransfer.files[0]);
+});
+
+canvasContainer.addEventListener('dragover',  e => { e.preventDefault(); canvasContainer.classList.add('drag-over'); });
+canvasContainer.addEventListener('dragleave', ()  => canvasContainer.classList.remove('drag-over'));
+canvasContainer.addEventListener('drop',      e  => {
+  e.preventDefault(); canvasContainer.classList.remove('drag-over'); loadImage(e.dataTransfer.files[0]);
+});
+
+// ─── Zoom & pan ──────────────────────────────────────────────────────────────
+
+const zoom = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0 };
+
+function applyZoomTransform() {
+  canvas.style.transformOrigin = 'center';
+  canvas.style.transform = `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})`;
+  document.getElementById('zoomLevel').textContent = Math.round(zoom.scale * 100) + '%';
+  canvasContainer.style.cursor = zoom.scale > 1 ? 'grab' : 'default';
+}
+
+function changeZoom(delta) {
+  zoom.scale = Math.max(0.25, Math.min(8, zoom.scale + delta));
+  if (zoom.scale <= 1) { zoom.tx = 0; zoom.ty = 0; }
+  applyZoomTransform();
+}
+
+function resetZoom() {
+  zoom.scale = 1; zoom.tx = 0; zoom.ty = 0;
+  applyZoomTransform();
+}
+
+canvasContainer.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 0.2 : -0.2;
+  // zoom toward cursor
+  const rect = canvasContainer.getBoundingClientRect();
+  const mx = e.clientX - rect.left - rect.width / 2;
+  const my = e.clientY - rect.top  - rect.height / 2;
+  const oldScale = zoom.scale;
+  zoom.scale = Math.max(0.25, Math.min(8, zoom.scale + delta));
+  const ratio = zoom.scale / oldScale;
+  zoom.tx = mx + (zoom.tx - mx) * ratio;
+  zoom.ty = my + (zoom.ty - my) * ratio;
+  if (zoom.scale <= 1) { zoom.tx = 0; zoom.ty = 0; }
+  applyZoomTransform();
+}, { passive: false });
+
+canvasContainer.addEventListener('mousedown', (e) => {
+  if (zoom.scale <= 1) return;
+  zoom.dragging = true;
+  zoom.startX = e.clientX - zoom.tx;
+  zoom.startY = e.clientY - zoom.ty;
+  canvasContainer.style.cursor = 'grabbing';
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!zoom.dragging) return;
+  zoom.tx = e.clientX - zoom.startX;
+  zoom.ty = e.clientY - zoom.startY;
+  applyZoomTransform();
+});
+
+window.addEventListener('mouseup', () => {
+  if (zoom.dragging) {
+    zoom.dragging = false;
+    canvasContainer.style.cursor = zoom.scale > 1 ? 'grab' : 'default';
+  }
+});
+
+// ─── Copy & download ─────────────────────────────────────────────────────────
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = prev, 1500);
+  });
+}
+
+function downloadImage() {
+  if (!currentImage) return;
+  const a = document.createElement('a');
+  a.download = 'image-effects.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+async function copyImage() {
+  if (!currentImage) return;
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); ToolKit.toast('Image copied'); }
+  catch (e) { ToolKit.toast('Clipboard blocked'); }
+}
+
+// ─── Shortcuts, undo/redo, local storage (shared kit) ────────────────────────
+const DEFAULT_STATE = JSON.parse(JSON.stringify(state));
+ToolKit.init({
+  tool: 'image-effects', version: 1,
+  getState: () => JSON.parse(JSON.stringify(state)),
+  setState: s => { Object.keys(s).forEach(k => { if (state[k]) Object.assign(state[k], s[k]); }); syncAllControls(); refreshAllToggles(); markPresetDirty(); renderEffects(); },
+  defaults: () => JSON.parse(JSON.stringify(DEFAULT_STATE)),
+  onReset: () => { ToolKit.saveAux('image', null); },
+});
+{ const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } }
+ToolKit.register('o', 'Open an image', () => fileInput.click(), { group: 'Image' });
+ToolKit.register('mod+s', 'Download PNG', downloadImage, { group: 'Export' });
+ToolKit.register('mod+shift+c', 'Copy image', copyImage, { group: 'Export' });
+Object.keys(PRESETS).forEach((name, i) => ToolKit.register(String(i + 1), `Look: ${name}`, () => applyPreset(name), { group: 'Looks' }));
+[['g', 'grain', 'Grain'], ['h', 'halftone', 'Halftone'], ['v', 'vignette', 'Vignette'], ['b', 'blur', 'Blur'], ['d', 'duotone', 'Duotone'], ['p', 'posterize', 'Posterize'], ['t', 'texture', 'Texture']]
+  .forEach(([k, name, label]) => ToolKit.register(k, `Toggle ${label.toLowerCase()}`, () => toggleEffect(name), { group: 'Effects' }));
+ToolKit.register('mod+0', 'Zoom to fit', resetZoom, { group: 'View' });
+ToolKit.register('mod+=', 'Zoom in', () => changeZoom(0.25), { group: 'View' });
+ToolKit.register('mod+-', 'Zoom out', () => changeZoom(-0.25), { group: 'View' });
+</script>
+</body>
+</html>
