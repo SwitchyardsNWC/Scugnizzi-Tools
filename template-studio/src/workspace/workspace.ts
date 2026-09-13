@@ -520,6 +520,47 @@ async function remember(dir: Handle): Promise<void> {
   }
 }
 
+// --- the project folder -------------------------------------------------------------------------------------
+//
+// The folder remembered here is the project every page on this site opens (docs/projects.md). The pages
+// share an origin, so a handle stored by the project board is the one Template Studio and Freeform find, and
+// none of them has to show a picker again. These hand the handle itself to the pages that read a project's
+// own files: project.json, board.json, frames.
+
+export { folderWorkspace, permissionOf };
+
+/** Asks for a folder, and remembers it as the project. Null when the picker was dismissed or is not there. */
+export async function pickFolderHandle(): Promise<Handle | null> {
+  const picker = (globalThis as Record<string, unknown>)['showDirectoryPicker'] as ((options?: { mode?: string }) => Promise<Handle>) | undefined;
+  if (!picker) return null;
+  try {
+    const dir = await picker({ mode: 'readwrite' });
+    await remember(dir);
+    return dir;
+  } catch {
+    return null;
+  }
+}
+
+/** The remembered folder, whatever Chrome currently grants on it. */
+export const recallFolderHandle = (): Promise<Handle | null> => recall();
+
+/** Forgets the folder, so no page opens it again until one is picked. */
+export async function forgetFolderHandle(): Promise<void> {
+  const db = await idb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete('workspace');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
 async function recall(): Promise<Handle | null> {
   const db = await idb();
   if (!db) return null;

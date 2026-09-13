@@ -53,3 +53,8 @@ html, body, #app { height: 100%; margin: 0; }
   font: inherit; font-size: 13px; font-weight: 600; color: #6b4ff6; cursor: pointer;
 }
 .ff-frames-new:hover { background: #eee9ff; }
+
+/* The project the frames save into (src/project): green while they do, amber while Chrome needs a click. */
+.ff-app .ff-project { gap: 8px; }
+.ff-project-name { max-width: 180px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fig-studio-dot.warn { background: #e2a33b; box-shadow: 0 0 0 3px rgb(226 163 59 / 0.22); }
