@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { compile } from '../src/compile/compile.ts';
-import { canvasTypeSampleSvg, freeformSvg } from '../src/compile/freeform.ts';
+import { brushOutline, canvasTypeSampleSvg, freeformSvg } from '../src/compile/freeform.ts';
 import { lint } from '../src/compile/lint.ts';
 import { canvasTypeOf, DEFAULT_CANVAS_TYPE, DEFAULT_DESIGN_SYSTEM, theme } from '../src/model/design-system.ts';
 import { convertBlock, renderAsImage } from '../src/model/edit.ts';
@@ -40,7 +40,11 @@ import {
   STICKY_COLORS,
   ungroupLayers,
   updateLayer,
+  moveItem,
+  erasePaths,
+  BRUSHES,
 } from '../src/model/freeform.ts';
+import { canvasCommands, filterCommands, layerName, slashAt, textStyleOf } from '../src/model/canvas-text.ts';
 import { markOf } from '../src/model/marks.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
 import type { FreeformBlock, Template } from '../src/model/types.ts';
@@ -304,3 +308,112 @@ describe('canvas type', () => {
   });
 });
 
+
+describe('the canvas’s own controls', () => {
+  const tpl = (block: FreeformBlock): Template => ({
+    schema: SCHEMA_VERSION,
+    id: 't',
+    name: 'T',
+    hubspotLabel: 'T',
+    pageBackground: '#fff',
+    forceLight: true,
+    preview: { company: 'C', address: 'A', city: 'C', state: 'S', zip: 'Z' },
+    sections: [{ id: 's', theme: 'cream', bandColor: null, containerColor: null, textColor: null, linkColor: null, padTop: 0, padBottom: 0, rows: [{ id: 'r', mobile: 'stack', columns: [{ id: 'c', span: 12, padTop: 0, padBottom: 0, align: 'left', blocks: [block] }] }] }],
+  } as unknown as Template);
+  const layersOf = (t: Template) => (t.sections[0]!.rows[0]!.columns[0]!.blocks[0] as FreeformBlock).layers;
+  const ds = DEFAULT_DESIGN_SYSTEM;
+
+  it('moves a layer, or a whole drawing, to a place in the list', () => {
+    const block = surface({
+      layers: [
+        { kind: 'rect', id: 'a', x: 0, y: 0, width: 10, height: 10, fill: null, stroke: null, strokeWidth: 1, radius: 0 },
+        { kind: 'path', id: 'p1', points: [0, 0, 1, 1], stroke: null, strokeWidth: 3, group: 'g1' },
+        { kind: 'path', id: 'p2', points: [0, 0, 2, 2], stroke: null, strokeWidth: 3, group: 'g1' },
+        { kind: 'text', id: 't', text: 'Hi', role: 'h2', color: null, x: 0, y: 0, width: 100, align: 'left' },
+      ],
+    });
+    expect(layersOf(moveItem(tpl(block), 'f', 'a', 2)).map((l) => l.id)).toEqual(['p1', 'p2', 't', 'a']);
+    expect(layersOf(moveItem(tpl(block), 'f', groupKey('g1'), 2)).map((l) => l.id)).toEqual(['a', 't', 'p1', 'p2']);
+    const same = tpl(block);
+    expect(moveItem(same, 'f', 't', 2)).toBe(same);
+  });
+
+  it('draws a layer’s own size, spacing and effect strength over its style', () => {
+    const text = { kind: 'text' as const, id: 'l1', text: 'Big', role: 'h2', color: null, x: 0, y: 0, width: 300, align: 'left' as const, look: 'retro' };
+    const plain = freeformSvg(surface({ layers: [text] }), ds);
+    expect(plain).toContain(`font-size:${DEFAULT_CANVAS_TYPE.retro!.size}px`);
+    const tweaked = freeformSvg(surface({ layers: [{ ...text, size: 72, letterSpacing: 6, lineHeight: 140, amount: 100 }] }), ds);
+    expect(tweaked).toContain('font-size:72px');
+    expect(tweaked).toContain('letter-spacing:6px');
+    expect(tweaked).toContain('line-height:140%');
+    expect(tweaked).toContain('text-shadow:9px 9px 0');
+    expect(textStyleOf({ ...text, size: 72 }, ds).size).toBe(72);
+  });
+
+  it('answers to slash commands for styles, sizes, spacing and colour', () => {
+    const text = { kind: 'text' as const, id: 'l1', text: 'Hi', role: 'h2', color: null, x: 0, y: 0, width: 300, align: 'left' as const };
+    const all = canvasCommands(text, ds);
+    expect(filterCommands(all, 'mar')[0]!.patch).toEqual({ look: 'marker', amount: undefined });
+    expect(filterCommands(all, 'huge')[0]!.patch).toEqual({ size: Math.round(textStyleOf(text, ds).size * 2.2) });
+    expect(filterCommands(all, 'wide')[0]!.id).toBe('spacing-wide');
+    expect(filterCommands(all, 'navy')[0]!.patch).toEqual({ color: 'navy' });
+    const note = { kind: 'sticky' as const, id: 'n', text: '', role: 'body', color: null, fill: STICKY_COLORS[0]!, x: 0, y: 0, width: 180, height: 180 };
+    const noteCommands = canvasCommands(note, ds);
+    expect(noteCommands.some((c) => c.group === 'Style')).toBe(false);
+    expect(filterCommands(noteCommands, 'pink')[0]!.patch).toEqual({ fill: STICKY_COLORS[1] });
+  });
+
+  it('finds a slash only where it opens a word', () => {
+    expect(slashAt('Hello /mar', 10)).toEqual({ at: 6, query: 'mar' });
+    expect(slashAt('/', 1)).toEqual({ at: 0, query: '' });
+    expect(slashAt('3/4', 3)).toBeNull();
+    expect(slashAt('/big words', 10)).toBeNull();
+  });
+
+  it('names layers by what they show', () => {
+    expect(layerName({ kind: 'text', id: 'x', text: '  First line\nsecond', role: 'h2', color: null, x: 0, y: 0, width: 1, align: 'left' })).toBe('First line');
+    expect(layerName({ kind: 'rect', id: 'x', x: 0, y: 0, width: 1, height: 1, fill: null, stroke: null, strokeWidth: 1, radius: 0 })).toBe('Box');
+  });
+});
+
+describe('pens and the eraser', () => {
+  const freeformIn = (t: Template) => t.sections.flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((b) => b.type === 'freeform') as FreeformBlock;
+  const line = (brush?: 'pen' | 'marker' | 'highlighter' | 'brush') => ({ kind: 'path' as const, id: 'p', points: [0, 0, 50, 0, 100, 0], stroke: null, strokeWidth: 4, ...(brush ? { brush } : {}) });
+
+  it('draws each pen its own way', () => {
+    const ds = DEFAULT_DESIGN_SYSTEM;
+    expect(freeformSvg(surface({ layers: [line()] }), ds)).toContain('stroke-linecap="round"');
+    const hl = freeformSvg(surface({ layers: [line('highlighter')] }), ds);
+    expect(hl).toContain('stroke-opacity="0.45"');
+    expect(hl).toContain('stroke="#FFD84D"');
+    const brush = freeformSvg(surface({ layers: [line('brush')] }), ds);
+    expect(brush).toContain('<path data-sy-layer="p"');
+    expect(brush).not.toContain('<polyline');
+    expect(brushOutline([0, 0, 100, 0], 10)).toMatch(/^M.* Z$/);
+    expect(BRUSHES.map((b) => b.brush)).toEqual(['pen', 'marker', 'highlighter', 'brush']);
+  });
+
+  it('remembers which pen a stroke was drawn with', () => {
+    const t = drawPath(doc(surface({ layers: [] })), 'f', [0, 0, 10, 10], 'navy', 20, undefined, 'highlighter');
+    expect(freeformIn(t).layers[0]).toMatchObject({ kind: 'path', brush: 'highlighter', strokeWidth: 20 });
+  });
+
+  it('rubs out the middle of a stroke and leaves both ends', () => {
+    const t = erasePaths(doc(surface({ layers: [line()] })), 'f', [50, 0], 10);
+    const paths = freeformIn(t).layers;
+    expect(paths).toHaveLength(2);
+    expect(paths[0]!.id).toBe('p');
+    const [a, b] = paths as Array<Extract<FreeformBlock['layers'][number], { kind: 'path' }>>;
+    expect(Math.max(...a!.points.filter((_, i) => i % 2 === 0))).toBeLessThan(40);
+    expect(Math.min(...b!.points.filter((_, i) => i % 2 === 0))).toBeGreaterThan(60);
+    expect(new Set(paths.map((l) => l.id)).size).toBe(2);
+  });
+
+  it('leaves alone what it never touched, and removes what it rubbed out entirely', () => {
+    const start = doc(surface({ layers: [line()] }));
+    expect(erasePaths(start, 'f', [50, 80], 10)).toBe(start);
+    const along: number[] = [];
+    for (let x = 0; x <= 100; x += 5) along.push(x, 0);
+    expect(freeformIn(erasePaths(start, 'f', along, 10)).layers).toHaveLength(0);
+  });
+});

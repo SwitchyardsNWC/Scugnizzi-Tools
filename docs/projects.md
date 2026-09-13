@@ -40,10 +40,11 @@ my-campaign/
     deck.json               the copy, structured: the source of truth
     deck.md                 the same copy, readable and editable in any text editor
     sources/                uploaded documents, kept as they arrived
+  board.json                the project board: where each file sits, frames, notes (see below)
   assets/                   pictures every tool can use
+    social-media/           a frame's files: one folder per frame
   design-systems/           as Template Studio has them now
   templates/                Template Studio's emails
-  boards/                   Canvas mode boards (docs in template-studio)
   social/  print/           future tools' files
   exports/                  what each tool hands off
 ```
@@ -92,6 +93,76 @@ later decision, not a first step.
 The image tools writing rendered pictures into `assets/` is what joins them to Template Studio's
 effects plan: an ink-bleed headline made in ink bleed shows up in the email's Assets panel.
 
+## The project board
+
+*Added 2026-09-13.*
+
+> "the freeform canvas holds all project assets. like I was thinking of doing in the template studio
+> (have a canvas view that you can see all the emails in) should really live as it's own way of
+> viewing and managing a project … Frames could be made for assets that can be used in tools. I make
+> a frame and name it 'social media'."
+
+A project opens onto a board rather than onto a list of files. Every email, picture, freeform page and
+copy piece sits on it as a card. Click a card and the view zooms into it and opens the tool that owns
+it. Frames group cards, and tools use frames as places to take from and save to. This replaces the
+multi-email view planned for Template Studio's Canvas mode: seeing the whole project is the project's
+job, not one tool's.
+
+**The folder is the truth; the board is only a view of it.** `board.json` stores where cards sit, the
+frames and the notes, and nothing else. The files stay where the folder structure puts them. A file
+added in Finder or Drive turns up in an *Unplaced* tray. A file that has been deleted shows as a
+missing card rather than vanishing. If the board held the assets itself, the folder and the board
+would drift the first time someone dragged a file in outside the app.
+
+**A frame is a folder.** Naming a frame "Social media" creates `assets/social-media/`. Dropping a
+picture into the frame puts the file in that folder. A frame knows its folder by a stable id, so
+renaming the frame renames the folder without breaking any links to it. What a frame is *for* is set
+on the frame, not guessed from its name: an optional size (Instagram post 1080 × 1080, story
+1080 × 1920, email hero 600 wide), and which tools offer it. Ink bleed, riso and image effects then
+show "Save to frame › Social media" and start at the frame's size, and Template Studio's Assets panel
+lists frames as folders.
+
+**One canvas engine, two documents.** The board reuses the Freeform canvas's view: zoom, pan,
+selection, the dock, the layers panel and the mini menu. It has its own model, though. Freeform
+layers are a recipe that becomes one picture; board cards are references to files. A standalone
+Freeform page becomes one more kind of card.
+
+**Cards are pictures until you zoom in.** Twenty live email previews on one canvas would crawl. Each
+tool writes a thumbnail when it saves (`exports/thumbs/`). The board draws those, and swaps in a live
+render only for the card you are zoomed into.
+
+### Google Drive
+
+There are two ways to reach Drive, and the first needs nothing new.
+
+- **A Drive folder synced to the computer (recommended first).** Google Drive for desktop keeps a
+  shared drive in sync with a local folder, and the dashboard opens that folder like any other. There
+  is no sign-in and no server. It stays connected through the stored handle and Chrome's "allow on
+  every visit", and the whole team sees the same project. The limits: Chrome on desktop only, everyone
+  installs Drive for desktop, and two people saving the same file at once leaves a conflicted copy.
+- **Drive's API directly from the page.** This is possible without a server: Google sign-in in the
+  browser, then read and write through the API. It needs a Google Cloud project with an OAuth client
+  allowed for `localhost:8770` and the Pages domain. The narrow permission only sees files the app
+  made or the user picked. Seeing a whole existing folder needs the broad Drive permission, which is
+  much easier to approve if it is registered as internal to the Workspace organisation.
+  "Stay connected" is mostly true: tokens last about an hour and can usually be renewed silently while
+  the Google session lasts, but a page with no server cannot hold a long-lived login, so an occasional
+  click to reconnect is expected. Every read is also a network call, which the thumbnails help with.
+
+Start with the synced folder. Build the API path only if people need the project without Drive for
+desktop, on a machine that doesn't sync.
+
+### Board phases
+
+This is a second track after phase 1 below, and it does not wait on the copy deck.
+
+| | Builds | Done when |
+|---|---|---|
+| **B1 · See the project** | The board as a view: cards for templates and assets, laid out automatically, thumbnails written on save, click to zoom in and open the tool. | Open a project and see every email; click one and land in Template Studio. |
+| **B2 · Arrange it** | Moving cards, notes, the Unplaced tray, missing cards; `board.json`. | A board arranged by hand looks the same tomorrow, and a file dropped in Finder appears. |
+| **B3 · Frames** | Frames as folders, with size presets and the tools they are offered to; drop in to file. | Make "Social media", drop three pictures in, and find them in `assets/social-media/`. |
+| **B4 · Tools use frames** | Save to frame and open from frame in the image tools; frames in Template Studio's Assets. | An ink-bleed headline saved to Social media is on the board without anyone moving it. |
+
 ## Phases
 
 | | Builds | Done when |
@@ -111,3 +182,9 @@ effects plan: an ink-bleed headline made in ink bleed shows up in the email's As
    addition, never a requirement.
 3. **Which document formats matter first?** Markdown and `.docx` are assumed. If the writers live in
    Google Docs, phase 5's hosting decision moves up.
+4. **Does dropping a file into a frame move it or copy it?** The plan says move, so a file lives in
+   one place. A picture can be in two frames only as a copy.
+5. **Does everyone have Drive for desktop?** If yes, the synced-folder route covers Drive. If not, the
+   API route and its Google Cloud setup move up.
+6. **Is the board the dashboard?** Opening a project could replace the grid of tools with the board,
+   with the tools on its dock.

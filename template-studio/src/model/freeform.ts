@@ -5,7 +5,7 @@
 // (compile/freeform.ts); turning the drawing into pixels is the app's (rasterise.ts).
 
 import type { ColorRef } from './design-system.ts';
-import type { Align } from './types.ts';
+import type { Align, Brush } from './types.ts';
 import type { Block, BrandBlock, FreeformBlock, FreeformLayer, Template } from './types.ts';
 import { MARKS, markOf } from './marks.ts';
 
@@ -263,12 +263,92 @@ export function addTextAt(template: Template, blockId: string, at: { x: number; 
 }
 
 /** A freehand stroke, as drawn: pairs of x and y in the surface's pixels. Fewer than two points is nothing. */
-export function drawPath(template: Template, blockId: string, points: number[], stroke: ColorRef, strokeWidth: number, group?: string): Template {
+export function drawPath(template: Template, blockId: string, points: number[], stroke: ColorRef, strokeWidth: number, group?: string, brush?: Brush): Template {
   if (points.length < 4) return template;
   return withFreeform(template, blockId, (block) => ({
     ...block,
-    layers: [...block.layers, { kind: 'path', id: newLayerId(block), points: points.map((v) => Math.round(v * 10) / 10), stroke, strokeWidth, ...(group ? { group } : {}) }],
+    layers: [
+      ...block.layers,
+      { kind: 'path', id: newLayerId(block), points: points.map((v) => Math.round(v * 10) / 10), stroke, strokeWidth, ...(group ? { group } : {}), ...(brush ? { brush } : {}) },
+    ],
   }));
+}
+
+/** The pens the canvas draws with, and the width each starts at. Jared: "add different pen types and an eraser." */
+export const BRUSHES: Array<{ brush: Brush; label: string; width: number; help: string }> = [
+  { brush: 'pen', label: 'Pen', width: 2.5, help: 'A fine, even line.' },
+  { brush: 'marker', label: 'Marker', width: 6, help: 'A chunky felt tip.' },
+  { brush: 'highlighter', label: 'Highlighter', width: 20, help: 'Wide and see-through, flat at the ends.' },
+  { brush: 'brush', label: 'Brush', width: 12, help: 'Swells in the middle and tapers to a point.' },
+];
+
+/**
+ * Rubs out freehand strokes wherever the eraser passed: `at` is the eraser's path as x,y pairs, and
+ * `radius` its size. A stroke crossed in the middle becomes two strokes; one rubbed out end to end
+ * is gone. Strokes the eraser never reached are left exactly as they were, so an eraser dragged
+ * over empty page changes nothing and adds no undo step.
+ */
+export function erasePaths(template: Template, blockId: string, at: number[], radius: number): Template {
+  if (at.length < 2 || radius <= 0) return template;
+  return withFreeform(template, blockId, (block) => {
+    let changed = false;
+    const out: FreeformLayer[] = [];
+    const r1 = (v: number) => Math.round(v * 10) / 10;
+    for (const l of block.layers) {
+      if (l.kind !== 'path' || l.points.length < 4) {
+        out.push(l);
+        continue;
+      }
+      const reach = radius + l.strokeWidth / 2;
+      const hits = (x: number, y: number) => {
+        for (let i = 0; i + 1 < at.length; i += 2) if (Math.hypot(x - at[i]!, y - at[i + 1]!) <= reach) return true;
+        return false;
+      };
+      const box = layerBox(l);
+      let near = false;
+      for (let i = 0; i + 1 < at.length && !near; i += 2) {
+        near = at[i]! >= box.x - reach && at[i]! <= box.x + box.width + reach && at[i + 1]! >= box.y - reach && at[i + 1]! <= box.y + box.height + reach;
+      }
+      if (!near) {
+        out.push(l);
+        continue;
+      }
+      // Points close enough together that the eraser cannot slip between two of them.
+      const step = Math.max(0.5, radius * 0.5);
+      const runs: number[][] = [];
+      let run: number[] = [];
+      let removed = false;
+      const visit = (x: number, y: number) => {
+        if (hits(x, y)) {
+          removed = true;
+          if (run.length) runs.push(run);
+          run = [];
+        } else run.push(r1(x), r1(y));
+      };
+      for (let i = 0; i + 3 < l.points.length; i += 2) {
+        const ax = l.points[i]!;
+        const ay = l.points[i + 1]!;
+        const bx = l.points[i + 2]!;
+        const by = l.points[i + 3]!;
+        const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step));
+        for (let j = 0; j < n; j += 1) visit(ax + ((bx - ax) * j) / n, ay + ((by - ay) * j) / n);
+      }
+      visit(l.points[l.points.length - 2]!, l.points[l.points.length - 1]!);
+      if (run.length) runs.push(run);
+      if (!removed) {
+        out.push(l);
+        continue;
+      }
+      changed = true;
+      runs
+        .filter((pts) => pts.length >= 4)
+        .forEach((pts, i) => {
+          const id = i === 0 ? l.id : newLayerId({ ...block, layers: [...block.layers, ...out] });
+          out.push({ ...l, id, points: pts });
+        });
+    }
+    return changed ? { ...block, layers: out } : block;
+  });
 }
 
 /** The picture was drawn from the recipe as it stands: remember both. */
@@ -472,5 +552,25 @@ export function pasteLayers(template: Template, blockId: string, layers: Freefor
       next = [...next, copy];
     }
     return { ...block, layers: next };
+  });
+}
+
+/**
+ * Moves one entry of the layer list — a layer, or a drawing (`group:<id>`) as a whole — to a place
+ * in the list, counted bottom to top the way `groupRuns` lists them. What the drag in the canvas's
+ * layer panel resolves to.
+ */
+export function moveItem(template: Template, blockId: string, key: string, to: number): Template {
+  return withFreeform(template, blockId, (block) => {
+    const items = groupRuns(block.layers);
+    const gid = groupOfKey(key);
+    const from = items.findIndex((it) => (gid ? it.kind === 'group' && it.id === gid : it.kind === 'layer' && it.layer.id === key));
+    if (from === -1) return block;
+    const target = Math.max(0, Math.min(items.length - 1, to));
+    if (target === from) return block;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(target, 0, moved!);
+    return { ...block, layers: next.flatMap((it) => (it.kind === 'layer' ? [it.layer] : it.layers)) };
   });
 }
