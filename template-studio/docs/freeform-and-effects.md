@@ -204,6 +204,18 @@ the selected layers as one picture and keeps them editable underneath.
   the app, so its print is the same bytes in any email section; the email print and the app's print were checked
   by pixel fingerprint. Template Studio reads the pictures Freeform keeps in IndexedDB (`app/kept-pictures.ts`), so
   the frame's photographs show. With no folder open, the browser now asks before leaving the page with unsaved edits.
+- **Several frames** *(2026-09-13)*. The Freeform app keeps frames, not one canvas (`model/frame-store.ts`). An index
+  at `scuggnizzi.freeform.frames` names them and says which is open, and each frame's drawing sits under its own key. The
+  canvas kept before frames became Frame 1 under the key it always had, `scuggnizzi.freeform.v1`, so every block already
+  linked to it still is. The frames pill beside Tools switches, adds, renames, duplicates and deletes, with thumbnails,
+  and a delete can be undone. A copied frame gets block ids of its own, so a Riso hand-off from one can't land on another.
+  Template Studio's panel is now a picker of every frame. A block whose frame was deleted keeps its drawing and says so. The
+  studio pill and "Edit in Freeform" say which frame they mean. Storage goes through one small `KeyValue` interface,
+  so the project folder can take its place.
+- **Template Studio keeps the email** *(2026-09-13)*. With no folder open, the email is kept in this browser as it changes
+  (`model/draft.ts`, key `scuggnizzi.studio.draft`), and once more as the page closes. It comes back on the next visit
+  with a welcome-back note, and the badge reads "kept in this browser". With a writable folder open the draft is cleared,
+  since the file is where the email lives. The leave-page warning now shows only if the browser refuses to keep the draft.
 - **And back** *(2026-09-13)*. "It pulls in the free form frame. but there is no way to go from freeform -> template
   studio." An open Template Studio writes `scuggnizzi.studio.presence` (its tab id, its email, how many of its blocks
   follow the frame) every 20 seconds, and takes it away when the tab closes. The Freeform app's pill beside Tools reads it:

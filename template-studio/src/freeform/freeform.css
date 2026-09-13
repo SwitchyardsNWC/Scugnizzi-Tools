@@ -17,3 +17,39 @@ html, body, #app { height: 100%; margin: 0; }
 .ff-app .fig-studio { gap: 8px; }
 .fig-studio-dot { width: 8px; height: 8px; border-radius: 999px; background: #c9c3b8; flex: none; }
 .fig-studio-dot.live { background: #3fb96b; box-shadow: 0 0 0 3px rgb(63 185 107 / 0.2); }
+
+/* Frames (FramesMenu.tsx). The Surface's own title pill would only repeat what the frames pill says. */
+.ff-app .fig-title { display: none; }
+.ff-frames { position: relative; }
+.ff-frames-pill b { max-width: 180px; overflow: hidden; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
+.ff-frames-pill .caret { font-size: 9px; color: #a39d92; }
+.ff-frames-pill.on { box-shadow: 0 0 0 2px #7b61ff, 0 8px 22px -8px rgb(40 30 10 / 0.26); }
+.ff-frames-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 10; width: 330px; padding: 8px; background: #fff; border-radius: 18px;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 18px 40px -12px rgb(40 30 10 / 0.4); animation: fig-pop 240ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.ff-frame-list { display: grid; gap: 2px; max-height: 60vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.ff-frame { display: flex; align-items: center; gap: 4px; border-radius: 12px; }
+.ff-frame:hover { background: #f6f4ef; }
+.ff-frame.on { background: #eee9ff; }
+.ff-frame-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 12px; cursor: pointer; }
+.ff-frame-thumb {
+  flex: none; display: grid; place-items: center; width: 68px; height: 46px; overflow: hidden; border-radius: 8px;
+  background: #f5f3ee; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+.ff-frame-thumb svg { display: block; width: auto !important; height: auto !important; max-width: 100%; max-height: 100%; }
+.ff-frame-text { display: grid; gap: 1px; min-width: 0; }
+.ff-frame-name { overflow: hidden; font-size: 13px; font-weight: 600; color: #1e1c19; white-space: nowrap; text-overflow: ellipsis; }
+.ff-frame-facts { overflow: hidden; font-size: 11px; color: #8d877c; white-space: nowrap; text-overflow: ellipsis; }
+.ff-frame-input { width: 100%; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; outline: 2px solid #7b61ff; font: inherit; font-size: 13px; }
+.ff-frame-actions { display: flex; padding-right: 6px; opacity: 0; transition: opacity 120ms; }
+.ff-frame:hover .ff-frame-actions, .ff-frame.on .ff-frame-actions { opacity: 1; }
+.ff-frame-actions button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; font-size: 13px; color: #6f6a60; cursor: pointer; }
+.ff-frame-actions button:hover { background: #fff; color: #1e1c19; }
+.ff-frame-actions button.danger:hover { background: #ffe7e3; color: #d8452b; }
+.ff-frame-actions button:disabled { opacity: 0.3; background: none; cursor: default; }
+.ff-frames-new {
+  width: 100%; height: 36px; margin-top: 6px; border: 0; border-radius: 12px; background: #f6f4ef;
+  font: inherit; font-size: 13px; font-weight: 600; color: #6b4ff6; cursor: pointer;
+}
+.ff-frames-new:hover { background: #eee9ff; }

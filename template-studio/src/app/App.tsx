@@ -10,17 +10,17 @@ import { freeformSvg } from '../compile/freeform.ts';
 import { recipeHash } from '../model/freeform.ts';
 import {
   addFrameBlock,
-  FREEFORM_APP_FRAME,
   followFrame,
   isCurrent,
   linkedBlocks,
-  readAppFrame,
+  readAppFrames,
   readStudioPresence,
   STUDIO_PRESENCE,
   STUDIO_REQUEST,
   unlinkFrame,
   type AppFrame,
 } from '../model/freeform-link.ts';
+import { DRAFT_KEY, draftJson, readDraft } from '../model/draft.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
@@ -163,14 +163,8 @@ export function App() {
   /** Pictures the Freeform app keeps (kept-pictures.ts), so a block linked to its frame shows them. The folder's win a clash of names. */
   const [kept, setKept] = useState<AssetFile[]>([]);
   const allAssets = useMemo(() => [...assets, ...kept.filter((k) => !assets.some((a) => a.name === k.name))], [assets, kept]);
-  /** The frame the Freeform app keeps, read from this site's storage (model/freeform-link.ts). */
-  const [appFrame, setAppFrame] = useState<AppFrame | null>(() => {
-    try {
-      return readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
-    } catch {
-      return null;
-    }
-  });
+  /** The Freeform app's frames, read from this site's storage (model/frame-store.ts, model/freeform-link.ts). */
+  const [appFrames, setAppFrames] = useState<AppFrame[]>(readFreeformFrames);
   /** Freeform pages with effects, printed, by block id: what the email canvas shows in their place (printed-preview.ts). */
   const [prints, setPrints] = useState<Record<string, { key: string; url: string }>>({});
   const [device, setDevice] = useState<Device>('desktop');
@@ -265,7 +259,15 @@ export function App() {
     else setError(cause instanceof Error ? cause.message : fallback);
   }, []);
 
-  const initial = useMemo(() => importV1(starterDesign as never).template, []);
+  // The email left open last time with no folder to save it in (model/draft.ts); else the standard email.
+  const restored = useMemo(() => {
+    try {
+      return readDraft(localStorage.getItem(DRAFT_KEY));
+    } catch {
+      return null;
+    }
+  }, []);
+  const initial = useMemo(() => restored ?? importV1(starterDesign as never).template, [restored]);
   // A new document's first save picks a name that collides with nothing here, and once the file
   // exists the folder is re-read so the panel lists it and the editor is bound to the real entry.
   const fileNames = useMemo(() => files.map((f) => f.fileName), [files]);
@@ -318,7 +320,7 @@ export function App() {
       if (!site || block?.type !== 'freeform') return;
       editor.select({ kind: 'block', sectionId: site.section.id, blockId });
       // A block that follows a Freeform app frame is drawn there; its own canvas would only be overwritten.
-      if (block.source?.app === 'freeform') return openFreeformApp();
+      if (block.source?.app === 'freeform') return openFreeformApp(block.source.key);
       setSurfaceOf(blockId);
     },
     [editor],
@@ -1124,19 +1126,16 @@ export function App() {
     };
   }, [shownTemplate, allAssets]);
 
-  // The Freeform app's frame, followed live: its tab writes on every change, and this tab hears it.
+  // The Freeform app's frames, followed live: its tab writes on every change, and this tab hears it.
+  const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:${f.name}`).join('|');
+  const framesSignature = framesKey(appFrames);
   useEffect(() => {
     const read = () => {
-      let next: AppFrame | null = null;
-      try {
-        next = readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
-      } catch {
-        next = null;
-      }
-      setAppFrame((old) => (old?.hash === next?.hash && old?.name === next?.name ? old : next));
+      const next = readFreeformFrames();
+      setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === FREEFORM_APP_FRAME) read();
+      if (event.key === null || event.key.startsWith('scuggnizzi.freeform.')) read();
     };
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', read);
@@ -1144,9 +1143,10 @@ export function App() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', read);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The pictures the Freeform app keeps, read again whenever its frame changes, since that is when one may have been dropped.
+  // The pictures the Freeform app keeps, read again whenever a frame changes, since that is when one may have been dropped.
   useEffect(() => {
     let cancelled = false;
     loadKeptPictures()
@@ -1163,96 +1163,142 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [appFrame?.hash]);
+  }, [framesSignature]);
 
-  // Linked blocks follow the frame. A burst of changes in the Freeform tab is one undo step here.
+  // Linked blocks follow their frames. A burst of changes in the Freeform tab is one undo step here. A block
+  // whose frame was deleted keeps the drawing it has.
   useEffect(() => {
-    if (!appFrame) return;
     let next = editor.template;
-    for (const b of linkedBlocks(next)) if (b.source?.key === appFrame.key && !isCurrent(b, appFrame)) next = followFrame(next, b.id, appFrame);
+    for (const b of linkedBlocks(next)) {
+      const frame = appFrames.find((f) => f.key === b.source?.key);
+      if (frame && !isCurrent(b, frame)) next = followFrame(next, b.id, frame);
+    }
     if (next !== editor.template) editor.commit('Update from Freeform', next, { coalesce: 'freeform-link' });
-  }, [appFrame, editor]);
+  }, [appFrames, editor]);
 
-  const openFreeformApp = useCallback(() => {
-    const tab = window.open(new URL('freeform.html', window.location.href).href, '_blank');
-    notify(tab ? 'Freeform is open in a new tab. What you change there shows up here.' : 'The browser blocked the new tab. Allow pop-ups for this page, or open Freeform from the dashboard.');
-  }, [notify]);
+  /** Opens the Freeform app in a new tab, on a frame when one is named. */
+  const openFreeformApp = useCallback(
+    (key?: string) => {
+      const url = new URL(`freeform.html${key ? `?frame=${encodeURIComponent(key)}` : ''}`, window.location.href).href;
+      const tab = window.open(url, '_blank');
+      notify(tab ? 'Freeform is open in a new tab. What you change there shows up here.' : 'The browser blocked the new tab. Allow pop-ups for this page, or open Freeform from the dashboard.');
+    },
+    [notify],
+  );
 
-  /** The Freeform app's frame, for the selected freeform block's panel: see it, link to it, open it. */
+  /** The Freeform app's frames, for the selected freeform block's panel: see them, pick one to follow, open it. */
   const freeformApp = useMemo(() => {
     const sel = editor.selection;
     if (sel.kind !== 'block') return undefined;
     const block = allBlocks(editor.template).find((b) => b.id === sel.blockId);
     if (!block || block.type !== 'freeform') return undefined;
     const ds = designSystemOf(editor.template);
+    const linkedKey = block.source?.app === 'freeform' ? block.source.key : null;
+    const followed = linkedKey ? appFrames.find((f) => f.key === linkedKey) : undefined;
     return {
-      frame: appFrame
-        ? {
-            name: appFrame.name,
-            width: appFrame.page.width,
-            height: appFrame.page.height,
-            layers: appFrame.page.layers.length,
-            printed: Boolean(appFrame.page.effects?.length),
-            thumb: withoutMissingPictures(withLocalAssets(freeformSvg(appFrame.page, ds), allAssets)),
-          }
-        : null,
-      linked: block.source?.app === 'freeform',
-      current: Boolean(appFrame && isCurrent(block, appFrame)),
+      frames: appFrames.map((f) => ({
+        key: f.key,
+        name: f.name,
+        width: f.page.width,
+        height: f.page.height,
+        layers: f.page.layers.length,
+        printed: Boolean(f.page.effects?.length),
+        thumb: withoutMissingPictures(withLocalAssets(freeformSvg(f.page, ds), allAssets)),
+      })),
+      linkedKey,
+      missing: Boolean(linkedKey && !followed),
+      current: Boolean(followed && isCurrent(block, followed)),
       ...(prints[block.id] ? { print: prints[block.id]!.url } : {}),
-      onLink: () => {
-        if (appFrame) editor.commit('Link to Freeform', followFrame(editor.template, block.id, appFrame));
+      onLink: (key: string) => {
+        const frame = appFrames.find((f) => f.key === key);
+        if (frame) editor.commit(linkedKey ? `Follow ${frame.name}` : 'Link to Freeform', followFrame(editor.template, block.id, frame));
       },
       onUnlink: () => editor.commit('Unlink from Freeform', unlinkFrame(editor.template, block.id)),
-      onOpen: openFreeformApp,
+      onOpen: (key?: string) => openFreeformApp(key ?? linkedKey ?? undefined),
     };
-  }, [editor, appFrame, allAssets, prints, openFreeformApp]);
+  }, [editor, appFrames, allAssets, prints, openFreeformApp]);
 
-  // With no folder open the email lives only in this tab. Leaving the page — or a browser that opens
-  // Freeform or Riso in this tab rather than a new one — would lose it, so the browser asks first.
+  // --- with no folder, the email is kept in this browser (model/draft.ts) ------------------------------------
+
+  const [draftFailed, setDraftFailed] = useState(false);
+  const templateRef = useRef(editor.template);
+  templateRef.current = editor.template;
+  const keepDraft = () => {
+    if (workspaceRef.current?.canWrite) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, draftJson(templateRef.current));
+      setDraftFailed(false);
+    } catch {
+      setDraftFailed(true);
+    }
+  };
+  // Written as it changes. With a writable folder open the email lives in its file and the draft goes, so a
+  // later visit never brings back something older than the file.
   useEffect(() => {
-    if (workspace || !editor.canUndo) return;
+    if (workspace?.canWrite) {
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Nothing kept to clear.
+      }
+      return;
+    }
+    const timer = window.setTimeout(keepDraft, 400);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor.template, workspace]);
+  useEffect(() => {
+    // Once more on the way out, for the last few keystrokes.
+    const flush = () => keepDraft();
+    window.addEventListener('pagehide', flush);
+    if (restored) notify(`Welcome back: ${restored.name}, as you left it. It is kept in this browser until you open a folder.`);
+    return () => window.removeEventListener('pagehide', flush);
+    // Once, on the way in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Only when the browser would not keep the email: then leaving the page would lose it, so the browser asks first.
+  useEffect(() => {
+    if (workspace?.canWrite || !draftFailed || !editor.canUndo) return;
     const onLeave = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', onLeave);
     return () => window.removeEventListener('beforeunload', onLeave);
-  }, [workspace, editor.canUndo]);
+  }, [workspace, draftFailed, editor.canUndo]);
 
-  // --- the other way: the Freeform app sends its frame here (model/freeform-link.ts) ------------------------
+  // --- the other way: the Freeform app sends a frame here (model/freeform-link.ts) ------------------------
 
   const studioTab = useRef(Math.random().toString(36).slice(2));
 
-  /** Shows the Freeform app's frame in this email: selects the block that follows it, or adds one above the footer. */
-  const bringFrame = () => {
-    let frame: AppFrame | null = null;
-    try {
-      frame = readAppFrame(localStorage.getItem(FREEFORM_APP_FRAME));
-    } catch {
-      frame = null;
-    }
-    if (!frame) return notify('The Freeform app has no frame to bring in yet.');
+  /** Shows a Freeform frame in this email: selects the block that follows it, or adds one above the footer. */
+  const bringFrame = (key?: string) => {
+    const frames = readFreeformFrames();
+    const frame = key ? frames.find((f) => f.key === key) : frames[0];
+    if (!frame) return notify(key ? 'That Freeform frame is gone.' : 'The Freeform app has no frame to bring in yet.');
     const t = editor.template;
     const already = linkedBlocks(t).find((b) => b.source?.key === frame.key);
     if (already) {
       const site = siteOf(t, already.id);
       if (site) editor.select({ kind: 'block', sectionId: site.section.id, blockId: already.id });
-      return notify(`Your Freeform frame is here, in ${t.name}.`);
+      return notify(`${frame.name} is here, in ${t.name}.`);
     }
     const added = addFrameBlock(t, frame, `ff${Date.now().toString(36)}-`);
-    editor.commit('Add Freeform frame', added.template, { select: { kind: 'block', sectionId: added.sectionId, blockId: added.blockId } });
-    notify(`Added your Freeform frame to ${t.name}, above the footer. It follows the frame from now on.`, () => editor.undo());
+    editor.commit(`Add ${frame.name}`, added.template, { select: { kind: 'block', sectionId: added.sectionId, blockId: added.blockId } });
+    notify(`Added ${frame.name} to ${t.name}, above the footer. It follows the frame from now on.`, () => editor.undo());
   };
   const bringFrameRef = useRef(bringFrame);
   bringFrameRef.current = bringFrame;
 
-  // Says this tab is open, which email it holds, and whether that email uses the frame. Every 20 seconds is
+  // Says this tab is open, which email it holds, and which frames that email follows. Every 20 seconds is
   // enough: a background tab's timers run about once a minute anyway, and presence lasts two.
-  const linkedHere = appFrame ? linkedBlocks(editor.template).filter((b) => b.source?.key === appFrame.key).length : 0;
+  const linkedKeys = [...new Set(linkedBlocks(editor.template).map((b) => b.source!.key))];
+  const linkedSignature = linkedKeys.join('|');
   useEffect(() => {
     const write = () => {
       try {
-        localStorage.setItem(STUDIO_PRESENCE, JSON.stringify({ tab: studioTab.current, email: editor.template.name, linked: linkedHere, at: Date.now() }));
+        localStorage.setItem(STUDIO_PRESENCE, JSON.stringify({ tab: studioTab.current, email: editor.template.name, linked: linkedKeys.length, keys: linkedKeys, at: Date.now() }));
       } catch {
         // Storage full or blocked: the Freeform app offers to open Template Studio instead.
       }
@@ -1260,7 +1306,8 @@ export function App() {
     write();
     const timer = window.setInterval(write, 20_000);
     return () => window.clearInterval(timer);
-  }, [editor.template.name, linkedHere]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor.template.name, linkedSignature]);
 
   useEffect(() => {
     const leave = () => {
@@ -1273,21 +1320,23 @@ export function App() {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== STUDIO_REQUEST || !event.newValue) return;
       try {
-        const request = JSON.parse(event.newValue) as { action?: string; tab?: string };
-        if (request.action === 'link' && request.tab === studioTab.current) bringFrameRef.current();
+        const request = JSON.parse(event.newValue) as { action?: string; tab?: string; key?: string };
+        if (request.action === 'link' && request.tab === studioTab.current) bringFrameRef.current(request.key);
       } catch {
         // Not a request this tab understands.
       }
     };
     window.addEventListener('pagehide', leave);
     window.addEventListener('storage', onStorage);
-    // Opened by the Freeform app with ?freeform=link: bring the frame in once, and take the request off the address.
+    // Opened by the Freeform app with ?freeform=link&frame=<key>: bring that frame in once, and take the request off the address.
     const params = new URLSearchParams(window.location.search);
     if (params.get('freeform') === 'link') {
+      const key = params.get('frame') ?? undefined;
       params.delete('freeform');
+      params.delete('frame');
       const rest = params.toString();
       window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
-      window.setTimeout(() => bringFrameRef.current(), 300);
+      window.setTimeout(() => bringFrameRef.current(key), 300);
     }
     return () => {
       window.removeEventListener('pagehide', leave);
@@ -2070,8 +2119,8 @@ function SaveBadge({ editor, workspace }: { editor: ReturnType<typeof useEditor>
   }
   if (!workspace?.canWrite) {
     return (
-      <span class="save" title="No folder open, so changes live in this tab only. Open a folder to save them.">
-        not saved to a folder
+      <span class="save" title="No folder open: this email is kept in this browser and comes back when you reopen Template Studio. Open a folder to save it as a file.">
+        kept in this browser
       </span>
     );
   }
@@ -2082,4 +2131,13 @@ function SaveBadge({ editor, workspace }: { editor: ReturnType<typeof useEditor>
       {text}
     </span>
   );
+}
+
+/** The Freeform app's frames, from this site's storage; none when it cannot be read. */
+function readFreeformFrames(): AppFrame[] {
+  try {
+    return readAppFrames((key) => localStorage.getItem(key));
+  } catch {
+    return [];
+  }
 }
