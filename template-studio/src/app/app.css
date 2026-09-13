@@ -1536,3 +1536,158 @@ button.fig-pill:active { transform: scale(0.96); }
   outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -1.5px;
   border-radius: 3px; transition: none;
 }
+
+/* Back to the dashboard, beside the wordmark. */
+.brand-back {
+  display: grid; place-items: center; width: 28px; height: 28px; margin-right: -2px; border-radius: 7px;
+  color: var(--muted); text-decoration: none; font-size: 16px; line-height: 1; flex: none;
+}
+.brand-back:hover { background: var(--line-soft); color: var(--ink); }
+
+/* The canvas takes the right pane too: everything about the canvas lives in the canvas now. */
+.canvas > .surface.fig { right: -320px; }
+
+/* --- the canvas's own controls (FigPanel.tsx) ------------------------------------------------------ */
+.surface.fig.with-panel .fig-dock, .surface.fig.with-panel .fig-trays, .surface.fig.with-panel .fig-hint { left: calc((100% - 300px) / 2); }
+
+.fig-panel {
+  top: 64px; right: 14px; bottom: 14px; width: 272px; display: flex; flex-direction: column; overflow: hidden;
+  background: #fff; border-radius: 20px; color: #1e1c19; font-size: 13px;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 16px 40px -14px rgb(40 30 10 / 0.34);
+}
+.surface.phase-start .fig-panel, .surface.phase-exit .fig-panel { transform: translateX(34px); }
+.fig-panel-open { top: 64px; right: 14px; }
+.fig-panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 16px; }
+.fig-panel-head b { font-size: 14px; }
+.fig-panel .grow { flex: 1; }
+.fig-count, .fig-badge {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: #f3f0e9; color: #8d877c; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.fig-icon-btn {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 10px;
+  background: none; color: #3d3931; cursor: pointer; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms, color 120ms;
+}
+.fig-icon-btn:hover { background: #f3f0e9; transform: translateY(-1px); }
+.fig-icon-btn.on { background: #eee9ff; color: #6b4ff6; }
+.fig-icon-btn.danger:hover, .fig-layer-actions .danger:hover { background: #ffe7e3; color: #d8452b; }
+
+.fig-layers { list-style: none; margin: 0; padding: 2px 8px 8px; overflow-y: auto; flex: 1; min-height: 0; }
+.fig-layers.nested { padding: 0 0 2px 22px; overflow: visible; }
+.fig-group { display: block; }
+.fig-layer { position: relative; display: flex; align-items: center; gap: 2px; border-radius: 12px; transition: background 120ms; }
+.fig-layer:hover, .fig-layer.hover { background: #f6f4ef; }
+.fig-layer.on { background: #eee9ff; }
+.fig-layer[draggable="true"] { cursor: grab; }
+.fig-layer.gap-before::before, .fig-layer.gap-after::after {
+  content: ''; position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 3px; background: #7b61ff; pointer-events: none;
+}
+.fig-layer.gap-before::before { top: -2px; }
+.fig-layer.gap-after::after { bottom: -2px; }
+.fig-layer-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 8px;
+  border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.fig-fold + .fig-layer-main { padding-left: 2px; }
+.fig-layer-icon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #f3f0e9; color: #5f5a50; transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1); }
+.fig-layer:hover .fig-layer-icon { transform: rotate(-6deg) scale(1.06); }
+.fig-layer-icon.k-text { background: #eee9ff; color: #6b4ff6; }
+.fig-layer-icon.k-sticky { background: #fff1bd; color: #8a6a00; }
+.fig-layer-icon.k-image { background: #dcefff; color: #2b6cb0; }
+.fig-layer-icon.k-mark { background: #ffe2ea; color: #c0355f; }
+.fig-layer-icon.k-group, .fig-layer-icon.k-path { background: #dff5dc; color: #2f7d32; }
+.fig-layer.on .fig-layer-icon { background: #fff; }
+.fig-layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.fig-layer-actions { display: flex; gap: 1px; padding-right: 4px; opacity: 0; transition: opacity 120ms; }
+.fig-layer:hover .fig-layer-actions, .fig-layer.on .fig-layer-actions { opacity: 1; }
+.fig-layer-actions button {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; color: #6f6a60; cursor: pointer;
+}
+.fig-layer-actions button:hover { background: #fff; color: #1e1c19; }
+.fig-fold { flex: none; display: grid; place-items: center; width: 20px; height: 26px; margin-left: 2px; padding: 0; border: 0; background: none; color: #a39d92; cursor: pointer; }
+.fig-fold svg { transition: transform 200ms ease; }
+.fig-fold.open svg { transform: rotate(90deg); }
+.fig-empty { padding: 20px 12px; color: #8d877c; font-size: 12.5px; line-height: 1.45; text-align: center; }
+
+.fig-page { display: grid; gap: 10px; padding: 10px 14px 14px; border-top: 1px solid #f0ece4; }
+.fig-page-row { display: flex; align-items: center; gap: 8px; }
+.fig-page-row b { flex: 1; font-size: 12px; color: #8d877c; }
+.fig-page label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #a39d92; }
+.fig-page input {
+  width: 58px; height: 28px; padding: 0 8px; border: 0; border-radius: 9px; background: #f6f4ef;
+  font: inherit; font-size: 12.5px; color: #1e1c19; font-variant-numeric: tabular-nums;
+}
+.fig-page input:focus { outline: 2px solid #7b61ff; }
+.fig-page-row.dots { flex-wrap: wrap; gap: 6px; }
+.fig-dot.clear, .fig-swatch-btn span.empty { background: repeating-conic-gradient(#e7e2d8 0 25%, #fff 0 50%) 0 0 / 8px 8px; }
+
+/* The mini menu over what is picked. Above it, the pop opens upward; below it, downward. */
+.fig-bar { z-index: 4; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; transform: translate(-50%, -100%); transform-origin: 50% 100%; animation: fig-bar-in 280ms cubic-bezier(.34, 1.56, .64, 1); }
+.fig-bar.below { flex-direction: column; transform: translate(-50%, 0); transform-origin: 50% 0; }
+@keyframes fig-bar-in { from { opacity: 0; scale: 0.86; } to { opacity: 1; scale: 1; } }
+.fig-bar-row {
+  display: flex; align-items: center; gap: 3px; padding: 5px; white-space: nowrap; background: #fff; border-radius: 16px; color: #1e1c19;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 12px 30px -10px rgb(40 30 10 / 0.35);
+}
+.fig-bar-row .fig-sep { margin: 5px 3px; }
+.fig-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 3px; border: 0; border-radius: 11px;
+  background: #f6f4ef; font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; cursor: pointer; transition: background 120ms;
+}
+.fig-chip:hover, .fig-chip.on { background: #eee9ff; }
+.fig-chip .caret { font-size: 9px; color: #a39d92; }
+.fig-chip-sample { display: block; width: 44px; height: 26px; overflow: hidden; border-radius: 8px; background: #fff; }
+.fig-chip-sample svg { display: block; width: 100%; height: 100%; }
+.fig-stepper { display: inline-flex; align-items: center; height: 32px; border-radius: 11px; background: #f6f4ef; }
+.fig-stepper button { width: 26px; height: 32px; padding: 0; border: 0; border-radius: 11px; background: none; font: inherit; font-size: 15px; font-weight: 700; color: #3d3931; cursor: pointer; }
+.fig-stepper button:hover { background: #eee9ff; color: #6b4ff6; }
+.fig-stepper-val { min-width: 28px; font-size: 12.5px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.fig-swatch-btn { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 11px; background: none; cursor: pointer; }
+.fig-swatch-btn:hover, .fig-swatch-btn.on { background: #f3f0e9; }
+.fig-swatch-btn span { display: block; width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15), inset 0 0 0 2px #fff; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1); }
+.fig-swatch-btn:hover span { transform: scale(1.12) rotate(12deg); }
+.fig-swatch-btn.square span { border-radius: 6px; }
+.fig-swatch-btn.ring span { background: none; border: 4px solid; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12); }
+.fig-bar-pop {
+  max-width: 440px; padding: 8px; background: #fff; border-radius: 16px; animation: fig-pop 260ms cubic-bezier(.34, 1.56, .64, 1);
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 12px 30px -10px rgb(40 30 10 / 0.35);
+}
+.fig-bar-dots { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fig-bar-looks { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 420px; }
+.fig-sliders { display: grid; gap: 9px; width: 272px; padding: 4px 4px 2px; }
+.fig-slide { display: grid; grid-template-columns: 96px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #3d3931; }
+.fig-slide input { width: 100%; accent-color: #7b61ff; }
+.fig-slide-val { color: #8d877c; text-align: right; font-variant-numeric: tabular-nums; }
+.fig-reset { justify-self: start; padding: 2px 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: #6b4ff6; cursor: pointer; }
+
+/* The slash menu under words being typed. */
+.fig-slash {
+  position: absolute; z-index: 5; width: 290px; max-height: 300px; overflow-y: auto; padding: 6px; background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 18px 40px -12px rgb(40 30 10 / 0.4); animation: fig-pop 240ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.fig-slash-group { padding: 8px 8px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a39d92; }
+.fig-slash-item {
+  display: grid; grid-template-columns: 50px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; width: 100%;
+  padding: 5px 8px 5px 5px; border: 0; border-radius: 11px; background: none; font: inherit; color: #1e1c19; text-align: left; cursor: pointer;
+}
+.fig-slash-item.on { background: #eee9ff; }
+.fig-slash-preview { grid-row: 1 / 3; display: grid; place-items: center; width: 50px; height: 34px; overflow: hidden; border-radius: 9px; background: #f6f4ef; }
+.fig-slash-item.on .fig-slash-preview { background: #fff; }
+.fig-slash-preview .look, .fig-slash-preview .look svg { display: block; width: 100%; height: 100%; }
+.fig-slash-preview .swatch { width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15); }
+.fig-slash-preview .glyph { font-size: 13px; font-weight: 800; color: #6b4ff6; }
+.fig-slash-label { font-size: 13px; font-weight: 600; }
+.fig-slash-hint { overflow: hidden; font-size: 11px; color: #8d877c; white-space: nowrap; text-overflow: ellipsis; }
+.fig-slash-empty { padding: 12px; font-size: 12.5px; color: #8d877c; }
+
+/* Pens and the eraser. */
+.surface.tool-eraser .surface-svg { cursor: none; }
+.fig-brush {
+  flex: none; display: grid; justify-items: center; gap: 1px; width: 84px; padding: 6px 4px 5px; border: 0; border-radius: 12px;
+  background: #f6f4ef; font: inherit; font-size: 11px; color: #5f5a50; cursor: pointer;
+  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+}
+.fig-brush span, .fig-brush svg { display: block; width: 72px; height: 29px; }
+.fig-brush b { font-weight: 600; }
+.fig-brush:hover { transform: translateY(-2px) rotate(-2deg); }
+.fig-brush.on { background: #eee9ff; box-shadow: inset 0 0 0 2px #7b61ff; color: #6b4ff6; }

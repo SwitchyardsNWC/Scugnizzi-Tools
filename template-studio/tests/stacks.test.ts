@@ -318,3 +318,16 @@ describe('grouping and ungrouping', () => {
     expect(addBlockToColumn(t, 'c1', 'legal', 1)).toBe(t);
   });
 });
+
+describe('rendering a grouped block as a picture', () => {
+  it('finds a cell of its own inside the block marker, though only the group wears hs_padded', () => {
+    const html = out(card(), true);
+    const start = html.indexOf('data-sy-block="h"');
+    const marked = html.slice(start, html.indexOf('data-sy-block="p"'));
+    expect(start).toBeGreaterThan(-1);
+    expect(marked).not.toContain('hs_padded');
+    // The render's fallback: the marker is a <td>, or holds one.
+    const tag = html.slice(html.lastIndexOf('<', start), start);
+    expect(tag.startsWith('<td') || marked.includes('<td')).toBe(true);
+  });
+});

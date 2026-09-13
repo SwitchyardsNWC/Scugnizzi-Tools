@@ -1044,7 +1044,10 @@ export function App() {
     async (blockId: string) => {
       const doc = frame.current?.contentDocument;
       const marked = doc?.querySelector(`[data-sy-block="${blockId}"]`) as HTMLElement | null;
-      const cell = marked?.querySelector('td.hs_padded') as HTMLElement | null;
+      // A block on its own wears `hs_padded`; a block in a group does not — the group's column cell
+      // wears it once for the whole stack, and each block is a plain row cell of its own inside it.
+      const cell = (marked?.querySelector('td.hs_padded') ??
+        (marked?.matches('td') ? marked : marked?.querySelector('td'))) as HTMLElement | null;
       if (!doc || !cell) {
         setError('That block is not on the canvas, so there is nothing to draw. Scroll it into view and try again.');
         return;
@@ -1250,6 +1253,9 @@ export function App() {
   return (
     <div class={`app ${presenting ? 'presenting' : ''}`}>
       <header class="bar">
+        <a class="brand-back" href="../../index.html" title="Back to Scugnizzi tools" aria-label="Back to Scugnizzi tools">
+          ←
+        </a>
         <div class="brand">Template&nbsp;Studio</div>
 
         <div class="bar-file">

@@ -347,6 +347,25 @@ export interface ButtonBlock extends BlockBase {
 }
 
 /** What every layer carries: its id, its turn about its own centre, and the group it moves with. */
+/**
+ * One text layer's own departures from its style, set from the canvas's mini menu and slash
+ * commands. Absent is the style's value, so changing the style in Design still reaches every layer
+ * nobody has tweaked.
+ */
+export interface TextTweaks {
+  /** Pixels. */
+  size?: number;
+  /** Pixels between letters. */
+  letterSpacing?: number;
+  /** Percent. */
+  lineHeight?: number;
+  /** The effect's strength, 0 to 100 — see `CanvasTextStyle.amount`. */
+  amount?: number;
+}
+
+/** How a freehand stroke is drawn. Absent is the marker every stroke was before there was a choice. */
+export type Brush = 'pen' | 'marker' | 'highlighter' | 'brush';
+
 interface LayerBase {
   id: string;
   rotation?: number;
@@ -363,13 +382,13 @@ interface LayerBase {
  * picture (learnings 3.68). Absent, the text is set in its email type role.
  */
 export type FreeformLayer =
-  | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string })
+  | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string } & TextTweaks)
   | (LayerBase & { kind: 'image'; src: string; x: number; y: number; width: number; height: number; opacity: number })
   | (LayerBase & { kind: 'rect'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; radius: number })
   | (LayerBase & { kind: 'ellipse'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number })
   | (LayerBase & { kind: 'line'; x1: number; y1: number; x2: number; y2: number; stroke: ColorRef; strokeWidth: number })
-  | (LayerBase & { kind: 'path'; points: number[]; stroke: ColorRef; strokeWidth: number })
-  | (LayerBase & { kind: 'sticky'; text: string; role: string; color: ColorRef; fill: ColorRef; x: number; y: number; width: number; height: number })
+  | (LayerBase & { kind: 'path'; points: number[]; stroke: ColorRef; strokeWidth: number; brush?: Brush })
+  | (LayerBase & { kind: 'sticky'; text: string; role: string; color: ColorRef; fill: ColorRef; x: number; y: number; width: number; height: number; size?: number })
   | (LayerBase & { kind: 'mark'; mark: string; color: ColorRef; x: number; y: number; width: number; height: number });
 
 /**

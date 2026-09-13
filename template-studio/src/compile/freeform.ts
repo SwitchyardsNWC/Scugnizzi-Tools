@@ -9,10 +9,11 @@
 // `data-sy-layer`, which is how the canvas finds one under the pointer; the export never sees this
 // markup at all, only the picture.
 
-import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type DesignSystem } from '../model/design-system.ts';
-import { layerBox } from '../model/freeform.ts';
+import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
+import { textStyleOf } from '../model/canvas-text.ts';
+import { BRUSHES, layerBox } from '../model/freeform.ts';
 import { markOf } from '../model/marks.ts';
-import type { FreeformBlock, FreeformLayer } from '../model/types.ts';
+import type { Brush, FreeformBlock, FreeformLayer } from '../model/types.ts';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const num = (n: number) => String(Math.round(n * 100) / 100);
@@ -59,12 +60,12 @@ function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number)
     case 'sticky': {
       // A note: a soft offset shadow drawn as a second shape rather than a filter, so the render has
       // nothing to approximate, then the paper, then the words inside a padding.
-      const t = typeOf(ds, layer.role);
+      const t = textStyleOf(layer, ds);
       const fill = colorOf(ds, layer.fill) ?? '#FFE58A';
       const color = colorOf(ds, layer.color) ?? '#2b2620';
       const pad = 14;
       const style =
-        `margin:0; font-family:${fontOf(ds, layer.role)}; font-size:${t.size}px; line-height:${t.lineHeight}%; font-weight:${t.weight}; ` +
+        `margin:0; font-family:${t.font}; font-size:${num(t.size)}px; line-height:${t.lineHeight}%; font-weight:${t.weight}; ` +
         `color:${color}; text-align:left; text-transform:none; letter-spacing:normal; font-style:normal; overflow-wrap:break-word; word-wrap:break-word`;
       const words = esc(layer.text).replace(/\r?\n/g, '<br/>');
       return (
@@ -109,11 +110,15 @@ function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number)
         `stroke="${colorOf(ds, layer.stroke) ?? ink}" stroke-width="${num(layer.strokeWidth)}" stroke-linecap="round"/>`
       );
     case 'path': {
+      // A highlighter left on its default is yellow: in the ink it would read as a thick marker.
+      const color = colorOf(ds, layer.stroke) ?? (layer.brush === 'highlighter' ? HIGHLIGHTER : ink);
+      if (layer.brush === 'brush') return `<path ${mark} d="${brushOutline(layer.points, layer.strokeWidth)}" fill="${color}"/>`;
       const pts: string[] = [];
       for (let i = 0; i + 1 < layer.points.length; i += 2) pts.push(`${num(layer.points[i]!)},${num(layer.points[i + 1]!)}`);
+      const hl = layer.brush === 'highlighter';
       return (
-        `<polyline ${mark} points="${pts.join(' ')}" fill="none" stroke="${colorOf(ds, layer.stroke) ?? ink}" ` +
-        `stroke-width="${num(layer.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"/>`
+        `<polyline ${mark} points="${pts.join(' ')}" fill="none" stroke="${color}" ` +
+        `stroke-width="${num(layer.strokeWidth)}" stroke-linecap="${hl ? 'butt' : 'round'}" stroke-linejoin="round"${hl ? ' stroke-opacity="0.45"' : ''}/>`
       );
     }
   }
@@ -145,38 +150,32 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
     `<foreignObject ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(Math.max(1, layer.width))}" height="${num(height)}">` +
     `<div xmlns="http://www.w3.org/1999/xhtml" style="${style}">${inner}</div></foreignObject>`;
 
-  if (!look) {
-    const t = typeOf(ds, layer.role);
-    const color = colorOf(ds, layer.color) ?? inkOf(ds);
-    const style =
-      `margin:0; font-family:${fontOf(ds, layer.role)}; font-size:${t.size}px; line-height:${t.lineHeight}%; font-weight:${t.weight}; ` +
-      `color:${color}; text-align:${layer.align};${t.uppercase ? ' text-transform:uppercase;' : ''}${t.letterSpacing ? ` letter-spacing:${t.letterSpacing}px;` : ''} ` +
-      'overflow-wrap:break-word; word-wrap:break-word';
-    return box(words, style);
-  }
-
-  const color = colorOf(ds, layer.color) ?? colorOf(ds, look.color) ?? inkOf(ds);
-  const font = (look.font && ds.fonts[look.font]) || ds.fontStack;
-  const k = Math.max(0, Math.min(100, look.amount)) / 100;
+  // The style and the layer's own tweaks, resolved once: the canvas's text field reads the same numbers.
+  const s = textStyleOf(layer, ds);
+  const color = colorOf(ds, layer.color) ?? colorOf(ds, s.color) ?? inkOf(ds);
+  const font = s.font;
+  const k = Math.max(0, Math.min(100, s.amount)) / 100;
   const base =
-    `margin:0; font-family:${font}; font-size:${look.size}px; line-height:${look.lineHeight}%; font-weight:${look.weight};${look.italic ? ' font-style:italic;' : ''} ` +
-    `color:${color}; text-align:${layer.align};${look.uppercase ? ' text-transform:uppercase;' : ''}${look.letterSpacing ? ` letter-spacing:${look.letterSpacing}px;` : ''} ` +
+    `margin:0; font-family:${font}; font-size:${num(s.size)}px; line-height:${num(s.lineHeight)}%; font-weight:${s.weight};${s.italic ? ' font-style:italic;' : ''} ` +
+    `color:${color}; text-align:${layer.align};${s.uppercase ? ' text-transform:uppercase;' : ''}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
     'overflow-wrap:break-word; word-wrap:break-word';
 
-  switch (look.effect) {
+  if (!look) return box(words, base);
+
+  switch (s.effect) {
     case 'outline': {
-      const ec = colorOf(ds, look.effectColor) ?? inkOf(ds);
+      const ec = colorOf(ds, s.effectColor) ?? inkOf(ds);
       return box(words, `${base}; -webkit-text-stroke:${num(1 + k * 5)}px ${ec}`);
     }
     case 'shadow': {
-      const ec = colorOf(ds, look.effectColor) ?? '#FFB000';
+      const ec = colorOf(ds, s.effectColor) ?? '#FFB000';
       const d = num(1 + k * 8);
       return box(words, `${base}; text-shadow:${d}px ${d}px 0 ${ec}`);
     }
     case 'sticker': {
       // A ring of hard shadows reads as a thick border in every engine, where a text stroke drawn
       // outside the letters is not something every engine agrees about.
-      const ec = colorOf(ds, look.effectColor) ?? '#ffffff';
+      const ec = colorOf(ds, s.effectColor) ?? '#ffffff';
       const w = 2 + k * 8;
       const ring = Array.from({ length: 16 }, (_, i) => {
         const a = (i / 16) * Math.PI * 2;
@@ -185,7 +184,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
       return box(words, `${base}; text-shadow:${[...ring, `0 ${num(w + 3)}px 0 rgba(0,0,0,0.18)`].join(', ')}`);
     }
     case 'highlight': {
-      const ec = colorOf(ds, look.effectColor) ?? '#FFE58A';
+      const ec = colorOf(ds, s.effectColor) ?? '#FFE58A';
       const from = Math.round(78 - k * 48);
       return box(
         `<span style="background:linear-gradient(transparent ${from}%, ${ec} ${from}%, ${ec} 94%, transparent 94%); padding:0 0.15em; -webkit-box-decoration-break:clone; box-decoration-break:clone">${words}</span>`,
@@ -208,17 +207,17 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
       return box(inner, base);
     }
     case 'arc': {
-      const line = (look.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
+      const line = (s.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
       const w = Math.max(1, layer.width);
       const sag = k * w * 0.32;
-      const baseline = layer.y + look.size + sag;
+      const baseline = layer.y + s.size + sag;
       const id = `sy-arc-${esc(layer.id)}-${Math.round(layer.x)}-${Math.round(layer.y)}-${Math.round(w)}`;
       const [offset, anchor] = layer.align === 'left' ? ['0%', 'start'] : layer.align === 'right' ? ['100%', 'end'] : ['50%', 'middle'];
       const d = `M${num(layer.x)} ${num(baseline)} Q${num(layer.x + w / 2)} ${num(baseline - sag * 2)} ${num(layer.x + w)} ${num(baseline)}`;
       return (
         `<g ${mark}><defs><path id="${id}" d="${d}"/></defs>` +
-        `<rect x="${num(layer.x)}" y="${num(layer.y)}" width="${num(w)}" height="${num(look.size * 1.3 + sag)}" fill="none" pointer-events="all"/>` +
-        `<text font-family="${esc(font)}" font-size="${num(look.size)}" font-weight="${look.weight}"${look.italic ? ' font-style="italic"' : ''}${look.letterSpacing ? ` letter-spacing="${num(look.letterSpacing)}"` : ''} fill="${color}">` +
+        `<rect x="${num(layer.x)}" y="${num(layer.y)}" width="${num(w)}" height="${num(s.size * 1.3 + sag)}" fill="none" pointer-events="all"/>` +
+        `<text font-family="${esc(font)}" font-size="${num(s.size)}" font-weight="${s.weight}"${s.italic ? ' font-style="italic"' : ''}${s.letterSpacing ? ` letter-spacing="${num(s.letterSpacing)}"` : ''} fill="${color}">` +
         `<textPath href="#${id}" startOffset="${offset}" text-anchor="${anchor}">${esc(line)}</textPath></text></g>`
       );
     }
@@ -248,3 +247,57 @@ export function canvasTypeSampleSvg(ds: DesignSystem, look: string | null, text 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w / scale)} ${num(h / scale)}" width="${w}" height="${h}">${freeformLayersSvg(sample, ds)}</svg>`;
 }
 
+
+/** The default highlighter ink. */
+export const HIGHLIGHTER = '#FFD84D';
+
+/**
+ * A brush stroke as a filled outline: the line's width swells towards the middle and tapers to a
+ * point at both ends, a function of distance along the stroke and nothing else, so the same points
+ * draw the same shape every time.
+ */
+export function brushOutline(points: number[], width: number): string {
+  const n = Math.floor(points.length / 2);
+  if (n < 2) return '';
+  const x = (i: number) => points[i * 2]!;
+  const y = (i: number) => points[i * 2 + 1]!;
+  const along: number[] = [0];
+  for (let i = 1; i < n; i += 1) along.push(along[i - 1]! + Math.hypot(x(i) - x(i - 1), y(i) - y(i - 1)));
+  const total = along[n - 1]! || 1;
+  const left: string[] = [];
+  const right: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = Math.max(0, i - 1);
+    const b = Math.min(n - 1, i + 1);
+    const dx = x(b) - x(a);
+    const dy = y(b) - y(a);
+    const d = Math.hypot(dx, dy) || 1;
+    const taper = Math.max(0.12, Math.sin(Math.PI * (along[i]! / total)) ** 0.55);
+    const h = (width / 2) * taper;
+    left.push(`${num(x(i) - (dy / d) * h)} ${num(y(i) + (dx / d) * h)}`);
+    right.push(`${num(x(i) + (dy / d) * h)} ${num(y(i) - (dx / d) * h)}`);
+  }
+  return `M${left.join(' L')} L${right.reverse().join(' L')} Z`;
+}
+
+/** A sample squiggle in a pen, for the trays that pick one. The real renderer on a small page. */
+export function brushSampleSvg(ds: DesignSystem, brush: Brush, color: ColorRef = null): string {
+  const def = BRUSHES.find((b) => b.brush === brush) ?? BRUSHES[1]!;
+  const points: number[] = [];
+  for (let i = 0; i <= 28; i += 1) {
+    const t = i / 28;
+    points.push(10 + t * 80, 20 + Math.sin(t * Math.PI * 2) * 8);
+  }
+  const sample: FreeformBlock = {
+    id: 'sample',
+    type: 'freeform',
+    alt: '',
+    width: 100,
+    height: 40,
+    background: null,
+    layers: [{ kind: 'path', id: `sample-${brush}`, points, stroke: color, strokeWidth: Math.min(def.width, 14), brush }],
+    src: '',
+    align: 'center',
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40" width="100" height="40">${freeformLayersSvg(sample, ds)}</svg>`;
+}
