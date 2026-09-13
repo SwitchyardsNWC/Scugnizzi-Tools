@@ -9,6 +9,7 @@
 // below, as a template holding one freeform block (src/freeform/main.tsx). A link names that key, so when
 // frames become files in a project it can name a file instead.
 
+import { createSection } from './catalog.ts';
 import { colorOf, DEFAULT_DESIGN_SYSTEM } from './design-system.ts';
 import { recipeHash, withFreeform } from './freeform.ts';
 import type { Block, FreeformBlock, Template } from './types.ts';
@@ -101,4 +102,53 @@ export function unlinkFrame(template: Template, blockId: string): Template {
     void _source;
     return rest;
   });
+}
+
+// --- the other way: from the Freeform app to Template Studio ------------------------------------------------
+//
+// Jared: "It pulls in the free form frame. but there is no way to go from freeform -> template studio." An
+// open Template Studio says so in this site's storage: which tab, which email, whether that email already
+// uses the frame. The Freeform app reads it to offer the way there, and asks that tab, by id, to show the
+// frame — or to add it, when the email does not use it yet.
+
+export const STUDIO_PRESENCE = 'scuggnizzi.studio.presence';
+export const STUDIO_REQUEST = 'scuggnizzi.studio.request';
+/**
+ * How long an open Template Studio counts as open without saying so again. Generous, because a browser
+ * slows a background tab's timers to about once a minute; a closed tab takes its presence with it.
+ */
+export const PRESENCE_FRESH_MS = 120_000;
+
+export interface StudioPresence {
+  tab: string;
+  email: string;
+  /** Blocks in that email following the Freeform app's frame. */
+  linked: number;
+  at: number;
+}
+
+/** The open Template Studio, or null when none has said so recently. */
+export function readStudioPresence(raw: string | null, now = Date.now()): StudioPresence | null {
+  try {
+    const p = raw ? (JSON.parse(raw) as Partial<StudioPresence>) : null;
+    if (!p || typeof p.tab !== 'string' || typeof p.at !== 'number' || now - p.at > PRESENCE_FRESH_MS) return null;
+    return { tab: p.tab, email: typeof p.email === 'string' && p.email ? p.email : 'your email', linked: typeof p.linked === 'number' ? p.linked : 0, at: p.at };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The email with a new freeform block following the frame, in a section of its own above the legal
+ * footer: where a picture belongs by default, and never under the unsubscribe block. Ids are made from
+ * the prefix, which the caller makes unique.
+ */
+export function addFrameBlock(template: Template, frame: AppFrame, idPrefix: string): { template: Template; sectionId: string; blockId: string } {
+  let n = 0;
+  const section = createSection('freeform', { id: () => `${idPrefix}${(n += 1)}`, taken: new Set() }, template.ds ?? DEFAULT_DESIGN_SYSTEM);
+  const block = section.rows[0]!.columns[0]!.blocks[0]!;
+  const footer = template.sections.findIndex((s) => s.rows.some((r) => r.columns.some((c) => c.blocks.some((b) => b.type === 'legal'))));
+  const at = footer === -1 ? template.sections.length : footer;
+  const placed: Template = { ...template, sections: [...template.sections.slice(0, at), section, ...template.sections.slice(at)] };
+  return { template: followFrame(placed, block.id, frame), sectionId: section.id, blockId: block.id };
 }
