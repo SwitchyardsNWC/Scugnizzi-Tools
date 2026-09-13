@@ -153,6 +153,58 @@ export interface ImageTokens {
   defaultWidth: number;
 }
 
+/** What a canvas type style does beyond the letters. Every one of them survives becoming a picture. */
+export type CanvasEffect = 'none' | 'outline' | 'shadow' | 'highlight' | 'sticker' | 'wobble' | 'arc';
+
+export const CANVAS_EFFECTS: Array<[CanvasEffect, string]> = [
+  ['none', 'Plain'],
+  ['outline', 'Outline'],
+  ['shadow', 'Hard shadow'],
+  ['highlight', 'Highlighter'],
+  ['sticker', 'Sticker'],
+  ['wobble', 'Wobble'],
+  ['arc', 'Arc'],
+];
+
+/**
+ * A text style for the freeform canvas. Its own category, because it follows none of the email's
+ * rules: it only ever ships inside a picture, so it can do what email type cannot — a thick outline,
+ * a hard offset shadow, a highlighter stroke, a sticker's white border, letters that wobble, a line
+ * that bends (learnings 3.68).
+ */
+export interface CanvasTextStyle {
+  label: string;
+  /** A key of `fonts`. Absent means the email's default stack. */
+  font?: string;
+  size: number;
+  weight: 'normal' | 'bold';
+  /** Percent. */
+  lineHeight: number;
+  uppercase?: boolean;
+  italic?: boolean;
+  letterSpacing?: number;
+  color: ColorRef;
+  effect: CanvasEffect;
+  /** The outline, the shadow, the highlight or the sticker border. Null picks one that reads. */
+  effectColor: ColorRef;
+  /** How much, 0 to 100: an outline's width, a shadow's offset, a wobble's swing, an arc's bend. */
+  amount: number;
+}
+
+export const DEFAULT_CANVAS_TYPE: Record<string, CanvasTextStyle> = {
+  marker: { label: 'Marker', size: 34, weight: 'bold', lineHeight: 105, italic: true, color: null, effect: 'wobble', effectColor: null, amount: 28 },
+  sticker: { label: 'Sticker', size: 30, weight: 'bold', lineHeight: 112, uppercase: true, letterSpacing: 1, color: null, effect: 'sticker', effectColor: '#ffffff', amount: 40 },
+  outline: { label: 'Outline', size: 46, weight: 'bold', lineHeight: 100, uppercase: true, color: '#00000000', effect: 'outline', effectColor: null, amount: 30 },
+  retro: { label: 'Retro', font: 'georgia', size: 40, weight: 'bold', lineHeight: 104, color: null, effect: 'shadow', effectColor: '#FFB000', amount: 40 },
+  highlight: { label: 'Highlighter', size: 24, weight: 'bold', lineHeight: 135, color: null, effect: 'highlight', effectColor: '#FFE58A', amount: 55 },
+  arc: { label: 'Arc', size: 24, weight: 'bold', lineHeight: 100, uppercase: true, letterSpacing: 3, color: null, effect: 'arc', effectColor: null, amount: 45 },
+};
+
+/** The system's canvas type, or the shipped styles for a system that has never set any. */
+export function canvasTypeOf(ds: DesignSystem): Record<string, CanvasTextStyle> {
+  return ds.canvasType && Object.keys(ds.canvasType).length ? ds.canvasType : DEFAULT_CANVAS_TYPE;
+}
+
 export interface DesignSystem {
   version: number;
   colors: Record<string, string>;
@@ -206,6 +258,8 @@ export interface DesignSystem {
   fontStack: string;
   /** The stacks a role may name. Email has no webfonts worth relying on — this is what is installed. */
   fonts: Record<string, string>;
+  /** Playful type for the freeform canvas. Absent means the shipped styles. See `CanvasTextStyle`. */
+  canvasType?: Record<string, CanvasTextStyle>;
   /**
    * The phone breakpoint, in pixels. Stored as a number rather than as a finished media query
    * because the compiler needs both sides of it — `max-width:639px` for the phone rules and

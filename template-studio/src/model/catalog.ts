@@ -68,7 +68,7 @@ export interface Control {
    * block that is alone in its column is a dial wired to nothing, and a panel should not carry
    * one of those.
    */
-  when?: 'stack';
+  when?: 'stack' | 'canvas';
 }
 
 export interface Group {
@@ -76,6 +76,8 @@ export interface Group {
   help?: string;
   /** Open on selection. Exactly one group per block should be — the one they came for. */
   open?: boolean;
+  /** Only inside the freeform canvas, or only outside it. Absent is both. */
+  when?: 'canvas' | 'email';
   controls: Control[];
 }
 
@@ -508,32 +510,37 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
   freeform: {
     type: 'freeform',
     name: 'Freeform',
-    summary: 'A drawing surface — images, text and shapes — that the email carries as one picture.',
+    summary: 'A canvas of pictures, text, notes, stamps and drawing, which the email carries as one picture.',
     outline: (b) => (b.type === 'freeform' ? `Freeform · ${b.layers.length} ${b.layers.length === 1 ? 'layer' : 'layers'}` : 'Freeform'),
     groups: [
       {
-        name: 'Layers',
+        name: 'Canvas',
         open: true,
-        help: 'Text, images and shapes on the surface, bottom to top. Drag a layer on the canvas to move it; Draw for freehand. The email never sees the layers — only the picture rendered from them.',
+        help: 'Everything on the canvas lives in the canvas. Open it to draw, drop pictures in, stamp and type; the email only ever sees the picture it becomes.',
         controls: [{ kind: 'layers', path: 'block.layers', label: 'Layers' }],
       },
       {
-        name: 'Picture',
-        help: 'The surface, and the picture it becomes. Render draws it; upload the PNG to HubSpot Files and paste the URL here, the way any image works.',
+        name: 'Page',
+        open: true,
+        when: 'canvas',
+        help: 'The canvas page, which is the size of the picture. Drag its edges on the canvas, or set it here.',
         controls: [
-          { kind: 'number', path: 'block.width', label: 'Width', min: 40, max: 700, suffix: 'px', help: 'The surface, and the picture, in pixels. Rendered at twice this for retina.' },
+          { kind: 'number', path: 'block.width', label: 'Width', min: 40, max: 700, suffix: 'px', help: 'Rendered at twice this for retina.' },
           { kind: 'number', path: 'block.height', label: 'Height', min: 20, max: 1200, suffix: 'px' },
-          { kind: 'palette', path: 'block.background', label: 'Background', zero: 'Transparent', help: 'Behind everything on the surface. Transparent shows the section through the picture — as a PNG, that survives.' },
+          { kind: 'palette', path: 'block.background', label: 'Background', zero: 'Transparent', help: 'Behind everything on the page. Transparent shows the section through the picture.' },
+        ],
+      },
+      {
+        name: 'Picture',
+        help: 'Render draws the canvas; upload the PNG to HubSpot Files and paste the URL here, the way any image works.',
+        controls: [
           { kind: 'text', path: 'block.alt', label: 'Alt text', help: 'What arrives where images are blocked, which is Outlook on Windows and most corporate mail.' },
           { kind: 'render-picture', path: 'block.src', label: 'Render' },
         ],
       },
-      {
-        name: 'Appearance',
-        controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border()],
-      },
-      spacing(),
-      background(),
+      { name: 'Appearance', when: 'email', controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border()] },
+      { ...spacing(), when: 'email' },
+      { ...background(), when: 'email' },
     ],
   },
 

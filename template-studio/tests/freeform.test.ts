@@ -7,11 +7,41 @@
 import { describe, expect, it } from 'vitest';
 
 import { compile } from '../src/compile/compile.ts';
-import { freeformSvg } from '../src/compile/freeform.ts';
+import { canvasTypeSampleSvg, freeformSvg } from '../src/compile/freeform.ts';
 import { lint } from '../src/compile/lint.ts';
-import { DEFAULT_DESIGN_SYSTEM, theme } from '../src/model/design-system.ts';
+import { canvasTypeOf, DEFAULT_CANVAS_TYPE, DEFAULT_DESIGN_SYSTEM, theme } from '../src/model/design-system.ts';
 import { convertBlock, renderAsImage } from '../src/model/edit.ts';
-import { addLayer, drawPath, isRendered, markRendered, nudgeLayer, recipeHash, removeLayer, reorderLayer, updateLayer } from '../src/model/freeform.ts';
+import {
+  addLayer,
+  addMarkAt,
+  addShapeAt,
+  addStickyAt,
+  drawPath,
+  duplicateGroup,
+  groupBox,
+  groupKey,
+  groupOfKey,
+  groupRuns,
+  isRendered,
+  layerClipText,
+  markRendered,
+  membersOf,
+  nudgeLayer,
+  paintGroup,
+  paintLayer,
+  parseLayerClip,
+  pasteLayers,
+  recipeHash,
+  removeGroup,
+  removeLayer,
+  reorderLayer,
+  replaceLayers,
+  scaleLayers,
+  STICKY_COLORS,
+  ungroupLayers,
+  updateLayer,
+} from '../src/model/freeform.ts';
+import { markOf } from '../src/model/marks.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
 import type { FreeformBlock, Template } from '../src/model/types.ts';
 
@@ -162,3 +192,115 @@ describe('changing the recipe', () => {
     expect(asHeading.type === 'heading' && asHeading.text).toBe('A card');
   });
 });
+
+describe('sticky notes, stamps and colour', () => {
+  const board = () => doc(surface({ layers: [] }));
+
+  it('draws a note with its words and a stamp in its colour, tilted', () => {
+    let t = addStickyAt(board(), 'f', { x: 100, y: 100 }, null);
+    t = addMarkAt(t, 'f', 'scgnzi', { x: 300, y: 100 }, 'red', 6);
+    t = updateLayer(t, 'f', 'l1', { text: 'Hi' });
+    const b = block(t);
+    expect(b.layers.map((l) => l.kind)).toEqual(['sticky', 'mark']);
+    const note = b.layers[0]!;
+    expect(note.kind === 'sticky' && [note.x, note.y, note.width, note.height]).toEqual([10, 10, 180, 180]);
+    const stamp = b.layers[1]!;
+    expect(stamp.kind === 'mark' && [stamp.width, stamp.height, stamp.rotation]).toEqual([88, Math.round(88 / markOf('scgnzi').ratio), 6]);
+    const svg = freeformSvg(b, DEFAULT_DESIGN_SYSTEM);
+    expect(svg).toContain('fill="#FFE58A"');
+    expect(svg).toContain('>Hi</div>');
+    // Stated, not inherited: the email's cell centres its content, and the canvas does not.
+    expect(svg).toMatch(/text-align:left; text-transform:none; letter-spacing:normal; font-style:normal[^"]*">Hi<\/div>/);
+    expect(svg).toContain(`viewBox="${markOf('scgnzi').viewBox}"`);
+    expect(svg).toContain('fill="#d10000"');
+    expect(svg).toMatch(/data-sy-layer="l2" transform="rotate\(6 /);
+  });
+
+  it('paints whichever property a kind is coloured by', () => {
+    let t = addShapeAt(board(), 'f', 'rect', { x: 0, y: 0 }, { x: 40, y: 40 }, 'navy');
+    t = addShapeAt(t, 'f', 'line', { x: 0, y: 0 }, { x: 40, y: 40 }, 'navy');
+    t = addStickyAt(t, 'f', { x: 0, y: 0 }, '#C4E4FF');
+    expect(block(t).layers[0]!.kind === 'rect' && (block(t).layers[0] as { fill: string }).fill).toBe('navy');
+    t = paintLayer(t, 'f', 'l1', 'red');
+    t = paintLayer(t, 'f', 'l2', 'red');
+    t = paintLayer(t, 'f', 'l3', null);
+    const [r, l, s] = block(t).layers;
+    expect(r?.kind === 'rect' && r.fill).toBe('red');
+    expect(l?.kind === 'line' && l.stroke).toBe('red');
+    expect(s?.kind === 'sticky' && s.fill).toBe(STICKY_COLORS[0]);
+  });
+});
+
+describe('drawings group themselves', () => {
+  const board = () => doc(surface({ layers: [] }));
+  const strokes = () => {
+    let t = drawPath(board(), 'f', [0, 0, 10, 10], 'navy', 3, 'g1');
+    t = drawPath(t, 'f', [20, 0, 30, 10], 'navy', 3, 'g1');
+    return drawPath(t, 'f', [0, 40, 40, 40], 'navy', 3);
+  };
+
+  it('lists a drawing as one item, and a lone stroke as a layer', () => {
+    const items = groupRuns(block(strokes()).layers);
+    expect(items.map((i) => (i.kind === 'group' ? `group of ${i.layers.length}` : i.layer.id))).toEqual(['group of 2', 'l3']);
+    expect(groupOfKey(groupKey('g1'))).toBe('g1');
+    expect(groupOfKey('l1')).toBeNull();
+  });
+
+  it('moves, scales, copies, colours and removes a drawing as one', () => {
+    const t = strokes();
+    const members = membersOf(block(t), 'g1');
+    expect(groupBox(members)).toEqual({ x: 0, y: 0, width: 30, height: 10 });
+    const scaled = block(replaceLayers(t, 'f', scaleLayers(members, groupBox(members), { x: 100, y: 100, width: 60, height: 20 })));
+    expect(groupBox(membersOf(scaled, 'g1'))).toEqual({ x: 100, y: 100, width: 60, height: 20 });
+    const copied = block(duplicateGroup(t, 'f', 'g1'));
+    expect(copied.layers).toHaveLength(5);
+    expect(new Set(copied.layers.map((l) => l.group).filter(Boolean))).toEqual(new Set(['g1', 'g2']));
+    expect(block(removeGroup(t, 'f', 'g1')).layers.map((l) => l.id)).toEqual(['l3']);
+    expect(block(ungroupLayers(t, 'f', 'g1')).layers.every((l) => !l.group)).toBe(true);
+    expect(membersOf(block(paintGroup(t, 'f', 'g1', 'red')), 'g1').every((l) => l.kind === 'path' && l.stroke === 'red')).toBe(true);
+  });
+
+  it('copies layers as clipboard text of its own, and pastes them with new ids and a new group', () => {
+    const t = strokes();
+    const layers = parseLayerClip(layerClipText(membersOf(block(t), 'g1')))!;
+    expect(layers).toHaveLength(2);
+    expect(parseLayerClip('{"template-studio":1,"kind":"blocks"}')).toBeNull();
+    expect(parseLayerClip('hello')).toBeNull();
+    const pasted = block(pasteLayers(t, 'f', layers, 24));
+    const fresh = pasted.layers.slice(3);
+    expect(fresh.map((l) => l.id)).toEqual(['l4', 'l5']);
+    expect(new Set(fresh.map((l) => l.group))).toEqual(new Set(['g2']));
+    expect(fresh[0]!.kind === 'path' && fresh[0]!.points).toEqual([24, 24, 34, 34]);
+  });
+});
+
+describe('canvas type', () => {
+  const withLook = (look?: string) =>
+    surface({ layers: [{ kind: 'text', id: 't', text: 'Hey', role: 'h2', color: null, x: 10, y: 10, width: 300, align: 'center', ...(look ? { look } : {}) }] });
+  const svgOf = (look?: string) => freeformSvg(withLook(look), DEFAULT_DESIGN_SYSTEM);
+
+  it('falls back to the shipped styles for a system that has none', () => {
+    expect(Object.keys(canvasTypeOf(DEFAULT_DESIGN_SYSTEM))).toEqual(Object.keys(DEFAULT_CANVAS_TYPE));
+  });
+
+  it('draws each effect as something the picture carries', () => {
+    expect(svgOf()).not.toContain('text-shadow');
+    expect(svgOf('outline')).toContain('-webkit-text-stroke:');
+    expect(svgOf('retro')).toContain('text-shadow:');
+    expect((svgOf('sticker').match(/px 0 #ffffff/g) ?? []).length).toBe(16);
+    expect(svgOf('highlight')).toContain('linear-gradient(transparent');
+    expect((svgOf('marker').match(/display:inline-block/g) ?? []).length).toBe(3);
+    expect(svgOf('arc')).toMatch(/<textPath href="#sy-arc-t-10-10-300" startOffset="50%" text-anchor="middle">HEY<\/textPath>/);
+  });
+
+  it('wobbles the same way every time, and a changed style is a stale picture', () => {
+    expect(svgOf('marker')).toBe(svgOf('marker'));
+    expect(recipeHash(withLook('outline'))).not.toBe(recipeHash(withLook('retro')));
+  });
+
+  it('samples a style with the same renderer', () => {
+    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, 'retro', 'Aa')).toContain('text-shadow:');
+    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, null, 'Aa')).toContain('>Aa</div>');
+  });
+});
+

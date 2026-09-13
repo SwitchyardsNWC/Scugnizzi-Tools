@@ -5,7 +5,9 @@ import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
 import { colorOf, type ColorRef } from '../model/design-system.ts';
 import type { BlockType } from '../model/types.ts';
 import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans } from '../model/edit.ts';
-import { addLayer, isRendered, removeLayer, reorderLayer, updateLayer, type LayerKind } from '../model/freeform.ts';
+import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
+import { MARKS } from '../model/marks.ts';
+import { canvasTypeOf } from '../model/design-system.ts';
 import type { FreeformLayer } from '../model/types.ts';
 import type { Lock } from '../model/types.ts';
 import type { Editor } from './useEditor.ts';
@@ -120,7 +122,8 @@ export function Inspector({ editor, onRasterise, rasterising, patternInfo, multi
       </nav>
       <p class="summary">{spec.summary}</p>
 
-      {spec.groups.map((group) => (
+      {/* A freeform block's canvas details show only inside the canvas, and its email settings only outside it. */}
+      {spec.groups.filter((group) => !group.when || (group.when === 'canvas') === Boolean(freeform?.open)).map((group) => (
         <GroupPanel
           key={`${block.id}-${group.name}`}
           group={group}
@@ -157,7 +160,7 @@ function GroupPanel({
   const inStack = (found.column?.blocks.length ?? 0) > 1;
   // A control that only means something in a group stays out of the panel otherwise — a dial
   // wired to nothing is worse than no dial.
-  const controls = group.controls.filter((c) => !c.when || (c.when === 'stack' && inStack));
+  const controls = group.controls.filter((c) => !c.when || (c.when === 'stack' && inStack) || (c.when === 'canvas' && Boolean(freeform?.open)));
   // The Spacing panel drives the overlay on the canvas: while the pointer is over it or a dial in
   // it has focus, the numbers being changed are drawn on the block they belong to.
   const live = group.name === 'Spacing' && onSpacingHot;
@@ -502,9 +505,11 @@ const LAYER_KINDS: Array<{ kind: LayerKind; label: string; help: string }> = [
   { kind: 'rect', label: 'Rectangle', help: 'A box: fill, outline, corner radius.' },
   { kind: 'ellipse', label: 'Ellipse', help: 'A circle when its width and height match.' },
   { kind: 'line', label: 'Line', help: 'From one point to another.' },
+  { kind: 'sticky', label: 'Note', help: 'A sticky note with words on it.' },
+  { kind: 'mark', label: 'Stamp', help: 'A brand mark, in any colour.' },
 ];
 
-const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', path: 'Drawing' };
+const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Stamp' };
 
 /** A compact number: label on the left, the field on the right, for a layer's geometry. */
 function Num({ label, value, onChange, min, max }: { label: string; value: number; onChange(v: number): void; min?: number; max?: number }) {
@@ -526,103 +531,212 @@ function Num({ label, value, onChange, min, max }: { label: string; value: numbe
 }
 
 /**
- * The freeform block's layers: the list, bottom to top; the buttons that add one; the pen; and
- * the picked layer's own numbers. Everything here is a change to the recipe, and the canvas draws
- * the recipe live — so a number typed here moves on the picture as it is typed.
+ * The freeform block in the panel.
+ *
+ * On the email it is a way in and a line of facts. The layers are the canvas's business, and a list
+ * of them beside the email was detail about a place you were not in (learnings 3.68). Inside the
+ * canvas it is the whole stack, with drawings gathered into groups and the picked layer's numbers.
  */
 function LayersField({ editor, freeform }: { editor: Editor; freeform?: FreeformUi }) {
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const block = resolve(editor.template, editor.selection).block;
   if (!block || block.type !== 'freeform') return null;
   const ds = designSystemOf(editor.template);
-  const picked = freeform?.layer ? (block.layers.find((l) => l.id === freeform.layer) ?? null) : null;
-  const key = (id: string) => `layer:${block.id}:${id}`;
+
+  if (!freeform?.open) {
+    const n = block.layers.length;
+    return (
+      <div class="field wide canvas-entry">
+        <button
+          class="btn wide canvas-open"
+          title="Zoom into the canvas to draw, drop pictures in, stamp and type. Double-clicking the block does the same."
+          onClick={() => freeform?.onEnter?.(block.id)}
+        >
+          Open canvas
+        </button>
+        <span class="canvas-facts">
+          {n} {n === 1 ? 'layer' : 'layers'} · {block.width} × {block.height}
+        </span>
+      </div>
+    );
+  }
+
+  const key = freeform.layer;
+  const group = groupOfKey(key);
+  const members = group ? membersOf(block, group) : [];
+  const picked = key && !group ? (block.layers.find((l) => l.id === key) ?? null) : null;
+  const coalesce = (id: string) => `layer:${block.id}:${id}`;
   const patch = (fields: Record<string, unknown>) => {
     if (!picked) return;
-    editor.commit('Layer', updateLayer(editor.template, block.id, picked.id, fields), { coalesce: key(picked.id) });
+    editor.commit('Layer', updateLayer(editor.template, block.id, picked.id, fields), { coalesce: coalesce(picked.id) });
   };
   const add = (kind: LayerKind) => {
     const next = addLayer(editor.template, block.id, kind);
     const added = next.sections.flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((b) => b.id === block.id);
     editor.commit('Add layer', next);
     const last = added && added.type === 'freeform' ? added.layers[added.layers.length - 1] : undefined;
-    freeform?.onSelectLayer(last?.id ?? null);
+    freeform.onSelectLayer(last?.id ?? null);
   };
   const roles = Object.keys(ds.type);
-  const nameOfLayer = (l: FreeformLayer) => (l.kind === 'text' ? l.text.trim().slice(0, 24) || 'Text' : LAYER_NAMES[l.kind]);
+  const looks = canvasTypeOf(ds);
+  const nameOfLayer = (l: FreeformLayer) =>
+    l.kind === 'text' || l.kind === 'sticky'
+      ? l.text.trim().slice(0, 24) || LAYER_NAMES[l.kind]
+      : l.kind === 'mark'
+        ? (MARKS.find((m) => m.key === l.mark)?.name ?? 'Stamp')
+        : LAYER_NAMES[l.kind];
+  const strokeOf = (l: FreeformLayer | undefined) => (l && (l.kind === 'path' || l.kind === 'line') ? l : undefined);
+  const firstStroke = strokeOf(members.find((m) => m.kind === 'path' || m.kind === 'line'));
+
+  const row = (l: FreeformLayer, grouped: boolean) => {
+    const index = block.layers.findIndex((x) => x.id === l.id);
+    return (
+      <li key={l.id} class={picked?.id === l.id ? 'on' : ''}>
+        <button class="layer-row" title={`${LAYER_NAMES[l.kind]}. Click to pick it; drag it on the canvas.`} onClick={() => freeform.onSelectLayer(picked?.id === l.id ? null : l.id)}>
+          <span class="layer-kind">{LAYER_NAMES[l.kind]}</span>
+          <span class="layer-name">{nameOfLayer(l)}</span>
+        </button>
+        <span class="layer-actions">
+          {!grouped && (
+            <>
+              <button disabled={index === block.layers.length - 1} title="Bring forward" aria-label="Bring forward" onClick={() => editor.commit('Reorder layer', reorderLayer(editor.template, block.id, l.id, 1))}>
+                ↑
+              </button>
+              <button disabled={index === 0} title="Send back" aria-label="Send back" onClick={() => editor.commit('Reorder layer', reorderLayer(editor.template, block.id, l.id, -1))}>
+                ↓
+              </button>
+            </>
+          )}
+          <button
+            class="danger"
+            title="Remove this layer."
+            aria-label="Remove"
+            onClick={() => {
+              editor.commit('Remove layer', removeLayer(editor.template, block.id, l.id));
+              if (picked?.id === l.id) freeform.onSelectLayer(null);
+            }}
+          >
+            ✕
+          </button>
+        </span>
+      </li>
+    );
+  };
 
   return (
     <div class="field wide layers">
-      {freeform?.onEnter && !freeform.open && (
-        <button class="btn wide" title="Open the surface as a workspace: pan and zoom, handles to resize and rotate, shapes drawn out by dragging, pictures dropped in from Assets. Double-clicking the block does the same." onClick={() => freeform.onEnter?.(block.id)}>
-          Edit surface
-        </button>
-      )}
       <div class="layer-add">
         {LAYER_KINDS.map((k) => (
           <button key={k.kind} class="btn" title={k.help} onClick={() => add(k.kind)}>
             {k.label}
           </button>
         ))}
-        {freeform && (
-          <button
-            class={`btn ${freeform.drawing ? 'on' : ''}`}
-            aria-pressed={freeform.drawing}
-            title={freeform.drawing ? 'Drawing. Drag on the surface to draw; click here, or press Esc, to stop.' : 'Draw freehand on the surface. Each stroke becomes a layer.'}
-            onClick={() => freeform.onDrawing(!freeform.drawing)}
-          >
-            {freeform.drawing ? 'Drawing…' : 'Draw'}
-          </button>
-        )}
       </div>
 
       <ul class="layer-list">
-        {[...block.layers].reverse().map((l, i, all) => {
-          const index = all.length - 1 - i;
-          return (
-            <li key={l.id} class={picked?.id === l.id ? 'on' : ''}>
-              <button class="layer-row" title={`${LAYER_NAMES[l.kind]}. Click to edit; drag it on the canvas to move it.`} onClick={() => freeform?.onSelectLayer(picked?.id === l.id ? null : l.id)}>
-                <span class="layer-kind">{LAYER_NAMES[l.kind]}</span>
-                <span class="layer-name">{nameOfLayer(l)}</span>
-              </button>
-              <span class="layer-actions">
-                <button disabled={index === block.layers.length - 1} title="Bring forward" aria-label="Bring forward" onClick={() => editor.commit('Reorder layer', reorderLayer(editor.template, block.id, l.id, 1))}>
-                  ↑
-                </button>
-                <button disabled={index === 0} title="Send back" aria-label="Send back" onClick={() => editor.commit('Reorder layer', reorderLayer(editor.template, block.id, l.id, -1))}>
-                  ↓
+        {[...groupRuns(block.layers)].reverse().map((item) =>
+          item.kind === 'layer' ? (
+            row(item.layer, false)
+          ) : (
+            <li key={`group-${item.id}`} class={`layer-group ${group === item.id ? 'on' : ''}`}>
+              <div class="layer-group-head">
+                <button
+                  class="layer-fold"
+                  aria-expanded={Boolean(openGroups[item.id])}
+                  aria-label={openGroups[item.id] ? 'Fold the drawing' : 'Show its strokes'}
+                  onClick={() => setOpenGroups((o) => ({ ...o, [item.id]: !o[item.id] }))}
+                >
+                  {openGroups[item.id] ? '▾' : '▸'}
                 </button>
                 <button
-                  class="danger"
-                  title="Remove this layer."
-                  aria-label="Remove"
-                  onClick={() => {
-                    editor.commit('Remove layer', removeLayer(editor.template, block.id, l.id));
-                    if (picked?.id === l.id) freeform?.onSelectLayer(null);
-                  }}
+                  class="layer-row"
+                  title="Strokes drawn in one go, grouped as they were drawn. They move, resize, colour and delete together."
+                  onClick={() => freeform.onSelectLayer(group === item.id ? null : `group:${item.id}`)}
                 >
-                  ✕
+                  <span class="layer-kind">Group</span>
+                  <span class="layer-name">Drawing · {item.layers.length} strokes</span>
                 </button>
-              </span>
+                <span class="layer-actions">
+                  <button
+                    title="Ungroup: every stroke its own layer again."
+                    aria-label="Ungroup"
+                    onClick={() => {
+                      editor.commit('Ungroup drawing', ungroupLayers(editor.template, block.id, item.id));
+                      if (group === item.id) freeform.onSelectLayer(null);
+                    }}
+                  >
+                    ⊟
+                  </button>
+                  <button
+                    class="danger"
+                    title="Remove the whole drawing."
+                    aria-label="Remove drawing"
+                    onClick={() => {
+                      editor.commit('Remove drawing', removeGroup(editor.template, block.id, item.id));
+                      if (group === item.id) freeform.onSelectLayer(null);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              </div>
+              {openGroups[item.id] && <ul class="layer-list nested">{[...item.layers].reverse().map((l) => row(l, true))}</ul>}
             </li>
-          );
-        })}
-        {block.layers.length === 0 && <li class="col-empty">nothing on the surface yet</li>}
+          ),
+        )}
+        {block.layers.length === 0 && <li class="col-empty">nothing on the canvas yet</li>}
       </ul>
+
+      {group && members.length > 0 && (
+        <div class="layer-fields">
+          <div class="layer-grid">
+            <Num
+              label="Weight"
+              value={firstStroke?.strokeWidth ?? 3}
+              min={1}
+              max={40}
+              onChange={(v) =>
+                editor.commit('Drawing weight', updateMembers(editor.template, block.id, group, (l) => (l.kind === 'path' || l.kind === 'line' ? { ...l, strokeWidth: v } : l)), {
+                  coalesce: coalesce(`group:${group}`),
+                })
+              }
+            />
+          </div>
+          <PresetSlot ds={ds} label="Colour" value={firstStroke?.stroke ?? null} onChange={(v) => editor.commit('Drawing colour', paintGroup(editor.template, block.id, group, v))} help="Every stroke in the drawing, together." allowNone noneLabel="Ink" />
+        </div>
+      )}
 
       {picked && (
         <div class="layer-fields">
+          {(picked.kind === 'text' || picked.kind === 'sticky') && (
+            <textarea rows={3} value={picked.text} title="The words. A new line is a new line." onInput={(e) => patch({ text: (e.target as HTMLTextAreaElement).value })} />
+          )}
           {picked.kind === 'text' && (
             <>
-              <textarea rows={3} value={picked.text} title="The words. A new line is a new line." onInput={(e) => patch({ text: (e.target as HTMLTextAreaElement).value })} />
               <div class="layer-grid">
-                <label class="layer-num" title="The type role: size, weight, tracking and case from Design › Type.">
-                  <span>Role</span>
-                  <select value={picked.role} onChange={(e) => patch({ role: (e.target as HTMLSelectElement).value })}>
-                    {roles.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
+                <label class="layer-num wide" title="A playful style from Design › Canvas type, or a role from Design › Type.">
+                  <span>Style</span>
+                  <select
+                    value={picked.look ? `look:${picked.look}` : picked.role}
+                    onChange={(e) => {
+                      const v = (e.target as HTMLSelectElement).value;
+                      patch(v.startsWith('look:') ? { look: v.slice(5) } : { role: v, look: undefined });
+                    }}
+                  >
+                    <optgroup label="Canvas type">
+                      {Object.entries(looks).map(([k, style]) => (
+                        <option key={k} value={`look:${k}`}>
+                          {style.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Email type">
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </label>
                 <label class="layer-num" title="Where the lines sit inside the layer's width.">
@@ -633,16 +747,45 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                     <option value="right">Right</option>
                   </select>
                 </label>
+                <Num label="Width" value={picked.width} min={10} onChange={(v) => patch({ width: v })} />
                 <Num label="X" value={picked.x} onChange={(v) => patch({ x: v })} />
                 <Num label="Y" value={picked.y} onChange={(v) => patch({ y: v })} />
-                <Num label="Width" value={picked.width} min={10} onChange={(v) => patch({ width: v })} />
               </div>
-              <PresetSlot ds={ds} label="Colour" value={picked.color} onChange={(v) => patch({ color: v })} help="Named from the palette. Left alone it is the first preset’s text colour." allowNone noneLabel="Ink" />
+              <PresetSlot ds={ds} label="Colour" value={picked.color} onChange={(v) => patch({ color: v })} help="Named from the palette. Left alone it is the style's own colour." allowNone noneLabel="Style" />
+            </>
+          )}
+          {picked.kind === 'sticky' && (
+            <div class="layer-grid">
+              <Num label="X" value={picked.x} onChange={(v) => patch({ x: v })} />
+              <Num label="Y" value={picked.y} onChange={(v) => patch({ y: v })} />
+              <Num label="Width" value={picked.width} min={20} onChange={(v) => patch({ width: v })} />
+              <Num label="Height" value={picked.height} min={20} onChange={(v) => patch({ height: v })} />
+            </div>
+          )}
+          {picked.kind === 'mark' && (
+            <>
+              <div class="layer-grid">
+                <label class="layer-num wide" title="Which brand mark.">
+                  <span>Mark</span>
+                  <select value={picked.mark} onChange={(e) => patch({ mark: (e.target as HTMLSelectElement).value })}>
+                    {MARKS.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Num label="X" value={picked.x} onChange={(v) => patch({ x: v })} />
+                <Num label="Y" value={picked.y} onChange={(v) => patch({ y: v })} />
+                <Num label="Width" value={picked.width} min={8} onChange={(v) => patch({ width: v })} />
+                <Num label="Height" value={picked.height} min={8} onChange={(v) => patch({ height: v })} />
+              </div>
+              <PresetSlot ds={ds} label="Colour" value={picked.color} onChange={(v) => patch({ color: v })} help="Named from the palette. Left alone it is the ink." allowNone noneLabel="Ink" />
             </>
           )}
           {picked.kind === 'image' && (
             <>
-              <input type="text" value={picked.src} placeholder="hero.jpg, or https://…" title="A file name from Assets, or a hosted URL. A remote picture cannot be drawn into the render — use a file from the folder for that." onInput={(e) => patch({ src: (e.target as HTMLInputElement).value })} />
+              <input type="text" value={picked.src} placeholder="hero.jpg, or https://…" title="A file name from Assets, or a hosted URL. A remote picture cannot be drawn into the render; use a file from the folder." onInput={(e) => patch({ src: (e.target as HTMLInputElement).value })} />
               <div class="layer-grid">
                 <Num label="X" value={picked.x} onChange={(v) => patch({ x: v })} />
                 <Num label="Y" value={picked.y} onChange={(v) => patch({ y: v })} />
@@ -666,21 +809,17 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
               <PresetSlot ds={ds} label="Outline" value={picked.stroke} onChange={(v) => patch({ stroke: v })} help="Named from the palette. A shape with no fill and no outline gets one in the ink colour, so it can be seen." allowNone noneLabel="None" />
             </>
           )}
-          {picked.kind === 'line' && (
+          {(picked.kind === 'line' || picked.kind === 'path') && (
             <>
               <div class="layer-grid">
-                <Num label="X1" value={picked.x1} onChange={(v) => patch({ x1: v })} />
-                <Num label="Y1" value={picked.y1} onChange={(v) => patch({ y1: v })} />
-                <Num label="X2" value={picked.x2} onChange={(v) => patch({ x2: v })} />
-                <Num label="Y2" value={picked.y2} onChange={(v) => patch({ y2: v })} />
-                <Num label="Weight" value={picked.strokeWidth} min={1} max={40} onChange={(v) => patch({ strokeWidth: v })} />
-              </div>
-              <PresetSlot ds={ds} label="Colour" value={picked.stroke} onChange={(v) => patch({ stroke: v })} help="Named from the palette." allowNone noneLabel="Ink" />
-            </>
-          )}
-          {picked.kind === 'path' && (
-            <>
-              <div class="layer-grid">
+                {picked.kind === 'line' && (
+                  <>
+                    <Num label="X1" value={picked.x1} onChange={(v) => patch({ x1: v })} />
+                    <Num label="Y1" value={picked.y1} onChange={(v) => patch({ y1: v })} />
+                    <Num label="X2" value={picked.x2} onChange={(v) => patch({ x2: v })} />
+                    <Num label="Y2" value={picked.y2} onChange={(v) => patch({ y2: v })} />
+                  </>
+                )}
                 <Num label="Weight" value={picked.strokeWidth} min={1} max={40} onChange={(v) => patch({ strokeWidth: v })} />
               </div>
               <PresetSlot ds={ds} label="Colour" value={picked.stroke} onChange={(v) => patch({ stroke: v })} help="Named from the palette." allowNone noneLabel="Ink" />

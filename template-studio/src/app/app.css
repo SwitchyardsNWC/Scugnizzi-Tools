@@ -535,7 +535,7 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 
 /* --- canvas ----------------------------------------------------------------------------------- */
 
-.canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
 /* One line of tools, and nothing that is not a tool. It carried a sentence of instructions and a
    two-line note about dark mode; both are on hover now, and the row is the height of its buttons. */
 .tools {
@@ -565,7 +565,6 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 /* While a surface is open as a workspace the email stage steps aside. `display` on the class
    would otherwise beat the attribute. */
 .scroller[hidden] { display: none; }
-.surface-tools .seg-btn { padding: 3px 9px; }
 /* Stands in for the mail client around the message, so a force-light email visibly holds its own
    colours against a dark surround rather than appearing to ignore the toggle. */
 .scroller.dark { background: #0a0c11; }
@@ -745,34 +744,154 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .layer-num input, .layer-num select { flex: 1; min-width: 0; font: inherit; font-size: 12px; }
 .btn.attention { border-color: var(--warn); }
 
-/* --- the surface editor ------------------------------------------------------------------------
- * A freeform block opened as a workspace: the page on a dotted field with no edges, pan and zoom,
- * handles on what is picked. Drawn in the editor's own document, with the same SVG the compiler
- * draws, so what is edited is what ships. */
-.surface { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.surface-tools {
-  display: flex; align-items: center; gap: 10px; padding: 7px 12px;
-  border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+/* --- the canvas (a freeform block, opened) ----------------------------------------------------
+ * FigJam's shape, on purpose: floating chrome on a warm dotted field, a dock of chunky tools at the
+ * bottom, pills at the top. It is an overlay above the email, so the zoom can start and end on the
+ * block itself (learnings 3.68). Light whatever the app's theme, like FigJam: it is a table you work
+ * on, not a panel of the tool. */
+.surface.fig {
+  position: absolute; inset: 0; z-index: 60; overflow: hidden;
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, sans-serif;
 }
-.surface-tools .grow { flex: 0 0 4px; }
-.surface-hint { font-size: 11.5px; color: var(--muted); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.surface-tools .btn { white-space: nowrap; }
-.surface-work { flex: 1; min-height: 0; position: relative; overflow: hidden; background: #e9e8e3; cursor: default; }
-.surface-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+.surface-work { position: absolute; inset: 0; overflow: hidden; outline: none; }
+.surface-backdrop { position: absolute; inset: 0; background: #f5f3ee; transition: opacity 420ms ease; }
+.surface-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: default; }
+.surface-dots, .surface-page-shadow { transition: opacity 420ms ease; }
+.surface.phase-start .surface-backdrop, .surface.phase-start .surface-dots, .surface.phase-start .surface-page-shadow,
+.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-dots, .surface.phase-exit .surface-page-shadow { opacity: 0; }
+.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-dots, .surface.phase-exit .surface-page-shadow { transition-duration: 360ms; }
+
 .surface.panning .surface-svg { cursor: grab; }
-.surface.tool-pen .surface-svg, .surface.tool-rect .surface-svg, .surface.tool-ellipse .surface-svg, .surface.tool-line .surface-svg { cursor: crosshair; }
+.surface.panning .surface-svg:active { cursor: grabbing; }
+.surface.tool-pen .surface-svg, .surface.tool-rect .surface-svg, .surface.tool-ellipse .surface-svg,
+.surface.tool-line .surface-svg, .surface.tool-sticky .surface-svg, .surface.tool-stamp .surface-svg { cursor: crosshair; }
 .surface.tool-text .surface-svg { cursor: text; }
-.surface-svg [data-sy-layer] { cursor: move; }
-.surface-handle { fill: #fff; stroke: #2b45d8; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
-.surface-handle.rot { cursor: grab; }
-.surface-page-handle { fill: transparent; cursor: nwse-resize; }
-.surface-page-handle:hover { fill: rgb(43 69 216 / 0.35); }
-.surface-text {
-  position: absolute; margin: 0; padding: 0; border: 1px dashed #2b45d8; outline: none; resize: none;
-  background: rgb(255 255 255 / 0.85); color: inherit; overflow: hidden; min-height: 1.4em; z-index: 5;
-}
+.surface.tool-select .surface-svg [data-sy-layer] { cursor: move; }
+.surface-handle { fill: #fff; stroke: #7b61ff; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.surface-handle.rot { fill: #7b61ff; cursor: grab; }
+.surface-page-grip { fill: #fff; stroke: rgb(40 30 10 / 0.22); stroke-width: 1px; vector-effect: non-scaling-stroke; transition: fill 120ms; }
+.surface-page-grip:hover { fill: #7b61ff; stroke: #7b61ff; }
 .surface-selection { pointer-events: none; }
 .surface-selection [data-handle] { pointer-events: auto; }
+.surface-text {
+  position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; border-radius: 2px; resize: none; overflow: hidden;
+  background: transparent; outline: 2px solid #7b61ff; outline-offset: 4px; transform-origin: 50% 50%;
+}
+.surface-text.on-sticky { outline-offset: 12px; }
+.surface-text::placeholder { color: rgb(0 0 0 / 0.35); }
+
+.fig-chrome { position: absolute; z-index: 3; transition: opacity 260ms ease, transform 460ms cubic-bezier(.34, 1.56, .64, 1); }
+.surface.phase-start .fig-chrome, .surface.phase-exit .fig-chrome { opacity: 0; pointer-events: none; }
+.surface.phase-enter .fig-chrome { transition-delay: 180ms; }
+.fig-top { top: 14px; display: flex; gap: 8px; }
+.fig-top-left { left: 14px; }
+.fig-top-right { right: 14px; }
+.surface.phase-start .fig-top, .surface.phase-exit .fig-top { transform: translateY(-18px); }
+
+.fig-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px; border: 0; border-radius: 999px;
+  background: #fff; color: #1e1c19; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(40 30 10 / 0.08), 0 8px 22px -8px rgb(40 30 10 / 0.26);
+}
+button.fig-pill { cursor: pointer; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms; }
+button.fig-pill:hover { transform: translateY(-1px) scale(1.04); }
+button.fig-pill:active { transform: scale(0.96); }
+.fig-title span { color: #8d877c; font-weight: 500; }
+.fig-zoom { padding: 0 4px; gap: 0; }
+.fig-zoom button {
+  height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 999px; background: none;
+  color: #1e1c19; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.fig-zoom button:hover { background: #f2efe8; }
+.fig-zoom .pct { min-width: 54px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.fig-done { background: #7b61ff; color: #fff; }
+.fig-done:hover { background: #6b4ff6; }
+
+.fig-dock {
+  left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; background: #fff; border-radius: 20px; max-width: calc(100% - 24px); overflow-x: auto;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 16px 40px -14px rgb(40 30 10 / 0.34);
+}
+.surface.phase-start .fig-dock, .surface.phase-exit .fig-dock { transform: translate(-50%, 28px) scale(0.94); }
+.fig-tools { display: flex; gap: 2px; }
+.fig-tool {
+  flex: none; width: 42px; height: 42px; display: grid; place-items: center; border: 0; border-radius: 13px;
+  background: none; color: #3d3931; cursor: pointer;
+  transition: transform 260ms cubic-bezier(.34, 1.56, .64, 1), background 120ms, color 120ms;
+}
+.fig-tool:hover { background: #f3f0e9; transform: translateY(-2px); }
+.fig-tool.on { background: #eee9ff; color: #6b4ff6; transform: translateY(-5px) scale(1.07); }
+.fig-tool.on svg { animation: fig-wiggle 460ms ease; }
+@keyframes fig-wiggle { 0% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 55% { transform: rotate(9deg); } 80% { transform: rotate(-3deg); } 100% { transform: rotate(0); } }
+.fig-sep { flex: none; width: 1px; align-self: stretch; margin: 6px 3px; background: #ece8df; }
+.fig-swatch {
+  flex: none; width: 30px; height: 30px; margin: 0 4px; padding: 0; border-radius: 999px; border: 3px solid #fff; cursor: pointer;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.16); transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.fig-swatch.none, .fig-dot.none { background: conic-gradient(#ff8f8f, #ffd36e, #97e28f, #86c8ff, #c7a9ff, #ff8f8f); }
+.fig-swatch:hover, .fig-swatch.on { transform: scale(1.14) rotate(20deg); }
+
+.fig-trays { left: 50%; bottom: 84px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100% - 24px); }
+.surface.phase-start .fig-trays, .surface.phase-exit .fig-trays { transform: translate(-50%, 20px); }
+.fig-tray {
+  display: flex; align-items: center; gap: 6px; padding: 8px; max-width: 100%; overflow-x: auto; background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 12px 30px -12px rgb(40 30 10 / 0.3);
+  animation: fig-pop 320ms cubic-bezier(.34, 1.56, .64, 1);
+}
+@keyframes fig-pop { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
+.fig-dot {
+  flex: none; width: 22px; height: 22px; padding: 0; border-radius: 999px; border: 2px solid #fff; cursor: pointer;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15); transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.fig-dot:hover { transform: scale(1.2); }
+.fig-dot.on { box-shadow: 0 0 0 2.5px #7b61ff; transform: scale(1.12); }
+.fig-tray .fig-sep { margin: 2px 3px; }
+.fig-stamp, .fig-look {
+  flex: none; border: 0; border-radius: 12px; background: #f6f4ef; display: grid; place-items: center; cursor: pointer;
+  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+}
+.fig-stamp { width: 52px; height: 52px; }
+.fig-stamp svg { width: 34px; height: 34px; }
+.fig-stamp:hover { transform: rotate(-8deg) scale(1.1); }
+.fig-look { width: 88px; height: 46px; padding: 0 4px; overflow: hidden; }
+.fig-look span, .fig-look svg { display: block; width: 100%; height: 100%; }
+.fig-look:hover { transform: translateY(-2px) rotate(-2deg); }
+.fig-stamp.on, .fig-look.on { background: #eee9ff; box-shadow: inset 0 0 0 2px #7b61ff; }
+
+.fig-size {
+  position: absolute; z-index: 2; transform: translateX(-100%); padding: 3px 9px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+  background: rgb(30 28 25 / 0.07); color: #6f6a60; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  transition: background 120ms, color 120ms;
+}
+.fig-size.on { background: #7b61ff; color: #fff; }
+.fig-hint {
+  left: 50%; top: 64px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+  background: #1e1c19; color: #fff; font-size: 12px; animation: fig-hint 4.6s ease forwards;
+}
+@keyframes fig-hint { 0% { opacity: 0; translate: 0 -8px; } 8% { opacity: 1; translate: 0 0; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+/* The freeform block in the side panel: a way in on the email, the stack inside the canvas. */
+.canvas-entry { display: grid; gap: 6px; }
+.btn.canvas-open { background: #7b61ff; border-color: #7b61ff; color: #fff; font-weight: 600; }
+.btn.canvas-open:hover { background: #6b4ff6; border-color: #6b4ff6; }
+.canvas-facts { font-size: 11.5px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.layer-list li.layer-group { display: block; }
+.layer-group-head { display: flex; align-items: center; gap: 2px; border-radius: 5px; }
+.layer-group.on > .layer-group-head { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.layer-fold { flex: none; width: 18px; height: 22px; padding: 0; border: 0; background: none; color: var(--faint); cursor: pointer; font-size: 10px; }
+.layer-list.nested { margin: 1px 0 3px 16px; padding-left: 6px; border-left: 1px solid var(--line-soft); }
+.layer-num.wide { grid-column: 1 / -1; }
+
+/* Canvas type in the Design panel: chips drawn by the canvas renderer, on paper so the samples read. */
+.canvas-type-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.canvas-type-chip {
+  display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: #fbfaf6; cursor: pointer; text-align: left;
+  transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), border-color 120ms;
+}
+.canvas-type-chip:hover { transform: translateY(-2px) rotate(-1deg); }
+.canvas-type-chip.on { border-color: #7b61ff; box-shadow: 0 0 0 1px #7b61ff; }
+.canvas-type-sample svg { display: block; width: 100%; height: auto; }
+.canvas-type-name { font-size: 11px; color: #5f5a50; font-weight: 600; }
 
 /* Preview: the email and nothing else. The header stays — Export and the checks live there, and so
    does the way back — and the tools row keeps the device switches, which are part of looking. */

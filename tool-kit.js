@@ -22,6 +22,7 @@
   let cfg = null, hist = [], idx = -1, applying = false, timer = 0, storeKey = null;
 
   // ---- storage ----
+  // The storage prefix keeps its original spelling on purpose: renaming it would wipe every tool's saved state.
   const key = n => `scuggnizzi.${cfg ? cfg.tool : 'x'}.${n}`;
   function save(snap) { if (!storeKey) return; try { localStorage.setItem(storeKey, `{"v":${cfg.version || 1},"state":${snap}}`); } catch (e) {} }
   function load() { if (!storeKey) return null; try { const o = JSON.parse(localStorage.getItem(storeKey) || 'null'); return o && o.v === (cfg.version || 1) ? o.state : null; } catch (e) { return null; } }
@@ -144,7 +145,7 @@
     const groups = new Map();
     for (const c of order) { const s = shortcuts.get(c), g = s.opts.group || 'Tool'; if (s.opts.hidden) continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push([c, s.label]); }
     const name = document.querySelector('#tool-banner .name'); const title = name ? name.textContent.replace(/_$/, '') : document.title;
-    let h = `<div class="sheet"><h2>Shortcuts</h2><p class="sub">${title} · the same keys work in every Scuggnizzi tool.</p>`;
+    let h = `<div class="sheet"><h2>Shortcuts</h2><p class="sub">${title} · the same keys work in every Scugnizzi tool.</p>`;
     for (const [g, rows] of groups) { h += `<h3>${g}</h3>`; for (const [c, l] of rows) h += `<div class="row"><span>${l}</span><kbd>${pretty(c)}</kbd></div>`; }
     h += `<div class="foot"><span>${cfg && cfg.getState ? 'Work is kept in this browser and comes back on reload.' : 'Nothing to save on this page.'}</span>`;
     if (cfg && cfg.getState) h += `<button class="danger" data-a="reset">Reset tool</button>`;

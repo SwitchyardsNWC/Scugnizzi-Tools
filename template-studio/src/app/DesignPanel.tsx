@@ -1,3 +1,5 @@
+import { CANVAS_EFFECTS, canvasTypeOf, type CanvasEffect, type CanvasTextStyle } from '../model/design-system.ts';
+import { canvasTypeSampleSvg } from '../compile/freeform.ts';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
@@ -140,6 +142,8 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
           halves of the same decision. */}
       <TypePanel editor={editor} ds={ds} phone={phone} />
       <RichTextPanel editor={editor} ds={ds} />
+      {/* Playful type for the freeform canvas, its own category: it follows none of the email's rules. */}
+      <CanvasTypePanel editor={editor} ds={ds} />
       <ColourPanel editor={editor} ds={ds} />
       {/* Directly under Colour, because a preset is a handful of colours with a name — reading one
           without the other is reading half of it. */}
@@ -1309,3 +1313,96 @@ function PagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
     </Panel>
   );
 }
+
+// --- canvas type -----------------------------------------------------------------------------------
+
+const AMOUNT_LABEL: Record<CanvasEffect, string> = { none: 'Amount', outline: 'Outline', shadow: 'Shadow', highlight: 'Highlight', sticker: 'Border', wobble: 'Wobble', arc: 'Bend' };
+
+/**
+ * Canvas type: playful text styles for the freeform canvas.
+ *
+ * Its own category because it follows none of the email's rules. It only ever ships as part of a
+ * picture, so it can outline, shadow, highlight, sticker, wobble and bend (learnings 3.68). Each
+ * chip is drawn by the canvas's own renderer, so the sample is exactly the picture.
+ */
+function CanvasTypePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
+  const styles = canvasTypeOf(ds);
+  const keys = Object.keys(styles);
+  const [chosen, setChosen] = useState(keys[0] ?? '');
+  const key = styles[chosen] ? chosen : (keys[0] ?? '');
+  const style = styles[key];
+  if (!style) return null;
+  const set = (change: Partial<CanvasTextStyle>) => editor.set('ds.canvasType', { ...styles, [key]: { ...style, ...change } });
+  const fonts = Object.keys(ds.fonts);
+
+  return (
+    <Panel
+      name="Canvas type"
+      help="Playful type for the freeform canvas. It ships inside a picture, so it can outline, shadow, highlight, sticker, wobble and bend. Pick a style on the canvas with the Text tool."
+    >
+      <div class="canvas-type-chips">
+        {keys.map((k) => (
+          <button key={k} class={`canvas-type-chip ${k === key ? 'on' : ''}`} aria-pressed={k === key} title={`${styles[k]!.label}. Click to tune it.`} onClick={() => setChosen(k)}>
+            <span class="canvas-type-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Play!') }} />
+            <span class="canvas-type-name">{styles[k]!.label}</span>
+          </button>
+        ))}
+      </div>
+      <div class="controls">
+        <div class="field" title="What the style does beyond the letters.">
+          <label>Effect</label>
+          <select value={style.effect} onChange={(e) => set({ effect: (e.target as HTMLSelectElement).value as CanvasEffect })}>
+            {CANVAS_EFFECTS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div class="field">
+          <label>Font</label>
+          <select
+            value={style.font ?? ''}
+            onChange={(e) => {
+              const v = (e.target as HTMLSelectElement).value;
+              set({ font: v || undefined });
+            }}
+          >
+            <option value="">The email’s font</option>
+            {fonts.map((f) => (
+              <option key={f} value={f}>
+                {f[0]!.toUpperCase() + f.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div class="field">
+          <label>Weight</label>
+          <select value={style.weight} onChange={(e) => set({ weight: (e.target as HTMLSelectElement).value as 'normal' | 'bold' })}>
+            <option value="normal">Regular</option>
+            <option value="bold">Bold</option>
+          </select>
+        </div>
+        <label class="field toggle">
+          <input type="checkbox" checked={Boolean(style.uppercase)} onChange={(e) => set({ uppercase: (e.target as HTMLInputElement).checked })} />
+          <span>Uppercase</span>
+        </label>
+        <label class="field toggle">
+          <input type="checkbox" checked={Boolean(style.italic)} onChange={(e) => set({ italic: (e.target as HTMLInputElement).checked })} />
+          <span>Italic</span>
+        </label>
+      </div>
+      <div class="dials">
+        <Dial label="Size" value={style.size} onChange={(v) => set({ size: v })} min={8} max={140} suffix="px" />
+        <Dial label="Line height" value={style.lineHeight} onChange={(v) => set({ lineHeight: v })} min={70} max={200} suffix="%" />
+        <Dial label="Tracking" value={style.letterSpacing ?? 0} onChange={(v) => set({ letterSpacing: v })} min={-4} max={20} step={0.5} suffix="px" zero="Normal" />
+        {style.effect !== 'none' && <Dial label={AMOUNT_LABEL[style.effect]} value={style.amount} onChange={(v) => set({ amount: v })} min={0} max={100} suffix="%" />}
+      </div>
+      <PresetSlot ds={ds} label="Colour" value={style.color} onChange={(v: CanvasTextStyle['color']) => set({ color: v })} help="The letters. Left alone they take the ink." allowNone noneLabel="Ink" />
+      {(style.effect === 'outline' || style.effect === 'shadow' || style.effect === 'highlight' || style.effect === 'sticker') && (
+        <PresetSlot ds={ds} label="Effect colour" value={style.effectColor} onChange={(v: CanvasTextStyle['color']) => set({ effectColor: v })} help="The outline, the shadow, the highlight or the sticker's border." allowNone noneLabel="Auto" />
+      )}
+    </Panel>
+  );
+}
+

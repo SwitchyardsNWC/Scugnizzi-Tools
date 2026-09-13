@@ -51,7 +51,6 @@ import {
   stackOf,
 } from '../model/edit.ts';
 import { canStack, STACKABLE } from '../model/catalog.ts';
-import { drawPath, nudgeLayer } from '../model/freeform.ts';
 import { clipText, parseClip } from '../model/clipboard.ts';
 import {
   applyPattern,
@@ -157,6 +156,9 @@ export function App() {
   /** A freeform block opened as a workspace of its own, in place of the email (learnings 3.67). */
   const [surfaceOf, setSurfaceOf] = useState<string | null>(null);
   const surfaceApi = useRef<SurfaceApi | null>(null);
+  /** Read by the clipboard handlers, which are bound once: the canvas has a clipboard of its own. */
+  const surfaceOpen = useRef(false);
+  surfaceOpen.current = Boolean(surfaceOf);
   const [overrides, setOverrides] = useState<Branch>({});
   const [showBranches, setShowBranches] = useState(false);
   const [showChecks, setShowChecks] = useState(false);
@@ -287,6 +289,16 @@ export function App() {
     },
     [editor],
   );
+
+  /** Where a freeform block's picture sits on the email canvas, in viewport pixels: where the canvas flies from and back to. */
+  const freeformRect = useCallback((blockId: string): DOMRect | null => {
+    const f = frame.current;
+    const el = f?.contentDocument?.querySelector(`[data-sy-block="${CSS.escape(blockId)}"] svg[data-sy-freeform]`);
+    if (!f || !el) return null;
+    const outer = f.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return new DOMRect(outer.left + r.left, outer.top + r.top, r.width, r.height);
+  }, []);
 
   // A run of selected blocks survives only an extension of itself. Any other change of selection
   // — a click, an add, a delete — is a new selection, and the run goes with the old one.
@@ -741,6 +753,8 @@ export function App() {
 
   const onClipboard = useCallback(
     (event: ClipboardEvent, kind: 'copy' | 'paste') => {
+      // The canvas has a clipboard of its own (Surface.tsx). Nothing copied or pasted in it may reach the email.
+      if (surfaceOpen.current) return;
       const data = event.clipboardData;
       if (!data) return;
       const sel = editor.selection;
@@ -1487,10 +1501,11 @@ export function App() {
               layer={selectedLayer}
               onSelectLayer={setSelectedLayer}
               onDone={() => setSurfaceOf(null)}
+              rectOf={() => (surfaceOf ? freeformRect(surfaceOf) : null)}
               api={surfaceApi}
             />
           )}
-          <div class={`scroller ${dark ? 'dark' : ''}`} ref={scroller} hidden={Boolean(surfaceOf)}>
+          <div class={`scroller ${dark ? 'dark' : ''}`} ref={scroller}>
             {/* A device around the canvas. It is chrome, and it earns its place: an email at 600px
                 floating on a grey field gives no sense of scale, and the one question a designer
                 asks of a preview is "how big is this really". The desktop frame is a mail client
@@ -1545,17 +1560,7 @@ export function App() {
                 const row = editor.template.sections.find((s) => s.id === sectionId)?.rows[0];
                 if (row) editor.resizeColumns(row.id, spans);
               }}
-              layer={selectedLayer}
-              drawing={drawing}
               onEnterSurface={enterSurface}
-              onSelectLayer={(_blockId, layerId) => setSelectedLayer(layerId)}
-              onMoveLayer={(blockId, layerId, dx, dy) => editor.commit('Move layer', nudgeLayer(editor.template, blockId, layerId, dx, dy), { coalesce: `layer:${blockId}:${layerId}` })}
-              onDrawPath={(blockId, points) => {
-                // In the ink of the first palette colour, three wide. The layer's own panel changes both.
-                const ink = Object.keys(designSystemOf(editor.template).colors)[0] ?? null;
-                const next = drawPath(editor.template, blockId, points, ink, 3);
-                if (next !== editor.template) editor.commit('Draw', next);
-              }}
               onClipboard={onClipboard}
               dim={showFields ? lockedBlockIds(shownTemplate) : []}
               textTargets={textTargets}

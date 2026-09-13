@@ -1,39 +1,61 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import type { JSX } from 'preact';
 
-import { freeformLayersSvg } from '../compile/freeform.ts';
+import { canvasTypeSampleSvg, freeformLayersSvg } from '../compile/freeform.ts';
+import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type ColorRef } from '../model/design-system.ts';
 import { designSystemOf, siteOf } from '../model/edit.ts';
-import { typeOf, fontOf } from '../model/design-system.ts';
 import {
   addImageLayerAt,
+  addMarkAt,
   addShapeAt,
+  addStickyAt,
   addTextAt,
   drawPath,
+  duplicateGroup,
   duplicateLayer,
+  groupBox,
+  groupKey,
+  groupOfKey,
   layerBox,
+  layerClipText,
+  membersOf,
+  newGroupId,
+  paintGroup,
+  paintLayer,
+  parseLayerClip,
+  pasteLayers,
+  removeGroup,
   removeLayer,
+  replaceLayers,
+  scaleLayers,
+  STICKY_COLORS,
   translateLayer,
   updateLayer,
   withLayerBox,
   type Box,
 } from '../model/freeform.ts';
-import type { FreeformBlock, FreeformLayer } from '../model/types.ts';
+import { MARKS } from '../model/marks.ts';
+import type { FreeformBlock, FreeformLayer, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { withLocalAssets } from './local-assets.ts';
 import { capture, release } from './pointer.ts';
 import type { Editor } from './useEditor.ts';
 
-// The surface editor: a freeform block opened as a workspace of its own.
+// The surface editor: a freeform block opened as a canvas you fall into.
 //
-// Jared: "make freeform less clunky and feel more like an endless canvas I can drop stuff on and
-// zoom in and out. allow me to drop assets from the assets panel into it, resize, rotate, and play
-// with on the canvas." The first version edited the surface in place on the email, at the email's
-// size, through a panel of numbers. This is the other thing: the page on a grey field with no
-// edges, pan and zoom, handles on what is picked, shapes drawn out by dragging, pictures dropped
-// in from the folder, words typed where they sit (learnings 3.67).
+// Jared, twice. First: "make freeform less clunky and feel more like an endless canvas I can drop
+// stuff on and zoom in and out" (learnings 3.67). Then: "give it a zoom in effect and make the
+// freeform canvas feel more like a figjam style canvas. make it fun and playful" (learnings 3.68).
 //
-// It draws exactly what the compiler draws — `freeformLayersSvg` is the same function the canvas
-// and the render use — and then lays its own handles over that, in the same coordinate space. So
-// what is edited here is what ships, not a second drawing of it.
+// So it is an overlay above the email rather than a replacement for it. It opens with the page
+// exactly where the block's picture sits on the email, at exactly that size, and flies out to fit
+// while a warm dotted field fades in; Done flies it back. The chrome floats — a dock of chunky
+// tools at the bottom, pills at the top — and things pop in, poof out and wiggle.
+//
+// What does not change is the one rule that matters: it draws with `freeformLayersSvg`, the same
+// function the email canvas and the render use, and lays its handles over that in the same
+// coordinate space. Sticky notes and stamps are real layer kinds with real renderings, so every
+// playful thing on this surface ships in the picture exactly as it looks here.
 
 export interface SurfaceProps {
   editor: Editor;
@@ -41,7 +63,10 @@ export interface SurfaceProps {
   assets: AssetFile[];
   layer: string | null;
   onSelectLayer(layerId: string | null): void;
+  /** Called once the surface has flown back into its block, or straight away without motion. */
   onDone(): void;
+  /** Where the block's picture sits on the email canvas right now, in viewport pixels. */
+  rectOf?(): DOMRect | null;
   /** Filled by the editor, so a picture dragged from the Assets panel can land on it. */
   api?: { current: SurfaceApi | null };
 }
@@ -51,8 +76,11 @@ export interface SurfaceApi {
   dropAsset(asset: AssetFile, at: { x: number; y: number } | null): void;
 }
 
-type Tool = 'select' | 'text' | 'rect' | 'ellipse' | 'line' | 'pen';
+type Tool = 'select' | 'hand' | 'sticky' | 'rect' | 'ellipse' | 'line' | 'pen' | 'text' | 'stamp';
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+/** `start` is the page sitting on the block; `enter` is the flight out; `exit` the flight home. */
+type Phase = 'start' | 'enter' | 'idle' | 'exit';
+type Point = { x: number; y: number };
 
 interface View {
   x: number;
@@ -62,158 +90,446 @@ interface View {
 
 type Drag =
   | { kind: 'pan'; x: number; y: number; view: View }
-  | { kind: 'move'; layer: FreeformLayer; x: number; y: number; moved: boolean }
+  | { kind: 'move'; layers: FreeformLayer[]; x: number; y: number; moved: boolean }
+  | { kind: 'resizeMany'; layers: FreeformLayer[]; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'resize'; layer: FreeformLayer; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'endpoint'; layer: FreeformLayer; which: 1 | 2 }
-  | { kind: 'rotate'; layer: FreeformLayer; centre: { x: number; y: number } }
-  | { kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: { x: number; y: number }; to: { x: number; y: number } }
+  | { kind: 'rotate'; layer: FreeformLayer; centre: Point }
+  | { kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point }
   | { kind: 'pen'; points: number[] }
-  | { kind: 'page'; width: number; height: number; x: number; y: number };
+  | { kind: 'page'; axis: 'x' | 'y' | 'both'; width: number; height: number; x: number; y: number };
 
-const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string }> = [
-  { tool: 'select', label: 'Select', key: 'V', help: 'Pick, move, resize and rotate what is on the surface. Space-drag or the middle button pans; ⌘ and the wheel zooms.' },
-  { tool: 'text', label: 'Text', key: 'T', help: 'Click to place words, in the heading role. Double-click any text to edit it where it sits.' },
-  { tool: 'rect', label: 'Box', key: 'R', help: 'Drag out a rectangle. Hold Shift for a square.' },
-  { tool: 'ellipse', label: 'Ellipse', key: 'O', help: 'Drag out an ellipse. Hold Shift for a circle.' },
-  { tool: 'line', label: 'Line', key: 'L', help: 'Drag from one end to the other.' },
-  { tool: 'pen', label: 'Pen', key: 'P', help: 'Draw freehand. Each stroke is a layer.' },
+const glyph = (...children: JSX.Element[]) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    {children}
+  </svg>
+);
+
+const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string; icon: () => JSX.Element }> = [
+  { tool: 'select', label: 'Select', key: 'V', help: 'Pick, move, resize and rotate.', icon: () => glyph(<path key="a" d="M6 3.5l12.5 7.2-5.6 1.4-2.6 5.4z" />) },
+  {
+    tool: 'hand',
+    label: 'Hand',
+    key: 'H',
+    help: 'Drag to look around. Holding Space does the same with any tool.',
+    icon: () =>
+      glyph(
+        <path key="a" d="M8.5 12.5V6.8a1.4 1.4 0 012.8 0v4.7" />,
+        <path key="b" d="M11.3 11.2V5.4a1.4 1.4 0 012.8 0v5.8" />,
+        <path key="c" d="M14.1 11.2V7a1.4 1.4 0 012.8 0v6.6a6 6 0 01-6 6h-.6a5.8 5.8 0 01-4.6-2.3l-2.3-3a1.4 1.4 0 012.1-1.8l1.7 1.7" />,
+      ),
+  },
+  { tool: 'sticky', label: 'Sticky note', key: 'S', help: 'Click to drop a note, then type.', icon: () => glyph(<path key="a" d="M5 4.5h14v9.8L14.3 19.5H5z" />, <path key="b" d="M14 19.3v-5h5" />) },
+  { tool: 'rect', label: 'Box', key: 'R', help: 'Drag out a box. Shift for a square.', icon: () => glyph(<rect key="a" x="4" y="6" width="16" height="12" rx="2.5" />) },
+  { tool: 'ellipse', label: 'Ellipse', key: 'O', help: 'Drag out an ellipse. Shift for a circle.', icon: () => glyph(<ellipse key="a" cx="12" cy="12" rx="8.2" ry="6.2" />) },
+  { tool: 'line', label: 'Line', key: 'L', help: 'Drag from one end to the other.', icon: () => glyph(<path key="a" d="M5 19L19 5" />) },
+  {
+    tool: 'pen',
+    label: 'Marker',
+    key: 'P',
+    help: 'Draw freehand. Every stroke is its own layer.',
+    icon: () => glyph(<path key="a" d="M4.5 19.5l1-4L15.8 5.2a2 2 0 012.8 0l.2.2a2 2 0 010 2.8L8.5 18.5z" />, <path key="b" d="M13.5 7.5l3 3" />),
+  },
+  { tool: 'text', label: 'Text', key: 'T', help: 'Click to place words in the heading role.', icon: () => glyph(<path key="a" d="M6 6.5h12M12 6.5v12M9.5 18.5h5" />) },
+  {
+    tool: 'stamp',
+    label: 'Stamp',
+    key: 'E',
+    help: 'Brand marks. Pick one from the tray and click to stamp, as many as you like.',
+    icon: () => glyph(<circle key="a" cx="12" cy="9" r="4.6" />, <path key="b" d="M9.5 13.2L9 16.5h6l-.5-3.3" />, <path key="c" d="M6 19.5h12" />),
+  },
 ];
+
+const POP: Keyframe[] = [{ scale: '0.2', opacity: 0 }, { scale: '1.14', opacity: 1, offset: 0.6 }, { scale: '0.97', offset: 0.82 }, { scale: '1', opacity: 1 }];
+const POOF: Keyframe[] = [{ scale: '1', opacity: 1 }, { scale: '1.12', opacity: 1, offset: 0.35 }, { scale: '0', opacity: 0 }];
+
+/** What is picked: one layer, or a group (`group:<id>`) of more than one. */
+function selectionOf(block: FreeformBlock, key: string | null): { layers: FreeformLayer[]; group: string | null } | null {
+  if (!key) return null;
+  const gid = groupOfKey(key);
+  if (gid) {
+    const members = membersOf(block, gid);
+    return members.length ? { layers: members, group: gid } : null;
+  }
+  const one = block.layers.find((l) => l.id === key);
+  return one ? { layers: [one], group: null } : null;
+}
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
-const HANDLE = 8;
+const HANDLE = 9;
+const ACCENT = '#7b61ff';
 
-const deg = (rad: number) => (rad * 180) / Math.PI;
+const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+const deg = (r: number) => (r * 180) / Math.PI;
 const rad = (d: number) => (d * Math.PI) / 180;
+/** A little overshoot, so a flight lands rather than stops. */
+const easeOutBack = (t: number) => {
+  const c1 = 1.18;
+  return 1 + (c1 + 1) * (t - 1) ** 3 + c1 * (t - 1) ** 2;
+};
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
-/** A point rotated about a centre. */
-function rotatePoint(p: { x: number; y: number }, c: { x: number; y: number }, angle: number): { x: number; y: number } {
+function rotatePoint(p: Point, c: Point, angle: number): Point {
   const a = rad(angle);
   const dx = p.x - c.x;
   const dy = p.y - c.y;
   return { x: c.x + dx * Math.cos(a) - dy * Math.sin(a), y: c.y + dx * Math.sin(a) + dy * Math.cos(a) };
 }
 
-export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, api }: SurfaceProps) {
+/** A layer's own fields, for a patch: everything but the id and the kind. */
+function fields(l: FreeformLayer): Record<string, unknown> {
+  const { id: _id, kind: _kind, ...rest } = l as unknown as { id: string; kind: string } & Record<string, unknown>;
+  void _id;
+  void _kind;
+  return rest;
+}
+
+export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api }: SurfaceProps) {
   const site = siteOf(editor.template, blockId);
   const block = site?.column.blocks[site.index];
   const ds = designSystemOf(editor.template);
 
+  // Refs for everything the pointer and key handlers read, so a handler bound in one render never
+  // acts on a template, a tool or a colour from an earlier one.
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const rectOfRef = useRef(rectOf);
+  rectOfRef.current = rectOf;
   const work = useRef<HTMLDivElement | null>(null);
   const svgEl = useRef<SVGSVGElement | null>(null);
-  const [view, setView] = useState<View>({ x: 80, y: 80, z: 1 });
+
+  const [view, setViewState] = useState<View>({ x: 0, y: 0, z: 1 });
   const viewRef = useRef(view);
-  viewRef.current = view;
-  const [tool, setTool] = useState<Tool>('select');
+  const setView = useCallback((next: View) => {
+    viewRef.current = next;
+    setViewState(next);
+  }, []);
+  const [phase, setPhase] = useState<Phase>('start');
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const [tool, setToolState] = useState<Tool>('select');
   const toolRef = useRef(tool);
   toolRef.current = tool;
+  const [paint, setPaint] = useState<ColorRef>(null);
+  const paintRef = useRef(paint);
+  paintRef.current = paint;
+  const [paintsOpen, setPaintsOpen] = useState(false);
+  const [stamp, setStamp] = useState(MARKS[0]!.key);
+  const stampRef = useRef(stamp);
+  stampRef.current = stamp;
+  /** The canvas type style new text is set in; null is the plain heading role. */
+  const [look, setLook] = useState<string | null>(() => Object.keys(canvasTypeOf(ds))[0] ?? null);
+  const lookRef = useRef(look);
+  lookRef.current = look;
+  /** The group this marker session's strokes go into. A new session starts with each new pen tool. */
+  const penGroup = useRef<string | null>(null);
+  /** How many times the clipboard has been pasted since it was copied, so each paste steps further out. */
+  const pasteCount = useRef(0);
+  const [pageDrag, setPageDrag] = useState(false);
   const drag = useRef<Drag | null>(null);
-  /** Live geometry during a drag, drawn without waiting for the commit to come back. */
-  const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: { x: number; y: number }; to: { x: number; y: number } } | { kind: 'pen'; points: number[] } | null>(null);
+  const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[] } | null>(null);
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
-  /** Measured heights of text layers, in surface units, for their boxes. */
   const [textHeights, setTextHeights] = useState<Record<string, number>>({});
   const [editingText, setEditingText] = useState<string | null>(null);
-  const [fitted, setFitted] = useState(false);
+  const [hover, setHover] = useState<string | null>(null);
+  const hoverRef = useRef<string | null>(null);
+  const [hint, setHint] = useState(true);
   const blockRef = useRef<FreeformBlock | null>(null);
   if (block?.type === 'freeform') blockRef.current = block;
   const layerRef = useRef(layer);
   layerRef.current = layer;
   /**
-   * The last press on a layer, for a double-click of our own. `preventDefault` on pointerdown —
-   * needed so a drag does not select text — also stops the browser's `dblclick` from ever
-   * arriving, so two presses on the same text within a beat are read here instead.
+   * The last press on a layer, for a double-click of our own: `preventDefault` on pointerdown,
+   * which stops a drag selecting text, also stops the browser dispatching `dblclick` at all.
    */
   const lastPress = useRef<{ layerId: string; at: number } | null>(null);
+  /** The layers just made, which pop in once they are on the page. */
+  const fresh = useRef<string[]>([]);
+  const anim = useRef<number | null>(null);
+  const reduced = useRef(typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)).current;
 
-  const commit = useCallback(
-    (label: string, next: typeof editor.template, coalesce?: string) => {
-      if (next !== editor.template) editor.commit(label, next, coalesce ? { coalesce } : {});
+  const tpl = () => editorRef.current.template;
+  const commit = useCallback((label: string, next: Template, coalesce?: string) => {
+    const ed = editorRef.current;
+    if (next !== ed.template) ed.commit(label, next, coalesce ? { coalesce } : {});
+  }, []);
+
+  const setTool = useCallback((next: Tool) => {
+    setToolState(next);
+    penGroup.current = null;
+    hoverRef.current = null;
+    setHover(null);
+  }, []);
+
+  // --- the view, and flying it ------------------------------------------------------------------
+
+  const stopAnim = () => {
+    if (anim.current !== null) cancelAnimationFrame(anim.current);
+    anim.current = null;
+  };
+
+  /** Eases the view to another. Zoom moves in log space, so 30% to 200% does not rush its start. */
+  const animateView = useCallback(
+    (to: View, ms: number, ease: (t: number) => number, done?: () => void) => {
+      stopAnim();
+      const from = viewRef.current;
+      const began = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - began) / ms);
+        const k = ease(t);
+        const z = Math.exp(Math.log(from.z) + (Math.log(to.z) - Math.log(from.z)) * k);
+        setView({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, z });
+        if (t < 1) anim.current = requestAnimationFrame(step);
+        else {
+          anim.current = null;
+          done?.();
+        }
+      };
+      anim.current = requestAnimationFrame(step);
     },
-    [editor],
+    [setView],
   );
 
-  // --- coordinates ------------------------------------------------------------------------------
-
   /** Screen to surface. */
-  const toSurface = useCallback((clientX: number, clientY: number) => {
+  const toSurface = useCallback((clientX: number, clientY: number): Point => {
     const r = svgEl.current?.getBoundingClientRect();
     const v = viewRef.current;
     if (!r) return { x: 0, y: 0 };
     return { x: (clientX - r.left - v.x) / v.z, y: (clientY - r.top - v.y) / v.z };
   }, []);
 
-  const fit = useCallback(() => {
+  /** The page fitted between the top pills and the dock. */
+  const fitView = useCallback((): View | null => {
     const b = blockRef.current;
     const w = work.current?.getBoundingClientRect();
-    if (!b || !w) return;
-    const z = Math.min(2, (w.width - 120) / Math.max(1, b.width), (w.height - 120) / Math.max(1, b.height));
-    setView({ z, x: (w.width - b.width * z) / 2, y: (w.height - b.height * z) / 2 });
+    if (!b || !w || w.width === 0) return null;
+    const z = clampZoom(Math.min(2, (w.width - 120) / Math.max(1, b.width), (w.height - 210) / Math.max(1, b.height)));
+    return { z, x: (w.width - b.width * z) / 2, y: (w.height - b.height * z) / 2 - 18 };
   }, []);
 
-  // Fit once the workspace has a size.
-  useLayoutEffect(() => {
-    if (fitted) return;
-    fit();
-    setFitted(true);
-  }, [fit, fitted]);
-
-  const zoomTo = useCallback((z: number, about?: { x: number; y: number }) => {
+  /** The view that puts the page exactly on the block's picture in the email underneath. */
+  const blockView = useCallback((): View | null => {
+    const b = blockRef.current;
     const w = work.current?.getBoundingClientRect();
-    const v = viewRef.current;
-    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
-    const px = about ? about.x : (w?.width ?? 0) / 2;
-    const py = about ? about.y : (w?.height ?? 0) / 2;
-    setView({ z: next, x: px - ((px - v.x) * next) / v.z, y: py - ((py - v.y) * next) / v.z });
+    const r = rectOfRef.current?.();
+    if (!b || !w || !r || r.width <= 0) return null;
+    return { z: r.width / Math.max(1, b.width), x: r.left - w.left, y: r.top - w.top };
   }, []);
 
-  // Wheel: ⌘/ctrl zooms about the pointer (that is what a pinch arrives as), plain wheel pans.
-  // Bound by hand so it can be non-passive; a passive listener cannot stop the page scrolling.
+  // In: one frame with the page on the block, then the flight out.
+  useLayoutEffect(() => {
+    // Focus leaves the email's frame, where a double-click put it, so every key and every copy and
+    // paste from here on arrives in this document and nowhere near the block around the canvas.
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    work.current?.focus({ preventScroll: true });
+    const fit = fitView();
+    const from = reduced ? null : blockView();
+    if (!fit || !from) {
+      if (fit) setView(fit);
+      setPhase('idle');
+      return;
+    }
+    setView(from);
+    setPhase('start');
+    const id = requestAnimationFrame(() => {
+      setPhase('enter');
+      animateView(fit, 640, easeOutBack, () => setPhase('idle'));
+    });
+    return () => {
+      cancelAnimationFrame(id);
+      stopAnim();
+    };
+    // Once, on the way in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Out: the flight home, and then the email. */
+  const leave = useCallback(() => {
+    if (phaseRef.current === 'exit') return;
+    setEditingText(null);
+    setPaintsOpen(false);
+    hoverRef.current = null;
+    setHover(null);
+    onSelectLayer(null);
+    const to = reduced ? null : blockView();
+    if (!to) {
+      onDone();
+      return;
+    }
+    setPhase('exit');
+    animateView(to, 460, easeInOutCubic, onDone);
+  }, [onSelectLayer, onDone, blockView, animateView, reduced]);
+
+  const zoomTo = useCallback(
+    (z: number, about?: Point, smooth = false) => {
+      const w = work.current?.getBoundingClientRect();
+      const v = viewRef.current;
+      const next = clampZoom(z);
+      const px = about ? about.x : (w?.width ?? 0) / 2;
+      const py = about ? about.y : (w?.height ?? 0) / 2;
+      const to = { z: next, x: px - ((px - v.x) * next) / v.z, y: py - ((py - v.y) * next) / v.z };
+      if (smooth && !reduced) animateView(to, 220, easeOutCubic);
+      else {
+        stopAnim();
+        setView(to);
+      }
+    },
+    [animateView, setView, reduced],
+  );
+
+  const fitSmooth = useCallback(() => {
+    const f = fitView();
+    if (!f) return;
+    if (reduced) setView(f);
+    else animateView(f, 420, easeOutBack);
+  }, [fitView, animateView, setView, reduced]);
+
+  // Wheel: ⌘ or a pinch zooms about the pointer, a plain wheel pans. Non-passive, or the page scrolls.
   useEffect(() => {
     const el = work.current;
     if (!el) return;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      if (phaseRef.current !== 'idle') return;
       const r = el.getBoundingClientRect();
       if (event.ctrlKey || event.metaKey) {
         zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025), { x: event.clientX - r.left, y: event.clientY - r.top });
       } else {
-        setView((v) => ({ ...v, x: v.x - event.deltaX, y: v.y - event.deltaY }));
+        stopAnim();
+        const v = viewRef.current;
+        setView({ ...v, x: v.x - event.deltaX, y: v.y - event.deltaY });
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoomTo]);
+  }, [zoomTo, setView]);
 
-  // --- the picked layer's box, with a text layer's measured height ---------------------------------
+  // --- boxes, and the little motions ---------------------------------------------------------------
 
+  // A text layer's height is however tall its words wrap to, measured in its own layout pixels. Held
+  // while it is being typed into, since its words are hidden under the field then.
   useLayoutEffect(() => {
     const b = blockRef.current;
     const svg = svgEl.current;
     if (!b || !svg) return;
-    const next: Record<string, number> = {};
-    for (const l of b.layers) {
-      if (l.kind !== 'text') continue;
-      const div = svg.querySelector(`[data-sy-layer="${CSS.escape(l.id)}"] div`) as HTMLElement | null;
-      if (div) next[l.id] = div.getBoundingClientRect().height / viewRef.current.z;
-    }
-    setTextHeights((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
-  }, [block, view.z]);
+    setTextHeights((old) => {
+      const next: Record<string, number> = {};
+      for (const l of b.layers) {
+        if (l.kind !== 'text') continue;
+        if (l.id === editingText && old[l.id]) {
+          next[l.id] = old[l.id]!;
+          continue;
+        }
+        const el = svg.querySelector(`[data-sy-layer="${CSS.escape(l.id)}"]`) as SVGGraphicsElement | null;
+        const div = el?.querySelector('div') as HTMLElement | null;
+        if (div) next[l.id] = div.offsetHeight;
+        else if (el && typeof el.getBBox === 'function') {
+          // Arc text is SVG text on a path, with no box of its own to measure: its drawn extent instead.
+          const bb = el.getBBox();
+          next[l.id] = Math.max(8, bb.y + bb.height - l.y);
+        }
+      }
+      return JSON.stringify(old) === JSON.stringify(next) ? old : next;
+    });
+  }, [block, editingText]);
 
   const boxOf = useCallback((l: FreeformLayer): Box => layerBox(l, textHeights[l.id]), [textHeights]);
+
+  const layerEl = (id: string) => svgEl.current?.querySelector(`[data-sy-layer="${CSS.escape(id)}"]`) as SVGGraphicsElement | null;
+
+  /**
+   * Motion that composes with a layer's own rotation. The individual `scale` property, not
+   * `transform`: CSS `transform` on an SVG element replaces its transform attribute, which would
+   * snap a rotated layer straight for the length of the animation.
+   */
+  const springy = (el: SVGGraphicsElement, frames: Keyframe[], ms: number, fill: FillMode = 'none') => {
+    if (reduced || typeof el.animate !== 'function') return null;
+    el.style.transformBox = 'fill-box';
+    el.style.transformOrigin = 'center';
+    return el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2,.9,.3,1)', fill });
+  };
+
+  // Pop: the layers just made, once they are on the page.
+  useLayoutEffect(() => {
+    if (fresh.current.length === 0) return;
+    const waiting: string[] = [];
+    for (const id of fresh.current) {
+      const el = layerEl(id);
+      if (el) springy(el, POP, 440);
+      else waiting.push(id);
+    }
+    fresh.current = waiting;
+  }, [block]);
+
+  /** Poof: a quick swell and shrink, and then what was picked is gone from the recipe. */
+  const poof = useCallback(
+    (key: string) => {
+      const b = blockRef.current;
+      const sel = b ? selectionOf(b, key) : null;
+      if (!sel) return;
+      onSelectLayer(null);
+      const gone = () =>
+        commit(sel.group ? 'Remove drawing' : 'Remove layer', sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id));
+      const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 220, 'forwards') : null));
+      const first = anims.find(Boolean);
+      if (first) first.onfinish = gone;
+      else gone();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blockId, commit, onSelectLayer],
+  );
+
+  /** New layers: committed, popped in, and picked unless the tool is one for doing it again. */
+  const placeMany = useCallback(
+    (label: string, next: Template, count: number, pick = true): string | null => {
+      commit(label, next);
+      const s = siteOf(next, blockId);
+      const b = s?.column.blocks[s.index];
+      if (!b || b.type !== 'freeform') return null;
+      const added = b.layers.slice(-count);
+      fresh.current = added.map((l) => l.id);
+      const shared = added[0]?.group && added.every((l) => l.group === added[0]!.group) && added.length > 1 ? added[0]!.group! : null;
+      const key = shared ? groupKey(shared) : (added[added.length - 1]?.id ?? null);
+      if (pick) onSelectLayer(key);
+      return key;
+    },
+    [commit, blockId, onSelectLayer],
+  );
+  const place = useCallback((label: string, next: Template, pick = true) => placeMany(label, next, 1, pick), [placeMany]);
+
+  const choosePaint = (color: ColorRef) => {
+    setPaint(color);
+    setPaintsOpen(false);
+    const b = blockRef.current;
+    const sel = b ? selectionOf(b, layerRef.current) : null;
+    if (!sel) return;
+    commit('Colour', sel.group ? paintGroup(tpl(), blockId, sel.group, color) : paintLayer(tpl(), blockId, sel.layers[0]!.id, color));
+  };
+
+  const chooseLook = (next: string | null) => {
+    setLook(next);
+    const b = blockRef.current;
+    const sel = b ? selectionOf(b, layerRef.current) : null;
+    const one = sel && !sel.group ? sel.layers[0] : undefined;
+    if (one?.kind === 'text') commit('Text style', updateLayer(tpl(), blockId, one.id, next ? { look: next } : { look: undefined }));
+  };
 
   // --- pointer ------------------------------------------------------------------------------------
 
   const onPointerDown = (event: PointerEvent) => {
     const b = blockRef.current;
     const svg = svgEl.current;
-    if (!b || !svg) return;
-    if (editingText) return;
+    if (!b || !svg || phaseRef.current !== 'idle' || editingText) return;
+    stopAnim();
+    setPaintsOpen(false);
     const p = toSurface(event.clientX, event.clientY);
     const target = event.target as Element;
+    const current = toolRef.current;
 
-    if (event.button === 1 || (event.button === 0 && spaceRef.current)) {
+    if (event.button === 1 || (event.button === 0 && (spaceRef.current || current === 'hand'))) {
       capture(svg as unknown as HTMLElement, event.pointerId);
       drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current };
       event.preventDefault();
@@ -223,26 +539,30 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     capture(svg as unknown as HTMLElement, event.pointerId);
 
     const handle = target.getAttribute('data-handle');
-    const picked = layerRef.current ? b.layers.find((l) => l.id === layerRef.current) : undefined;
-    if (handle && picked) {
-      if (handle === 'rot') {
-        const box = boxOf(picked);
-        drag.current = { kind: 'rotate', layer: picked, centre: { x: box.x + box.width / 2, y: box.y + box.height / 2 } };
-      } else if (handle === 'p1' || handle === 'p2') {
-        drag.current = { kind: 'endpoint', layer: picked, which: handle === 'p1' ? 1 : 2 };
-      } else {
-        drag.current = { kind: 'resize', layer: picked, handle: handle as Handle, box: boxOf(picked), x: p.x, y: p.y };
+    if (handle === 'page' || handle === 'page-e' || handle === 'page-s') {
+      // The page's own edges: the right one is the width, the bottom one the height, the corner both.
+      drag.current = { kind: 'page', axis: handle === 'page-e' ? 'x' : handle === 'page-s' ? 'y' : 'both', width: b.width, height: b.height, x: p.x, y: p.y };
+      setPageDrag(true);
+      event.preventDefault();
+      return;
+    }
+    const sel = selectionOf(b, layerRef.current);
+    if (handle && sel) {
+      const one = sel.group ? undefined : sel.layers[0]!;
+      if (sel.group) {
+        drag.current = { kind: 'resizeMany', layers: sel.layers, handle: handle as Handle, box: groupBox(sel.layers, textHeights), x: p.x, y: p.y };
+      } else if (handle === 'rot' && one) {
+        const box = boxOf(one);
+        drag.current = { kind: 'rotate', layer: one, centre: { x: box.x + box.width / 2, y: box.y + box.height / 2 } };
+      } else if ((handle === 'p1' || handle === 'p2') && one) {
+        drag.current = { kind: 'endpoint', layer: one, which: handle === 'p1' ? 1 : 2 };
+      } else if (one) {
+        drag.current = { kind: 'resize', layer: one, handle: handle as Handle, box: boxOf(one), x: p.x, y: p.y };
       }
       event.preventDefault();
       return;
     }
-    if (handle === 'page') {
-      drag.current = { kind: 'page', width: b.width, height: b.height, x: p.x, y: p.y };
-      event.preventDefault();
-      return;
-    }
 
-    const current = toolRef.current;
     if (current === 'pen') {
       drag.current = { kind: 'pen', points: [p.x, p.y] };
       setGhost({ kind: 'pen', points: [p.x, p.y] });
@@ -255,13 +575,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       event.preventDefault();
       return;
     }
-    if (current === 'text') {
-      const next = addTextAt(editor.template, blockId, p);
-      commit('Add text', next);
-      const added = lastLayerId(next, blockId);
-      onSelectLayer(added);
-      setEditingText(added);
+    if (current === 'text' || current === 'sticky') {
+      const id =
+        current === 'text'
+          ? place('Add text', addTextAt(tpl(), blockId, p, paintRef.current, lookRef.current ?? undefined))
+          : place('Add sticky note', addStickyAt(tpl(), blockId, p, paintRef.current));
+      release(svg as unknown as HTMLElement, event.pointerId);
+      setEditingText(id);
       setTool('select');
+      event.preventDefault();
+      return;
+    }
+    if (current === 'stamp') {
+      // A real stamp never lands straight. The tilt is chosen here and stored, so the recipe stays exact.
+      place('Stamp', addMarkAt(tpl(), blockId, stampRef.current, p, paintRef.current, Math.round(Math.random() * 16 - 8)), false);
       event.preventDefault();
       return;
     }
@@ -269,21 +596,21 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const hit = target.closest('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
     if (hit) {
       const l = b.layers.find((x) => x.id === hit);
+      if (!l) return;
+      // A stroke that belongs to a drawing picks the drawing; Alt picks the stroke on its own.
+      const gid = l.group && !event.altKey && membersOf(b, l.group).length > 1 ? l.group : null;
       const now = Date.now();
       const again = lastPress.current?.layerId === hit && now - lastPress.current.at < 450;
       lastPress.current = { layerId: hit, at: now };
-      if (l && again && l.kind === 'text') {
-        // The second press on a text layer opens it for typing where it sits.
+      if (!gid && again && (l.kind === 'text' || l.kind === 'sticky')) {
         onSelectLayer(hit);
         setEditingText(hit);
         release(svg as unknown as HTMLElement, event.pointerId);
         event.preventDefault();
         return;
       }
-      if (l) {
-        onSelectLayer(hit);
-        drag.current = { kind: 'move', layer: l, x: p.x, y: p.y, moved: false };
-      }
+      onSelectLayer(gid ? groupKey(gid) : hit);
+      drag.current = { kind: 'move', layers: gid ? membersOf(b, gid) : [l], x: p.x, y: p.y, moved: false };
     } else {
       lastPress.current = null;
       onSelectLayer(null);
@@ -295,7 +622,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const onPointerMove = (event: PointerEvent) => {
     const state = drag.current;
     const b = blockRef.current;
-    if (!state || !b) return;
+    if (!state) {
+      // Hover: a soft outline on whatever the pointer is over, as long as nothing is being done.
+      if (toolRef.current === 'select' && phaseRef.current === 'idle' && !spaceRef.current && b) {
+        const hit = (event.target as Element).closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
+        const l = hit ? b.layers.find((x) => x.id === hit) : undefined;
+        const key = l?.group && !event.altKey && membersOf(b, l.group).length > 1 ? groupKey(l.group) : hit;
+        if (key !== hoverRef.current) {
+          hoverRef.current = key;
+          setHover(key);
+        }
+      }
+      return;
+    }
+    if (!b) return;
     const p = toSurface(event.clientX, event.clientY);
     const key = `surface:${blockId}`;
     switch (state.kind) {
@@ -307,25 +647,28 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         const dy = p.y - state.y;
         if (!state.moved && Math.hypot(dx, dy) * viewRef.current.z < 3) return;
         state.moved = true;
-        const moved = translateLayer(state.layer, dx, dy);
-        commit('Move layer', updateLayer(editor.template, blockId, state.layer.id, fields(moved)), `${key}:move:${state.layer.id}`);
+        commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
-      case 'resize': {
-        commit('Resize layer', updateLayer(editor.template, blockId, state.layer.id, fields(resized(state, p, event.shiftKey))), `${key}:resize:${state.layer.id}`);
+      case 'resizeMany': {
+        const box = boxFromHandle(state.box, state.handle, p.x - state.x, p.y - state.y, event.shiftKey);
+        commit('Resize drawing', replaceLayers(tpl(), blockId, scaleLayers(state.layers, state.box, box)), `${key}:resize:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
+      case 'resize':
+        commit('Resize layer', updateLayer(tpl(), blockId, state.layer.id, fields(resized(state, p, event.shiftKey))), `${key}:resize:${state.layer.id}`);
+        return;
       case 'endpoint': {
         if (state.layer.kind !== 'line') return;
         const patch = state.which === 1 ? { x1: Math.round(p.x), y1: Math.round(p.y) } : { x2: Math.round(p.x), y2: Math.round(p.y) };
-        commit('Resize line', updateLayer(editor.template, blockId, state.layer.id, patch), `${key}:end:${state.layer.id}`);
+        commit('Resize line', updateLayer(tpl(), blockId, state.layer.id, patch), `${key}:end:${state.layer.id}`);
         return;
       }
       case 'rotate': {
         let angle = deg(Math.atan2(p.y - state.centre.y, p.x - state.centre.x)) + 90;
         if (event.shiftKey) angle = Math.round(angle / 15) * 15;
-        angle = ((Math.round(angle * 10) / 10) % 360 + 360) % 360;
-        commit('Rotate layer', updateLayer(editor.template, blockId, state.layer.id, { rotation: angle === 0 ? 0 : angle }), `${key}:rotate:${state.layer.id}`);
+        angle = (((Math.round(angle * 10) / 10) % 360) + 360) % 360;
+        commit('Rotate layer', updateLayer(tpl(), blockId, state.layer.id, { rotation: angle }), `${key}:rotate:${state.layer.id}`);
         return;
       }
       case 'create': {
@@ -343,12 +686,11 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         setGhost({ kind: 'pen', points: [...state.points] });
         return;
       case 'page': {
-        const w = Math.max(40, Math.round(state.width + (p.x - state.x)));
-        const h = Math.max(20, Math.round(state.height + (p.y - state.y)));
-        if (site) {
-          editor.setAt({ kind: 'block', sectionId: site.section.id, blockId }, 'block.width', w);
-          editor.setAt({ kind: 'block', sectionId: site.section.id, blockId }, 'block.height', h);
-        }
+        const s = siteOf(tpl(), blockId);
+        if (!s) return;
+        const at = { kind: 'block' as const, sectionId: s.section.id, blockId };
+        if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(700, Math.round(state.width + (p.x - state.x)))));
+        if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(1200, Math.round(state.height + (p.y - state.y)))));
         return;
       }
     }
@@ -360,36 +702,51 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (svg) release(svg as unknown as HTMLElement, event.pointerId);
     drag.current = null;
     setGhost(null);
+    setPageDrag(false);
     if (!state) return;
     if (state.kind === 'create') {
       const dragged = Math.hypot(state.to.x - state.from.x, state.to.y - state.from.y) * viewRef.current.z > 4;
       const to = dragged ? state.to : { x: state.from.x + 120, y: state.from.y + (state.tool === 'line' ? 0 : 80) };
-      const next = addShapeAt(editor.template, blockId, state.tool, state.from, to);
-      commit('Add shape', next);
-      onSelectLayer(lastLayerId(next, blockId));
+      place('Add shape', addShapeAt(tpl(), blockId, state.tool, state.from, to, paintRef.current));
       setTool('select');
     } else if (state.kind === 'pen') {
-      const ink = Object.keys(ds.colors)[0] ?? null;
-      const next = drawPath(editor.template, blockId, state.points, ink, 3);
-      commit('Draw', next);
-      if (next !== editor.template) onSelectLayer(lastLayerId(next, blockId));
+      // Every stroke of one marker session goes into one drawing, so a doodle is one thing to move.
+      const b = blockRef.current;
+      if (!penGroup.current && b) penGroup.current = newGroupId(b);
+      const ink = paintRef.current ?? Object.keys(ds.colors)[0] ?? null;
+      commit('Draw', drawPath(tpl(), blockId, state.points, ink, 5, penGroup.current ?? undefined));
     }
   };
 
-  /** A layer's own fields, for a patch: everything but the id and the kind. */
-  const fields = (l: FreeformLayer): Record<string, unknown> => {
-    const { id: _id, kind: _kind, ...rest } = l as unknown as Record<string, unknown> & { id: string; kind: string };
-    void _id;
-    void _kind;
-    return rest;
+  /** A box pulled by one of its handles, the opposite side staying put. Shift keeps a corner's proportions. */
+  const boxFromHandle = (start: Box, h: Handle, dx: number, dy: number, uniform: boolean): Box => {
+    let { x, y, width, height } = start;
+    if (h.includes('e')) width = Math.max(4, start.width + dx);
+    if (h.includes('s')) height = Math.max(4, start.height + dy);
+    if (h.includes('w')) {
+      width = Math.max(4, start.width - dx);
+      x = start.x + start.width - width;
+    }
+    if (h.includes('n')) {
+      height = Math.max(4, start.height - dy);
+      y = start.y + start.height - height;
+    }
+    if (uniform && h.length === 2) {
+      const s = Math.max(width / start.width, height / start.height);
+      width = start.width * s;
+      height = start.height * s;
+      if (h.includes('w')) x = start.x + start.width - width;
+      if (h.includes('n')) y = start.y + start.height - height;
+    }
+    return { x, y, width, height };
   };
 
   /**
-   * The resized layer. The pointer is taken into the layer's own, unrotated frame; the new box is
-   * built there with the opposite side or corner anchored; and then the whole thing is shifted so
-   * that anchor stays where it was on screen, which a rotated box otherwise drifts away from.
+   * The resized layer. The pointer is taken into the layer's own, unrotated frame; the box is
+   * rebuilt there with the opposite side anchored; and then shifted so that anchor stays where it
+   * was on screen, which a rotated box otherwise walks away from.
    */
-  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: { x: number; y: number }, uniform: boolean): FreeformLayer => {
+  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: Point, uniform: boolean): FreeformLayer => {
     const angle = state.layer.rotation ?? 0;
     const start = state.box;
     const c = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
@@ -409,7 +766,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       height = Math.max(4, start.height - dy);
       y = start.y + start.height - height;
     }
-    if (uniform && h.length === 2) {
+    // A stamp keeps its proportions from any corner; everything else only with Shift.
+    if ((uniform || state.layer.kind === 'mark') && h.length === 2) {
       const s = Math.max(width / start.width, height / start.height);
       width = start.width * s;
       height = start.height * s;
@@ -418,14 +776,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     }
     let box: Box = { x, y, width, height };
     if (angle) {
-      // The anchor is the corner or side opposite the handle. Its world position must not move.
       const anchor = {
         x: h.includes('w') ? start.x + start.width : h.includes('e') ? start.x : c.x,
         y: h.includes('n') ? start.y + start.height : h.includes('s') ? start.y : c.y,
       };
       const world = rotatePoint(anchor, c, angle);
       const c2 = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      // The same corner or side of the new box, rotated about the new centre, has moved; shift it back.
       const anchorLocal = {
         x: h.includes('w') ? box.x + box.width : h.includes('e') ? box.x : box.x + box.width / 2,
         y: h.includes('n') ? box.y + box.height : h.includes('s') ? box.y : box.y + box.height / 2,
@@ -436,12 +792,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     return withLayerBox(state.layer, box);
   };
 
-  // --- keys, while the editor is open --------------------------------------------------------------
+  // --- keys, while the canvas is open ----------------------------------------------------------------
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
+      if (phaseRef.current !== 'idle') return;
       const meta = event.metaKey || event.ctrlKey;
       const b = blockRef.current;
       if (!b) return;
@@ -456,40 +813,39 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         if (editingText) setEditingText(null);
         else if (toolRef.current !== 'select') setTool('select');
         else if (layerRef.current) onSelectLayer(null);
-        else onDone();
+        else leave();
         return;
       }
       if (meta && (event.key === '0' || event.key === '1')) {
         event.preventDefault();
-        if (event.key === '0') fit();
-        else zoomTo(1);
+        if (event.key === '0') fitSmooth();
+        else zoomTo(1, undefined, true);
         return;
       }
       if (meta && (event.key === '=' || event.key === '+' || event.key === '-')) {
         event.preventDefault();
-        zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25));
+        zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
         return;
       }
-      if (!meta) {
+      if (!meta && !event.altKey && event.key.length === 1) {
         const found = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase());
-        if (found && event.key.length === 1) {
+        if (found) {
           setTool(found.tool);
           return;
         }
       }
       const picked = layerRef.current;
-      if (!picked) return;
+      const sel = selectionOf(b, picked);
+      if (!picked || !sel) return;
       if (meta && event.key.toLowerCase() === 'd') {
         event.preventDefault();
-        const next = duplicateLayer(editor.template, blockId, picked);
-        commit('Duplicate layer', next);
-        onSelectLayer(lastLayerId(next, blockId));
+        if (sel.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, sel.group), sel.layers.length);
+        else place('Duplicate layer', duplicateLayer(tpl(), blockId, picked));
         return;
       }
       if (event.key === 'Backspace' || event.key === 'Delete') {
         event.preventDefault();
-        commit('Remove layer', removeLayer(editor.template, blockId, picked));
-        onSelectLayer(null);
+        poof(picked);
         return;
       }
       const step = event.shiftKey ? 10 : 1;
@@ -497,8 +853,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       const move = arrows[event.key];
       if (move) {
         event.preventDefault();
-        const l = b.layers.find((x) => x.id === picked);
-        if (l) commit('Nudge layer', updateLayer(editor.template, blockId, picked, fields(translateLayer(l, move[0], move[1]))), `surface:${blockId}:nudge:${picked}`);
+        commit('Nudge', replaceLayers(tpl(), blockId, sel.layers.map((l) => translateLayer(l, move[0], move[1]))), `surface:${blockId}:nudge:${picked}`);
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -513,7 +868,53 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [editor, blockId, commit, onSelectLayer, onDone, fit, zoomTo, editingText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockId, commit, onSelectLayer, leave, zoomTo, fitSmooth, editingText, setTool, place, placeMany, poof]);
+
+  // --- the canvas's own clipboard -------------------------------------------------------------------
+  //
+  // In the capture phase on the document, stopped there, so the email's own copy and paste never
+  // hear a key pressed in here. A copy is of layers; a paste steps further out each time, the way a
+  // design tool pastes.
+
+  useEffect(() => {
+    const busy = (event: ClipboardEvent) => {
+      const t = event.target as HTMLElement | null;
+      return phaseRef.current !== 'idle' || Boolean(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable));
+    };
+    const onCopy = (event: ClipboardEvent, cut: boolean) => {
+      if (busy(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const b = blockRef.current;
+      const key = layerRef.current;
+      const sel = b ? selectionOf(b, key) : null;
+      if (!sel || !event.clipboardData) return;
+      event.clipboardData.setData('text/plain', layerClipText(sel.layers));
+      pasteCount.current = 0;
+      if (cut && key) poof(key);
+    };
+    const onPaste = (event: ClipboardEvent) => {
+      if (busy(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const layers = parseLayerClip(event.clipboardData?.getData('text/plain') ?? '');
+      if (!layers) return;
+      pasteCount.current += 1;
+      placeMany('Paste', pasteLayers(tpl(), blockId, layers, 24 * pasteCount.current), layers.length);
+    };
+    const copy = (e: ClipboardEvent) => onCopy(e, false);
+    const cut = (e: ClipboardEvent) => onCopy(e, true);
+    document.addEventListener('copy', copy, true);
+    document.addEventListener('cut', cut, true);
+    document.addEventListener('paste', onPaste, true);
+    return () => {
+      document.removeEventListener('copy', copy, true);
+      document.removeEventListener('cut', cut, true);
+      document.removeEventListener('paste', onPaste, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockId, placeMany, poof]);
 
   // --- pictures from the folder ------------------------------------------------------------------
 
@@ -522,13 +923,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       const img = new Image();
       img.onload = () => {
         const point = at ? toSurface(at.x, at.y) : null;
-        const next = addImageLayerAt(editor.template, blockId, asset.name, { width: img.naturalWidth || 200, height: img.naturalHeight || 150 }, point);
-        commit('Add picture', next);
-        onSelectLayer(lastLayerId(next, blockId));
+        place('Add picture', addImageLayerAt(tpl(), blockId, asset.name, { width: img.naturalWidth || 200, height: img.naturalHeight || 150 }, point));
       };
       img.src = asset.url;
     },
-    [editor, blockId, commit, onSelectLayer, toSurface],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blockId, place, toSurface],
   );
   if (api) api.current = { dropAsset };
 
@@ -536,8 +936,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   // --- what is drawn -------------------------------------------------------------------------------
 
-  const picked = layer ? block.layers.find((l) => l.id === layer) : undefined;
-  const pickedBox = picked ? boxOf(picked) : null;
+  const idle = phase === 'idle';
+  const sel = idle ? selectionOf(block, layer) : null;
+  const picked = sel && !sel.group ? sel.layers[0] : undefined;
+  const pickedBox = sel ? (sel.group ? groupBox(sel.layers, textHeights) : boxOf(sel.layers[0]!)) : null;
+  const hoverSel = hover && hover !== layer && idle && tool === 'select' ? selectionOf(block, hover) : null;
+  const hovered = hoverSel && !hoverSel.group ? hoverSel.layers[0] : undefined;
+  const hoveredBox = hoverSel ? (hoverSel.group ? groupBox(hoverSel.layers, textHeights) : boxOf(hoverSel.layers[0]!)) : null;
   const hs = HANDLE / view.z;
   const allHandles: Array<{ h: Handle; x: number; y: number; cursor: string }> = pickedBox
     ? [
@@ -551,44 +956,51 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         { h: 'w', x: pickedBox.x, y: pickedBox.y + pickedBox.height / 2, cursor: 'ew-resize' },
       ]
     : [];
-  // Text has a width and finds its own height, so only its sides can be pulled.
-  const handles = allHandles.filter((hd) => (picked?.kind === 'text' ? hd.h === 'e' || hd.h === 'w' : true));
+  // Text has a width and finds its own height, so only its sides pull; a stamp only its corners.
+  const handles = allHandles.filter((hd) => (picked?.kind === 'text' ? hd.h === 'e' || hd.h === 'w' : picked?.kind === 'mark' ? hd.h.length === 2 : true));
+  const pickedText = picked?.kind === 'text' ? picked : undefined;
+  const currentLook = pickedText ? (pickedText.look ?? null) : look;
   const rotation = picked?.rotation ?? 0;
   const centre = pickedBox ? { x: pickedBox.x + pickedBox.width / 2, y: pickedBox.y + pickedBox.height / 2 } : null;
+  const rotateAbout = (l: FreeformLayer, box: Box) => (l.rotation ? `rotate(${l.rotation} ${box.x + box.width / 2} ${box.y + box.height / 2})` : undefined);
+
   const editing = editingText ? block.layers.find((l) => l.id === editingText) : undefined;
-  const editRole = editing && editing.kind === 'text' ? typeOf(ds, editing.role) : null;
+  const typing = editing && (editing.kind === 'text' || editing.kind === 'sticky') ? editing : undefined;
+  // The words being typed are hidden in the drawing, or they would show twice under the field.
+  const drawn: FreeformBlock = typing ? { ...block, layers: block.layers.map((l) => (l.id === typing.id && (l.kind === 'text' || l.kind === 'sticky') ? { ...l, text: '' } : l)) } : block;
+  const ink = theme(ds, firstPreset(ds)).text;
+  // The ground the picture sits on in the email, so the page matches it at both ends of the flight.
+  const pageFill = colorOf(ds, block.background) ?? site.section.containerColor ?? site.section.bandColor ?? '#ffffff';
+  const palette = Object.keys(ds.colors).slice(0, 8);
+  const count = block.layers.length;
+  const swatch = colorOf(ds, paint);
+
+  const field = typing
+    ? (() => {
+        const pad = typing.kind === 'sticky' ? 14 : 0;
+        const box = boxOf(typing);
+        const role = typeOf(ds, typing.role);
+        const styled = typing.kind === 'text' && typing.look ? canvasTypeOf(ds)[typing.look] : undefined;
+        const size = styled?.size ?? role.size;
+        return {
+          left: view.x + (box.x + pad) * view.z,
+          top: view.y + (box.y + pad) * view.z,
+          width: Math.max(10, box.width - pad * 2) * view.z,
+          height: typing.kind === 'sticky' ? Math.max(10, box.height - pad * 2) * view.z : Math.max(size * 1.3, textHeights[typing.id] ?? 0) * view.z,
+          size: size * view.z,
+          style: { lineHeight: styled?.lineHeight ?? role.lineHeight, weight: styled?.weight ?? role.weight, uppercase: styled?.uppercase ?? role.uppercase, letterSpacing: styled?.letterSpacing ?? role.letterSpacing },
+          italic: Boolean(styled?.italic),
+          font: styled ? (styled.font && ds.fonts[styled.font]) || ds.fontStack : fontOf(ds, typing.role),
+          color: colorOf(ds, typing.color) ?? (styled ? colorOf(ds, styled.color) : null) ?? (typing.kind === 'sticky' ? '#2b2620' : ink),
+          align: typing.kind === 'text' ? typing.align : 'left',
+        };
+      })()
+    : null;
 
   return (
-    <div class={`surface ${space ? 'panning' : ''} tool-${tool}`}>
-      <div class="surface-tools">
-        <div class="seg" role="group" aria-label="Tools">
-          {TOOLS.map((t) => (
-            <button key={t.tool} class={`seg-btn ${tool === t.tool ? 'on' : ''}`} aria-pressed={tool === t.tool} title={`${t.help}  ·  ${t.key}`} onClick={() => setTool(t.tool)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <span class="surface-hint" title="Drag a picture from the Assets panel onto the surface, or click one there to drop it in the middle.">
-          Assets drop in from the panel.
-        </span>
-        <span class="grow" />
-        <div class="seg" role="group" aria-label="Zoom">
-          <button class="seg-btn" title="Zoom out  ·  ⌘−" onClick={() => zoomTo(view.z / 1.25)}>
-            −
-          </button>
-          <button class="seg-btn" title="Fit the surface in the window  ·  ⌘0" onClick={fit}>
-            {Math.round(view.z * 100)}%
-          </button>
-          <button class="seg-btn" title="Zoom in  ·  ⌘+" onClick={() => zoomTo(view.z * 1.25)}>
-            +
-          </button>
-        </div>
-        <button class="btn" title="Back to the email. Esc does the same once nothing is picked." onClick={onDone}>
-          Done
-        </button>
-      </div>
-
-      <div class="surface-work" ref={work}>
+    <div class={`surface fig phase-${phase} tool-${tool} ${space || tool === 'hand' ? 'panning' : ''}`}>
+      <div class="surface-work" ref={work} tabIndex={-1}>
+        <div class="surface-backdrop" aria-hidden="true" />
         <svg
           class="surface-svg"
           ref={svgEl}
@@ -596,67 +1008,127 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onPointerLeave={() => {
+            if (drag.current) return;
+            hoverRef.current = null;
+            setHover(null);
+          }}
         >
           <defs>
-            <pattern id="surface-dots" width={24 * view.z} height={24 * view.z} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
-              <circle cx={1} cy={1} r={1} fill="rgba(0,0,0,0.13)" />
+            <pattern id="fig-dots" width={22 * view.z} height={22 * view.z} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
+              <circle cx={1.3} cy={1.3} r={1.3} fill="rgba(70,58,38,0.17)" />
             </pattern>
-            <filter id="surface-shadow" x="-10%" y="-10%" width="120%" height="130%">
-              <feDropShadow dx="0" dy={6} stdDeviation={10} flood-color="#000" flood-opacity="0.22" />
+            <filter id="fig-shadow" x="-20%" y="-20%" width="140%" height="150%">
+              <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#3a2f1d" flood-opacity="0.2" />
             </filter>
           </defs>
-          <rect width="100%" height="100%" fill="url(#surface-dots)" />
+          <rect class="surface-dots" width="100%" height="100%" fill="url(#fig-dots)" />
           <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
-            <rect class="surface-page" x={0} y={0} width={block.width} height={block.height} fill="#ffffff" filter="url(#surface-shadow)" />
-            <g dangerouslySetInnerHTML={{ __html: withLocalAssets(freeformLayersSvg(block, ds), assets) }} />
-            {/* The page's own corner: drag it and the surface grows. */}
-            <rect data-handle="page" x={block.width - hs} y={block.height - hs} width={hs * 2} height={hs * 2} class="surface-page-handle" />
-            {ghost?.kind === 'create' && ghostShape(ghost)}
-            {ghost?.kind === 'pen' && <polyline points={pairs(ghost.points)} fill="none" stroke="#2b45d8" stroke-width={3} stroke-linecap="round" stroke-linejoin="round" />}
-            {pickedBox && centre && picked && (
-              <g transform={rotation ? `rotate(${rotation} ${centre.x} ${centre.y})` : undefined} class="surface-selection">
-                <rect x={pickedBox.x} y={pickedBox.y} width={pickedBox.width} height={pickedBox.height} fill="none" stroke="#2b45d8" stroke-width={1 / view.z} stroke-dasharray={`${4 / view.z} ${3 / view.z}`} />
-                {picked.kind === 'line' ? (
-                  <>
-                    <circle data-handle="p1" cx={picked.x1} cy={picked.y1} r={hs * 0.8} class="surface-handle" />
-                    <circle data-handle="p2" cx={picked.x2} cy={picked.y2} r={hs * 0.8} class="surface-handle" />
-                  </>
-                ) : (
-                  <>
-                    {handles.map((hd) => (
-                      <rect key={hd.h} data-handle={hd.h} x={hd.x - hs / 2} y={hd.y - hs / 2} width={hs} height={hs} class="surface-handle" style={{ cursor: hd.cursor }} />
-                    ))}
-                    <line x1={centre.x} y1={pickedBox.y} x2={centre.x} y2={pickedBox.y - 22 / view.z} stroke="#2b45d8" stroke-width={1 / view.z} />
-                    <circle data-handle="rot" cx={centre.x} cy={pickedBox.y - 22 / view.z} r={hs * 0.7} class="surface-handle rot" />
-                  </>
-                )}
-              </g>
+            <rect class="surface-page-shadow" x={0} y={0} width={block.width} height={block.height} fill={pageFill} filter="url(#fig-shadow)" />
+            <rect x={0} y={0} width={block.width} height={block.height} fill={pageFill} />
+            <g dangerouslySetInnerHTML={{ __html: withLocalAssets(freeformLayersSvg(drawn, ds), assets) }} />
+            {idle && (
+              <>
+                <rect data-handle="page-e" x={block.width - 3.5 / view.z} y={block.height / 2 - 20 / view.z} width={7 / view.z} height={40 / view.z} rx={3.5 / view.z} class="surface-page-grip" style={{ cursor: 'ew-resize' }} />
+                <rect data-handle="page-s" x={block.width / 2 - 20 / view.z} y={block.height - 3.5 / view.z} width={40 / view.z} height={7 / view.z} rx={3.5 / view.z} class="surface-page-grip" style={{ cursor: 'ns-resize' }} />
+                <circle data-handle="page" cx={block.width} cy={block.height} r={6 / view.z} class="surface-page-grip" style={{ cursor: 'nwse-resize' }} />
+              </>
             )}
+            <g class="surface-selection">
+              {hoveredBox && hoverSel && (
+                <rect
+                  x={hoveredBox.x}
+                  y={hoveredBox.y}
+                  width={hoveredBox.width}
+                  height={hoveredBox.height}
+                  fill="none"
+                  stroke={ACCENT}
+                  stroke-width={1.5 / view.z}
+                  stroke-dasharray={hoverSel.group ? `${5 / view.z} ${4 / view.z}` : undefined}
+                  opacity={0.6}
+                  transform={hovered ? rotateAbout(hovered, hoveredBox) : undefined}
+                />
+              )}
+              {ghost?.kind === 'create' && ghostShape(ghost)}
+              {ghost?.kind === 'pen' && <polyline points={pairs(ghost.points)} fill="none" stroke={swatch ?? ACCENT} stroke-width={5} stroke-linecap="round" stroke-linejoin="round" />}
+              {pickedBox && centre && sel && (
+                <g transform={rotation ? `rotate(${rotation} ${centre.x} ${centre.y})` : undefined}>
+                  <rect
+                    x={pickedBox.x}
+                    y={pickedBox.y}
+                    width={pickedBox.width}
+                    height={pickedBox.height}
+                    fill="none"
+                    stroke={ACCENT}
+                    stroke-width={1.5 / view.z}
+                    stroke-dasharray={sel.group ? `${5 / view.z} ${4 / view.z}` : undefined}
+                  />
+                  {picked?.kind === 'line' ? (
+                    <>
+                      <circle data-handle="p1" cx={picked.x1} cy={picked.y1} r={hs * 0.6} class="surface-handle" />
+                      <circle data-handle="p2" cx={picked.x2} cy={picked.y2} r={hs * 0.6} class="surface-handle" />
+                    </>
+                  ) : (
+                    <>
+                      {handles.map((hd) => (
+                        <circle key={hd.h} data-handle={hd.h} cx={hd.x} cy={hd.y} r={hs / 2} class="surface-handle" style={{ cursor: hd.cursor }} />
+                      ))}
+                      {/* A drawing scales but does not turn: its strokes have no one centre to turn about. */}
+                      {!sel.group && (
+                        <>
+                          <line x1={centre.x} y1={pickedBox.y} x2={centre.x} y2={pickedBox.y - 24 / view.z} stroke={ACCENT} stroke-width={1.5 / view.z} />
+                          <circle data-handle="rot" cx={centre.x} cy={pickedBox.y - 24 / view.z} r={hs * 0.62} class="surface-handle rot" />
+                        </>
+                      )}
+                    </>
+                  )}
+                </g>
+              )}
+            </g>
           </g>
         </svg>
-        {editing && editing.kind === 'text' && editRole && (
+
+        {idle && (
+          <div class={`fig-size ${pageDrag ? 'on' : ''}`} style={{ left: `${view.x + block.width * view.z}px`, top: `${view.y + block.height * view.z + 12}px` }}>
+            {block.width} × {block.height}
+          </div>
+        )}
+
+        {field && typing && (
           <textarea
-            class="surface-text"
+            class={`surface-text ${typing.kind === 'sticky' ? 'on-sticky' : ''}`}
             style={{
-              left: `${view.x + editing.x * view.z}px`,
-              top: `${view.y + editing.y * view.z}px`,
-              width: `${editing.width * view.z}px`,
-              fontFamily: fontOf(ds, editing.role),
-              fontSize: `${editRole.size * view.z}px`,
-              lineHeight: `${editRole.lineHeight}%`,
-              fontWeight: editRole.weight,
-              textAlign: editing.align,
-              textTransform: editRole.uppercase ? 'uppercase' : 'none',
-              letterSpacing: editRole.letterSpacing ? `${editRole.letterSpacing * view.z}px` : undefined,
+              left: `${field.left}px`,
+              top: `${field.top}px`,
+              width: `${field.width}px`,
+              height: `${field.height}px`,
+              fontFamily: field.font,
+              fontSize: `${field.size}px`,
+              lineHeight: `${field.style.lineHeight}%`,
+              fontWeight: field.style.weight,
+              fontStyle: field.italic ? 'italic' : 'normal',
+              color: field.color,
+              textAlign: field.align,
+              textTransform: field.style.uppercase ? 'uppercase' : 'none',
+              letterSpacing: field.style.letterSpacing ? `${field.style.letterSpacing * view.z}px` : undefined,
+              transform: typing.rotation ? `rotate(${typing.rotation}deg)` : undefined,
             }}
-            value={editing.text}
+            value={typing.text}
+            placeholder={typing.kind === 'sticky' ? 'Type something…' : ''}
             ref={(el) => {
               if (el && document.activeElement !== el) {
                 el.focus();
                 el.select();
               }
             }}
-            onInput={(e) => commit('Edit text', updateLayer(editor.template, blockId, editing.id, { text: (e.target as HTMLTextAreaElement).value }), `surface:${blockId}:text:${editing.id}`)}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement;
+              if (typing.kind === 'text') {
+                el.style.height = 'auto';
+                el.style.height = `${el.scrollHeight}px`;
+              }
+              commit('Edit text', updateLayer(tpl(), blockId, typing.id, { text: el.value }), `surface:${blockId}:text:${typing.id}`);
+            }}
             onBlur={() => setEditingText(null)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
@@ -668,6 +1140,100 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           />
         )}
       </div>
+
+      <div class="fig-chrome fig-top fig-top-left">
+        <button class="fig-pill fig-back" title="Back to the email. Esc does the same once nothing is picked." onClick={leave}>
+          <span aria-hidden="true">←</span> Email
+        </button>
+        <span class="fig-pill fig-title">
+          <b>Freeform</b>
+          <span>
+            {count} {count === 1 ? 'layer' : 'layers'}
+          </span>
+        </span>
+      </div>
+      <div class="fig-chrome fig-top fig-top-right">
+        <div class="fig-pill fig-zoom">
+          <button title="Zoom out  ·  ⌘−" aria-label="Zoom out" onClick={() => zoomTo(view.z / 1.25, undefined, true)}>
+            −
+          </button>
+          <button class="pct" title="Fit the surface  ·  ⌘0" onClick={fitSmooth}>
+            {Math.round(view.z * 100)}%
+          </button>
+          <button title="Zoom in  ·  ⌘+" aria-label="Zoom in" onClick={() => zoomTo(view.z * 1.25, undefined, true)}>
+            +
+          </button>
+        </div>
+        <button class="fig-pill fig-done" title="Fly back into the email." onClick={leave}>
+          Done
+        </button>
+      </div>
+
+      {(tool === 'stamp' || tool === 'text' || pickedText || paintsOpen) && (
+        <div class="fig-chrome fig-trays">
+          {paintsOpen && (
+            <div class="fig-tray fig-paints" role="group" aria-label="Colour">
+              <button class={`fig-dot none ${paint === null ? 'on' : ''}`} title="Each kind's own default colour" aria-label="Default colours" onClick={() => choosePaint(null)} />
+              {palette.map((name) => (
+                <button key={name} class={`fig-dot ${paint === name ? 'on' : ''}`} style={{ background: colorOf(ds, name) ?? undefined }} title={`${name}, from the design system`} aria-label={name} onClick={() => choosePaint(name)} />
+              ))}
+              <span class="fig-sep" aria-hidden="true" />
+              {STICKY_COLORS.map((hex) => (
+                <button key={hex} class={`fig-dot ${paint === hex ? 'on' : ''}`} style={{ background: hex }} title="A note colour" aria-label={`Note colour ${hex}`} onClick={() => choosePaint(hex)} />
+              ))}
+            </div>
+          )}
+          {(tool === 'text' || pickedText) && (
+            <div class="fig-tray fig-looks" role="group" aria-label="Text style">
+              {[null, ...Object.keys(canvasTypeOf(ds))].map((k) => (
+                <button
+                  key={k ?? 'plain'}
+                  class={`fig-look ${currentLook === k ? 'on' : ''}`}
+                  aria-pressed={currentLook === k}
+                  title={k ? `${canvasTypeOf(ds)[k]!.label}. Tune it in Design › Canvas type.` : 'Plain: the heading role from Design › Type.'}
+                  onClick={() => chooseLook(k)}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Aa') }} />
+                </button>
+              ))}
+            </div>
+          )}
+          {tool === 'stamp' && (
+            <div class="fig-tray fig-stamps" role="group" aria-label="Stamps">
+              {MARKS.map((m) => (
+                <button key={m.key} class={`fig-stamp ${stamp === m.key ? 'on' : ''}`} title={m.name} aria-pressed={stamp === m.key} onClick={() => setStamp(m.key)}>
+                  <svg viewBox={m.viewBox} fill={swatch ?? ink} aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.body }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div class="fig-chrome fig-dock">
+        <div class="fig-tools" role="toolbar" aria-label="Tools">
+          {TOOLS.map((t) => (
+            <button key={t.tool} class={`fig-tool ${tool === t.tool ? 'on' : ''}`} aria-pressed={tool === t.tool} aria-label={t.label} title={`${t.label}  ·  ${t.key}\n${t.help}`} onClick={() => setTool(t.tool)}>
+              {t.icon()}
+            </button>
+          ))}
+        </div>
+        <span class="fig-sep" aria-hidden="true" />
+        <button
+          class={`fig-swatch ${paintsOpen ? 'on' : ''} ${swatch ? '' : 'none'}`}
+          style={swatch ? { background: swatch } : undefined}
+          aria-expanded={paintsOpen}
+          aria-label="Colour"
+          title="Colour. Paints what is picked, and whatever you make next."
+          onClick={() => setPaintsOpen((v) => !v)}
+        />
+      </div>
+
+      {hint && idle && (
+        <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
+          Double-click text to type · hold Space to pan · ⌘C ⌘V copy layers · drag pictures in from Assets
+        </div>
+      )}
     </div>
   );
 }
@@ -678,21 +1244,21 @@ const pairs = (points: number[]) => {
   return out.join(' ');
 };
 
-function ghostShape(g: { tool: 'rect' | 'ellipse' | 'line'; from: { x: number; y: number }; to: { x: number; y: number } }) {
+function ghostShape(g: { tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point }) {
   const x = Math.min(g.from.x, g.to.x);
   const y = Math.min(g.from.y, g.to.y);
   const w = Math.abs(g.to.x - g.from.x);
   const h = Math.abs(g.to.y - g.from.y);
-  const paint = { fill: 'rgba(43,69,216,0.08)', stroke: '#2b45d8', 'stroke-width': 1.5 };
-  if (g.tool === 'line') return <line x1={g.from.x} y1={g.from.y} x2={g.to.x} y2={g.to.y} stroke="#2b45d8" stroke-width={2} />;
+  if (g.tool === 'line') return <line x1={g.from.x} y1={g.from.y} x2={g.to.x} y2={g.to.y} stroke={ACCENT} stroke-width={2.5} stroke-linecap="round" />;
+  const paint = { fill: 'rgba(123,97,255,0.1)', stroke: ACCENT, 'stroke-width': 2 };
   if (g.tool === 'ellipse') return <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2} {...paint} />;
-  return <rect x={x} y={y} width={w} height={h} {...paint} />;
+  return <rect x={x} y={y} width={w} height={h} rx={3} {...paint} />;
 }
 
 /** The id of the last layer of a freeform block in a template — the one just added. */
-function lastLayerId(template: Editor['template'], blockId: string): string | null {
-  const site = siteOf(template, blockId);
-  const b = site?.column.blocks[site.index];
+function lastLayerId(template: Template, blockId: string): string | null {
+  const s = siteOf(template, blockId);
+  const b = s?.column.blocks[s.index];
   if (!b || b.type !== 'freeform') return null;
   return b.layers[b.layers.length - 1]?.id ?? null;
 }

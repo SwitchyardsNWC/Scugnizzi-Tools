@@ -1,4 +1,4 @@
-# Scuggnizzi tools
+# Scugnizzi tools
 
 A folder of small browser tools for the Switchyards design team, with an index page that opens
 each one in place. Four of them are single HTML files with no build step. The fifth, Template
@@ -35,7 +35,7 @@ There is a `.claude/launch.json` so the Claude desktop app can start the same se
   index. Include it right after `<body>` with `data-tool="Name"`.
 - **`tool-kit.js`** gives every tool the same keyboard: ⌘Z undo, ⇧⌘Z redo, `?` for the shortcut
   sheet, Esc to close, ⌥⌘R to reset. It also keeps each tool's state in `localStorage` under
-  `scuggnizzi.<tool>.*`, so a page reload does not lose work. A tool registers its own shortcuts
+  `scuggnizzi.<tool>.*` (the original spelling, kept so saved state survives), so a page reload does not lose work. A tool registers its own shortcuts
   with `ToolKit.register('mod+s', 'Download PNG', fn)`.
 - **`design system/Enkel Design system v2/`** is the design system the index page is set in.
   *Enkel* is Swedish for simple: one sans for words, one mono for figures, a sunken page with
@@ -109,3 +109,9 @@ Scugnizzi-Tools/
 ├── text bleed/  image effects/  split flap/  riso/
 └── template-studio/                the email template builder (Vite + TypeScript + Preact)
 ```
+
+## Where this is going
+
+[`docs/projects.md`](docs/projects.md) plans one project folder, opened once from the dashboard, that
+every tool saves into, with a copy document that feeds words to every tool and takes changes back.
+
