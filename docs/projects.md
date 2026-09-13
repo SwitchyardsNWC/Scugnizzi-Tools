@@ -1,6 +1,7 @@
 # One project folder for every tool
 
-*A plan. Written 2026-09-13 from an idea of Jared's. Nothing here is built.*
+*A plan. Written 2026-09-13 from an idea of Jared's. Phase 0 and board phases B1 and B2 are built;
+see [What is built](#what-is-built).*
 
 > "if you could open a project folder from the dashboard that all the tools will auto save/connect
 > to, so they can all work together through project file structure. Think of a tool for copy writers
@@ -173,6 +174,62 @@ This is a second track after phase 1 below, and it does not wait on the copy dec
 | **3 · Binding** | Slot references in Template Studio fields first, then the other tools; the chip; unbind. | The chosen headline appears in the email and on a split-flap board. |
 | **4 · Both ways** | Writes from tools back to slots, the channel for live updates, the both-changed prompt, the history. | Change a headline in the email and watch the deck update in another tab. |
 | **5 · Documents out** | `.docx` export of the deck; a decision on Google Docs. | The deck leaves as a document someone can mark up. |
+
+## What is built
+
+*2026-09-13.*
+
+> "add the project folder - this could be a new tool that starts linking all these projects together
+> and can turn into the project canvas that brings everything to one endless canvas."
+
+**Project** is a tool of its own: dashboard card 07, `template-studio/project.html`. It is built from
+Template Studio's source tree, so the board draws emails with the real compiler and frames with the real
+canvas code. The code is in `template-studio/src/project/`, and the pure rules are in
+`src/model/project.ts` and `src/model/frame-file.ts`.
+
+- **One folder, every page.** The folder handle is stored where Template Studio always kept its own.
+  Opening a project on the board opens it in Template Studio and Freeform with no picker.
+- **Pages keep in step.** Pages tell each other through a `BroadcastChannel` (`scuggnizzi.project`), so
+  an open Freeform tab picks up the project at once.
+- **When Chrome needs a click.** After a restart Chrome usually wants one click before it opens a
+  remembered folder again. Every page offers that click: "Reopen <name>" on the board and in Freeform,
+  and a banner in Template Studio.
+- **`project.json`** is written the first time a folder is opened for editing. Its id comes from the
+  folder's name, so two pages opening a new folder at once agree on it. Once written it stays, whatever
+  the folder is later renamed to.
+- **The board.**
+  - **Cards and lanes.** Every email, frame and picture is a card. Emails are live previews, drawn only
+    once they have scrolled into view. Frames show their drawing, printed through Riso when they have it.
+    Cards with no place go into lanes by kind.
+  - **Arranging.** Dragging a card saves `board.json`. A card whose file has gone shows as missing, with
+    a way to forget its place.
+  - **Lines.** They show which frame an email's block follows, and which emails and frames each picture
+    is in.
+  - **Opening.** Double-click a card, or its ↗, to zoom in and open the tool: Template Studio at that
+    file (`index.html?open=`), or Freeform at that frame.
+  - **Adding.** Drop pictures on the board to add them to `assets/`. New frame opens Freeform with an
+    empty frame.
+  - **Keeping current.** The board reads the folder again on focus and every five seconds, so work saved
+    in another tool, or synced in by Drive, turns up on its own.
+- **Frames are files.**
+  - **Where.** With a project open, each Freeform frame is also `frames/<name>.frame.json`. It is written
+    a moment after each edit, renamed along with the frame, and deleted with it.
+  - **Which copy wins.** The browser's copy stays the working copy, and an email follows it through
+    storage events as before. Between the two, the later save wins, one frame at a time.
+  - **Adoption.** A frame no project has yet, drawn before any folder was open, is written into the
+    project that opens next. A frame another project has is left alone, and hidden while this one is open.
+    A frame whose file was deleted from the folder leaves the list, but its drawing is kept in the browser.
+- **Pictures go into `assets/`.** Pictures dropped on the Freeform canvas go into `assets/` when a
+  project is open for editing. Pictures kept only in the browser from before the project are copied in
+  too, so the folder has everything its frames are drawn with.
+
+**Not yet:**
+- The copy deck (phases 2 to 5).
+- Frames as folders on the board (B3, B4).
+- The single-file tools saving into the project (phase 1).
+- Thumbnails written on save; the board draws live, and only what is in view.
+- Two machines editing the same frame at once is last save wins, with no both-changed prompt.
+- Template Studio's frame picker still lists every frame the browser keeps, not only the project's.
 
 ## To decide first
 

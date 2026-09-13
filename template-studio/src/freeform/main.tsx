@@ -5,11 +5,12 @@
 //
 // Not a copy. This page mounts the same `Surface` and the same model as the block inside Template Studio,
 // so a tweak to the canvas lands in both. It keeps several frames (model/frame-store.ts). Each is a
-// template holding one freeform block, the shape the model already understands, and they are kept in this
-// browser's storage until the shared project folder (docs/projects.md) gives them files.
+// template holding one freeform block, the shape the model already understands. With a project open
+// (src/project), every frame is also a file in its `frames/` folder, and pictures dropped on the canvas go
+// into its `assets/`, so the project board and the rest of the team see them.
 
 import { render } from 'preact';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { freeformSvg } from '../compile/freeform.ts';
 import { createSection } from '../model/catalog.ts';
@@ -18,15 +19,20 @@ import { designSystemOf } from '../model/edit.ts';
 import {
   addFrame,
   copyFrameDoc,
+  FRAME_PREFIX,
+  FRAMES_INDEX,
   frameName,
   loadFrames,
   newFrameId,
   openFrame,
+  projectFrames,
+  readFrameIndex,
   removeFrame,
   renameFrame,
   restoreFrame,
+  tagFrames,
+  touchFrame,
   type FrameIndex,
-  type KeyValue,
 } from '../model/frame-store.ts';
 import { blankTemplate } from '../model/starters.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
@@ -36,21 +42,14 @@ import { keepPicture, loadKeptPictures } from '../app/kept-pictures.ts';
 import { readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, type StudioPresence } from '../model/freeform-link.ts';
 import { Surface, type SurfaceApi } from '../app/Surface.tsx';
 import { useEditor } from '../app/useEditor.ts';
+import { listPictures, writePicture, type PictureEntry } from '../project/folder.ts';
+import { copyKeptPictures, deleteFrameFile, syncFrames, writeFrame, type FolderFrame } from '../project/frame-sync.ts';
+import { siteStore } from '../project/site-store.ts';
+import { useProject, type Project } from '../project/useProject.ts';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
 
-/** This site's storage, or a stand-in for the visit when the browser will not give it. */
-function siteStore(): KeyValue {
-  try {
-    localStorage.setItem('scuggnizzi.freeform.probe', '1');
-    localStorage.removeItem('scuggnizzi.freeform.probe');
-    return localStorage;
-  } catch {
-    const map = new Map<string, string>();
-    return { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v), removeItem: (k) => void map.delete(k) };
-  }
-}
 const store = siteStore();
 
 /** An empty frame. Its ids start with the frame's own, so no two frames' blocks share one. */
@@ -83,16 +82,30 @@ function frameDoc(key: string, name: string): Template {
   return makeFrame(name, key.split('.').pop() || newFrameId());
 }
 
-/** The frames on the way in, with the one the address names open: Template Studio's "Edit in Freeform" says which. */
-function startingFrames(): FrameIndex {
-  let index = loadFrames(store, makeFrame);
+/**
+ * What the address asks for, read once and taken off it: a frame to open (Template Studio's "Edit in
+ * Freeform" and the project board say which), or a new frame (the board's New frame).
+ */
+const request = (() => {
   const params = new URLSearchParams(window.location.search);
-  const wanted = params.get('frame');
-  if (wanted) {
-    index = openFrame(store, index, wanted);
+  const frame = params.get('frame');
+  const fresh = params.get('new') === '1';
+  if (frame || fresh) {
     params.delete('frame');
+    params.delete('new');
     const rest = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+  }
+  return { frame, fresh };
+})();
+
+function startingFrames(): FrameIndex {
+  let index = loadFrames(store, makeFrame);
+  if (request.frame) index = openFrame(store, index, request.frame);
+  if (request.fresh) {
+    const id = newFrameId();
+    const name = frameName(index);
+    index = addFrame(store, index, name, makeFrame(name, id), id);
   }
   return index;
 }
@@ -117,6 +130,8 @@ function FreeformTool() {
   const [frames, setFrames] = useState<FrameIndex>(startingFrames);
   const framesRef = useRef(frames);
   framesRef.current = frames;
+  // A frame the address named that this browser does not have yet: it may arrive with the project's files.
+  const pendingFrame = useRef<string | null>(request.frame && !frames.frames.some((f) => f.key === request.frame) ? request.frame : null);
   const [initialDoc] = useState(() => {
     const entry = frames.frames.find((f) => f.key === frames.active) ?? frames.frames[0]!;
     return frameDoc(entry.key, entry.name);
@@ -130,16 +145,225 @@ function FreeformTool() {
   // Remount the surface whenever a different drawing is on it, so it fits that page.
   const [session, setSession] = useState(0);
 
-  // The open frame's drawing, saved as it changes. A switch of frame loads the new drawing and names the
-  // new frame in the same render, so a drawing is never written under another frame's key.
+  // --- the project -----------------------------------------------------------------------------------------
+
+  const project = useProject();
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const projectId = project.info && (project.status === 'ready' || project.status === 'view-only') ? project.info.id : null;
+  /** The project's frame files as last read or written. */
+  const folder = useRef<FolderFrame[]>([]);
+  const projectPictures = useRef<PictureEntry[]>([]);
+  const pictureUrls = useRef(new Map<string, { modified: number; url: string }>());
+  const [projectAssets, setProjectAssets] = useState<AssetFile[]>([]);
+  /** Writes to the folder, one at a time and in order. */
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const run = useCallback(
+    (task: () => Promise<void>) => {
+      queue.current = queue.current.then(task).catch((cause: unknown) => notify(cause instanceof Error ? cause.message : 'The project folder could not be written.'));
+      return queue.current;
+    },
+    [notify],
+  );
+
+  /** The drawing on the canvas as last written to the store, to tell a change made elsewhere from our own. */
+  const lastWritten = useRef<string | null>(null);
+  /** Set while a drawing is being loaded, so loading it does not count as an edit. */
+  const loading = useRef(true);
+  /**
+   * Edits count as newer than the folder's copy only once the folder has been looked at. Otherwise a stale
+   * drawing kept in this browser would be dated now, the moment the page opens, and written over a newer file.
+   */
+  const settled = useRef(false);
   useEffect(() => {
+    if (project.status === 'none' || project.status === 'unsupported' || project.status === 'asking') settled.current = true;
+  }, [project.status]);
+
+  /** Puts another frame's drawing on the canvas. Undo history is the frame's own, so it starts again. */
+  const show = (next: FrameIndex, doc: Template) => {
+    framesRef.current = next;
+    setFrames(next);
+    loading.current = true;
+    editor.load(doc, null);
+    setLayer(null);
+    setSession((n) => n + 1);
+  };
+  const showRef = useRef(show);
+  showRef.current = show;
+
+  /** Writes one frame's file, and marks the frame as the project's. */
+  const pushKey = useCallback(async (key: string) => {
+    const p = projectRef.current;
+    if (!p.dir || !p.info || !p.writable) return;
+    const index = readFrameIndex(store.getItem(FRAMES_INDEX));
+    const entry = index?.frames.find((f) => f.key === key);
+    const raw = store.getItem(key);
+    if (!index || !entry || raw === null || (entry.project && entry.project !== p.info.id)) return;
+    const written = await writeFrame(p.dir, { key, name: entry.name, savedAt: entry.updatedAt, template: JSON.parse(raw) as Template }, folder.current);
+    folder.current = [...folder.current.filter((f) => f.key !== key), written];
+    if (entry.project === p.info.id) return;
+    const id = p.info.id;
+    tagFrames(store, index, [key], id);
+    setFrames((cur) => {
+      const next = { ...cur, frames: cur.frames.map((f) => (f.key === key ? { ...f, project: id } : f)) };
+      framesRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const pushTimer = useRef(0);
+  const schedulePush = useCallback(
+    (key: string) => {
+      if (!projectRef.current.writable) return;
+      window.clearTimeout(pushTimer.current);
+      pushTimer.current = window.setTimeout(() => void run(() => pushKey(key)), 700);
+    },
+    [run, pushKey],
+  );
+
+  // The open frame's drawing, saved as it changes: to the store at once, to the project's file a moment later.
+  // A switch of frame loads the new drawing and names the new frame in the same render, so a drawing is never
+  // written under another frame's key.
+  useEffect(() => {
+    const key = framesRef.current.active;
+    const json = JSON.stringify(editor.template);
+    const quiet = loading.current;
+    loading.current = false;
+    lastWritten.current = json;
+    let changed = false;
     try {
-      store.setItem(frames.active, JSON.stringify(editor.template));
+      if (store.getItem(key) !== json) {
+        store.setItem(key, json);
+        changed = true;
+      }
     } catch {
       // Storage full or blocked: the canvas still works for this visit.
     }
+    if (!changed || quiet || !settled.current) return;
+    const next = touchFrame(store, framesRef.current, key);
+    framesRef.current = next;
+    setFrames(next);
+    schedulePush(key);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor.template]);
+
+  /** The project's pictures, as assets the canvas can draw. */
+  const usePictures = useCallback((pictures: PictureEntry[]) => {
+    projectPictures.current = pictures;
+    const urls = pictureUrls.current;
+    const next: AssetFile[] = pictures.map((p) => {
+      const old = urls.get(p.path);
+      if (old && old.modified === p.modified) return { name: p.path, size: p.size, url: old.url };
+      if (old) URL.revokeObjectURL(old.url);
+      const url = URL.createObjectURL(p.file);
+      urls.set(p.path, { modified: p.modified, url });
+      return { name: p.path, size: p.size, url };
+    });
+    for (const [path, old] of urls) {
+      if (pictures.some((p) => p.path === path)) continue;
+      URL.revokeObjectURL(old.url);
+      urls.delete(path);
+    }
+    setProjectAssets(next);
+  }, []);
+
+  /** Brings this browser's frames and the project's files together, and shows the result. */
+  const resync = useCallback(
+    () =>
+      run(async () => {
+        const p = projectRef.current;
+        if (!p.dir || !p.info || (p.status !== 'ready' && p.status !== 'view-only')) return;
+        try {
+          const id = p.info.id;
+          const result = await syncFrames(p.dir, id, store, p.writable);
+          folder.current = result.folder;
+          if (result.failed) notify(result.failed);
+          let index = result.index ?? loadFrames(store, makeFrame);
+
+          if (projectFrames(index, id).length === 0) {
+            // A project with no frames of its own yet: one to draw on, written into it.
+            const frameId = newFrameId();
+            const doc = makeFrame('Frame 1', frameId);
+            index = addFrame(store, index, 'Frame 1', doc, frameId);
+            if (p.writable) {
+              const entry = index.frames[index.frames.length - 1]!;
+              folder.current = [...folder.current, await writeFrame(p.dir, { key: entry.key, name: entry.name, savedAt: entry.updatedAt, template: doc }, folder.current)];
+              index = tagFrames(store, index, [entry.key], id);
+            }
+          }
+          const visible = projectFrames(index, id);
+          const wanted = pendingFrame.current;
+          if (wanted && visible.some((f) => f.key === wanted)) {
+            index = openFrame(store, index, wanted);
+            pendingFrame.current = null;
+          }
+          if (!visible.some((f) => f.key === index.active)) index = openFrame(store, index, visible[0]!.key);
+
+          const before = framesRef.current.active;
+          const stored = store.getItem(index.active);
+          if (index.active !== before || (stored !== null && stored !== lastWritten.current)) {
+            const entry = index.frames.find((f) => f.key === index.active)!;
+            showRef.current(index, frameDoc(entry.key, entry.name));
+            if (index.active === before) notify(`${entry.name} changed in the project folder. This is the latest version.`);
+          } else {
+            framesRef.current = index;
+            setFrames(index);
+          }
+
+          let pictures = await listPictures(p.dir).catch(() => [] as PictureEntry[]);
+          if (p.writable) {
+            // Pictures kept only in this browser, from before the project, go into its assets.
+            const kept = await loadKeptPictures().catch(() => [] as AssetFile[]);
+            if ((await copyKeptPictures(p.dir, result.folder, pictures, kept)).length) pictures = await listPictures(p.dir).catch(() => pictures);
+          }
+          usePictures(pictures);
+        } finally {
+          settled.current = true;
+        }
+      }),
+    [run, notify, usePictures],
+  );
+
+  useEffect(() => {
+    if (project.status === 'ready' || project.status === 'view-only') void resync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.generation]);
+
+  useEffect(() => {
+    let last = 0;
+    const onFocus = () => {
+      const status = projectRef.current.status;
+      if (Date.now() - last < 2000 || (status !== 'ready' && status !== 'view-only')) return;
+      last = Date.now();
+      void resync();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [resync]);
+
+  // Another tab changed the frames: the project board taking a newer file, or a second Freeform tab.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === FRAMES_INDEX && event.newValue) {
+        const next = readFrameIndex(event.newValue);
+        if (!next) return;
+        const own = framesRef.current.active;
+        const merged = { ...next, active: next.frames.some((f) => f.key === own) ? own : next.active };
+        if (merged.active !== own) {
+          const entry = merged.frames.find((f) => f.key === merged.active)!;
+          showRef.current(merged, frameDoc(entry.key, entry.name));
+        } else {
+          framesRef.current = merged;
+          setFrames(merged);
+        }
+      } else if (event.key && event.key === framesRef.current.active && event.newValue !== null && event.newValue !== lastWritten.current) {
+        const entry = framesRef.current.frames.find((f) => f.key === event.key);
+        if (entry) showRef.current(framesRef.current, frameDoc(entry.key, entry.name));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // The selection is always the frame's one block.
   useEffect(() => {
@@ -184,14 +408,29 @@ function FreeformTool() {
       });
   }, []);
 
+  /** What the canvas can draw: the project's pictures first, then the ones this browser keeps. */
+  const allAssets = useMemo(() => [...projectAssets, ...assets.filter((a) => !projectAssets.some((p) => p.name === a.name))], [projectAssets, assets]);
+
   /**
-   * Pictures from the computer. The layer stores the file's name, the way a picture from a project
-   * folder is stored; the file itself is kept in this browser's IndexedDB under that name, so it is
-   * still there after a reload.
+   * Pictures from the computer. The layer stores the file's name. With a project open for editing the file
+   * goes into its `assets/`, where every tool finds it; otherwise it is kept in this browser's IndexedDB
+   * under that name, so it is still there after a reload.
    */
   const addFiles = useCallback(
     (files: FileList | File[], at: { x: number; y: number } | null) => {
       for (const file of [...files].filter((f) => f.type.startsWith('image/'))) {
+        const p = projectRef.current;
+        if (p.dir && p.writable) {
+          void writePicture(p.dir, file, projectPictures.current)
+            .then((name) => {
+              projectPictures.current = [...projectPictures.current, { path: name, size: file.size, modified: Date.now(), file }];
+              const asset: AssetFile = { name, size: file.size, url: URL.createObjectURL(file) };
+              setProjectAssets((old) => [...old.filter((a) => a.name !== name), asset]);
+              api.current?.dropAsset(asset, at);
+            })
+            .catch((cause: unknown) => notify(cause instanceof Error ? `${file.name} could not go into the project: ${cause.message}` : `${file.name} could not go into the project.`));
+          continue;
+        }
         const asset: AssetFile = { name: file.name, size: file.size, url: URL.createObjectURL(file) };
         setAssets((old) => [...old.filter((a) => a.name !== asset.name), asset]);
         keepPicture(file.name, file).catch(() => notify(`${file.name} is on the canvas, but this browser would not keep it for next time.`));
@@ -204,15 +443,13 @@ function FreeformTool() {
   if (!found) return null;
   const { block } = found;
   const activeEntry = frames.frames.find((f) => f.key === frames.active) ?? frames.frames[0]!;
+  /** The frames the menu lists: with a project open, its own and any not in a project yet. */
+  const listed: FrameIndex = projectId ? { ...frames, frames: projectFrames(frames, projectId) } : frames;
 
   // --- frames ----------------------------------------------------------------------------------------------
 
-  /** Puts another frame's drawing on the canvas. Undo history is the frame's own, so it starts again. */
-  const show = (next: FrameIndex, doc: Template) => {
-    setFrames(next);
-    editor.load(doc, null);
-    setLayer(null);
-    setSession((n) => n + 1);
+  const pushLater = (key: string) => {
+    if (projectRef.current.writable) void run(() => pushKey(key));
   };
   const openKey = (key: string) => {
     if (key === frames.active) return;
@@ -222,27 +459,56 @@ function FreeformTool() {
   };
   const newFrame = () => {
     const id = newFrameId();
-    const name = frameName(frames);
+    const name = frameName(listed);
     const doc = makeFrame(name, id);
     show(addFrame(store, frames, name, doc, id), doc);
+    pushLater(FRAME_PREFIX + id);
   };
   const duplicateKey = (key: string) => {
     const entry = frames.frames.find((f) => f.key === key);
     if (!entry) return;
     const id = newFrameId();
-    const name = frameName(frames, `${entry.name} copy`.replace(/ copy copy$/, ' copy'));
+    const name = frameName(listed, `${entry.name} copy`.replace(/ copy copy$/, ' copy'));
     const doc = copyFrameDoc(key === frames.active ? editor.template : frameDoc(key, entry.name), id, name);
     show(addFrame(store, frames, name, doc, id), doc);
+    pushLater(FRAME_PREFIX + id);
   };
-  const renameKey = (key: string, name: string) => setFrames(renameFrame(store, frames, key, name));
+  const renameKey = (key: string, name: string) => {
+    const next = renameFrame(store, frames, key, name);
+    if (next === frames) return;
+    framesRef.current = next;
+    setFrames(next);
+    pushLater(key);
+  };
   const removeKey = (key: string) => {
+    const entry = frames.frames.find((f) => f.key === key);
+    const p = projectRef.current;
+    if (listed.frames.length <= 1) return notify('The last frame stays: there is always one to draw on.');
+    if (entry?.project && p.info && entry.project === p.info.id && !p.writable) {
+      return notify(`${p.info.name} is open view-only, so ${entry.name} cannot be deleted from it. Allow editing first.`);
+    }
     const { index, removed } = removeFrame(store, frames, key);
     if (!removed) return notify('The last frame stays: there is always one to draw on.');
     if (key === frames.active) {
-      const entry = index.frames.find((f) => f.key === index.active)!;
-      show(index, frameDoc(entry.key, entry.name));
-    } else setFrames(index);
-    notify(`Deleted ${removed.entry.name}.`, () => show(restoreFrame(store, framesRef.current, removed), frameDoc(removed.entry.key, removed.entry.name)));
+      const shown = projectId ? projectFrames(index, projectId) : index.frames;
+      const target = shown.some((f) => f.key === index.active) ? index : openFrame(store, index, shown[0]!.key);
+      const next = target.frames.find((f) => f.key === target.active)!;
+      show(target, frameDoc(next.key, next.name));
+    } else {
+      framesRef.current = index;
+      setFrames(index);
+    }
+    if (removed.entry.project && p.dir && p.writable) {
+      const dir = p.dir;
+      void run(async () => {
+        await deleteFrameFile(dir, key, folder.current);
+        folder.current = folder.current.filter((f) => f.key !== key);
+      });
+    }
+    notify(`Deleted ${removed.entry.name}.`, () => {
+      show(restoreFrame(store, framesRef.current, removed), frameDoc(removed.entry.key, removed.entry.name));
+      pushLater(removed.entry.key);
+    });
   };
 
   // --- to Template Studio ----------------------------------------------------------------------------------
@@ -301,7 +567,7 @@ function FreeformTool() {
   const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
   const exportPng = async () => {
     try {
-      const canvas = await freeformCanvas(block, ds, { assets, scale: 2, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
+      const canvas = await freeformCanvas(block, ds, { assets: allAssets, scale: 2, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
       download(`${fileBase}@2x.png`, await canvasBlob(canvas));
     } catch (cause) {
       failed(cause);
@@ -311,7 +577,7 @@ function FreeformTool() {
     if (!printed) return download(`${fileBase}.svg`, new Blob([freeformSvg(block, ds)], { type: 'image/svg+xml' }));
     // A print is pixels, which SVG cannot describe: the printed picture goes inside it as an image.
     try {
-      const canvas = await freeformCanvas(block, ds, { assets, scale: 2, ground });
+      const canvas = await freeformCanvas(block, ds, { assets: allAssets, scale: 2, ground });
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${block.width}" height="${block.height}" viewBox="0 0 ${block.width} ${block.height}"><image href="${canvas.toDataURL('image/png')}" width="${block.width}" height="${block.height}"/></svg>`;
       download(`${fileBase}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
     } catch (cause) {
@@ -334,7 +600,7 @@ function FreeformTool() {
           key={`${frames.active}:${session}`}
           editor={editor}
           blockId={block.id}
-          assets={assets}
+          assets={allAssets}
           layer={layer}
           onSelectLayer={setLayer}
           onDone={() => setLayer(null)}
@@ -345,10 +611,11 @@ function FreeformTool() {
                 <a class="fig-pill fig-back" href="../../index.html" title="Back to Scugnizzi tools">
                   <span aria-hidden="true">←</span> Tools
                 </a>
+                <ProjectPill project={project} />
                 <FramesMenu
-                  frames={frames}
+                  frames={listed}
                   ds={ds}
-                  assets={assets}
+                  assets={allAssets}
                   activeDoc={editor.template}
                   docOf={(key) => frameDoc(key, frames.frames.find((f) => f.key === key)?.name ?? 'Frame')}
                   linkedKeys={studio?.keys ?? []}
@@ -420,6 +687,48 @@ function FreeformTool() {
       </main>
     </div>
   );
+}
+
+/** Which project the frames save into, and the one click each state needs. */
+function ProjectPill({ project }: { project: Project }) {
+  const name = project.info?.name ?? project.dir?.name ?? 'Project';
+  switch (project.status) {
+    case 'loading':
+    case 'unsupported':
+      return null;
+    case 'none':
+      return (
+        <button
+          class="fig-pill ff-project"
+          title="Open a project folder. Frames save into it as files, and the project board shows them beside its emails."
+          onClick={() => void project.open()}
+        >
+          <span class="fig-studio-dot" aria-hidden="true" />
+          Open project…
+        </button>
+      );
+    case 'asking':
+      return (
+        <button class="fig-pill ff-project" title={`Chrome needs one click to open ${name} again.`} onClick={() => void project.allow()}>
+          <span class="fig-studio-dot warn" aria-hidden="true" />
+          <span class="ff-project-name">Reopen {name}</span>
+        </button>
+      );
+    case 'view-only':
+      return (
+        <button class="fig-pill ff-project" title={`${name} is open view-only, so frames are not saved into it. One click asks Chrome for edit access.`} onClick={() => void project.allow()}>
+          <span class="fig-studio-dot warn" aria-hidden="true" />
+          <span class="ff-project-name">{name}</span> · Allow editing
+        </button>
+      );
+    default:
+      return (
+        <a class="fig-pill ff-project" href="project.html" title={`Frames save into ${name}/frames. Open the project board.`}>
+          <span class="fig-studio-dot live" aria-hidden="true" />
+          <span class="ff-project-name">{name}</span>
+        </a>
+      );
+  }
 }
 
 const root = document.getElementById('app');

@@ -34,7 +34,6 @@ import {
   downloadBlob,
   isWriteRefused,
   openFolder,
-  restoreFolder,
   supportsFolders,
   workspaceFromFiles,
   type AssetFile,
@@ -42,6 +41,7 @@ import {
   type Workspace,
 } from '../workspace/workspace.ts';
 import { Preview, type DropSpot, type PreviewApi, type RowInfo, type RowMenuSpec } from './Preview.tsx';
+import { useProjectFolder } from './useProjectFolder.ts';
 import { SHORTCUTS } from './slash.ts';
 import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
 import { InboxChrome } from './Inbox.tsx';
@@ -1018,9 +1018,9 @@ export function App() {
   }, [workspace, adopt, notify]);
 
 
-  useEffect(() => {
-    void restoreFolder().then((found) => found && adopt(found));
-  }, [adopt]);
+  // The remembered folder, which is the open project's (src/project): reopened as before, plus a template the
+  // project board asked for, the one click Chrome may need after a restart, and a project opened in another tab.
+  const projectFolder = useProjectFolder({ adopt, workspace, load: editor.load, notify });
 
   const open = useCallback(
     async (file: TemplateFile) => {
@@ -1648,6 +1648,16 @@ export function App() {
             </button>
           )}
           <button class="link" onClick={() => setRefused(null)}>Dismiss</button>
+        </div>
+      )}
+
+      {projectFolder.reopenable && (
+        <div class="banner" role="status">
+          {projectFolder.reopenable.name} is the project folder, and Chrome needs one click to open it again.
+          <button class="btn" onClick={() => void projectFolder.reopen()}>
+            Reopen {projectFolder.reopenable.name}
+          </button>
+          <button class="link" onClick={projectFolder.dismiss}>Dismiss</button>
         </div>
       )}
 
