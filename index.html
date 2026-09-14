@@ -9,14 +9,100 @@
   /* Enkel: sunken page, paper cards, one soft hairline, no shadow, no radius on containers. Words in the sans, figures in mono. */
   html,body{height:100%}
   body{background:var(--surface-sunken);display:flex;flex-direction:column;min-height:100vh}
+  .spacer{flex:1}
   .shell-header{height:var(--shell-header-height);box-sizing:border-box;display:flex;align-items:center;gap:var(--spacing-24);padding:0 var(--spacing-24);
     background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-hairline)}
   .wordmark{font-size:var(--text-heading-sm);letter-spacing:var(--tracking-heading-sm);color:var(--text-primary);text-decoration:none}
   .shell-header .tagline{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .shell-header .spacer{flex:1}
   .shell-header .count{font-family:var(--font-mono);font-size:var(--text-meta);color:var(--text-muted);letter-spacing:0}
   main{flex:1;width:100%;box-sizing:border-box;padding:0}
-  /* One clean grid: no gaps, hairlines shared between neighbours (grid draws top/left, each card draws right/bottom). */
+
+  /* Section heads: an uppercase index entry and a count, over a soft rule. */
+  .section-head{display:flex;align-items:center;gap:var(--spacing-8);height:40px;box-sizing:border-box;padding:0 var(--spacing-24);border-bottom:var(--border-width) solid var(--border-card);
+    font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+  .section-head .n{font-family:var(--font-mono);letter-spacing:0}
+  .section-head .hint{text-transform:none;font-size:var(--text-caption);letter-spacing:var(--tracking-caption)}
+  .dot{width:8px;height:8px;background:var(--delta-flat);flex:0 0 8px}
+  .dot.live,.dot.open{background:var(--status-done)}
+  .dot.ask{background:var(--status-risk)}
+  .arrow{opacity:0;color:var(--text-primary);transition:opacity var(--duration-fast) var(--ease-standard);font-family:var(--font-helveticaneue)}
+
+  /* Buttons. 36 tall from padding, never centring: 1 + 11 / 16 line / 7 + 1. */
+  .btn{display:inline-flex;align-items:center;gap:var(--spacing-8);box-sizing:border-box;max-width:100%;min-height:var(--control-height);padding:11px 16px 7px;
+    border:var(--border-width) solid transparent;border-radius:var(--radius-buttons);background:transparent;cursor:pointer;text-decoration:none;
+    font-size:var(--text-body);line-height:var(--control-line);letter-spacing:var(--tracking-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+  .btn.filled{background:var(--action-primary);border-color:var(--action-primary);color:var(--action-primary-text)}
+  .btn.filled:hover{background:var(--action-primary-hover);border-color:var(--action-primary-hover);color:var(--action-primary-text)}
+  .btn.outline{border-color:var(--border-hairline);color:var(--text-primary)}
+  .btn.outline:hover{background:var(--surface-row-hover);color:var(--text-primary)}
+  .btn.ghost{padding-left:0;padding-right:0;color:var(--text-muted)}
+  .btn.ghost:hover{color:var(--text-primary)}
+
+  /* ---- Project: the hub. A band of its own above the tools, laid out as a page rather than one more card. ---- */
+  .hub{background:var(--surface-card);border-bottom:var(--border-width) solid var(--border-hairline)}
+  .hub-top{display:grid;grid-template-columns:minmax(360px,5fr) 7fr;min-height:440px}
+  .hub-intro{display:flex;flex-direction:column;gap:var(--spacing-16);min-width:0;padding:var(--spacing-32) var(--spacing-24) var(--spacing-24);border-right:var(--border-width) solid var(--border-card)}
+  .hub-eyebrow{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted)}
+  .hub-title{margin:0;font-size:var(--text-display);line-height:var(--leading-display);letter-spacing:var(--tracking-display);font-weight:400;color:var(--text-primary);overflow-wrap:anywhere}
+  .hub-sub{display:flex;flex-wrap:wrap;gap:0 var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted)}
+  .hub-sub .mono{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0}
+  .lede{font-size:var(--text-body);line-height:var(--leading-prose);color:var(--text-secondary);max-width:52ch}
+  .note{font-size:var(--text-meta);line-height:var(--leading-prose-tight);color:var(--text-muted);max-width:52ch}
+  .actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-8) var(--spacing-12);padding-top:var(--spacing-8)}
+
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:var(--border-width) solid var(--border-muted);border-bottom:var(--border-width) solid var(--border-muted)}
+  .stat{display:flex;flex-direction:column;gap:var(--spacing-8);padding:var(--spacing-12) var(--spacing-12) var(--spacing-12) 0;color:inherit;text-decoration:none;transition:background-color var(--duration-fast) var(--ease-standard)}
+  .stat + .stat{padding-left:var(--spacing-12);border-left:var(--border-width) solid var(--border-muted)}
+  .stat:hover{background:var(--surface-row-hover);color:inherit}
+  .stat .label{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-secondary)}
+  .stat .value{font-family:var(--font-mono);font-size:var(--text-stat);line-height:var(--leading-stat);letter-spacing:var(--tracking-stat);color:var(--text-primary)}
+  .stat .value small{font-size:var(--text-meta);letter-spacing:0;color:var(--delta-down);margin-left:var(--spacing-8)}
+  .sq{width:8px;height:8px;flex:0 0 8px}
+  .sq.email{background:var(--data-1)} .sq.frame{background:var(--data-6)} .sq.picture{background:var(--data-5)}
+
+  /* The board, in miniature: board.json drawn to scale. A drill card, so its border deepens to ink on hover. */
+  .hub-board{display:flex;flex-direction:column;min-width:0;padding:var(--spacing-24);color:inherit;text-decoration:none}
+  .hub-board:hover{color:inherit}
+  .hub-field{position:relative;flex:1;min-height:300px;background:var(--surface-sunken);border:var(--border-width) solid var(--border-card);transition:border-color var(--duration-fast) var(--ease-standard)}
+  .hub-board:hover .hub-field{border-color:var(--border-hairline)}
+  .hub-board:hover .arrow{opacity:1}
+  .hub-field svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .hub-field .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--text-meta);color:var(--text-muted);max-width:none}
+  .hub-board-foot{display:flex;align-items:center;gap:var(--spacing-12);padding-top:var(--spacing-12);font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
+  .hub-board-foot .path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .map *{vector-effect:non-scaling-stroke}
+  .map .card{fill:var(--surface-card);stroke:var(--border-card)}
+  .map .rule{stroke:var(--border-muted)}
+  .map .text{stroke:var(--text-faint)}
+  .map .inset{fill:none;stroke:var(--border-card)}
+  .map .fill{fill:var(--data-track)}
+  .map .missing{fill:none;stroke:var(--text-faint)}
+  .map .k-email{fill:var(--data-1)} .map .k-frame{fill:var(--data-6)} .map .k-picture{fill:var(--data-5)}
+  .map .follows{fill:none;stroke:var(--data-6);stroke-width:1.5}
+  .map .uses{fill:none;stroke:var(--data-5);stroke-width:1.25}
+  .map .end-follows{fill:var(--data-6)} .map .end-uses{fill:var(--data-5)}
+
+  /* Start from a type: one row, each type drawn as the shapes it starts with, at their true proportions. */
+  .hub-types{border-top:var(--border-width) solid var(--border-card)}
+  .hub-types .section-head{border-bottom-color:var(--border-muted)}
+  .types{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+  .type{display:flex;flex-direction:column;gap:var(--spacing-12);min-width:0;padding:var(--card-padding) var(--spacing-24) var(--spacing-24);color:inherit;text-decoration:none;
+    border-right:var(--border-width) solid var(--border-muted);transition:background-color var(--duration-fast) var(--ease-standard)}
+  .type:last-child{border-right:0}
+  .type:hover{background:var(--surface-row-hover);color:inherit}
+  .type:hover .arrow{opacity:1}
+  .type .shape{height:48px;display:flex;align-items:flex-end}
+  .type .shape svg{max-width:100%;height:auto;display:block}
+  .type .text{display:flex;flex-direction:column;gap:var(--spacing-4);min-width:0}
+  .type .name{display:flex;align-items:baseline;gap:var(--spacing-8);font-size:var(--text-subheading);line-height:var(--leading-subheading);letter-spacing:var(--tracking-subheading);color:var(--text-primary)}
+  .type .count{font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:0;color:var(--text-muted)}
+  .type p{font-size:var(--text-meta);line-height:var(--leading-prose-tight);letter-spacing:var(--tracking-meta);color:var(--text-secondary)}
+  .sil{fill:var(--surface-sunken);stroke:var(--text-muted);transition:stroke var(--duration-fast) var(--ease-standard)}
+  .sil-text{stroke:var(--text-faint)}
+  .type:hover .sil{stroke:var(--text-primary)}
+
+  /* ---- Tools: one clean grid. No gaps; hairlines shared between neighbours (each card draws right/bottom). ---- */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0}
   .tool{display:flex;flex-direction:column;background:var(--surface-card);border-right:var(--border-width) solid var(--border-card);border-bottom:var(--border-width) solid var(--border-card);color:inherit;text-decoration:none;
     box-shadow:inset 0 0 0 0 var(--border-hairline);transition:box-shadow var(--duration-fast) var(--ease-standard)}
@@ -31,20 +117,32 @@
   .body{padding:var(--card-padding);display:flex;flex-direction:column;gap:var(--spacing-8);flex:1}
   .kicker{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
   .kicker .n{font-family:var(--font-mono);letter-spacing:0}
-  .dot{width:8px;height:8px;background:var(--delta-flat);flex:0 0 8px}
-  .dot.live{background:var(--delta-up)}
   .tool h2{margin:0;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);letter-spacing:var(--tracking-heading-sm);font-weight:400;color:var(--text-primary)}
   .tool p{font-size:var(--text-meta);line-height:var(--leading-prose-tight);letter-spacing:var(--tracking-meta);color:var(--text-secondary);max-width:none}
   .meta{margin-top:auto;padding-top:var(--spacing-12);display:flex;align-items:center;gap:var(--spacing-12);border-top:var(--border-width) solid var(--border-muted);
     font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
   .meta .path{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .arrow{opacity:0;color:var(--text-primary);transition:opacity var(--duration-fast) var(--ease-standard);font-family:var(--font-helveticaneue)}
   footer{padding:var(--spacing-16) var(--spacing-24);border-top:var(--border-width) solid var(--border-hairline);background:var(--surface-paper);
     display:flex;gap:var(--spacing-24);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:var(--tracking-caption)}
   footer .mono{font-family:var(--font-mono-detail);letter-spacing:0}
+
+  @media (max-width:1023px){
+    .hub-top{grid-template-columns:1fr;min-height:0}
+    .hub-intro{border-right:0;border-bottom:var(--border-width) solid var(--border-card)}
+    .hub-intro .actions{margin-top:var(--spacing-8)}
+    .hub-field{min-height:260px}
+    .types{grid-template-columns:1fr}
+    .type{flex-direction:row;align-items:center;gap:var(--spacing-16);border-right:0;border-bottom:var(--border-width) solid var(--border-muted)}
+    .type:last-child{border-bottom:0}
+    .type .text{flex:1}
+    .type .shape{order:2;flex:0 0 36%;height:auto;justify-content:flex-end;align-items:center}
+  }
   @media (max-width:767px){
-    .shell-header{padding:0 var(--gutter-phone)}
-    .shell-header .tagline{display:none}
+    .shell-header,.section-head{padding:0 var(--gutter-phone)}
+    .shell-header .tagline,.section-head .hint{display:none}
+    .hub-intro{padding:var(--spacing-24) var(--gutter-phone)}
+    .hub-board{padding:var(--gutter-phone)}
+    .type{padding:var(--card-padding) var(--gutter-phone)}
     .grid{grid-template-columns:1fr}
     .tool p{font-size:var(--text-meta-mobile)}
   }
@@ -53,25 +151,47 @@
 <body>
   <header class="shell-header">
     <a class="wordmark" href="./">Scugnizzi tools</a>
-    <span class="tagline">Small single-file tools. Each opens in place; each keeps its own folder.</span>
+    <span class="tagline">One project folder, and the small tools that work in it.</span>
     <span class="spacer"></span>
     <span class="count" id="count"></span>
   </header>
 
   <main>
+    <section class="hub" aria-labelledby="hub-label">
+      <div class="section-head">
+        <span id="hub-label">Project</span><span>·</span><span>One folder for every tool</span>
+        <span class="spacer"></span><span class="dot" id="hub-dot"></span><span id="hub-state"></span>
+      </div>
+      <div class="hub-top">
+        <div class="hub-intro" id="hub-now" aria-live="polite"></div>
+        <a class="hub-board" id="hub-board" href="template-studio/dist/project.html" aria-label="Open the project board">
+          <div class="hub-field" id="hub-field"></div>
+          <div class="hub-board-foot"><span class="path" id="hub-map-label"></span><span class="arrow">→</span></div>
+        </a>
+      </div>
+      <div class="hub-types">
+        <div class="section-head"><span>Start from a type</span><span class="spacer"></span><span class="hint">Opens Create a project on the board</span></div>
+        <div class="types" id="types"></div>
+      </div>
+    </section>
+
+    <div class="section-head"><span>Tools</span><span class="n" id="tool-count"></span><span class="spacer"></span><span class="hint">Template Studio and Freeform open the project on their own</span></div>
     <section class="grid" id="grid"></section>
   </main>
 
   <footer>
     <span>Interface on the Enkel design system</span>
     <span class="mono">node serve.js · localhost:8770</span>
-    <span class="spacer" style="flex:1"></span>
+    <span class="spacer"></span>
     <span>Press <span class="mono">?</span> for shortcuts</span>
   </footer>
 
 <script src="tool-kit.js"></script>
 <script>
-// Add a tool: one entry here, one folder (or file) beside index.html.
+const PROJECT = 'template-studio/dist/project.html';
+
+// Add a tool: one entry here, one folder (or file) beside index.html. Project is not in this list: it has the
+// section above the tools.
 const TOOLS = [
   { n: '01', kicker: 'Type', name: 'Ink bleed', mark: 'ink bleed_', status: 'live',
     desc: 'Typewriter and photocopy text on paper. Layers of text and SVG stamps, each with its own bleed, smudge, stamp and copier drift. Receipt tears, dark paper, six-frame GIF export.',
@@ -91,10 +211,23 @@ const TOOLS = [
   { n: '06', kicker: 'Canvas', name: 'Freeform', mark: 'freeform_', status: 'live',
     desc: 'The Template Studio freeform canvas as a tool of its own. Sticky notes, stamps, shapes, marker and playful type on an endless dotted field. Drop in pictures, export SVG or PNG. Shares its code with the email block.',
     href: 'template-studio/dist/freeform.html', path: 'template-studio/freeform.html · npm run build' },
-  { n: '07', kicker: 'Hub', name: 'Project', mark: 'project_', status: 'live',
-    desc: 'One folder for every tool. Create a project from a type (campaign, email, social, print) or open a folder, and every email, Freeform frame and picture in it sits on one endless board, with lines showing which frame an email follows and where each picture is used. Template Studio and Freeform open the same folder on their own.',
-    href: 'template-studio/dist/project.html', path: 'template-studio/project.html · npm run build' },
 ];
+
+// What Create a project offers. Mirrors PROJECT_TYPES in template-studio/src/model/project-types.ts, which decides
+// what each type writes; the sizes here only draw the shapes.
+const TYPES = [
+  { id: 'campaign', name: 'Campaign', blurb: 'An email, social posts and a poster, all from one idea.', emails: 1, frames: [[600, 300], [1080, 1080], [1080, 1920], [1200, 1600]] },
+  { id: 'email', name: 'Email', blurb: 'A HubSpot email on the Switchyards system, and a hero frame to draw its picture in.', emails: 1, frames: [[600, 300]] },
+  { id: 'social', name: 'Social media', blurb: 'Frames at the sizes feeds and stories want.', emails: 0, frames: [[1080, 1080], [1080, 1350], [1080, 1920], [1200, 628]] },
+  { id: 'print', name: 'Print', blurb: 'A poster, a flyer and a postcard, in print proportions.', emails: 0, frames: [[1200, 1600], [850, 1100], [900, 600]] },
+  { id: 'blank', name: 'Blank', blurb: 'The folders and nothing in them.', emails: 0, frames: [] },
+];
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const arr = (v) => (Array.isArray(v) ? v : []);
+
+// --- tools ------------------------------------------------------------------------------------------------------
 
 const grid = document.getElementById('grid');
 for (const t of TOOLS) {
@@ -102,7 +235,7 @@ for (const t of TOOLS) {
   a.innerHTML = `
     <div class="mark"><span>${t.mark}</span></div>
     <div class="body">
-      <div class="kicker"><span class="n">${t.n}</span><span>·</span><span>${t.kicker}</span><span class="spacer" style="flex:1"></span><span class="dot ${t.status}"></span><span>${t.status}</span></div>
+      <div class="kicker"><span class="n">${t.n}</span><span>·</span><span>${t.kicker}</span><span class="spacer"></span><span class="dot ${t.status}"></span><span>${t.status}</span></div>
       <h2>${t.name}</h2>
       <p>${t.desc}</p>
       <div class="meta"><span class="path">${t.path}</span><span class="arrow">→</span></div>
@@ -120,12 +253,402 @@ ph.innerHTML = `
     <div class="meta"><span class="path">index.html · TOOLS</span></div>
   </div>`;
 grid.appendChild(ph);
-document.getElementById('count').textContent = `${TOOLS.length} tool${TOOLS.length === 1 ? '' : 's'}`;
+document.getElementById('count').textContent = plural(TOOLS.length, 'tool');
+document.getElementById('tool-count').textContent = String(TOOLS.length).padStart(2, '0');
 
-// Shared shortcuts: digits open tools, ? lists the keys. No state to keep here.
+// --- project types ----------------------------------------------------------------------------------------------
+
+/** The shapes a type starts with, side by side at one height: an email as a page of lines, each frame at its size. */
+function typeShapes(type) {
+  const H = 40, GAP = 6, parts = [];
+  let x = 0;
+  const shape = (w, inner = '') => { parts.push(`<rect class="sil" x="${x + 0.5}" y="0.5" width="${w - 1}" height="${H - 1}"/>${inner}`); x += w + GAP; };
+  for (let i = 0; i < type.emails; i += 1) {
+    const w = 26, lines = [9, 15, 21, 27].map((y, j) => `<line class="sil-text" x1="${x + 5}" y1="${y}" x2="${x + w - (j === 3 ? 11 : 5)}" y2="${y}"/>`).join('');
+    shape(w, lines);
+  }
+  for (const [fw, fh] of type.frames) shape(Math.round((H * fw) / fh));
+  if (!parts.length) { parts.push(`<rect class="sil" x="0.5" y="0.5" width="${H - 1}" height="${H - 1}" stroke-dasharray="3 3"/>`); x = H + GAP; }
+  const W = x - GAP;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${parts.join('')}</svg>`;
+}
+
+const types = document.getElementById('types');
+for (const t of TYPES) {
+  const a = document.createElement('a'); a.className = 'type'; a.href = `${PROJECT}?create=${t.id}`;
+  const made = [t.emails && plural(t.emails, 'email'), t.frames.length && plural(t.frames.length, 'frame')].filter(Boolean).join(' · ') || 'folders only';
+  a.innerHTML = `
+    <div class="shape">${typeShapes(t)}</div>
+    <div class="text">
+      <div class="name"><span>${t.name}</span><span class="spacer"></span><span class="arrow">→</span></div>
+      <span class="count">${made}</span>
+      <p>${t.blurb}</p>
+    </div>`;
+  types.appendChild(a);
+}
+
+// --- the open project -------------------------------------------------------------------------------------------
+//
+// Every page on this site shares one remembered folder: Template Studio keeps its handle in IndexedDB
+// (template-studio/src/workspace/workspace.ts), and the board, Freeform and this page all read that one. Pages tell
+// each other on the `scuggnizzi.project` channel. This page reads the folder and never writes it: project.json is
+// the board's to write.
+
+const HANDLES = { db: 'template-studio', store: 'handles', key: 'workspace' };
+
+function handleStore() {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(HANDLES.db, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore(HANDLES.store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+}
+async function recallFolder() {
+  const db = await handleStore();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const request = db.transaction(HANDLES.store, 'readonly').objectStore(HANDLES.store).get(HANDLES.key);
+      request.onsuccess = () => resolve(request.result ?? null);
+      request.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+}
+async function rememberFolder(dir) {
+  const db = await handleStore();
+  if (!db) return;
+  await new Promise((resolve) => {
+    try {
+      const tx = db.transaction(HANDLES.store, 'readwrite');
+      tx.objectStore(HANDLES.store).put(dir, HANDLES.key);
+      tx.oncomplete = tx.onerror = () => resolve();
+    } catch { resolve(); }
+  });
+}
+async function permissionOf(dir, mode) {
+  try { return (await dir.queryPermission?.({ mode })) ?? 'granted'; } catch { return 'denied'; }
+}
+
+let channel = null;
+try { channel = new BroadcastChannel('scuggnizzi.project'); } catch { channel = null; }
+const tell = (type) => { try { channel?.postMessage({ type }); } catch { /* nothing to tell */ } };
+
+async function childDir(dir, name) { try { return await dir.getDirectoryHandle(name); } catch { return null; } }
+async function readJson(fileHandle) { try { return JSON.parse(await (await fileHandle.getFile()).text()); } catch { return null; } }
+
+const TEMPLATE = /\.(template|design)\.json$/;
+const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
+
+/** What the board would show for a folder: its cards, where board.json puts them, and what is made from what. */
+async function readFolder(dir) {
+  const project = await (async () => { try { return await readJson(await dir.getFileHandle('project.json')); } catch { return null; } })();
+  const info = project && project.version === 1 && typeof project.id === 'string' && project.id ? project : null;
+
+  const emails = [];
+  for (const source of [dir, await childDir(dir, 'templates')]) {
+    if (!source) continue;
+    for await (const [fileName, entry] of source.entries()) {
+      if (entry.kind !== 'file' || !TEMPLATE.test(fileName)) continue;
+      const doc = await readJson(entry);
+      const name = (doc && typeof doc.name === 'string' && doc.name.trim()) || fileName.replace(TEMPLATE, '').replace(/[-_]+/g, ' ');
+      emails.push({ id: `email:${fileName}`, kind: 'email', name, doc });
+    }
+  }
+
+  const frames = [];
+  const framesDir = await childDir(dir, 'frames');
+  if (framesDir) {
+    for await (const [fileName, entry] of framesDir.entries()) {
+      if (entry.kind !== 'file' || !fileName.endsWith('.frame.json')) continue;
+      const raw = await readJson(entry);
+      if (!raw || raw.version !== 1 || raw.kind !== 'scuggnizzi.freeform-frame' || typeof raw.key !== 'string' || !raw.key.startsWith('scuggnizzi.freeform.')) continue;
+      frames.push({ id: `frame:${raw.key}`, kind: 'frame', key: raw.key, name: (typeof raw.name === 'string' && raw.name.trim()) || 'Frame', doc: raw.template });
+    }
+  }
+
+  // Three folders deep, as the board looks. Pictures under rendered/ are drawn from an email's text and get no card.
+  const pictures = [];
+  const walk = async (folder, prefix, depth) => {
+    for await (const [name, entry] of folder.entries()) {
+      if (name.startsWith('.')) continue;
+      const path = prefix ? `${prefix}/${name}` : name;
+      if (entry.kind === 'directory') { if (depth > 1) await walk(entry, path, depth - 1); continue; }
+      if (IMAGE.test(name) && !path.startsWith('rendered/')) pictures.push({ id: `picture:${path}`, kind: 'picture', path, name });
+    }
+  };
+  const assets = await childDir(dir, 'assets');
+  if (assets) await walk(assets, '', 3);
+
+  const board = await (async () => { try { return await readJson(await dir.getFileHandle('board.json')); } catch { return null; } })();
+  const places = {};
+  if (board && board.version === 1 && board.cards && typeof board.cards === 'object') {
+    for (const [id, at] of Object.entries(board.cards)) {
+      if (SIZE[id.slice(0, id.indexOf(':'))] && at && Number.isFinite(at.x) && Number.isFinite(at.y)) places[id] = { x: Math.round(at.x), y: Math.round(at.y) };
+    }
+  }
+
+  return {
+    name: (info && typeof info.name === 'string' && info.name.trim().slice(0, 80)) || dir.name,
+    type: info && info.type, createdAt: info && info.createdAt,
+    emails, frames, pictures,
+    ...layoutBoard([...emails, ...frames, ...pictures], places),
+    links: projectLinks(emails, frames, pictures),
+  };
+}
+
+// Mirrors layoutBoard in template-studio/src/model/project.ts, so a card with no place yet sits where the board will put it.
+const SIZE = { email: { w: 260, h: 380 }, frame: { w: 300, h: 250 }, picture: { w: 220, h: 210 } };
+const CARD_GAP = 40, LANE_GAP = 120, COLUMNS = 5;
+const overlaps = (a, b) => a.x < b.x + b.w + CARD_GAP && b.x < a.x + a.w + CARD_GAP && a.y < b.y + b.h + CARD_GAP && b.y < a.y + a.h + CARD_GAP;
+
+function layoutBoard(sources, places) {
+  const present = new Set(sources.map((s) => s.id));
+  const cards = sources.filter((s) => places[s.id]).map((s) => ({ ...s, ...SIZE[s.kind], ...places[s.id] }));
+  const missing = Object.entries(places).filter(([id]) => !present.has(id)).map(([id, at]) => {
+    const kind = id.slice(0, id.indexOf(':'));
+    return { id, kind, name: 'Missing', ...SIZE[kind], ...at };
+  });
+  for (const kind of ['email', 'frame', 'picture']) {
+    const waiting = sources.filter((s) => s.kind === kind && !places[s.id]).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    if (!waiting.length) continue;
+    const { w, h } = SIZE[kind];
+    const taken = [...cards, ...missing];
+    const same = taken.filter((c) => c.kind === kind);
+    const x0 = same.length ? Math.min(...same.map((c) => c.x)) : taken.length ? Math.min(...taken.map((c) => c.x)) : 0;
+    const y0 = same.length ? Math.min(...same.map((c) => c.y)) : taken.length ? Math.max(...taken.map((c) => c.y + c.h)) + LANE_GAP : 0;
+    let slot = 0;
+    for (const source of waiting) {
+      let spot;
+      do {
+        spot = { x: x0 + (slot % COLUMNS) * (w + CARD_GAP), y: y0 + Math.floor(slot / COLUMNS) * (h + CARD_GAP), w, h };
+        slot += 1;
+      } while (taken.some((r) => overlaps(r, spot)) && slot < 100000);
+      const card = { ...source, ...spot };
+      cards.push(card);
+      taken.push(card);
+    }
+  }
+  return { cards, missing };
+}
+
+// Mirrors projectLinks in template-studio/src/model/project.ts: the frame an email's block follows, and the pictures shown.
+function* blocksOf(template) {
+  for (const section of arr(template && template.sections)) for (const row of arr(section && section.rows)) for (const column of arr(row && row.columns)) yield* arr(column && column.blocks);
+}
+function projectLinks(emails, frames, pictures) {
+  const frameByKey = new Map(frames.map((f) => [f.key, f.id]));
+  const pictureByPath = new Map(pictures.map((p) => [p.path, p.id]));
+  const out = [], seen = new Set();
+  const add = (from, to, kind) => {
+    if (!from || from === to || seen.has(`${from}>${to}`)) return;
+    seen.add(`${from}>${to}`);
+    out.push({ from, to, kind });
+  };
+  for (const holder of [...emails, ...frames]) {
+    for (const block of blocksOf(holder.doc)) {
+      if (!block) continue;
+      if (block.type === 'image') add(pictureByPath.get(block.src), holder.id, 'uses');
+      if (block.type !== 'freeform') continue;
+      const followed = block.source && block.source.app === 'freeform' ? frameByKey.get(block.source.key) : undefined;
+      if (followed) { add(followed, holder.id, 'follows'); continue; }
+      for (const layer of arr(block.layers)) if (layer && layer.kind === 'image') add(pictureByPath.get(layer.src), holder.id, 'uses');
+    }
+  }
+  return out;
+}
+
+/** What the map shows before a project is open: a campaign as the board lays one out, so the idea reads at a glance. */
+const EXAMPLE = (() => {
+  const hero = 'scuggnizzi.freeform.frame.example-hero', square = 'scuggnizzi.freeform.frame.example-square';
+  const withBlocks = (blocks) => ({ sections: [{ rows: [{ columns: [{ blocks }] }] }] });
+  const emails = [{ id: 'email:spring-launch', kind: 'email', name: 'Spring launch', doc: withBlocks([{ type: 'freeform', source: { app: 'freeform', key: hero } }, { type: 'image', src: 'club-night.jpg' }]) }];
+  const frames = [
+    { id: `frame:${hero}`, kind: 'frame', key: hero, name: 'Email hero', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: 'grain.png' }] }]) },
+    { id: `frame:${square}`, kind: 'frame', key: square, name: 'Square post', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: 'club-night.jpg' }] }]) },
+    { id: 'frame:story', kind: 'frame', key: 'story', name: 'Story', doc: null },
+    { id: 'frame:poster', kind: 'frame', key: 'poster', name: 'Poster', doc: null },
+  ];
+  const pictures = [{ id: 'picture:club-night.jpg', kind: 'picture', path: 'club-night.jpg', name: 'club-night.jpg' }, { id: 'picture:grain.png', kind: 'picture', path: 'grain.png', name: 'grain.png' }];
+  const places = {
+    'email:spring-launch': { x: 0, y: 0 },
+    [`frame:${hero}`]: { x: 340, y: 0 }, [`frame:${square}`]: { x: 680, y: 0 }, 'frame:story': { x: 340, y: 290 }, 'frame:poster': { x: 680, y: 290 },
+    'picture:club-night.jpg': { x: 1020, y: 0 }, 'picture:grain.png': { x: 1020, y: 250 },
+  };
+  return { ...layoutBoard([...emails, ...frames, ...pictures], places), links: projectLinks(emails, frames, pictures) };
+})();
+
+// --- the map ----------------------------------------------------------------------------------------------------
+
+const field = document.getElementById('hub-field');
+let drawn = null;
+
+function drawMap(board) {
+  drawn = board;
+  if (!board) { field.innerHTML = ''; return; }
+  const all = [...board.cards, ...board.missing];
+  if (!all.length) { field.innerHTML = '<p class="empty">Nothing on the board yet.</p>'; return; }
+  const pad = 60;
+  const minX = Math.min(...all.map((c) => c.x)) - pad, minY = Math.min(...all.map((c) => c.y)) - pad;
+  const vw = Math.max(...all.map((c) => c.x + c.w)) + pad - minX, vh = Math.max(...all.map((c) => c.y + c.h)) + pad - minY;
+  // Board units per screen pixel, so the kind squares stay 8px at any size of board.
+  const unit = Math.max(vw / (field.clientWidth || 700), vh / (field.clientHeight || 320));
+  const byId = new Map(all.map((c) => [c.id, c]));
+
+  // Lines leave the facing edges and run under the cards; the square where each lands is drawn over them, on the
+  // card that is made from the other.
+  const anchor = (c, toward) => {
+    const cx = c.x + c.w / 2, cy = c.y + c.h / 2, dx = toward.x + toward.w / 2 - cx, dy = toward.y + toward.h / 2 - cy;
+    return Math.abs(dx) * c.h > Math.abs(dy) * c.w ? { x: cx + (Math.sign(dx) * c.w) / 2, y: cy, across: true } : { x: cx, y: cy + (Math.sign(dy) * c.h) / 2, across: false };
+  };
+  const e = 5 * unit;
+  const ends = [];
+  const lines = board.links.map((l) => {
+    const a = byId.get(l.from), b = byId.get(l.to);
+    if (!a || !b) return '';
+    const p = anchor(a, b), q = anchor(b, a), mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
+    const c1 = p.across ? `${mx} ${p.y}` : `${p.x} ${my}`, c2 = q.across ? `${mx} ${q.y}` : `${q.x} ${my}`;
+    const dash = l.kind === 'uses' ? ` stroke-dasharray="${4 * unit} ${3 * unit}"` : '';
+    ends.push(`<rect class="end-${l.kind}" x="${q.x - e / 2}" y="${q.y - e / 2}" width="${e}" height="${e}"/>`);
+    return `<path class="${l.kind}" d="M${p.x} ${p.y}C${c1} ${c2} ${q.x} ${q.y}"${dash}/>`;
+  }).join('');
+
+  const head = 40;
+  const s = Math.min(8 * unit, head * 0.6), m = (head - s) / 2;
+  const cards = board.cards.map((c) => {
+    let body = '';
+    if (c.kind === 'email') body = [0, 1, 2, 3, 4].map((i) => `<line class="text" x1="${c.x + 24}" y1="${c.y + head + 36 + i * 28}" x2="${c.x + c.w - 24 - (i === 4 ? c.w * 0.35 : 0)}" y2="${c.y + head + 36 + i * 28}"/>`).join('');
+    if (c.kind === 'frame') body = `<rect class="inset" x="${c.x + 20}" y="${c.y + head + 20}" width="${c.w - 40}" height="${c.h - head - 40}"/>`;
+    if (c.kind === 'picture') body = `<rect class="fill" x="${c.x + 16}" y="${c.y + head + 16}" width="${c.w - 32}" height="${c.h - head - 32}"/>`;
+    return `<g><title>${esc(c.name)}</title><rect class="card" x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}"/>`
+      + `<line class="rule" x1="${c.x}" y1="${c.y + head}" x2="${c.x + c.w}" y2="${c.y + head}"/>`
+      + `<rect class="k-${c.kind}" x="${c.x + m}" y="${c.y + m}" width="${s}" height="${s}"/>${body}</g>`;
+  }).join('');
+  const missing = board.missing.map((c) => `<g><title>Missing: its file has gone</title><rect class="missing" x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" stroke-dasharray="${4 * unit} ${4 * unit}"/></g>`).join('');
+
+  field.innerHTML = `<svg class="map" viewBox="${minX} ${minY} ${vw} ${vh}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${lines}${missing}${cards}${ends.join('')}</svg>`;
+}
+try { new ResizeObserver(() => drawn && drawMap(drawn)).observe(field); } catch { /* the map keeps its first drawing */ }
+
+// --- the hub ----------------------------------------------------------------------------------------------------
+
+/**
+ * - `unsupported`: this browser cannot open a folder.
+ * - `none`: no project is remembered.
+ * - `asking`: one is remembered, and Chrome wants a click before it opens it again.
+ * - `gone`: it is remembered and cannot be read: moved, renamed or deleted.
+ * - `view-only` and `ready`: open, for reading or for reading and writing.
+ */
+const hub = { status: 'loading', dir: null, data: null };
+let looking = 0;
+
+async function look() {
+  const turn = (looking += 1);
+  const next = { status: 'none', dir: null, data: null };
+  if (typeof window.showDirectoryPicker !== 'function') next.status = 'unsupported';
+  else {
+    next.dir = await recallFolder();
+    if (next.dir) {
+      if ((await permissionOf(next.dir, 'read')) !== 'granted') next.status = 'asking';
+      else {
+        try {
+          next.data = await readFolder(next.dir);
+          next.status = (await permissionOf(next.dir, 'readwrite')) === 'granted' ? 'ready' : 'view-only';
+        } catch { next.status = 'gone'; }
+      }
+    }
+  }
+  if (turn !== looking) return; // a later look has already started
+  Object.assign(hub, next);
+  renderHub();
+}
+
+const STATES = {
+  loading: ['', ''], unsupported: ['', 'Chrome only'], none: ['', 'No project open'], asking: ['ask', 'Needs a click'],
+  gone: ['ask', 'Folder not found'], 'view-only': ['ask', 'Open · view only'], ready: ['open', 'Open'],
+};
+
+function renderHub() {
+  const { status, dir, data } = hub;
+  const [dot, label] = STATES[status];
+  document.getElementById('hub-dot').className = `dot ${dot}`;
+  document.getElementById('hub-state').textContent = label;
+
+  const now = document.getElementById('hub-now');
+  const folder = dir ? esc(dir.name) : '';
+  const pitch = `<p class="lede">A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, the pictures they use, and lines showing what is made from what.</p>`;
+  const others = `<a class="btn ghost" href="template-studio/dist/index.html">Template Studio</a><a class="btn ghost" href="template-studio/dist/freeform.html">Freeform</a>`;
+
+  if (status === 'loading') now.innerHTML = '';
+  else if (status === 'unsupported') {
+    now.innerHTML = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
+      <p class="note">Opening a folder needs Chrome or Edge on a computer.</p>
+      <div class="actions"><a class="btn outline" href="${PROJECT}">Open the board</a></div>`;
+  } else if (status === 'none') {
+    now.innerHTML = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
+      <p class="note">Any folder works, including one Google Drive for desktop or Dropbox keeps in sync. When Chrome asks, choose “Edit files”.</p>
+      <div class="actions"><a class="btn filled" href="${PROJECT}?create">Create a project</a><button class="btn outline" type="button" data-act="pick">Open a folder…</button></div>`;
+  } else if (status === 'asking') {
+    now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
+      <p class="note">Chrome wants one click before it opens this folder again. Template Studio and Freeform open it too, once it is.</p>
+      <div class="actions"><button class="btn filled" type="button" data-act="allow">Reopen ${folder}</button><button class="btn ghost" type="button" data-act="pick">Open a different folder…</button></div>`;
+  } else if (status === 'gone') {
+    now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
+      <p class="note">This folder could not be read. It may have been moved, renamed or deleted. Open it again where it is now, or start another.</p>
+      <div class="actions"><button class="btn filled" type="button" data-act="pick">Open a folder…</button><a class="btn outline" href="${PROJECT}?create">Create a project</a></div>`;
+  } else {
+    const type = TYPES.find((t) => t.id === data.type);
+    const created = data.createdAt ? new Date(data.createdAt) : null;
+    const sub = [
+      type ? `${esc(type.name)} project` : 'Folder',
+      created && `created ${created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: created.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}`,
+      `<span class="mono">${folder}/</span>`,
+    ].filter(Boolean).join('<span>·</span>');
+    const stat = (kind, label, n) => `<a class="stat" href="${PROJECT}"><span class="label"><span class="sq ${kind}"></span>${label}</span><span class="value">${n}</span></a>`;
+    now.innerHTML = `<p class="hub-eyebrow">Open project</p><h1 class="hub-title">${esc(data.name)}</h1>
+      <div class="hub-sub">${sub}</div>
+      <div class="stats">${stat('email', 'Emails', data.emails.length)}${stat('frame', 'Frames', data.frames.length)}${stat('picture', 'Pictures', data.pictures.length)}</div>
+      ${status === 'view-only' ? '<p class="note">Chrome opened this folder view-only. Allow editing so the tools can save into it.</p>' : ''}
+      <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board →</a>${status === 'view-only' ? '<button class="btn outline" type="button" data-act="allow">Allow editing</button>' : ''}${others}
+        <button class="btn ghost" type="button" data-act="pick">Open a different folder…</button></div>`;
+  }
+
+  const open = status === 'ready' || status === 'view-only';
+  drawMap(status === 'loading' ? null : open ? data : EXAMPLE);
+  const cards = open ? data.cards.length + data.missing.length : 0;
+  document.getElementById('hub-map-label').textContent =
+    status === 'loading' ? '' :
+    open ? [`${dir.name}/board.json`, plural(cards, 'card'), data.missing.length && `${data.missing.length} missing`, plural(data.links.length, 'line')].filter(Boolean).join(' · ') :
+    status === 'asking' ? `Example board · reopen to see ${dir.name}` :
+    'Example board · a campaign';
+}
+
+document.getElementById('hub-now').addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-act]');
+  if (!button) return;
+  if (button.dataset.act === 'pick') {
+    let dir = null;
+    try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch { return; } // dismissed
+    await rememberFolder(dir);
+    tell('opened');
+  } else if (button.dataset.act === 'allow' && hub.dir) {
+    try { await hub.dir.requestPermission({ mode: 'readwrite' }); } catch { /* refused: the look below says so */ }
+    tell('opened');
+  }
+  await look();
+});
+
+if (channel) channel.onmessage = (event) => { if (['opened', 'closed'].includes(event.data && event.data.type)) void look(); };
+window.addEventListener('focus', () => void look());
+void look();
+
+// Shared shortcuts: digits open tools, P the project board, ? lists the keys. No state to keep here.
 ToolKit.init({ tool: 'index' });
+ToolKit.register('p', 'Open the project board', () => { location.href = PROJECT; }, { group: 'Project' });
+ToolKit.register('n', 'Create a project', () => { location.href = `${PROJECT}?create`; }, { group: 'Project' });
 TOOLS.forEach((t, i) => ToolKit.register(String(i + 1), `Open ${t.name}`, () => { location.href = t.href; }, { group: 'Tools' }));
-
 </script>
 </body>
 </html>

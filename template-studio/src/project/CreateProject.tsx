@@ -13,6 +13,8 @@ import { createProjectFolder, pickDestination } from './folder.ts';
 type Dir = FileSystemDirectoryHandle;
 
 export interface CreateProjectProps {
+  /** The type chosen when the sheet opens, by id. The first type when absent or unknown. */
+  initialType?: string;
   onClose(): void;
   /** `where` is the folder it went into, or empty when the chosen folder became the project. */
   onCreated(dir: Dir, name: string, where: string): Promise<void>;
@@ -58,8 +60,8 @@ function explain(cause: unknown, where: string): string {
   return cause instanceof Error ? cause.message : 'The project could not be created.';
 }
 
-export function CreateProject({ onClose, onCreated }: CreateProjectProps) {
-  const [typeId, setTypeId] = useState(PROJECT_TYPES[0]!.id);
+export function CreateProject({ initialType, onClose, onCreated }: CreateProjectProps) {
+  const [typeId, setTypeId] = useState((PROJECT_TYPES.find((t) => t.id === initialType) ?? PROJECT_TYPES[0]!).id);
   const [name, setName] = useState('');
   const [parent, setParent] = useState<Dir | null>(null);
   const [busy, setBusy] = useState(false);
