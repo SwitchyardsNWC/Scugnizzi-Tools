@@ -5,7 +5,8 @@
       "name": "scugnizzi-tools",
       "runtimeExecutable": "node",
       "runtimeArgs": ["serve.js"],
-      "port": 8770
+      "port": 8770,
+      "autoPort": true
     }
   ]
 }

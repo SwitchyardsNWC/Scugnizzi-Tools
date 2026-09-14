@@ -67,6 +67,11 @@ One folder beside `index.html`, one entry in the `TOOLS` array at the bottom of 
 Number it, give it a kicker and a one-line description, point `href` at the file. The index draws
 the card.
 
+**Project** is not in that list. It has its own section at the top of the dashboard: the project
+that is open, drawn from its folder (name, counts, a map of its board), and a row of project types
+that open Create a project on the board (`project.html?create=<type>`). The dashboard only reads the
+folder; the board writes it.
+
 ## Template Studio
 
 The one tool with a build. It replaces the first email template builder, whose export the
