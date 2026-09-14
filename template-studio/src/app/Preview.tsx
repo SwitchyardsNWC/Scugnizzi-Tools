@@ -6,6 +6,12 @@ import { BLOCK_ICONS, ColumnsIcon, GroupIcon } from './icons.tsx';
 import { capture, release } from './pointer.ts';
 import { SlashMenu } from './SlashMenu.tsx';
 import { blockItem, filterItems, FORMAT_COMMANDS, markdownShortcut, slashQuery, type Exec, type SlashItem } from './slash.ts';
+import { CHROME, PLAUSIBLE, splitDocument } from './preview/chrome.ts';
+import { LinkField } from './preview/LinkField.tsx';
+import { RowMenu } from './preview/RowMenu.tsx';
+import type { DropSpot, Hint, PreviewApi, RowCard, RowInfo, RowMenuSpec, SlashState, SpaceBox } from './preview/types.ts';
+
+export type { DropSpot, PreviewApi, RowInfo, RowMenuSpec } from './preview/types.ts';
 
 // The canvas.
 //
@@ -23,28 +29,6 @@ import { blockItem, filterItems, FORMAT_COMMANDS, markdownShortcut, slashQuery, 
 // change to `html` is patched into the document's body when only the body changed, and reloads
 // the frame only when the head moved (learnings 3.61); baking an outline into the markup would
 // make every click a document change, for a cosmetic reason.
-
-/**
- * What a section is, for the bar on its row: the glyph, the name, and — for a lone block — which
- * block, so clicking the name selects it rather than the section around it.
- */
-export interface RowInfo {
-  kind: 'block' | 'group' | 'columns';
-  label: string;
-  glyph: BlockType | 'group' | 'columns';
-  blockId?: string;
-}
-
-/**
- * What the ⋯ on a row offers. Built by the app, because the actions are the editor's; the canvas
- * only knows where the row is.
- */
-export interface RowMenuSpec {
-  columns?: { count: number; onPick(count: number): void };
-  mobile?: { value: 'stack' | 'side-by-side'; onPick(value: 'stack' | 'side-by-side'): void };
-  background?: { value: string; options: Array<[string, string]>; onPick(key: string): void };
-  actions: Array<{ label: string; onClick(): void; danger?: boolean; title?: string }>;
-}
 
 export interface PreviewProps {
   html: string;
@@ -159,136 +143,6 @@ export interface PreviewProps {
   autoEdit?: string | null;
   onAutoEdited?(): void;
 }
-
-export interface PreviewApi {
-  /** Opens the block's text for editing on the canvas. False when it has no text to edit. */
-  startEditing(blockId: string): boolean;
-  /** The slash menu, in its add-a-block form, on the selected block. */
-  openQuickAdd(): void;
-}
-
-/**
- * The slash menu's state. `format` is the menu over an editable, `insert` the same menu on a
- * selected block with only the add-a-block half, `link` the URL field that replaces it while a
- * link is being typed. Position is in frame coordinates, like the action bar's.
- */
-interface SlashState {
-  mode: 'format' | 'insert' | 'link';
-  query: string;
-  index: number;
-  top: number;
-  left: number;
-}
-
-/**
- * Where a dragged block would land, named in terms of the document rather than of pixels.
- *
- * The canvas resolves a pointer position to one of these and stops there. Turning it into "column
- * c7, index 2" needs the document, which this component deliberately does not have — it knows about
- * markup and rectangles, and the editor knows about structure.
- */
-export type DropSpot =
-  /** Into the block's column, before or after it — alongside it in the same cell. */
-  | { at: 'block'; blockId: string; before: boolean }
-  /** A full-width section of its own, before or after this one. */
-  | { at: 'section'; sectionId: string; before: boolean }
-  /** Into a column's own padding: the start of it, or with `tail` the end. */
-  | { at: 'column'; columnId: string; tail: boolean }
-  | { at: 'end' };
-
-/**
- * Where to draw the indicator, in frame coordinates. A line for an edge, a box for a whole column.
- * `frame` is the cell a drop would land *inside*, drawn faintly so an inset line reads as "into
- * this" rather than as a line that happens to be short.
- */
-interface Hint {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  box: boolean;
-  frame?: { top: number; left: number; width: number; height: number };
-}
-
-/**
- * One strip of the spacing overlay: a padding, a gap, a section's space, or a box's inset, with
- * the number it is. Drawn over the canvas on hover and while a spacing dial is being worked, so
- * the structure a block sits in is visible rather than inferred from where the words stop.
- */
-interface SpaceBox {
-  /** Stable across re-measures — `pad-top`, `gap-bottom` — so a strip keeps its node between them. */
-  key: string;
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  kind: 'pad' | 'gap' | 'section' | 'box';
-  /** The number the strip is, as rendered. */
-  value: number;
-}
-
-/** A row as the canvas draws it: what it is, and its band in frame coordinates. */
-interface RowCard extends RowInfo {
-  sectionId: string;
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
-/** Below this, the measurement is a document that has not finished parsing, not a short email. */
-const PLAUSIBLE = 24;
-
-/**
- * A document in two pieces: everything up to and including the `<body …>` tag, and the body's
- * contents. Two documents with the same shell differ only in what the body holds, and that can be
- * written into a live document without reloading it.
- */
-function splitDocument(html: string): { shell: string; body: string } | null {
-  const open = html.indexOf('<body');
-  const start = open === -1 ? -1 : html.indexOf('>', open) + 1;
-  const end = html.lastIndexOf('</body>');
-  if (open === -1 || start <= 0 || end === -1 || end < start) return null;
-  return { shell: html.slice(0, start), body: html.slice(start, end) };
-}
-
-/**
- * Editor chrome, injected into the preview document.
- *
- * `outline` rather than `border`, because a border would change layout and the whole point of this
- * canvas is that it is the compiled email at its real dimensions. Negative offset keeps the outline
- * inside the block's own box so adjacent selections do not overlap.
- */
-const CHROME = `
-<style data-sy-chrome>
-  [data-sy-block] { cursor: pointer; }
-  [data-sy-block]:hover { outline: 2px solid color-mix(in srgb, #2b45d8 55%, transparent); outline-offset: -2px; }
-  [data-sy-selected] { outline: 2px solid #2b45d8 !important; outline-offset: -2px; }
-  [data-sy-selected-section] { outline: 2px dashed #2b45d8 !important; outline-offset: -2px; }
-  [data-sy-selected] svg[data-sy-freeform] [data-sy-layer] { cursor: move; }
-  [data-sy-layer-on] { outline: 1.5px dashed #2b45d8; outline-offset: 2px; }
-  html[data-sy-drawing] [data-sy-selected] svg[data-sy-freeform], html[data-sy-drawing] [data-sy-selected] svg[data-sy-freeform] * { cursor: crosshair !important; }
-  [data-sy-slot]:hover, [data-sy-column]:hover > [data-sy-slot] { border-color: #2b45d8 !important; color: #2b45d8 !important; }
-  [data-sy-dim] { opacity: 0.28; }
-  [data-sy-text-editing] { outline: 2px solid #0b6f4c !important; outline-offset: 2px; cursor: text; }
-  /* Body is positioned so the drop indicator can be placed against the document rather than the
-     viewport. No offsets, so nothing in the email moves. */
-  body { position: relative; }
-  html[data-sy-dragging] [data-sy-block]:hover { outline: none; }
-  html[data-sy-dragging] * { cursor: grabbing !important; user-select: none; }
-  /* The block you picked up, left behind. Dimming it rather than removing it keeps the rest of the
-     email still, so the drop indicator is the only thing moving and the layout does not jump under
-     the pointer. */
-  [data-sy-lifted] { opacity: 0.3 !important; }
-  /* The copy in your hand. A clone rather than a label, and inside the frame rather than over it,
-     so the email's own stylesheet renders it and what you are carrying looks like what you picked
-     up. */
-  [data-sy-carry] {
-    position: absolute !important; z-index: 9998; pointer-events: none; opacity: 0.65;
-    box-shadow: 0 14px 30px -10px rgba(0,0,0,0.45); border-radius: 3px; overflow: hidden;
-    transform: rotate(-0.6deg);
-  }
-</style>`;
 
 export function Preview({
   html,
@@ -586,7 +440,6 @@ export function Preview({
       box: false,
       ...(frameRect ? { frame: rectOf(frameRect) } : {}),
     });
-
 
     let block = under.closest('[data-sy-block]') as HTMLElement | null;
     // A block cannot be dropped onto itself. Walking up rather than giving up means dropping onto
@@ -1833,109 +1686,3 @@ export function Preview({
     </div>
   );
 }
-
-/**
- * The row's menu: the structure decisions in one place on the row itself, so a designer who has
- * just clicked something on the canvas is not sent to a side panel for the number of columns.
- * Layout, phones, background, then the verbs; each closes the menu when it has acted.
- */
-function RowMenu({ spec, top, left, onClose }: { spec: RowMenuSpec | null; top: number; left: number; onClose(): void }) {
-  if (!spec) return null;
-  const done = (fn: () => void) => () => {
-    fn();
-    onClose();
-  };
-  return (
-    <div class="sy-rowmenu" style={{ top: `${top}px`, left: `${left}px` }} onPointerDown={(e) => e.stopPropagation()}>
-      {spec.columns && (
-        <div class="sy-rowmenu-group">
-          <span class="sy-rowmenu-label">Columns</span>
-          <div class="seg" role="group" aria-label="Number of columns">
-            {[1, 2, 3, 4].map((n) => (
-              <button key={n} class={`seg-btn ${spec.columns!.count === n ? 'on' : ''}`} aria-pressed={spec.columns!.count === n} onClick={done(() => spec.columns!.onPick(n))}>
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {spec.mobile && (
-        <div class="sy-rowmenu-group">
-          <span class="sy-rowmenu-label">On phones</span>
-          <select value={spec.mobile.value} onChange={(e) => spec.mobile!.onPick((e.target as HTMLSelectElement).value as 'stack' | 'side-by-side')}>
-            <option value="stack">Stack, full width each</option>
-            <option value="side-by-side">Stay side by side</option>
-          </select>
-        </div>
-      )}
-      {spec.background && (
-        <div class="sy-rowmenu-group">
-          <span class="sy-rowmenu-label">Background</span>
-          <select value={spec.background.value} onChange={(e) => spec.background!.onPick((e.target as HTMLSelectElement).value)}>
-            {spec.background.options.map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      <div class="sy-rowmenu-actions">
-        {spec.actions.map((a) => (
-          <button key={a.label} class={a.danger ? 'danger' : ''} title={a.title} onClick={done(a.onClick)}>
-            {a.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * The URL field a link is typed into. Over the canvas, at the caret, where the menu was.
- *
- * It takes focus — it has to — which is why the editable's `focusout` is told to ignore the
- * departure (`linking`). Enter makes the link; Escape or leaving the field puts the caret back
- * where it was without one.
- */
-function LinkField({ top, left, onSubmit, onCancel }: { top: number; left: number; onSubmit(url: string): void; onCancel(): void }) {
-  const input = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    input.current?.focus();
-  }, []);
-  return (
-    <form
-      class="sy-tools sy-link"
-      style={{ top: `${top}px`, left: `${left}px` }}
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(input.current?.value ?? '');
-      }}
-    >
-      <span class="sy-link-label">Link to</span>
-      <input
-        ref={input}
-        type="text"
-        placeholder="https://…"
-        spellcheck={false}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            onCancel();
-          }
-          // Handled here as well as by the form: implicit submission rides on a keypress that a
-          // synthetic Enter does not always carry (learnings 3.52).
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onSubmit(input.current?.value ?? '');
-          }
-        }}
-        onBlur={onCancel}
-      />
-      <button type="submit" title="Make the link">
-        ↵
-      </button>
-    </form>
-  );
-}
-
