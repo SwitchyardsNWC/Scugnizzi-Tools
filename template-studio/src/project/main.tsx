@@ -7,10 +7,11 @@
 // the real compiler and frames with the real canvas code.
 
 import { render } from 'preact';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 import { Board } from './Board.tsx';
 import { CreateProject } from './CreateProject.tsx';
+import { useInstall, watchLaunches, type InstallState, type LaunchedFile } from './launch.ts';
 import { useProject, type Project } from './useProject.ts';
 import '../app/app.css';
 import './project.css';
@@ -39,10 +40,34 @@ function ProjectTool() {
     window.setTimeout(() => setToast((t) => (t === message ? null : t)), 4200);
   }, []);
   const open = (project.status === 'ready' || project.status === 'view-only') && project.dir && project.info;
+  const install = useInstall();
+  /** A `.scug` this page was opened with, whose folder this browser has yet to be shown. */
+  const [launch, setLaunch] = useState<LaunchedFile | null>(null);
+  const projectRef = useRef(project);
+  projectRef.current = project;
 
   useEffect(() => {
     document.title = open && project.info ? `${project.info.name} · Project` : 'Project';
   }, [open, project.info]);
+
+  // Opened from Finder with a .scug: the project it names, from the folder remembered for it, or else a word
+  // about which folder to choose.
+  useEffect(() => {
+    watchLaunches(
+      (file) => {
+        void (async () => {
+          setLaunch(null);
+          if (await projectRef.current.openById(file.launcher.id)) return;
+          setLaunch(file);
+        })();
+      },
+      (fileName) => notify(`${fileName} isn't a project's launch file.`),
+    );
+  }, [notify]);
+
+  useEffect(() => {
+    if (open) setLaunch(null);
+  }, [open]);
 
   const created = useCallback(
     async (dir: FileSystemDirectoryHandle, name: string, where: string) => {
@@ -58,7 +83,7 @@ function ProjectTool() {
       {open && project.info ? (
         <Board key={project.info.id} project={project} notify={notify} onCreateProject={() => setCreating('')} />
       ) : (
-        <Welcome project={project} onCreate={() => setCreating('')} />
+        <Welcome project={project} launch={launch} onDropLaunch={() => setLaunch(null)} install={install} onCreate={() => setCreating('')} />
       )}
       {creating !== null && <CreateProject initialType={creating} onClose={() => setCreating(null)} onCreated={created} />}
       {toast && (
@@ -70,8 +95,56 @@ function ProjectTool() {
   );
 }
 
-function Welcome({ project, onCreate }: { project: Project; onCreate(): void }) {
+interface WelcomeProps {
+  project: Project;
+  launch: LaunchedFile | null;
+  onDropLaunch(): void;
+  install: { state: InstallState; install(): Promise<boolean> };
+  onCreate(): void;
+}
+
+function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomeProps) {
   const remembered = project.status === 'asking' ? project.dir?.name : null;
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => setProblem(null), [launch]);
+
+  const chooseFor = async () => {
+    if (!launch) return;
+    setProblem(await project.openFor(launch.launcher, launch.fileName));
+  };
+
+  if (launch) {
+    return (
+      <div class="pb-welcome">
+        <a class="fig-pill pb-back" href="../../index.html" title="Back to Scugnizzi tools">
+          <span aria-hidden="true">←</span> Tools
+        </a>
+        <div class="pb-welcome-card">
+          <p class="pb-kicker">Project</p>
+          <h1>Open {launch.launcher.name}.</h1>
+          <p class="pb-lede">
+            You opened <b>{launch.fileName}</b>, and this browser hasn’t been shown the folder it lives in yet. Choose that folder once. From then on the file
+            opens the project on its own, and so do Template Studio and Freeform.
+          </p>
+          {problem && (
+            <p class="pb-warn" role="alert">
+              {problem}
+            </p>
+          )}
+          <div class="pb-actions">
+            <button class="pb-primary" onClick={() => void chooseFor()}>
+              Choose the folder…
+            </button>
+            <button class="pb-secondary" onClick={onDropLaunch}>
+              Not now
+            </button>
+          </div>
+          <p class="pb-foot">When Chrome asks, choose “Edit files”, so the tools can save into it.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div class="pb-welcome">
       <a class="fig-pill pb-back" href="../../index.html" title="Back to Scugnizzi tools">
@@ -148,6 +221,14 @@ function Welcome({ project, onCreate }: { project: Project; onCreate(): void }) 
             <span>where each card sits on the board</span>
           </li>
         </ul>
+        {install.state === 'installable' && (
+          <p class="pb-install">
+            <button class="pb-secondary" onClick={() => void install.install()}>
+              Install as an app
+            </button>
+            <span>Then a project’s .scug file opens it from Finder.</span>
+          </p>
+        )}
         <p class="pb-foot">
           Any folder works, including one Google Drive for desktop or Dropbox keeps in sync, so the team sees the same project. When Chrome asks, choose
           “Edit files”.

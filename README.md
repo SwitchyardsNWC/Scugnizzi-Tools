@@ -19,6 +19,25 @@ back from a canvas, which a `file://` page is not allowed to do, and Ink bleed a
 
 There is a `.claude/launch.json` so the Claude desktop app can start the same server by name.
 
+## Installing it as an app
+
+The site is also a Chrome app. Open the **Project** tool and choose **Install as an app** (or the
+install icon in Chrome's address bar). It gets a dock icon and a window of its own, and it registers
+`.scug` as a file type it opens.
+
+Every project folder holds a `<name>.scug` file: Create a project writes one, and a folder opened as
+it was gets one the first time it is open for editing. Double-click it in Finder and the app opens
+that project's board. The file carries the project's id, not its folder, because a web page can only
+reach a folder through a handle Chrome already stored for it. So on a machine that has opened the
+project before, the file opens it straight away, with the one click Chrome wants before it reopens a
+remembered folder. On a machine that has never seen it, the page asks for the folder once, checks
+it is the right one, and remembers it from then on.
+
+The pieces: `template-studio/public/manifest.webmanifest` (copied into `dist/` on build) names the
+app, its icons and the file type; every page links it; `src/project/launch.ts` reads the launched
+file and offers the install prompt. There is no service worker, so nothing is cached and the app
+is always the site as it is on Pages. Chrome and Edge on a computer only, as with folders.
+
 ## The tools
 
 | # | Tool | What it does | Where |

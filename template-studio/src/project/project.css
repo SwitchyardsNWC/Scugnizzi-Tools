@@ -32,6 +32,8 @@ body { background: #f5f3ee; }
 .pb-link.follows circle { fill: #7b61ff; }
 .pb-link.uses path { stroke: #2e9c5f; stroke-dasharray: 5 6; }
 .pb-link.uses circle { fill: #2e9c5f; }
+.pb-link.made path { stroke: #e0457b; }
+.pb-link.made circle { fill: #e0457b; }
 .pb-link.on { opacity: 1; }
 .pb-link.on path { stroke-width: 3px; }
 
@@ -56,6 +58,7 @@ body { background: #f5f3ee; }
 .pb-missing .pb-kind { background: #f1ede5; color: #8d877c; }
 .pb-card-name { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; white-space: nowrap; text-overflow: ellipsis; }
 .pb-chip { flex: none; padding: 2px 6px; border-radius: 6px; background: #fff1f4; color: #d23a67; font-size: 10.5px; font-weight: 700; }
+.pb-chip.ink-bleed { background: #efece6; color: #3d3931; }
 .pb-card-open { flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; background: none; color: #6f6a60; font-size: 14px; cursor: pointer; }
 .pb-card-open:hover { background: #f3f0e9; color: #1e1c19; }
 
@@ -80,6 +83,42 @@ body { background: #f5f3ee; }
 .pb-card-note p { margin: 0 0 10px; }
 .pb-link-btn { padding: 0; border: 0; background: none; color: #6b4ff6; font: inherit; font-weight: 650; cursor: pointer; }
 .pb-link-btn:hover { text-decoration: underline; }
+
+/* --- groups: named regions, each a folder under assets/ ------------------------------------------------------ */
+.pb-group {
+  position: absolute; box-sizing: border-box; border-radius: 26px; background: rgb(255 255 255 / 0.42);
+  border: 2px solid rgb(123 97 255 / 0.16); transition: background 160ms, border-color 160ms, box-shadow 200ms;
+  animation: pb-card-in 460ms cubic-bezier(.34, 1.56, .64, 1) both;
+}
+.pb-group.drop { background: rgb(238 233 255 / 0.72); border-color: #7b61ff; box-shadow: 0 0 0 8px rgb(123 97 255 / 0.12); }
+.pb-group.lifted { border-color: #7b61ff; box-shadow: 0 30px 60px -30px rgb(40 30 10 / 0.45); }
+.pb-group-head {
+  position: absolute; left: 0; right: 0; top: 0; height: 48px; display: flex; align-items: center; gap: 10px;
+  padding: 0 10px 0 20px; cursor: grab; user-select: none;
+}
+.pb-group.lifted .pb-group-head { cursor: grabbing; }
+.pb-group-name { flex: none; max-width: 60%; overflow: hidden; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: #3b2fa8; white-space: nowrap; text-overflow: ellipsis; }
+.pb-group-folder { flex: 1; min-width: 0; overflow: hidden; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: #9a9387; white-space: nowrap; text-overflow: ellipsis; }
+.pb-group-input {
+  flex: none; width: 55%; height: 32px; padding: 0 8px; border: 0; border-radius: 9px; outline: 2px solid #7b61ff; background: #fff;
+  font: inherit; font-size: 17px; font-weight: 800; color: #3b2fa8;
+}
+.pb-group-x {
+  flex: none; height: 30px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 10px; background: none;
+  color: #8d877c; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer;
+}
+.pb-group-x:hover { background: rgb(255 255 255 / 0.9); color: #1e1c19; }
+.pb-group-x.confirm { background: #ffe7e3; color: #c2361f; }
+.pb-group-resize {
+  position: absolute; right: 8px; bottom: 8px; width: 18px; height: 18px; cursor: nwse-resize; box-sizing: border-box;
+  border-right: 3px solid rgb(123 97 255 / 0.35); border-bottom: 3px solid rgb(123 97 255 / 0.35); border-radius: 0 0 8px 0;
+}
+.pb-group-resize:hover { border-color: #7b61ff; }
+.pb-dock-icon.group { background: #fff4e0; color: #b7791f; }
+.pb-drop-out {
+  position: fixed; left: 50%; top: 70px; z-index: 6; padding: 8px 14px; transform: translateX(-50%); border-radius: 999px;
+  background: #1d1b26; color: #fff; font-size: 13px; pointer-events: none;
+}
 
 /* --- chrome ----------------------------------------------------------------------------------------------- */
 .pb-dot { flex: none; width: 8px; height: 8px; border-radius: 999px; background: #c9c3b8; }
@@ -168,6 +207,7 @@ body { background: #f5f3ee; }
 .pb-tree li + li { border-top: 1px solid #f0ece4; }
 .pb-tree code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: #1e1c19; }
 .pb-foot { margin: 0; font-size: 12.5px; line-height: 1.5; color: #8d877c; }
+.pb-install { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 18px; font-size: 12.5px; line-height: 1.5; color: #8d877c; }
 
 /* Three cards drifting behind the welcome: what a board is made of. */
 .pb-float {

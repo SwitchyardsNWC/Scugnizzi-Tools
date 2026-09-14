@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scugnizzi tools</title>
+<meta name="theme-color" content="#1e1c19">
+<link rel="manifest" href="template-studio/dist/manifest.webmanifest">
+<link rel="icon" href="template-studio/dist/icons/app-192.png" type="image/png">
 <link rel="stylesheet" href="design system/Enkel Design system v2/styles.css">
 <style>
   /* Enkel: sunken page, paper cards, one soft hairline, no shadow, no radius on containers. Words in the sans, figures in mono. */
@@ -57,7 +60,6 @@
   .stat:hover{background:var(--surface-row-hover);color:inherit}
   .stat .label{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-secondary)}
   .stat .value{font-family:var(--font-mono);font-size:var(--text-stat);line-height:var(--leading-stat);letter-spacing:var(--tracking-stat);color:var(--text-primary)}
-  .stat .value small{font-size:var(--text-meta);letter-spacing:0;color:var(--delta-down);margin-left:var(--spacing-8)}
   .sq{width:8px;height:8px;flex:0 0 8px}
   .sq.email{background:var(--data-1)} .sq.frame{background:var(--data-6)} .sq.picture{background:var(--data-5)}
 
@@ -72,6 +74,8 @@
   .hub-board-foot{display:flex;align-items:center;gap:var(--spacing-12);padding-top:var(--spacing-12);font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
   .hub-board-foot .path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .map *{vector-effect:non-scaling-stroke}
+  .map .group{fill:none;stroke:var(--text-faint)}
+  .map .group-rule{stroke:var(--border-card)}
   .map .card{fill:var(--surface-card);stroke:var(--border-card)}
   .map .rule{stroke:var(--border-muted)}
   .map .text{stroke:var(--text-faint)}
@@ -81,7 +85,8 @@
   .map .k-email{fill:var(--data-1)} .map .k-frame{fill:var(--data-6)} .map .k-picture{fill:var(--data-5)}
   .map .follows{fill:none;stroke:var(--data-6);stroke-width:1.5}
   .map .uses{fill:none;stroke:var(--data-5);stroke-width:1.25}
-  .map .end-follows{fill:var(--data-6)} .map .end-uses{fill:var(--data-5)}
+  .map .made{fill:none;stroke:var(--data-2);stroke-width:1.25}
+  .map .end-follows{fill:var(--data-6)} .map .end-uses{fill:var(--data-5)} .map .end-made{fill:var(--data-2)}
 
   /* Start from a type: one row, each type drawn as the shapes it starts with, at their true proportions. */
   .hub-types{border-top:var(--border-width) solid var(--border-card)}
@@ -129,7 +134,6 @@
   @media (max-width:1023px){
     .hub-top{grid-template-columns:1fr;min-height:0}
     .hub-intro{border-right:0;border-bottom:var(--border-width) solid var(--border-card)}
-    .hub-intro .actions{margin-top:var(--spacing-8)}
     .hub-field{min-height:260px}
     .types{grid-template-columns:1fr}
     .type{flex-direction:row;align-items:center;gap:var(--spacing-16);border-right:0;border-bottom:var(--border-width) solid var(--border-muted)}
@@ -175,7 +179,7 @@
       </div>
     </section>
 
-    <div class="section-head"><span>Tools</span><span class="n" id="tool-count"></span><span class="spacer"></span><span class="hint">Template Studio and Freeform open the project on their own</span></div>
+    <div class="section-head"><span>Tools</span><span class="n" id="tool-count"></span><span class="spacer"></span><span class="hint">Tools that work in a project find the open one on their own</span></div>
     <section class="grid" id="grid"></section>
   </main>
 
@@ -187,6 +191,7 @@
   </footer>
 
 <script src="tool-kit.js"></script>
+<script src="project.js"></script>
 <script>
 const PROJECT = 'template-studio/dist/project.html';
 
@@ -287,65 +292,28 @@ for (const t of TYPES) {
   types.appendChild(a);
 }
 
-// --- the open project -------------------------------------------------------------------------------------------
+// --- reading the project ----------------------------------------------------------------------------------------
 //
-// Every page on this site shares one remembered folder: Template Studio keeps its handle in IndexedDB
-// (template-studio/src/workspace/workspace.ts), and the board, Freeform and this page all read that one. Pages tell
-// each other on the `scuggnizzi.project` channel. This page reads the folder and never writes it: project.json is
-// the board's to write.
-
-const HANDLES = { db: 'template-studio', store: 'handles', key: 'workspace' };
-
-function handleStore() {
-  return new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(HANDLES.db, 1);
-      request.onupgradeneeded = () => request.result.createObjectStore(HANDLES.store);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    } catch { resolve(null); }
-  });
-}
-async function recallFolder() {
-  const db = await handleStore();
-  if (!db) return null;
-  return new Promise((resolve) => {
-    try {
-      const request = db.transaction(HANDLES.store, 'readonly').objectStore(HANDLES.store).get(HANDLES.key);
-      request.onsuccess = () => resolve(request.result ?? null);
-      request.onerror = () => resolve(null);
-    } catch { resolve(null); }
-  });
-}
-async function rememberFolder(dir) {
-  const db = await handleStore();
-  if (!db) return;
-  await new Promise((resolve) => {
-    try {
-      const tx = db.transaction(HANDLES.store, 'readwrite');
-      tx.objectStore(HANDLES.store).put(dir, HANDLES.key);
-      tx.oncomplete = tx.onerror = () => resolve();
-    } catch { resolve(); }
-  });
-}
-async function permissionOf(dir, mode) {
-  try { return (await dir.queryPermission?.({ mode })) ?? 'granted'; } catch { return 'denied'; }
-}
-
-let channel = null;
-try { channel = new BroadcastChannel('scuggnizzi.project'); } catch { channel = null; }
-const tell = (type) => { try { channel?.postMessage({ type }); } catch { /* nothing to tell */ } };
+// project.js finds the project every page on this site shares and says when it changes. This page reads the folder
+// to draw it and never writes into it, and never picks a folder: the board does both.
 
 async function childDir(dir, name) { try { return await dir.getDirectoryHandle(name); } catch { return null; } }
 async function readJson(fileHandle) { try { return JSON.parse(await (await fileHandle.getFile()).text()); } catch { return null; } }
+async function readJsonAt(dir, name) { try { return await readJson(await dir.getFileHandle(name)); } catch { return null; } }
 
 const TEMPLATE = /\.(template|design)\.json$/;
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
+// Mirrors RECIPE_TOOLS and assetPath in template-studio/src/model/tool-recipes.ts.
+const RECIPE_TOOLS = { riso: { dir: 'riso', ext: '.riso.json' }, 'ink-bleed': { dir: 'ink-bleed', ext: '.ink-bleed.json' } };
+const assetPath = (path) => {
+  if (typeof path !== 'string' || !path.startsWith('assets/')) return null;
+  const rest = path.slice('assets/'.length);
+  return rest && !rest.split('/').some((part) => !part || part === '.' || part === '..') ? rest : null;
+};
 
-/** What the board would show for a folder: its cards, where board.json puts them, and what is made from what. */
-async function readFolder(dir) {
-  const project = await (async () => { try { return await readJson(await dir.getFileHandle('project.json')); } catch { return null; } })();
-  const info = project && project.version === 1 && typeof project.id === 'string' && project.id ? project : null;
+/** What the board would show for a folder: its cards and groups, where board.json puts them, and what is made from what. */
+async function readFolder(dir, projectJson) {
+  const info = projectJson && projectJson.version === 1 && typeof projectJson.id === 'string' && projectJson.id ? projectJson : null;
 
   const emails = [];
   for (const source of [dir, await childDir(dir, 'templates')]) {
@@ -382,11 +350,16 @@ async function readFolder(dir) {
   const assets = await childDir(dir, 'assets');
   if (assets) await walk(assets, '', 3);
 
-  const board = await (async () => { try { return await readJson(await dir.getFileHandle('board.json')); } catch { return null; } })();
-  const places = {};
-  if (board && board.version === 1 && board.cards && typeof board.cards === 'object') {
-    for (const [id, at] of Object.entries(board.cards)) {
-      if (SIZE[id.slice(0, id.indexOf(':'))] && at && Number.isFinite(at.x) && Number.isFinite(at.y)) places[id] = { x: Math.round(at.x), y: Math.round(at.y) };
+  // What Riso and Ink bleed saved, and from which pictures.
+  const recipes = [];
+  for (const [tool, { dir: name, ext }] of Object.entries(RECIPE_TOOLS)) {
+    const folder = await childDir(dir, name);
+    if (!folder) continue;
+    for await (const [fileName, entry] of folder.entries()) {
+      if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
+      const raw = await readJson(entry);
+      const output = raw && raw.version === 1 && raw.tool === tool ? assetPath(raw.output) : null;
+      if (output) recipes.push({ output, sources: [...new Set(arr(raw.sources).map(assetPath).filter((s) => s && s !== output))] });
     }
   }
 
@@ -394,56 +367,134 @@ async function readFolder(dir) {
     name: (info && typeof info.name === 'string' && info.name.trim().slice(0, 80)) || dir.name,
     type: info && info.type, createdAt: info && info.createdAt,
     emails, frames, pictures,
-    ...layoutBoard([...emails, ...frames, ...pictures], places),
-    links: projectLinks(emails, frames, pictures),
+    ...layoutBoard([...emails, ...frames, ...pictures], readBoard(await readJsonAt(dir, 'board.json'))),
+    links: projectLinks(emails, frames, pictures, recipes),
   };
 }
 
-// Mirrors layoutBoard in template-studio/src/model/project.ts, so a card with no place yet sits where the board will put it.
+// Mirrors readBoard and layoutBoard in template-studio/src/model/project.ts, so a card or group with no place yet sits
+// where the board will put it.
 const SIZE = { email: { w: 260, h: 380 }, frame: { w: 300, h: 250 }, picture: { w: 220, h: 210 } };
 const CARD_GAP = 40, LANE_GAP = 120, COLUMNS = 5;
+const GROUP_HEAD = 48, GROUP_PAD = 28, GROUP_COLUMNS = 4;
+const GROUP_MIN = { w: GROUP_PAD * 2 + SIZE.picture.w, h: GROUP_HEAD + SIZE.picture.h + GROUP_PAD };
 const overlaps = (a, b) => a.x < b.x + b.w + CARD_GAP && b.x < a.x + a.w + CARD_GAP && a.y < b.y + b.h + CARD_GAP && b.y < a.y + a.h + CARD_GAP;
+const byName = (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+const isGroupFolder = (name) => typeof name === 'string' && name.length > 0 && name.length <= 80 && !/[\\/]/.test(name) && !name.startsWith('.') && name !== 'rendered';
+const sizedGroup = (g) => ({ ...g, x: Math.round(g.x), y: Math.round(g.y), w: Math.round(Math.max(GROUP_MIN.w, g.w)), h: Math.round(Math.max(GROUP_MIN.h, g.h)) });
 
-function layoutBoard(sources, places) {
+/** The group folder a card belongs to: a picture's folder under assets/, when a group can own it. */
+function cardFolder(card) {
+  if (card.kind !== 'picture') return null;
+  const path = card.id.slice('picture:'.length), slash = path.indexOf('/');
+  const folder = slash > 0 ? path.slice(0, slash) : null;
+  return isGroupFolder(folder) ? folder : null;
+}
+
+function readBoard(raw) {
+  const places = {}, groups = [];
+  if (!raw || raw.version !== 1) return { places, groups };
+  if (raw.cards && typeof raw.cards === 'object') {
+    for (const [id, at] of Object.entries(raw.cards)) {
+      if (SIZE[id.slice(0, id.indexOf(':'))] && at && Number.isFinite(at.x) && Number.isFinite(at.y)) places[id] = { x: Math.round(at.x), y: Math.round(at.y) };
+    }
+  }
+  const ids = new Set(), folders = new Set();
+  for (const g of arr(raw.groups)) {
+    if (!g || typeof g.id !== 'string' || !g.id || ids.has(g.id) || !isGroupFolder(g.folder) || folders.has(g.folder)) continue;
+    if (![g.x, g.y, g.w, g.h].every(Number.isFinite)) continue;
+    ids.add(g.id);
+    folders.add(g.folder);
+    const name = typeof g.name === 'string' ? g.name.trim().slice(0, 60) : '';
+    groups.push(sizedGroup({ id: g.id, name: name || g.folder, folder: g.folder, x: g.x, y: g.y, w: g.w, h: g.h }));
+  }
+  return { places, groups };
+}
+
+function layoutBoard(sources, { places, groups: stored }) {
   const present = new Set(sources.map((s) => s.id));
   const cards = sources.filter((s) => places[s.id]).map((s) => ({ ...s, ...SIZE[s.kind], ...places[s.id] }));
   const missing = Object.entries(places).filter(([id]) => !present.has(id)).map(([id, at]) => {
     const kind = id.slice(0, id.indexOf(':'));
     return { id, kind, name: 'Missing', ...SIZE[kind], ...at };
   });
-  for (const kind of ['email', 'frame', 'picture']) {
-    const waiting = sources.filter((s) => s.kind === kind && !places[s.id]).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    if (!waiting.length) continue;
-    const { w, h } = SIZE[kind];
-    const taken = [...cards, ...missing];
-    const same = taken.filter((c) => c.kind === kind);
-    const x0 = same.length ? Math.min(...same.map((c) => c.x)) : taken.length ? Math.min(...taken.map((c) => c.x)) : 0;
-    const y0 = same.length ? Math.min(...same.map((c) => c.y)) : taken.length ? Math.max(...taken.map((c) => c.y + c.h)) + LANE_GAP : 0;
+  const groups = stored.map((g) => ({ ...g }));
+  const fill = (waiting, taken, spotAt) => {
     let slot = 0;
     for (const source of waiting) {
       let spot;
-      do {
-        spot = { x: x0 + (slot % COLUMNS) * (w + CARD_GAP), y: y0 + Math.floor(slot / COLUMNS) * (h + CARD_GAP), w, h };
-        slot += 1;
-      } while (taken.some((r) => overlaps(r, spot)) && slot < 100000);
+      do { spot = spotAt(slot); slot += 1; } while (taken.some((r) => overlaps(r, spot)) && slot < 100000);
       const card = { ...source, ...spot };
       cards.push(card);
       taken.push(card);
     }
+  };
+
+  // Cards in no group, in lanes that keep clear of the groups.
+  for (const kind of ['email', 'frame', 'picture']) {
+    const waiting = sources.filter((s) => s.kind === kind && !places[s.id] && !cardFolder(s)).sort(byName);
+    if (!waiting.length) continue;
+    const { w, h } = SIZE[kind];
+    const taken = [...cards, ...missing, ...groups];
+    const same = [...cards.filter((c) => c.kind === kind && !cardFolder(c)), ...missing.filter((m) => m.kind === kind)];
+    const x0 = same.length ? Math.min(...same.map((c) => c.x)) : taken.length ? Math.min(...taken.map((c) => c.x)) : 0;
+    const y0 = same.length ? Math.min(...same.map((c) => c.y)) : taken.length ? Math.max(...taken.map((c) => c.y + c.h)) + LANE_GAP : 0;
+    fill(waiting, taken, (slot) => ({ x: x0 + (slot % COLUMNS) * (w + CARD_GAP), y: y0 + Math.floor(slot / COLUMNS) * (h + CARD_GAP), w, h }));
   }
-  return { cards, missing };
+
+  // A group for every folder that has none, sized for its pictures, in a row below everything else.
+  let row = null;
+  for (const folder of [...new Set(sources.map(cardFolder).filter(Boolean))].sort()) {
+    if (groups.some((g) => g.folder === folder)) continue;
+    if (!row) {
+      const taken = [...cards, ...missing, ...groups];
+      row = { x: taken.length ? Math.min(...taken.map((r) => r.x)) : 0, y: taken.length ? Math.max(...taken.map((r) => r.y + r.h)) + LANE_GAP : 0 };
+    }
+    const count = sources.filter((s) => cardFolder(s) === folder).length;
+    const cols = Math.min(Math.max(count, 1), GROUP_COLUMNS), rows = Math.max(1, Math.ceil(count / GROUP_COLUMNS));
+    let id = `group:${folder}`;
+    for (let n = 2; groups.some((g) => g.id === id); n += 1) id = `group:${folder}-${n}`;
+    const group = sizedGroup({ id, name: folder, folder, x: row.x, y: row.y,
+      w: GROUP_PAD * 2 + cols * SIZE.picture.w + (cols - 1) * CARD_GAP, h: GROUP_HEAD + rows * SIZE.picture.h + (rows - 1) * CARD_GAP + GROUP_PAD });
+    groups.push(group);
+    row.x += group.w + LANE_GAP;
+  }
+
+  // Pictures without a place, inside their group.
+  for (const group of groups) {
+    const waiting = sources.filter((s) => cardFolder(s) === group.folder && !places[s.id]).sort(byName);
+    if (!waiting.length) continue;
+    const { w, h } = SIZE.picture;
+    const cols = Math.max(1, Math.floor((group.w - GROUP_PAD * 2 + CARD_GAP) / (w + CARD_GAP)));
+    fill(waiting, [...cards, ...missing], (slot) => ({ x: group.x + GROUP_PAD + (slot % cols) * (w + CARD_GAP), y: group.y + GROUP_HEAD + Math.floor(slot / cols) * (h + CARD_GAP), w, h }));
+  }
+
+  // A group is drawn at least big enough to hold its members, wherever they have been put.
+  const placedGroups = groups.map((group) => {
+    let [x0, y0, x1, y1] = [group.x, group.y, group.x + group.w, group.y + group.h];
+    for (const m of cards) {
+      if (cardFolder(m) !== group.folder) continue;
+      x0 = Math.min(x0, m.x - GROUP_PAD);
+      y0 = Math.min(y0, m.y - GROUP_HEAD);
+      x1 = Math.max(x1, m.x + m.w + GROUP_PAD);
+      y1 = Math.max(y1, m.y + m.h + GROUP_PAD);
+    }
+    return { ...group, x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  });
+  return { cards, missing, groups: placedGroups };
 }
 
-// Mirrors projectLinks in template-studio/src/model/project.ts: the frame an email's block follows, and the pictures shown.
+// Mirrors projectLinks in template-studio/src/model/project.ts: the frame an email's block follows, the pictures shown,
+// and the pictures a tool made from others.
 function* blocksOf(template) {
   for (const section of arr(template && template.sections)) for (const row of arr(section && section.rows)) for (const column of arr(row && row.columns)) yield* arr(column && column.blocks);
 }
-function projectLinks(emails, frames, pictures) {
+function projectLinks(emails, frames, pictures, recipes = []) {
   const frameByKey = new Map(frames.map((f) => [f.key, f.id]));
   const pictureByPath = new Map(pictures.map((p) => [p.path, p.id]));
   const out = [], seen = new Set();
   const add = (from, to, kind) => {
-    if (!from || from === to || seen.has(`${from}>${to}`)) return;
+    if (!from || !to || from === to || seen.has(`${from}>${to}`)) return;
     seen.add(`${from}>${to}`);
     out.push({ from, to, kind });
   };
@@ -457,27 +508,30 @@ function projectLinks(emails, frames, pictures) {
       for (const layer of arr(block.layers)) if (layer && layer.kind === 'image') add(pictureByPath.get(layer.src), holder.id, 'uses');
     }
   }
+  for (const recipe of recipes) for (const source of recipe.sources) add(pictureByPath.get(source), pictureByPath.get(recipe.output), 'made');
   return out;
 }
 
 /** What the map shows before a project is open: a campaign as the board lays one out, so the idea reads at a glance. */
 const EXAMPLE = (() => {
   const hero = 'scuggnizzi.freeform.frame.example-hero', square = 'scuggnizzi.freeform.frame.example-square';
+  const club = 'social-media/club-night.jpg', grain = 'social-media/grain.png';
   const withBlocks = (blocks) => ({ sections: [{ rows: [{ columns: [{ blocks }] }] }] });
-  const emails = [{ id: 'email:spring-launch', kind: 'email', name: 'Spring launch', doc: withBlocks([{ type: 'freeform', source: { app: 'freeform', key: hero } }, { type: 'image', src: 'club-night.jpg' }]) }];
+  const emails = [{ id: 'email:spring-launch', kind: 'email', name: 'Spring launch', doc: withBlocks([{ type: 'freeform', source: { app: 'freeform', key: hero } }, { type: 'image', src: club }]) }];
   const frames = [
-    { id: `frame:${hero}`, kind: 'frame', key: hero, name: 'Email hero', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: 'grain.png' }] }]) },
-    { id: `frame:${square}`, kind: 'frame', key: square, name: 'Square post', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: 'club-night.jpg' }] }]) },
+    { id: `frame:${hero}`, kind: 'frame', key: hero, name: 'Email hero', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: grain }] }]) },
+    { id: `frame:${square}`, kind: 'frame', key: square, name: 'Square post', doc: withBlocks([{ type: 'freeform', layers: [{ kind: 'image', src: club }] }]) },
     { id: 'frame:story', kind: 'frame', key: 'story', name: 'Story', doc: null },
     { id: 'frame:poster', kind: 'frame', key: 'poster', name: 'Poster', doc: null },
   ];
-  const pictures = [{ id: 'picture:club-night.jpg', kind: 'picture', path: 'club-night.jpg', name: 'club-night.jpg' }, { id: 'picture:grain.png', kind: 'picture', path: 'grain.png', name: 'grain.png' }];
+  const pictures = [club, grain].map((path) => ({ id: `picture:${path}`, kind: 'picture', path, name: path.split('/').pop() }));
   const places = {
     'email:spring-launch': { x: 0, y: 0 },
     [`frame:${hero}`]: { x: 340, y: 0 }, [`frame:${square}`]: { x: 680, y: 0 }, 'frame:story': { x: 340, y: 290 }, 'frame:poster': { x: 680, y: 290 },
-    'picture:club-night.jpg': { x: 1020, y: 0 }, 'picture:grain.png': { x: 1020, y: 250 },
+    [`picture:${club}`]: { x: 1060, y: 0 }, [`picture:${grain}`]: { x: 1060, y: 250 },
   };
-  return { ...layoutBoard([...emails, ...frames, ...pictures], places), links: projectLinks(emails, frames, pictures) };
+  const groups = [sizedGroup({ id: 'group:social-media', name: 'Social media', folder: 'social-media', x: 1032, y: -48, w: 276, h: 536 })];
+  return { ...layoutBoard([...emails, ...frames, ...pictures], { places, groups }), links: projectLinks(emails, frames, pictures) };
 })();
 
 // --- the map ----------------------------------------------------------------------------------------------------
@@ -488,14 +542,17 @@ let drawn = null;
 function drawMap(board) {
   drawn = board;
   if (!board) { field.innerHTML = ''; return; }
-  const all = [...board.cards, ...board.missing];
+  const all = [...board.cards, ...board.missing, ...board.groups];
   if (!all.length) { field.innerHTML = '<p class="empty">Nothing on the board yet.</p>'; return; }
   const pad = 60;
   const minX = Math.min(...all.map((c) => c.x)) - pad, minY = Math.min(...all.map((c) => c.y)) - pad;
   const vw = Math.max(...all.map((c) => c.x + c.w)) + pad - minX, vh = Math.max(...all.map((c) => c.y + c.h)) + pad - minY;
   // Board units per screen pixel, so the kind squares stay 8px at any size of board.
   const unit = Math.max(vw / (field.clientWidth || 700), vh / (field.clientHeight || 320));
-  const byId = new Map(all.map((c) => [c.id, c]));
+  const byId = new Map([...board.cards, ...board.missing].map((c) => [c.id, c]));
+
+  const groups = board.groups.map((g) => `<g><title>${esc(g.name)} · assets/${esc(g.folder)}/</title><rect class="group" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}"/>`
+    + `<line class="group-rule" x1="${g.x}" y1="${g.y + GROUP_HEAD}" x2="${g.x + g.w}" y2="${g.y + GROUP_HEAD}"/></g>`).join('');
 
   // Lines leave the facing edges and run under the cards; the square where each lands is drawn over them, on the
   // card that is made from the other.
@@ -528,37 +585,26 @@ function drawMap(board) {
   }).join('');
   const missing = board.missing.map((c) => `<g><title>Missing: its file has gone</title><rect class="missing" x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" stroke-dasharray="${4 * unit} ${4 * unit}"/></g>`).join('');
 
-  field.innerHTML = `<svg class="map" viewBox="${minX} ${minY} ${vw} ${vh}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${lines}${missing}${cards}${ends.join('')}</svg>`;
+  field.innerHTML = `<svg class="map" viewBox="${minX} ${minY} ${vw} ${vh}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${groups}${lines}${missing}${cards}${ends.join('')}</svg>`;
 }
 try { new ResizeObserver(() => drawn && drawMap(drawn)).observe(field); } catch { /* the map keeps its first drawing */ }
 
 // --- the hub ----------------------------------------------------------------------------------------------------
 
 /**
- * - `unsupported`: this browser cannot open a folder.
- * - `none`: no project is remembered.
- * - `asking`: one is remembered, and Chrome wants a click before it opens it again.
- * - `gone`: it is remembered and cannot be read: moved, renamed or deleted.
- * - `view-only` and `ready`: open, for reading or for reading and writing.
+ * project.js's status, plus `gone`: a remembered folder Chrome grants that can no longer be read (moved, renamed or
+ * deleted).
  */
 const hub = { status: 'loading', dir: null, data: null };
 let looking = 0;
 
+/** Reads the open project again: when project.js reports a change, when a tool saves into it, and when this tab comes back. */
 async function look() {
+  const P = window.ScugnizziProject;
   const turn = (looking += 1);
-  const next = { status: 'none', dir: null, data: null };
-  if (typeof window.showDirectoryPicker !== 'function') next.status = 'unsupported';
-  else {
-    next.dir = await recallFolder();
-    if (next.dir) {
-      if ((await permissionOf(next.dir, 'read')) !== 'granted') next.status = 'asking';
-      else {
-        try {
-          next.data = await readFolder(next.dir);
-          next.status = (await permissionOf(next.dir, 'readwrite')) === 'granted' ? 'ready' : 'view-only';
-        } catch { next.status = 'gone'; }
-      }
-    }
+  const next = { status: P.status, dir: P.dir, data: null };
+  if (next.status === 'ready' || next.status === 'view-only') {
+    try { next.data = await readFolder(P.dir, P.info); } catch { next.status = 'gone'; }
   }
   if (turn !== looking) return; // a later look has already started
   Object.assign(hub, next);
@@ -579,7 +625,6 @@ function renderHub() {
   const now = document.getElementById('hub-now');
   const folder = dir ? esc(dir.name) : '';
   const pitch = `<p class="lede">A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, the pictures they use, and lines showing what is made from what.</p>`;
-  const others = `<a class="btn ghost" href="template-studio/dist/index.html">Template Studio</a><a class="btn ghost" href="template-studio/dist/freeform.html">Freeform</a>`;
 
   if (status === 'loading') now.innerHTML = '';
   else if (status === 'unsupported') {
@@ -589,15 +634,15 @@ function renderHub() {
   } else if (status === 'none') {
     now.innerHTML = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
       <p class="note">Any folder works, including one Google Drive for desktop or Dropbox keeps in sync. When Chrome asks, choose “Edit files”.</p>
-      <div class="actions"><a class="btn filled" href="${PROJECT}?create">Create a project</a><button class="btn outline" type="button" data-act="pick">Open a folder…</button></div>`;
+      <div class="actions"><a class="btn filled" href="${PROJECT}?create">Create a project</a><a class="btn outline" href="${PROJECT}">Open a folder</a></div>`;
   } else if (status === 'asking') {
     now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
-      <p class="note">Chrome wants one click before it opens this folder again. Template Studio and Freeform open it too, once it is.</p>
-      <div class="actions"><button class="btn filled" type="button" data-act="allow">Reopen ${folder}</button><button class="btn ghost" type="button" data-act="pick">Open a different folder…</button></div>`;
+      <p class="note">Chrome wants one click before it opens this folder again. After that, the tools find it on their own.</p>
+      <div class="actions"><button class="btn filled" type="button" data-act="allow">Reopen ${folder}</button><a class="btn ghost" href="${PROJECT}">Open a different folder</a></div>`;
   } else if (status === 'gone') {
     now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
-      <p class="note">This folder could not be read. It may have been moved, renamed or deleted. Open it again where it is now, or start another.</p>
-      <div class="actions"><button class="btn filled" type="button" data-act="pick">Open a folder…</button><a class="btn outline" href="${PROJECT}?create">Create a project</a></div>`;
+      <p class="note">This folder could not be read. It may have been moved, renamed or deleted. Open it again on the board, where it is now, or start another.</p>
+      <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board</a><a class="btn outline" href="${PROJECT}?create">Create a project</a></div>`;
   } else {
     const type = TYPES.find((t) => t.id === data.type);
     const created = data.createdAt ? new Date(data.createdAt) : null;
@@ -611,38 +656,30 @@ function renderHub() {
       <div class="hub-sub">${sub}</div>
       <div class="stats">${stat('email', 'Emails', data.emails.length)}${stat('frame', 'Frames', data.frames.length)}${stat('picture', 'Pictures', data.pictures.length)}</div>
       ${status === 'view-only' ? '<p class="note">Chrome opened this folder view-only. Allow editing so the tools can save into it.</p>' : ''}
-      <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board →</a>${status === 'view-only' ? '<button class="btn outline" type="button" data-act="allow">Allow editing</button>' : ''}${others}
-        <button class="btn ghost" type="button" data-act="pick">Open a different folder…</button></div>`;
+      <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board →</a>${status === 'view-only' ? '<button class="btn outline" type="button" data-act="allow">Allow editing</button>' : ''}
+        <a class="btn ghost" href="template-studio/dist/index.html">Template Studio</a><a class="btn ghost" href="template-studio/dist/freeform.html">Freeform</a></div>`;
   }
 
   const open = status === 'ready' || status === 'view-only';
   drawMap(status === 'loading' ? null : open ? data : EXAMPLE);
-  const cards = open ? data.cards.length + data.missing.length : 0;
   document.getElementById('hub-map-label').textContent =
     status === 'loading' ? '' :
-    open ? [`${dir.name}/board.json`, plural(cards, 'card'), data.missing.length && `${data.missing.length} missing`, plural(data.links.length, 'line')].filter(Boolean).join(' · ') :
+    open ? [
+      `${dir.name}/board.json`, plural(data.cards.length + data.missing.length, 'card'), data.groups.length && plural(data.groups.length, 'group'),
+      data.missing.length && `${data.missing.length} missing`, plural(data.links.length, 'line'),
+    ].filter(Boolean).join(' · ') :
     status === 'asking' ? `Example board · reopen to see ${dir.name}` :
     'Example board · a campaign';
 }
 
-document.getElementById('hub-now').addEventListener('click', async (event) => {
-  const button = event.target.closest('button[data-act]');
-  if (!button) return;
-  if (button.dataset.act === 'pick') {
-    let dir = null;
-    try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch { return; } // dismissed
-    await rememberFolder(dir);
-    tell('opened');
-  } else if (button.dataset.act === 'allow' && hub.dir) {
-    try { await hub.dir.requestPermission({ mode: 'readwrite' }); } catch { /* refused: the look below says so */ }
-    tell('opened');
-  }
-  await look();
+// Reopen and Allow editing are the one click Chrome needs; project.js asks, then reports the change.
+document.getElementById('hub-now').addEventListener('click', (event) => {
+  if (event.target.closest('button[data-act="allow"]')) void ScugnizziProject.allow();
 });
 
-if (channel) channel.onmessage = (event) => { if (['opened', 'closed'].includes(event.data && event.data.type)) void look(); };
-window.addEventListener('focus', () => void look());
-void look();
+ScugnizziProject.onChange(() => void look());
+try { new BroadcastChannel('scuggnizzi.project').onmessage = (event) => { if (event.data && event.data.type === 'saved') void look(); }; } catch { /* counts refresh on focus instead */ }
+window.addEventListener('focus', () => { if (hub.status !== 'loading') void look(); });
 
 // Shared shortcuts: digits open tools, P the project board, ? lists the keys. No state to keep here.
 ToolKit.init({ tool: 'index' });

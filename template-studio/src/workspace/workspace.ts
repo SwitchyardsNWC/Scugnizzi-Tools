@@ -49,6 +49,8 @@ export type SaveResult = { ok: true; modified: number } | { ok: false; conflict:
 export interface Workspace {
   label: string;
   kind: 'folder' | 'files';
+  /** The folder itself, for a folder workspace: what the project's own files are read through. */
+  handle?: FileSystemDirectoryHandle;
   /**
    * Whether templates and exports can be written back, rather than downloaded.
    *
@@ -177,6 +179,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
   return {
     label: dir.name,
     kind: 'folder',
+    handle: dir,
     canWrite: writable,
 
     async requestWrite() {
@@ -529,17 +532,51 @@ async function remember(dir: Handle): Promise<void> {
 
 export { folderWorkspace, permissionOf };
 
-/** Asks for a folder, and remembers it as the project. Null when the picker was dismissed or is not there. */
-export async function pickFolderHandle(): Promise<Handle | null> {
+/**
+ * Asks for a folder, and remembers it as the project. Null when the picker was dismissed or is not there.
+ * With `remember: false` the folder is only handed back, for a caller that has to look at it first.
+ */
+export async function pickFolderHandle(options: { remember?: boolean } = {}): Promise<Handle | null> {
   const picker = (globalThis as Record<string, unknown>)['showDirectoryPicker'] as ((options?: { mode?: string }) => Promise<Handle>) | undefined;
   if (!picker) return null;
   try {
     const dir = await picker({ mode: 'readwrite' });
-    await remember(dir);
+    if (options.remember !== false) await remember(dir);
     return dir;
   } catch {
     return null;
   }
+}
+
+// Every project this browser has opened is remembered by its id as well, so a `.scug` launch file, which
+// carries the id and nothing about where the folder is, finds its folder without a picker.
+
+const projectKey = (id: string) => `project:${id}`;
+
+/** Remembers which folder holds the project with this id. */
+export async function rememberProjectFolder(id: string, dir: Handle): Promise<void> {
+  const db = await idb();
+  if (!db) return;
+  try {
+    db.transaction(STORE, 'readwrite').objectStore(STORE).put(dir, projectKey(id));
+  } catch {
+    /* the project still opens by picking its folder */
+  }
+}
+
+/** The folder remembered for a project id, whatever Chrome currently grants on it. */
+export async function recallProjectFolder(id: string): Promise<Handle | null> {
+  const db = await idb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(projectKey(id));
+      request.onsuccess = () => resolve((request.result as Handle) ?? null);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 /** The remembered folder, whatever Chrome currently grants on it. */
