@@ -2,7 +2,7 @@
 // Any request for <folder>/assets/index.json lists the .svg files in that folder, which is how
 // tools like Ink bleed discover stamps dropped into their assets directory.
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = __dirname, port = 8770;
+const root = __dirname, port = Number(process.env.PORT) || 8770;
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gif': 'image/gif',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.otf': 'font/otf', '.ttf': 'font/ttf', '.woff': 'font/woff', '.woff2': 'font/woff2' };
 http.createServer((req, res) => {

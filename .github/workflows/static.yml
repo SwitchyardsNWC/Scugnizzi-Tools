@@ -1,28 +1,23 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# Deploys the site to GitHub Pages: the dashboard, the single-file tools, and Template Studio,
+# which is built here rather than committed, so the live site can never be behind its source.
+name: Deploy to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# One deployment at a time. A run already in progress is left to finish; queued runs in between are skipped.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -31,13 +26,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: template-studio/package-lock.json
+
+      - name: Build Template Studio
+        working-directory: template-studio
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      # serve.js answers <folder>/assets/index.json with the folder's SVG files, which is how Ink
+      # bleed finds the stamps dropped beside it. Pages has no server, so the same list is written
+      # as a file for every assets folder that has one.
+      - name: Write stamp indexes
+        run: |
+          find . -path ./template-studio/node_modules -prune -o -type d -name assets -print | while read -r dir; do
+            case "$dir" in ./template-studio/*) continue;; esac
+            node -e '
+              const fs = require("fs"), dir = process.argv[1];
+              const svgs = fs.readdirSync(dir).filter((f) => /\.svg$/i.test(f)).sort();
+              if (svgs.length) fs.writeFileSync(dir + "/index.json", JSON.stringify(svgs));
+            ' "$dir"
+          done
+
+      # Only what the site serves. Source, tests, docs, the v1 reference files and the HubSpot probe stay out.
+      - name: Assemble the site
+        run: |
+          rsync -a --prune-empty-dirs ./ _site/ \
+            --exclude '.git' --exclude '.github' --exclude '.claude' --exclude '_site' \
+            --exclude '.DS_Store' --exclude 'node_modules' \
+            --exclude 'template-studio/src' --exclude 'template-studio/tests' --exclude 'template-studio/tools' \
+            --exclude 'template-studio/probe' --exclude 'template-studio/reference' --exclude 'template-studio/docs' \
+            --exclude 'template-studio/*.md' --exclude 'template-studio/*.json' --exclude 'template-studio/*.ts' \
+            --exclude 'template-studio/index.html' --exclude 'template-studio/freeform.html' --exclude 'template-studio/project.html'
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: _site
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

@@ -15,9 +15,18 @@ node serve.js
 Then open <http://localhost:8770>. The server is thirty lines of Node and serves this folder as
 it is. Two tools need it rather than a double-clicked file: the image effects editor reads pixels
 back from a canvas, which a `file://` page is not allowed to do, and Ink bleed asks the server for
-`assets/index.json` to discover the SVG stamps dropped into its folder.
+`assets/index.json` to discover the SVG stamps dropped into its folder. On the live site that
+file is written at deploy time (see Hosting below), so a stamp dropped into the folder shows up
+on Pages after the next push.
+
+Template Studio has to be built once before the index page can open it:
+
+```bash
+cd template-studio && npm install && npm run build
+```
 
 There is a `.claude/launch.json` so the Claude desktop app can start the same server by name.
+It reads `PORT` if one is set.
 
 ## Installing it as an app
 
@@ -86,7 +95,10 @@ What is in it:
   phone and dark; inline editing with a `/` menu; a design system panel where one change moves
   every block that follows it; a layer tree; drag and drop.
 - **A workspace**: a folder the team already syncs, holding `templates/`, `design-systems/`,
-  `patterns/`, `assets/` and `exports/`. Two designers on the same folder see each other's work.
+  `patterns/`, `assets/` and `exports/`. Two designers on the same folder see each other's work,
+  one save at a time: there is no merging, so if both edit the same template the later save wins.
+  The editor notices when the file changed under it and refuses to write over the other person's
+  save, but the fix is a human one — save a copy, or reload theirs.
 - **A validator** that checks a template against every rule a real send has taught us, before
   Export will write the file.
 
@@ -101,16 +113,21 @@ npm test           # the suite: the HubSpot contract, the compiler, the model, t
 npm run workspace  # regenerates the example folder: two design systems and a template on each
 ```
 
-The `dist/` folder is a build output. Either commit it so the index page works straight from a
-checkout, or run `npm run build` after cloning.
+The `dist/` folder is a build output and is not committed. Run `npm run build` after cloning,
+and again after changing anything under `src/`; the index page opens `dist/`, not the source.
 
-**Hosting.** Template Studio is a static site with no server, so it can be served from GitHub
-Pages as it is; `vite.config.ts` builds with relative paths for exactly that. The templates live
-in a local folder the browser is granted access to, which is how a team on one synced Drive or
-Dropbox folder shares them. Two things follow: it is Chrome only, because only Chrome's File
-System Access API can open a folder; and when Chrome's picker asks "Edit files" or "View files",
-choose Edit, or nothing saves back. If the folder is on Google Drive, set Drive to mirror it
-rather than stream it.
+**Hosting.** The whole site is served from GitHub Pages by `.github/workflows/static.yml`. On
+every push to `main` it installs Template Studio's dependencies, runs the tests, builds `dist/`,
+writes each tool's `assets/index.json`, and uploads the site without the source, tests, docs,
+reference files or the HubSpot probe. Because the build happens there, the live site is always
+the source as pushed; a failing test stops the deploy.
+
+Template Studio itself is static, with no server; `vite.config.ts` builds with relative paths for
+exactly that. The templates live in a local folder the browser is granted access to, which is
+how a team on one synced Drive or Dropbox folder shares them. Two things follow: it is Chrome
+only, because only Chrome's File System Access API can open a folder; and when Chrome's picker
+asks "Edit files" or "View files", choose Edit, or nothing saves back. If the folder is on
+Google Drive, set Drive to mirror it rather than stream it.
 
 Its documentation is in `template-studio/docs/`: the product brief, the plan, the architecture,
 the acceptance list, and `learnings.md`, which records every fact about HubSpot and email

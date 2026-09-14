@@ -10,3 +10,6 @@ node_modules/
 
 # Output of template-studio/tools/regenerate-v1-export.js
 regen-*.html
+
+# Build output: GitHub Pages builds template-studio itself (.github/workflows/static.yml)
+template-studio/dist/
