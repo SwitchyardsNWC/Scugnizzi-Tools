@@ -16,10 +16,25 @@ import { useProject, type Project } from './useProject.ts';
 import '../app/app.css';
 import './project.css';
 
+/**
+ * `?create` or `?create=<type>`: the dashboard's Create a project, landing straight on the sheet with that type
+ * chosen. Taken off the address once read, so a reload does not open the sheet again.
+ */
+function createFromAddress(): string | null {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('create')) return null;
+  const type = params.get('create') ?? '';
+  params.delete('create');
+  const rest = params.toString();
+  history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+  return type;
+}
+
 function ProjectTool() {
   const project = useProject();
   const [toast, setToast] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  /** The type the create sheet starts on; null when the sheet is closed. */
+  const [creating, setCreating] = useState<string | null>(createFromAddress);
   const notify = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast((t) => (t === message ? null : t)), 4200);
@@ -57,7 +72,7 @@ function ProjectTool() {
   const created = useCallback(
     async (dir: FileSystemDirectoryHandle, name: string, where: string) => {
       await project.use(dir);
-      setCreating(false);
+      setCreating(null);
       notify(where ? `Created ${name} in ${where}.` : `Created ${name}.`);
     },
     [project, notify],
@@ -66,11 +81,11 @@ function ProjectTool() {
   return (
     <div class="pb-app">
       {open && project.info ? (
-        <Board key={project.info.id} project={project} notify={notify} onCreateProject={() => setCreating(true)} />
+        <Board key={project.info.id} project={project} notify={notify} onCreateProject={() => setCreating('')} />
       ) : (
-        <Welcome project={project} launch={launch} onDropLaunch={() => setLaunch(null)} install={install} onCreate={() => setCreating(true)} />
+        <Welcome project={project} launch={launch} onDropLaunch={() => setLaunch(null)} install={install} onCreate={() => setCreating('')} />
       )}
-      {creating && <CreateProject onClose={() => setCreating(false)} onCreated={created} />}
+      {creating !== null && <CreateProject initialType={creating} onClose={() => setCreating(null)} onCreated={created} />}
       {toast && (
         <div class="pb-toast" role="status">
           {toast}

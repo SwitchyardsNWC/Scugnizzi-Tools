@@ -191,6 +191,12 @@ canvas code. The code is in `template-studio/src/project/`, and the pure rules a
   Opening a project on the board opens it in Template Studio and Freeform with no picker.
 - **Pages keep in step.** Pages tell each other through a `BroadcastChannel` (`scuggnizzi.project`), so
   an open Freeform tab picks up the project at once.
+- **The dashboard leads with it.** Project is a section of its own above the tools, not card 07. It reads
+  the open project through `project.js` and shows its name, type and counts, and a map of `board.json` laid
+  out the way the board lays it out, groups and lines included. With no project open, the map shows an
+  example campaign. It gives Chrome its click to reopen a project, and leaves picking folders and writing
+  into them to the board. Below that, a row of project types links to `project.html?create=<type>`, which
+  opens Create a project with that type chosen.
 - **When Chrome needs a click.** After a restart Chrome usually wants one click before it opens a
   remembered folder again. Every page offers that click: "Reopen <name>" on the board and in Freeform,
   and a banner in Template Studio.
