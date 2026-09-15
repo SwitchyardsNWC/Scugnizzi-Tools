@@ -752,6 +752,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   /** The pen's dwell timer: fires once the pen has sat still long enough to snap the stroke. */
   const holdTimer = useRef(0);
+  /** A press held still on a layer becomes the hand after a beat (Canvas menu, Hold to pan). */
+  const holdPan = useRef(0);
+  const [held, setHeld] = useState(false);
   /** A pencil has touched this canvas, so from now on a finger pans while a drawing tool is in hand. */
   const penSeen = useRef(false);
   /** The view when the second finger landed, which a pinch is measured against. */
@@ -902,6 +905,15 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }
       onSelectLayer(gid ? groupKey(gid) : hit);
       drag.current = { kind: 'move', layers: gid ? membersOf(b, gid) : [l], x: p.x, y: p.y, moved: false };
+      // Held still on it for a beat: the hand from here, so dragging moves the page and not the layer.
+      const { clientX, clientY } = event;
+      window.clearTimeout(holdPan.current);
+      holdPan.current = window.setTimeout(() => {
+        const d = drag.current;
+        if (!d || d.kind !== 'move' || d.moved) return;
+        drag.current = { kind: 'pan', x: clientX, y: clientY, view: viewRef.current, tracker: new PanTracker() };
+        setHeld(true);
+      }, settingsRef.current.holdPanMs);
     } else {
       lastPress.current = null;
       onSelectLayer(null);
@@ -943,6 +955,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         const dy = p.y - state.y;
         if (!state.moved && Math.hypot(dx, dy) * viewRef.current.z < 3) return;
         state.moved = true;
+        window.clearTimeout(holdPan.current);
         commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
@@ -1017,6 +1030,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const onPointerUp = (event: PointerEvent) => {
     gestures.current!.up(event);
     window.clearTimeout(holdTimer.current);
+    window.clearTimeout(holdPan.current);
+    setHeld(false);
     const state = drag.current;
     const svg = svgEl.current;
     if (svg) release(svg as unknown as HTMLElement, event.pointerId);
@@ -1475,7 +1490,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     : null;
 
   return (
-    <div class={`surface fig phase-${phase} tool-${tool} ${space || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''}`}>
+    <div class={`surface fig phase-${phase} tool-${tool} ${space || held || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''}`}>
       <div class="surface-work" ref={work} tabIndex={-1}>
         <div class="surface-backdrop" aria-hidden="true" />
         <svg

@@ -119,7 +119,7 @@
         <div class="row" style="margin-top:8px"><label></label><button id="sample">Use the sample image</button></div>
         <div id="projectRow" hidden>
           <div class="row"><label></label><button id="fromProject">From the project…</button></div>
-          <p class="hint">Save to project puts the print beside its picture in the project's assets, at the press size, with its settings in riso/.</p>
+          <p class="hint">Save to project puts the print beside its picture in the project's assets, at the press size, and keeps its settings with the project.</p>
         </div>
         <p class="hint">Photos and flat graphics both work. The image is downscaled to 900 px for the press and kept in this browser.</p>
       </div>
@@ -589,7 +589,7 @@ function syncProject() {
   save.textContent = made && made.output ? `Save to ${made.output.split('/').pop()}` : 'Save to project';
   save.title = Project.status !== 'ready' ? `Chrome needs one click to let this page save into ${Project.name}`
     : made && made.output ? `Save over ${made.output} in ${Project.name}, with its settings in ${made.recipe}`
-    : `Save the print into ${Project.name}/assets, with its settings in riso/`;
+    : `Save the print into ${Project.name}/assets, and keep its settings with the project`;
 }
 function keptOrSample() { const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } else sampleImage(); }
 function projectImage(path) {
@@ -649,7 +649,7 @@ $('#saveProject').addEventListener('click', async () => {
   btn.disabled = true;
   try {
     const output = made && made.output ? made.output : await Project.freePath(folderOf(made && made.source), `${slugOf(stemOf(made && made.source ? made.source : src.name))}-riso`, '.png');
-    const recipe = made && made.recipe ? made.recipe : await Project.freePath('riso', stemOf(output), '.riso.json');
+    const recipe = made && made.recipe ? made.recipe : await Project.freePath(Project.recipeFolder('riso'), stemOf(output), '.riso.json');
     const sources = made && made.source ? [made.source] : [];
     const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png'));
     await Project.writeFile(output, blob);

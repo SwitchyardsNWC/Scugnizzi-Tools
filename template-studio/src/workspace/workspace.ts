@@ -10,6 +10,7 @@
 // back to picking files by hand and downloading the result, so Safari and Firefox degrade rather
 // than break.
 
+import { META_DIR, RENDERED_PREFIX } from '../model/layout.ts';
 import { migrate } from '../model/schema.ts';
 import { importV1 } from '../model/import-v1.ts';
 import { completeDesignSystem, type DesignSystem } from '../model/design-system.ts';
@@ -176,6 +177,26 @@ export const supportsFolders = () => typeof (globalThis as Record<string, unknow
 type Handle = FileSystemDirectoryHandle;
 
 function folderWorkspace(dir: Handle, writable: boolean): Workspace {
+  /**
+   * The project's hidden folder (model/layout.ts), when the folder is a project. Its templates, design systems,
+   * patterns and rendered pictures live there; a plain folder opened as a workspace keeps the old shape.
+   */
+  const meta = () => subdirectory(dir, META_DIR);
+  /** A folder to write the tools' files into: inside .scug/ for a project, at the top otherwise. */
+  const toolFolder = async (name: string): Promise<Handle> => {
+    const m = await meta();
+    return (m ?? dir).getDirectoryHandle(name, { create: true });
+  };
+  /** Every folder a tool's files may be in: the new place, and the old one until the project is opened for editing. */
+  const toolFolders = async (name: string): Promise<Handle[]> => {
+    const out: Handle[] = [];
+    const m = await meta();
+    const modern = m ? await subdirectory(m, name) : null;
+    if (modern) out.push(modern);
+    const legacy = await subdirectory(dir, name);
+    if (legacy) out.push(legacy);
+    return out;
+  };
   return {
     label: dir.name,
     kind: 'folder',
@@ -193,12 +214,13 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
 
     async list() {
       const out: TemplateFile[] = [];
-      // Templates live at the top level and under `templates/`, so both are walked — a workspace
-      // that has not been organised yet still lists.
-      for (const source of [dir, await subdirectory(dir, 'templates')]) {
-        if (!source) continue;
+      const seen = new Set<string>();
+      // Templates live in `.scug/templates/` in a project, and at the top level or under `templates/` in a
+      // workspace that has not been organised yet, so all three are walked; the first place wins a name.
+      for (const source of [...(await toolFolders('templates')), dir]) {
         for await (const [fileName, entry] of source.entries()) {
-          if (entry.kind !== 'file' || !isTemplateFile(fileName)) continue;
+          if (entry.kind !== 'file' || !isTemplateFile(fileName) || seen.has(fileName)) continue;
+          seen.add(fileName);
           // The DOM lib does not discriminate the handle union on `kind`, so this narrows by hand.
           const handle = entry as FileSystemFileHandle;
           const file = await handle.getFile();
@@ -225,7 +247,9 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
       return writing(dir.name, async () => {
         const parts = path.split('/').filter(Boolean);
         const fileName = parts.pop()!;
-        let folder = await dir.getDirectoryHandle('assets', { create: true });
+        // A rendered picture goes into .scug/rendered/ in a project, and keeps its `rendered/…` name in documents.
+        const m = parts[0] === RENDERED_PREFIX ? await meta() : null;
+        let folder = m ? await m.getDirectoryHandle(parts.shift()!, { create: true }) : await dir.getDirectoryHandle('assets', { create: true });
         for (const part of parts) folder = await folder.getDirectoryHandle(part, { create: true });
         const handle = await folder.getFileHandle(fileName, { create: true });
         const out = await handle.createWritable();
@@ -236,16 +260,16 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     },
 
     async designSystems() {
-      const folder = await subdirectory(dir, 'design-systems');
       const out: Record<string, DesignSystem> = {};
-      if (!folder) return out;
-      for await (const [fileName, entry] of folder.entries()) {
-        if (entry.kind !== 'file' || !fileName.endsWith(SYSTEM)) continue;
-        try {
-          const text = await (await (entry as FileSystemFileHandle).getFile()).text();
-          out[systemName(fileName)] = completeDesignSystem(JSON.parse(text));
-        } catch {
-          // A file that is not JSON is somebody's half-written edit, not a reason to lose the rest.
+      for (const folder of await toolFolders('design-systems')) {
+        for await (const [fileName, entry] of folder.entries()) {
+          if (entry.kind !== 'file' || !fileName.endsWith(SYSTEM) || systemName(fileName) in out) continue;
+          try {
+            const text = await (await (entry as FileSystemFileHandle).getFile()).text();
+            out[systemName(fileName)] = completeDesignSystem(JSON.parse(text));
+          } catch {
+            // A file that is not JSON is somebody's half-written edit, not a reason to lose the rest.
+          }
         }
       }
       return out;
@@ -256,7 +280,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         return;
       }
       await writing(dir.name, async () => {
-        const folder = await dir.getDirectoryHandle('design-systems', { create: true });
+        const folder = await toolFolder('design-systems');
         const handle = await folder.getFileHandle(systemFileName(name), { create: true });
         const out = await handle.createWritable();
         await out.write(json);
@@ -265,16 +289,18 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     },
 
     async patterns() {
-      const folder = await subdirectory(dir, 'patterns');
       const out: Pattern[] = [];
-      if (!folder) return out;
-      for await (const [fileName, entry] of folder.entries()) {
-        if (entry.kind !== 'file' || !fileName.endsWith(PATTERN)) continue;
-        try {
-          const text = await (await (entry as FileSystemFileHandle).getFile()).text();
-          out.push(parsePattern(JSON.parse(text)));
-        } catch {
-          // Skipped, not fatal, for the same reason as a system file.
+      const seen = new Set<string>();
+      for (const folder of await toolFolders('patterns')) {
+        for await (const [fileName, entry] of folder.entries()) {
+          if (entry.kind !== 'file' || !fileName.endsWith(PATTERN) || seen.has(fileName)) continue;
+          seen.add(fileName);
+          try {
+            const text = await (await (entry as FileSystemFileHandle).getFile()).text();
+            out.push(parsePattern(JSON.parse(text)));
+          } catch {
+            // Skipped, not fatal, for the same reason as a system file.
+          }
         }
       }
       return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -285,7 +311,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         return;
       }
       await writing(dir.name, async () => {
-        const folder = await dir.getDirectoryHandle('patterns', { create: true });
+        const folder = await toolFolder('patterns');
         const handle = await folder.getFileHandle(patternFileName(pattern.name), { create: true });
         const out = await handle.createWritable();
         await out.write(json);
@@ -309,17 +335,33 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     },
 
     async assets() {
-      const folder = await subdirectory(dir, 'assets');
-      if (!folder) return [];
       const out: AssetFile[] = [];
-      await collectImages(folder, '', out, 3);
-      return out.sort((a, b) => a.name.localeCompare(b.name));
+      // Rendered pictures first, from .scug/rendered/, under the `rendered/` name documents use; then assets/, where
+      // the old layout kept them too, the first spelling of a name winning.
+      const m = await meta();
+      const rendered = m ? await subdirectory(m, RENDERED_PREFIX) : null;
+      if (rendered) await collectImages(rendered, RENDERED_PREFIX, out, 2);
+      const folder = await subdirectory(dir, 'assets');
+      if (folder) await collectImages(folder, '', out, 3);
+      const seen = new Set<string>();
+      return out
+        .filter((a) => {
+          if (seen.has(a.name)) {
+            URL.revokeObjectURL(a.url);
+            return false;
+          }
+          seen.add(a.name);
+          return true;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
     },
 
     async writeTemplate(fileName, json, expectedModified) {
       if (!writable) throw refused(dir.name);
       return writing(dir.name, async () => {
-        const source = (await subdirectory(dir, 'templates')) ?? dir;
+        // Into .scug/templates/ in a project; otherwise where the workspace keeps them, or the top.
+        const m = await meta();
+        const source = m ? await m.getDirectoryHandle('templates', { create: true }) : ((await subdirectory(dir, 'templates')) ?? dir);
         const handle = await source.getFileHandle(fileName, { create: true });
 
         const onDisk = await handle.getFile();

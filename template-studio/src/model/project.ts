@@ -11,11 +11,15 @@
 //
 // Pure, so what the board shows for a folder is decided here and tested on plain data.
 
+import { metaPath } from './layout.ts';
 import type { ToolRecipe } from './tool-recipes.ts';
 import type { Block, Template } from './types.ts';
 
-export const PROJECT_FILE = 'project.json';
-export const BOARD_FILE = 'board.json';
+/** In `.scug/` (model/layout.ts). The old layout kept them at the top of the project; folder.ts moves them. */
+export const PROJECT_FILE = metaPath('project.json');
+export const BOARD_FILE = metaPath('board.json');
+export const LEGACY_PROJECT_FILE = 'project.json';
+export const LEGACY_BOARD_FILE = 'board.json';
 /** Pages on this site tell each other a project was opened or closed. */
 export const PROJECT_CHANNEL = 'scuggnizzi.project';
 

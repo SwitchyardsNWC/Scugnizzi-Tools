@@ -4,7 +4,7 @@
 // browser's store. The Freeform app runs it when a project opens and when it comes back into focus, and the
 // project board runs it so frames drawn before the project existed are on the board from the first look.
 
-import { FRAME_EXT, FRAMES_DIR, frameFileJson, frameFileName, planFrameSync, readFrameFile, type FrameFile } from '../model/frame-file.ts';
+import { FRAME_EXT, FRAMES_DIR, frameFileJson, frameFileName, LEGACY_FRAMES_DIR, planFrameSync, readFrameFile, type FrameFile } from '../model/frame-file.ts';
 import { applyPulls, dropFrames, readFrames, tagFrames, type FrameIndex, type KeyValue } from '../model/frame-store.ts';
 import type { Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
@@ -14,37 +14,45 @@ type Dir = FileSystemDirectoryHandle;
 
 export interface FolderFrame extends FrameFile {
   fileName: string;
+  /** The file's path in the project: under `.scug/frames/`, or the old `frames/` until the project is opened for editing. */
+  path: string;
 }
 
-/** Every frame file in the project, by name. Two files claiming one frame (a copy made in Finder): the later save. */
+/**
+ * Every frame file in the project, by name, from `.scug/frames/` and the old `frames/` both. Two files claiming one
+ * frame (a copy made in Finder, or one layout's copy beside the other's): the later save.
+ */
 export async function readFolderFrames(dir: Dir): Promise<FolderFrame[]> {
-  const folder = await childDir(dir, [FRAMES_DIR]);
-  if (!folder) return [];
   const byKey = new Map<string, FolderFrame>();
-  for await (const [fileName, entry] of folder.entries()) {
-    if (entry.kind !== 'file' || !fileName.endsWith(FRAME_EXT)) continue;
-    try {
-      const frame = readFrameFile(await (await (entry as FileSystemFileHandle).getFile()).text());
-      if (!frame) continue;
-      const other = byKey.get(frame.key);
-      if (!other || other.savedAt < frame.savedAt) byKey.set(frame.key, { ...frame, fileName });
-    } catch {
-      // A file mid-sync or unreadable: the rest still count.
+  for (const sub of [FRAMES_DIR, LEGACY_FRAMES_DIR]) {
+    const folder = await childDir(dir, sub.split('/'));
+    if (!folder) continue;
+    for await (const [fileName, entry] of folder.entries()) {
+      if (entry.kind !== 'file' || !fileName.endsWith(FRAME_EXT)) continue;
+      try {
+        const frame = readFrameFile(await (await (entry as FileSystemFileHandle).getFile()).text());
+        if (!frame) continue;
+        const other = byKey.get(frame.key);
+        if (!other || other.savedAt < frame.savedAt) byKey.set(frame.key, { ...frame, fileName, path: `${sub}/${fileName}` });
+      } catch {
+        // A file mid-sync or unreadable: the rest still count.
+      }
     }
   }
   return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Writes one frame's file. A renamed frame moves to a file named for it, and the old file goes. */
+/** Writes one frame's file, into `.scug/frames/`. A renamed frame moves to a file named for it, and the old file goes. */
 export async function writeFrame(dir: Dir, frame: FrameFile, folder: FolderFrame[]): Promise<FolderFrame> {
   const current = folder.find((f) => f.key === frame.key);
   const fileName = frameFileName(
     frame.name,
     folder.filter((f) => f.key !== frame.key).map((f) => f.fileName),
   );
-  await writeFile(dir, `${FRAMES_DIR}/${fileName}`, frameFileJson(frame));
-  if (current && current.fileName !== fileName) await removeFile(dir, `${FRAMES_DIR}/${current.fileName}`);
-  return { ...frame, fileName };
+  const path = `${FRAMES_DIR}/${fileName}`;
+  await writeFile(dir, path, frameFileJson(frame));
+  if (current && current.path !== path) await removeFile(dir, current.path);
+  return { ...frame, fileName, path };
 }
 
 /**
@@ -77,7 +85,7 @@ export async function copyKeptPictures(dir: Dir, frames: FrameFile[], pictures: 
 }
 
 export async function deleteFrameFile(dir: Dir, key: string, folder: FolderFrame[]): Promise<void> {
-  for (const f of folder) if (f.key === key) await removeFile(dir, `${FRAMES_DIR}/${f.fileName}`);
+  for (const f of folder) if (f.key === key) await removeFile(dir, f.path);
 }
 
 export interface FrameSyncResult {

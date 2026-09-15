@@ -10,9 +10,12 @@
 //
 // Pure: the files are read and written by src/project/frame-sync.ts.
 
+import { META } from './layout.ts';
 import type { Template } from './types.ts';
 
-export const FRAMES_DIR = 'frames';
+/** `.scug/frames` (model/layout.ts); `frames/` at the top of the project in the old layout. */
+export const FRAMES_DIR = META.frames;
+export const LEGACY_FRAMES_DIR = 'frames';
 export const FRAME_EXT = '.frame.json';
 const KIND = 'scuggnizzi.freeform-frame';
 

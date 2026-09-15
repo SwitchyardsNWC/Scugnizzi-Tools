@@ -112,12 +112,9 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
     }
   };
 
-  const inFolder = (folder: string) => plan.files.filter((f) => f.path.startsWith(`${folder}/`)).map((f) => f.path.slice(folder.length + 1));
-  const atRoot = plan.files.filter((f) => !f.path.includes('/')).map((f) => f.path);
-  // The tree as a tree: `assets/photos` sits under `assets`.
-  const topFolders = plan.folders.filter((f) => !f.includes('/'));
-  const subFolders = (folder: string) => plan.folders.filter((f) => f.startsWith(`${folder}/`)).map((f) => f.slice(folder.length + 1));
   const rootNote = (file: string) => (file.endsWith('.scug') ? 'opens it from Finder' : '');
+  // The plan as a tree, folders before files at each level, so what is written is seen the way Finder shows it.
+  const tree = useMemo(() => buildTree(plan.folders, plan.files.map((f) => f.path)), [plan]);
 
   return (
     <div class="cp-backdrop" onPointerDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
@@ -193,35 +190,7 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
               <div class="cp-root">
                 <code>{plan.folder}/</code>
               </div>
-              <ul>
-                {topFolders.map((folder) => (
-                  <li key={folder}>
-                    <code class="cp-dir">{folder}/</code>
-                    <span class="cp-note">{folderNote(folder)}</span>
-                    {(subFolders(folder).length > 0 || inFolder(folder).length > 0) && (
-                      <ul>
-                        {subFolders(folder).map((sub) => (
-                          <li key={`${folder}/${sub}`}>
-                            <code class="cp-dir">{sub}/</code>
-                            <span class="cp-note">{folderNote(`${folder}/${sub}`)}</span>
-                          </li>
-                        ))}
-                        {inFolder(folder).map((file) => (
-                          <li key={file}>
-                            <code class="cp-file">{file}</code>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-                {atRoot.map((file) => (
-                  <li key={file}>
-                    <code class="cp-file">{file}</code>
-                    {rootNote(file) && <span class="cp-note">{rootNote(file)}</span>}
-                  </li>
-                ))}
-              </ul>
+              <Tree nodes={tree} path="" rootNote={rootNote} />
             </div>
           </div>
         </div>
@@ -254,5 +223,54 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
         </footer>
       </div>
     </div>
+  );
+}
+
+interface TreeNode {
+  name: string;
+  folder: boolean;
+  children: TreeNode[];
+}
+
+/** Folders and files as one tree, folders first at each level. */
+function buildTree(folders: string[], files: string[]): TreeNode[] {
+  const root: TreeNode = { name: '', folder: true, children: [] };
+  const at = (parts: string[], folder: boolean) => {
+    let node = root;
+    parts.forEach((part, i) => {
+      const last = i === parts.length - 1;
+      let next = node.children.find((c) => c.name === part);
+      if (!next) {
+        next = { name: part, folder: last ? folder : true, children: [] };
+        node.children.push(next);
+      }
+      node = next;
+    });
+  };
+  for (const f of folders) at(f.split('/'), true);
+  for (const f of files) at(f.split('/'), false);
+  const sort = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => Number(b.folder) - Number(a.folder) || a.name.localeCompare(b.name));
+    for (const n of nodes) sort(n.children);
+  };
+  sort(root.children);
+  return root.children;
+}
+
+function Tree({ nodes, path, rootNote }: { nodes: TreeNode[]; path: string; rootNote(file: string): string }) {
+  return (
+    <ul>
+      {nodes.map((node) => {
+        const full = path ? `${path}/${node.name}` : node.name;
+        const note = node.folder ? folderNote(full) : path ? '' : rootNote(node.name);
+        return (
+          <li key={full}>
+            <code class={node.folder ? 'cp-dir' : 'cp-file'}>{node.folder ? `${node.name}/` : node.name}</code>
+            {note && <span class="cp-note">{note}</span>}
+            {node.children.length > 0 && <Tree nodes={node.children} path={full} rootNote={rootNote} />}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

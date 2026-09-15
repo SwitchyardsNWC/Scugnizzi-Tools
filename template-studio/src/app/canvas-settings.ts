@@ -6,18 +6,28 @@
 
 import { useEffect, useState } from 'preact/hooks';
 
+/** What lies under the board: nothing, drafting lines, a dot grid, or a cutting mat. */
+export type GroundKind = 'none' | 'lines' | 'dots' | 'mat';
+export const GROUND_KINDS: readonly GroundKind[] = ['none', 'lines', 'dots', 'mat'];
+/** The grounds that draw something, each with an opacity of its own. */
+export type DrawnGround = Exclude<GroundKind, 'none'>;
+
 export interface CanvasSettings {
   /** The canvas keeps sliding after a pan lets go (inertia.ts). */
   momentum: boolean;
   /** The slide's time constant in ms: how long it takes to lose about two thirds of its speed. */
   friction: number;
+  /** How long a press has to stay still on a card or layer before it becomes the hand and drags the view instead. */
+  holdPanMs: number;
   /** How much a pinch zooms for how far the fingers move: 1 is one to one, 2 is twice as eager. */
   pinchGain: number;
   /** The same for the wheel and trackpad. */
   wheelGain: number;
-  /** The board's drafting grid. */
-  grid: boolean;
-  /** The grid's fine step, in board pixels; the firm line is every fifth. */
+  /** What lies under the board. */
+  ground: GroundKind;
+  /** How strongly each ground shows over the paper, 0.1 to 1; each keeps its own. */
+  groundOpacity: Record<DrawnGround, number>;
+  /** The grid's fine step, in board pixels; the firm line, or the bigger dot, is every fifth. */
   gridStep: number;
   /** Cards and groups let go on the board land on the grid. */
   snap: boolean;
@@ -36,9 +46,11 @@ export interface CanvasSettings {
 export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
   momentum: true,
   friction: 320,
+  holdPanMs: 320,
   pinchGain: 1.5,
   wheelGain: 1,
-  grid: true,
+  ground: 'lines',
+  groundOpacity: { lines: 0.5, dots: 0.6, mat: 0.85 },
   gridStep: 24,
   snap: false,
   quickShapes: true,
@@ -51,8 +63,10 @@ export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
 /** Each dial's floor, ceiling and step. */
 export const CANVAS_RANGES = {
   friction: { min: 120, max: 800, step: 20 },
+  holdPanMs: { min: 150, max: 800, step: 10 },
   pinchGain: { min: 1, max: 3, step: 0.1 },
   wheelGain: { min: 0.4, max: 3, step: 0.1 },
+  groundOpacity: { min: 0.1, max: 1, step: 0.05 },
   gridStep: { min: 8, max: 64, step: 8 },
   holdMs: { min: 80, max: 500, step: 20 },
 } as const;
@@ -66,7 +80,7 @@ const text = (value: unknown, max: number): string => (typeof value === 'string'
 
 /** The settings as stored, with every value checked and clamped; anything unreadable is the default. */
 export function parseCanvasSettings(raw: string | null): CanvasSettings {
-  type Raw = Partial<Record<keyof CanvasSettings, unknown>>;
+  type Raw = Partial<Record<keyof CanvasSettings | 'grid', unknown>>;
   let value: Raw | null = null;
   try {
     value = raw ? (JSON.parse(raw) as Raw) : null;
@@ -76,12 +90,21 @@ export function parseCanvasSettings(raw: string | null): CanvasSettings {
   const d = DEFAULT_CANVAS_SETTINGS;
   if (!value || typeof value !== 'object') return { ...d };
   const pencil = value.pencilOnly;
+  // Until September 2026 the ground was a single `grid` flag; off then is off now.
+  const ground = typeof value.ground === 'string' && (GROUND_KINDS as readonly string[]).includes(value.ground) ? (value.ground as GroundKind) : value.grid === false ? 'none' : d.ground;
+  const opacities = value.groundOpacity && typeof value.groundOpacity === 'object' ? (value.groundOpacity as Partial<Record<DrawnGround, unknown>>) : {};
   return {
     momentum: flag(value.momentum, d.momentum),
     friction: clamp(value.friction, CANVAS_RANGES.friction, d.friction),
+    holdPanMs: clamp(value.holdPanMs, CANVAS_RANGES.holdPanMs, d.holdPanMs),
     pinchGain: clamp(value.pinchGain, CANVAS_RANGES.pinchGain, d.pinchGain),
     wheelGain: clamp(value.wheelGain, CANVAS_RANGES.wheelGain, d.wheelGain),
-    grid: flag(value.grid, d.grid),
+    ground,
+    groundOpacity: {
+      lines: clamp(opacities.lines, CANVAS_RANGES.groundOpacity, d.groundOpacity.lines),
+      dots: clamp(opacities.dots, CANVAS_RANGES.groundOpacity, d.groundOpacity.dots),
+      mat: clamp(opacities.mat, CANVAS_RANGES.groundOpacity, d.groundOpacity.mat),
+    },
     gridStep: clamp(value.gridStep, CANVAS_RANGES.gridStep, d.gridStep),
     snap: flag(value.snap, d.snap),
     quickShapes: flag(value.quickShapes, d.quickShapes),
