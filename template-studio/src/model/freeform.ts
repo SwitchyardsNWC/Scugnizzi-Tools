@@ -4,6 +4,7 @@
 // Pure and DOM-free like the rest of the model. Drawing the recipe is the compiler's
 // (compile/freeform.ts); turning the drawing into pixels is the app's (rasterise.ts).
 
+import type { QuickShape } from './quick-shape.ts';
 import type { ColorRef } from './design-system.ts';
 import type { Align, Brush } from './types.ts';
 import type { Block, BrandBlock, FreeformBlock, FreeformLayer, Template } from './types.ts';
@@ -273,6 +274,26 @@ export function drawPath(template: Template, blockId: string, points: number[], 
       { kind: 'path', id: newLayerId(block), points: points.map((v) => Math.round(v * 10) / 10), stroke, strokeWidth, ...(group ? { group } : {}), ...(brush ? { brush } : {}) },
     ],
   }));
+}
+
+/**
+ * A stroke that snapped to a shape (model/quick-shape.ts), as the layer it meant to be: a line, an outlined
+ * rectangle or ellipse at its tilt, or a triangle as a closed path. It keeps the pen's colour and width, and
+ * joins the marker session's drawing like any other stroke.
+ */
+export function addQuickShape(template: Template, blockId: string, shape: QuickShape, stroke: ColorRef, strokeWidth: number, group?: string, brush?: Brush): Template {
+  if (shape.kind === 'triangle') return drawPath(template, blockId, shape.points, stroke, strokeWidth, group, brush);
+  return withFreeform(template, blockId, (block) => {
+    const id = newLayerId(block);
+    const base = { id, ...(group ? { group } : {}) };
+    const layer: FreeformLayer =
+      shape.kind === 'line'
+        ? { ...base, kind: 'line', x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2, stroke, strokeWidth }
+        : shape.kind === 'rect'
+          ? { ...base, kind: 'rect', x: shape.x, y: shape.y, width: shape.width, height: shape.height, fill: null, stroke, strokeWidth, radius: 0, ...(shape.rotation ? { rotation: shape.rotation } : {}) }
+          : { ...base, kind: 'ellipse', x: shape.x, y: shape.y, width: shape.width, height: shape.height, fill: null, stroke, strokeWidth, ...(shape.rotation ? { rotation: shape.rotation } : {}) };
+    return { ...block, layers: [...block.layers, layer] };
+  });
 }
 
 /** The pens the canvas draws with, and the width each starts at. Jared: "add different pen types and an eraser." */

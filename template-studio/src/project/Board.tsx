@@ -38,6 +38,7 @@ import {
   forgetCard,
   frameCardId,
   groupAt,
+  kindOfCard,
   groupFolderName,
   layoutBoard,
   moveCard,
@@ -47,9 +48,11 @@ import {
   projectLinks,
   readBoard,
   removeGroup,
+  tidyBoard,
   withPlaces,
   type BoardDoc,
   type BoardGroup,
+  type BoardLayout,
   type CardKind,
   type CardSource,
   type PlacedCard,
@@ -58,7 +61,12 @@ import {
 import { freeAssetPath, movedPath } from '../model/asset-moves.ts';
 import type { Template } from '../model/types.ts';
 import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
+import { useCanvasSettings, writeCanvasSettings } from '../app/canvas-settings.ts';
+import { CanvasMenu } from '../app/CanvasMenu.tsx';
+import { TouchGestures } from '../app/gestures.ts';
+import { glide, PanTracker } from '../app/inertia.ts';
 import { loadKeptPictures } from '../app/kept-pictures.ts';
+import { capture } from '../app/pointer.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
 import {
@@ -78,6 +86,9 @@ import {
 import { copyKeptPictures, syncFrames } from './frame-sync.ts';
 import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
+import { History, useHistory } from './history.ts';
+import { colorForName, defaultPresenceName, usePresence } from './presence.ts';
+import { DEFAULT_PRESENCE_HOST } from './presence-config.ts';
 import type { Project } from './useProject.ts';
 
 type View = { x: number; y: number; z: number };
@@ -312,6 +323,25 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   projectRef.current = project;
   const { files, kept, refresh, stale, current } = useProjectFiles(projectRef, notify);
 
+  // How the board moves (canvas-settings.ts), read through a ref by handlers bound once.
+  const settings = useCanvasSettings();
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  /** A board position on the grid, when snapping is on. */
+  const snap = (v: number) => (settingsRef.current.snap ? Math.round(v / settingsRef.current.gridStep) * settingsRef.current.gridStep : v);
+
+  // --- undo (history.ts) ---
+  const history = useRef(new History()).current;
+  const past = useHistory(history);
+  /** Runs one step back or forward, and says what went wrong rather than leaving the board half-changed in silence. */
+  const step = async (which: 'undo' | 'redo') => {
+    try {
+      await (which === 'undo' ? history.undo() : history.redo());
+    } catch (cause) {
+      notify(cause instanceof Error ? `Could not ${which}: ${cause.message}` : `Could not ${which}.`);
+    }
+  };
+
   // --- board.json ---
   const [board, setBoard] = useState<BoardDoc>(emptyBoard);
   const [boardRead, setBoardRead] = useState(false);
@@ -349,6 +379,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       saveTimer.current = window.setTimeout(async () => {
         try {
           boardModified.current = await writeFile(dir, BOARD_FILE, boardJson(boardRef.current));
+          savedRef.current?.();
         } catch (cause) {
           notify(cause instanceof Error ? `The board could not be saved: ${cause.message}` : 'The board could not be saved.');
         } finally {
@@ -363,6 +394,19 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     void loadBoard();
     void refresh();
   }, [loadBoard, refresh]);
+
+  // --- who else is here (presence.ts, party/board.ts) ---
+  const presenceHost = (settings.presenceHost || DEFAULT_PRESENCE_HOST).trim();
+  // A name the first time, kept in the settings so it is the same in every tab and can be changed in the Canvas menu.
+  useEffect(() => {
+    if (!settings.presenceName) writeCanvasSettings({ presenceName: defaultPresenceName() });
+  }, [settings.presenceName]);
+  const myName = settings.presenceName || 'Someone';
+  const presence = usePresence({ host: presenceHost, room: presenceHost ? info.id : null, name: myName, color: colorForName(myName), onSaved: refreshAll });
+  /** Tells the others a file changed, from the save timer, which is bound once. */
+  const savedRef = useRef<() => void>(() => {});
+  savedRef.current = presence.sendSaved;
+  const peersBySelected = useMemo(() => new Map(presence.peers.filter((p) => p.selected).map((p) => [p.selected!, p])), [presence.peers]);
 
   useEffect(() => {
     refreshAll();
@@ -404,7 +448,21 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     ],
     [files],
   );
-  const layout = useMemo(() => layoutBoard(sources, board, files.folders), [sources, board, files.folders]);
+  // What is made from what, before the layout: a card with no place yet goes beside what it is linked to.
+  const links = useMemo(
+    () =>
+      projectLinks(
+        files.emails.flatMap((e) => (e.template ? [{ id: e.id, template: e.template }] : [])),
+        files.frames.map((f) => ({ id: f.id, key: f.key, template: f.template })),
+        files.pictures.filter((p) => !p.rendered).map((p) => ({ id: p.id, path: p.path })),
+        files.recipes,
+      ),
+    [files],
+  );
+  const layout = useMemo(() => layoutBoard(sources, board, files.folders, links), [sources, board, files.folders, links]);
+  /** The layout as it is now, for undo steps recorded earlier. */
+  const layoutRef = useRef<BoardLayout>(layout);
+  layoutRef.current = layout;
 
   // A card that just found a place keeps it, so a file added tomorrow does not shuffle today's board.
   // A group just made for a folder is kept the same way. Not from a read older than a move the board just made: that
@@ -421,16 +479,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const assets = useMemo<AssetFile[]>(
     () => [...files.pictures.map((p) => ({ name: p.path, size: p.size, url: p.url })), ...kept.filter((k) => !files.pictures.some((p) => p.path === k.name))],
     [files.pictures, kept],
-  );
-  const links = useMemo(
-    () =>
-      projectLinks(
-        files.emails.flatMap((e) => (e.template ? [{ id: e.id, template: e.template }] : [])),
-        files.frames.map((f) => ({ id: f.id, key: f.key, template: f.template })),
-        files.pictures.filter((p) => !p.rendered).map((p) => ({ id: p.id, path: p.path })),
-        files.recipes,
-      ),
-    [files],
   );
   const recipeOf = useMemo(() => recipesByOutput(files.recipes), [files.recipes]);
 
@@ -501,9 +549,17 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
   const reduced = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, []);
   const anim = useRef(0);
+  /** A slide after a pan lets go (inertia.ts), stopped by the next touch. */
+  const glideStop = useRef<(() => void) | null>(null);
+  /** Stops whatever the view is doing on its own: a flight, or a slide. */
+  const stopMotion = useCallback(() => {
+    cancelAnimationFrame(anim.current);
+    glideStop.current?.();
+    glideStop.current = null;
+  }, []);
   const animateTo = useCallback(
     (to: View, ms = 360, done?: () => void) => {
-      cancelAnimationFrame(anim.current);
+      stopMotion();
       if (reduced) {
         setView(to);
         done?.();
@@ -520,7 +576,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       };
       anim.current = requestAnimationFrame(step);
     },
-    [reduced, setView],
+    [reduced, setView, stopMotion],
   );
 
   const bounds = useMemo<Rect | null>(() => {
@@ -557,11 +613,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const to = { z: next, x: px - ((px - v.x) * next) / v.z, y: py - ((py - v.y) * next) / v.z };
       if (smooth) animateTo(to, 220);
       else {
-        cancelAnimationFrame(anim.current);
+        stopMotion();
         setView(to);
       }
     },
-    [size, animateTo, setView],
+    [size, animateTo, setView, stopMotion],
   );
   const fit = useCallback(() => {
     const f = fitView();
@@ -575,19 +631,20 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const r = el.getBoundingClientRect();
-      if (event.ctrlKey || event.metaKey) zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025), { x: event.clientX - r.left, y: event.clientY - r.top });
+      if (event.ctrlKey || event.metaKey) zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025 * settingsRef.current.wheelGain), { x: event.clientX - r.left, y: event.clientY - r.top });
       else {
-        cancelAnimationFrame(anim.current);
+        stopMotion();
         const v = viewRef.current;
         setView({ ...v, x: v.x - event.deltaX, y: v.y - event.deltaY });
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoomTo, setView]);
+  }, [zoomTo, setView, stopMotion]);
 
   // --- selecting, moving, opening ---
   const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => presence.sendSelect(selected), [selected, presence.sendSelect]);
   const [moving, setMoving] = useState<{ id: string; x: number; y: number } | null>(null);
   const [panning, setPanning] = useState(false);
   /** A group being moved or resized, as it is drawn until the pointer lets go, with the cards riding along. */
@@ -596,13 +653,52 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  /** + Group was pressed: the next drag on the board draws the new group's region. */
+  const [grouping, setGrouping] = useState(false);
+  const groupingRef = useRef(false);
+  groupingRef.current = grouping;
+  /** The region being dragged out for a new group, on the board. */
+  const [marquee, setMarquee] = useState<Rect | null>(null);
   const drag = useRef<
-    | { kind: 'pan'; x: number; y: number; view: View; moved: boolean }
+    | { kind: 'pan'; x: number; y: number; view: View; moved: boolean; tracker: PanTracker }
     | { kind: 'card'; id: string; x: number; y: number; from: { x: number; y: number }; moved: boolean }
     | { kind: 'group'; id: string; x: number; y: number; riders: string[]; moved: boolean }
     | { kind: 'resize'; id: string; x: number; y: number; moved: boolean }
+    | { kind: 'marquee'; from: { x: number; y: number }; moved: boolean }
     | null
   >(null);
+
+  /** The view when the second finger landed, which a pinch is measured against. */
+  const gestureView = useRef<View | null>(null);
+  // Fingers: two pan and pinch the board, whatever one was doing; a palm beside a pencil is ignored (gestures.ts).
+  const gestures = useRef<TouchGestures | null>(null);
+  if (!gestures.current) {
+    gestures.current = new TouchGestures({
+      onStart: () => {
+        drag.current = null;
+        setMoving(null);
+        setGroupDrag(null);
+        setDropTarget(null);
+        setMarquee(null);
+        setPanning(false);
+        stopMotion();
+        gestureView.current = viewRef.current;
+      },
+      onPinch: ({ start, mid, scale }) => {
+        const from = gestureView.current;
+        const r = stage.current?.getBoundingClientRect();
+        if (!from || !r) return;
+        // The gain makes the zoom more eager than the fingers' own spread: ×1 is one to one.
+        const z = clampZoom(from.z * Math.pow(scale, settingsRef.current.pinchGain));
+        const k = z / from.z;
+        setView({ z, x: mid.x - r.left - (start.x - r.left - from.x) * k, y: mid.y - r.top - (start.y - r.top - from.y) * k });
+      },
+      onEnd: () => {
+        gestureView.current = null;
+      },
+      onTap: (fingers) => void step(fingers >= 3 ? 'redo' : 'undo'),
+    });
+  }
 
   const riding = <T extends { id: string; x: number; y: number }>(c: T): T =>
     groupDrag && groupDrag.riders.includes(c.id) ? { ...c, x: c.x + groupDrag.dx, y: c.y + groupDrag.dy } : c;
@@ -650,14 +746,21 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     if (event.button !== 0 && event.button !== 1) return;
     const target = event.target as Element;
     if (target.closest('button, a, input')) return;
+    const landing = gestures.current!.down(event);
+    if (landing === 'palm' || landing === 'gesture') return;
     const primary = event.button === 0;
+    stopMotion();
+    if (primary && groupingRef.current) {
+      // Drawing out a group: over cards or not, the region is what is being made.
+      drag.current = { kind: 'marquee', from: worldAt(event.clientX, event.clientY), moved: false };
+      return;
+    }
     const cardEl = primary ? (target.closest('[data-card]') as HTMLElement | null) : null;
     const resizeEl = primary ? (target.closest('[data-group-resize]') as HTMLElement | null) : null;
     const headEl = primary ? (target.closest('[data-group-head]') as HTMLElement | null) : null;
     const id = cardEl?.dataset['card'];
     const rect = id ? rects.get(id) : undefined;
     const group = layout.groups.find((g) => g.id === (resizeEl?.dataset['groupResize'] ?? headEl?.dataset['groupHead']));
-    cancelAnimationFrame(anim.current);
     if (id && rect) drag.current = { kind: 'card', id, x: event.clientX, y: event.clientY, from: { x: rect.x, y: rect.y }, moved: false };
     else if (group && resizeEl) drag.current = { kind: 'resize', id: group.id, x: event.clientX, y: event.clientY, moved: false };
     else if (group) {
@@ -666,23 +769,38 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const riders = [...layout.cards, ...layout.missing].filter((c) => group.members.includes(c.id) || inside(c)).map((c) => c.id);
       drag.current = { kind: 'group', id: group.id, x: event.clientX, y: event.clientY, riders, moved: false };
     } else {
-      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, moved: false };
+      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, moved: false, tracker: new PanTracker() };
       setPanning(true);
     }
   };
   const onPointerMove = (event: PointerEvent) => {
+    if (gestures.current!.move(event)) return;
+    if (event.pointerType !== 'touch' || drag.current) {
+      const w = worldAt(event.clientX, event.clientY);
+      presence.sendCursor(Math.round(w.x), Math.round(w.y));
+    }
     const d = drag.current;
     if (!d) return;
+    if (d.kind === 'marquee') {
+      const p = worldAt(event.clientX, event.clientY);
+      if (!d.moved && Math.hypot(p.x - d.from.x, p.y - d.from.y) * viewRef.current.z < 3) return;
+      if (!d.moved) if (stage.current) capture(stage.current, event.pointerId);
+      d.moved = true;
+      setMarquee({ x: Math.min(d.from.x, p.x), y: Math.min(d.from.y, p.y), w: Math.abs(p.x - d.from.x), h: Math.abs(p.y - d.from.y) });
+      return;
+    }
     const dx = event.clientX - d.x;
     const dy = event.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < 3) return;
     // Captured only once it is a drag: a capture taken on press sends the click, and so the double-click that
     // opens a card, to the stage instead of the card.
-    if (!d.moved) stage.current?.setPointerCapture(event.pointerId);
+    if (!d.moved) if (stage.current) capture(stage.current, event.pointerId);
     d.moved = true;
     const z = viewRef.current.z;
-    if (d.kind === 'pan') setView({ ...d.view, x: d.view.x + dx, y: d.view.y + dy });
-    else if (d.kind === 'group') setGroupDrag({ id: d.id, dx: dx / z, dy: dy / z, dw: 0, dh: 0, riders: d.riders });
+    if (d.kind === 'pan') {
+      d.tracker.push(event.clientX, event.clientY);
+      setView({ ...d.view, x: d.view.x + dx, y: d.view.y + dy });
+    } else if (d.kind === 'group') setGroupDrag({ id: d.id, dx: dx / z, dy: dy / z, dw: 0, dh: 0, riders: d.riders });
     else if (d.kind === 'resize') setGroupDrag({ id: d.id, dx: 0, dy: 0, dw: dx / z, dh: dy / z, riders: [] });
     else {
       setMoving({ id: d.id, x: d.from.x + dx / z, y: d.from.y + dy / z });
@@ -696,15 +814,38 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       }
     }
   };
-  const onPointerUp = () => {
+  const onPointerUp = (event: PointerEvent) => {
+    gestures.current!.up(event);
     const d = drag.current;
     drag.current = null;
     setPanning(false);
     if (!d) return;
+    if (d.kind === 'marquee') {
+      const region = marquee;
+      setMarquee(null);
+      setGrouping(false);
+      // A drag makes the group that size; a click makes one the usual size, there.
+      const drawn = d.moved && region && region.w > 24 && region.h > 24 ? region : { x: d.from.x - 280, y: d.from.y - 200, w: 560, h: 400 };
+      void newGroup({ x: snap(drawn.x), y: snap(drawn.y), w: Math.max(24, snap(drawn.w)), h: Math.max(24, snap(drawn.h)) });
+      return;
+    }
     if (d.kind === 'pan') {
       if (!d.moved) {
         setSelected(null);
         setConfirming(null);
+        return;
+      }
+      // Let go while moving: the board keeps sliding and eases to a stop (inertia.ts).
+      const v = d.tracker.velocity();
+      if (v && !reduced && settingsRef.current.momentum) {
+        glideStop.current = glide(
+          v,
+          (dx, dy) => {
+            const cur = viewRef.current;
+            setView({ ...cur, x: cur.x + dx, y: cur.y + dy });
+          },
+          { friction: settingsRef.current.friction },
+        );
       }
       return;
     }
@@ -713,7 +854,18 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const change = groupDrag;
       setGroupDrag(null);
       if (!group || !d.moved || !change) return;
-      saveBoard(moveGroupWith(boardRef.current, { ...group, w: group.w + change.dw, h: group.h + change.dh }, change.dx, change.dy, change.riders));
+      const dx = snap(group.x + change.dx) - group.x;
+      const dy = snap(group.y + change.dy) - group.y;
+      const w = change.dw ? Math.max(24, snap(group.w + change.dw)) : group.w;
+      const h = change.dh ? Math.max(24, snap(group.h + change.dh)) : group.h;
+      const before = placesOf(boardRef.current, group, change.riders);
+      saveBoard(moveGroupWith(boardRef.current, { ...group, w, h }, dx, dy, change.riders));
+      const after = placesOf(boardRef.current, group, change.riders);
+      history.push({
+        label: d.kind === 'resize' ? `Resize ${group.name}` : `Move ${group.name}`,
+        undo: () => saveBoard(restorePlaces(boardRef.current, before)),
+        redo: () => saveBoard(restorePlaces(boardRef.current, after)),
+      });
       return;
     }
     const target = dropTarget;
@@ -722,7 +874,15 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const card = layout.cards.find((c) => c.id === d.id);
       if (card && target) void fileIn(card, target === 'out' ? null : (layout.groups.find((g) => g.id === target) ?? null), moving);
       else {
-        saveBoard(moveCard(boardRef.current, d.id, moving.x, moving.y));
+        const id = d.id;
+        const from = d.from;
+        const to = { x: snap(moving.x), y: snap(moving.y) };
+        saveBoard(moveCard(boardRef.current, id, to.x, to.y));
+        history.push({
+          label: `Move ${card?.name ?? missingName(id, kindOfCardOr(id))}`,
+          undo: () => saveBoard(moveCard(boardRef.current, id, from.x, from.y)),
+          redo: () => saveBoard(moveCard(boardRef.current, id, to.x, to.y)),
+        });
         if (!projectRef.current.writable) notify(`${info.name} is open view-only, so the arrangement lasts until the page reloads. Allow editing to keep it.`);
       }
     }
@@ -734,8 +894,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
       const mod = event.metaKey || event.ctrlKey;
-      if (event.key === 'Escape') setSelected(null);
-      else if (event.key === 'Enter' && selected) {
+      if (event.key === 'Escape') {
+        if (groupingRef.current) setGrouping(false);
+        else setSelected(null);
+      } else if (mod && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        void step(event.shiftKey ? 'redo' : 'undo');
+      } else if (event.key === 'Enter' && selected) {
         const card = layout.cards.find((c) => c.id === selected);
         if (card) openCard(card);
       } else if (event.shiftKey && event.code === 'Digit1') {
@@ -763,13 +928,35 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const { id, name, folder, x, y, w, h } = group;
     return addGroup(removeGroup(boardRef.current, id), { id, name, folder, x, y, w, h, ...patch });
   };
+  /** The group with this id as it is laid out now, for a step recorded when it was somewhere else. */
+  const latestGroup = (id: string, fallback: PlacedGroup): PlacedGroup => layoutRef.current.groups.find((g) => g.id === id) ?? fallback;
+
+  /**
+   * Moves pictures between folders and re-keys their cards, one at a time, for filing and for taking it back. Every
+   * file that names a picture is renamed with it (folder.ts, movePicture). Returns how many documents were rewritten.
+   */
+  const relocate = async (moves: Array<{ from: string; to: string }>): Promise<number> => {
+    let rewritten = 0;
+    for (const m of moves) {
+      rewritten += await movePicture(dir, m.from, m.to);
+      stale();
+      const b = boardRef.current;
+      const oldId = pictureCardId(m.from);
+      const place = b.cards[oldId];
+      let next = forgetCard(b, oldId);
+      if (place) next = moveCard(next, pictureCardId(m.to), place.x, place.y);
+      saveBoard(next);
+    }
+    presence.sendSaved();
+    return rewritten;
+  };
 
   /**
    * Files a picture where it was dropped: into a group's folder, or back into assets/ when `group` is null. The file
-   * moves, and everything that names it is renamed with it (folder.ts, movePicture).
+   * moves, and everything that names it is renamed with it (folder.ts, movePicture). Undo moves it back.
    */
   const fileIn = async (card: PlacedCard, group: PlacedGroup | null, at: { x: number; y: number }) => {
-    saveBoard(moveCard(boardRef.current, card.id, at.x, at.y));
+    saveBoard(moveCard(boardRef.current, card.id, snap(at.x), snap(at.y)));
     if (!projectRef.current.writable) {
       notify(`${info.name} is open view-only, so ${card.name} stays where its file is. Allow editing to file it.`);
       return;
@@ -777,20 +964,28 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const from = card.id.slice('picture:'.length);
     const to = freeAssetPath(movedPath(from, group ? group.folder : null), files.pictures.map((p) => p.path));
     try {
-      const rewritten = await movePicture(dir, from, to);
-      stale();
-      const b = boardRef.current;
-      const place = b.cards[card.id] ?? at;
-      saveBoard(moveCard(forgetCard(b, card.id), pictureCardId(to), place.x, place.y));
+      const rewritten = await relocate([{ from, to }]);
       await refresh();
       const where = group ? `into ${group.name}` : 'out of its group';
       notify(`Moved ${card.name} ${where}${rewritten ? `, and renamed it in the ${rewritten === 1 ? 'file' : `${rewritten} files`} that show it` : ''}.`);
+      history.push({
+        label: group ? `File ${card.name} in ${group.name}` : `Take ${card.name} out`,
+        undo: async () => {
+          await relocate([{ from: to, to: from }]);
+          await refresh();
+        },
+        redo: async () => {
+          await relocate([{ from, to }]);
+          await refresh();
+        },
+      });
     } catch (cause) {
       notify(cause instanceof Error ? `${card.name} could not be moved: ${cause.message}` : `${card.name} could not be moved.`);
     }
   };
 
-  const newGroup = async () => {
+  /** A new group: where it was dragged out, or the usual size in the middle of the view when no region is given. */
+  const newGroup = async (region?: Rect) => {
     if (!projectRef.current.writable) {
       notify(`${info.name} is open view-only. Allow editing to add a group.`);
       return;
@@ -808,12 +1003,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       return;
     }
     const v = viewRef.current;
-    const [w, h] = [560, 400];
-    let x = (size.w / 2 - v.x) / v.z - w / 2;
-    let y = (size.h / 2 - v.y) / v.z - h / 2;
-    // Never on top of cards it does not hold, which would look filed and are not: clear of everything, and the view
-    // goes to it.
-    const clash = [...layout.cards, ...layout.missing, ...layout.groups].some((r) => x < r.x + r.w && r.x < x + w && y < r.y + r.h && r.y < y + h);
+    const [w, h] = region ? [region.w, region.h] : [560, 400];
+    let x = region ? region.x : (size.w / 2 - v.x) / v.z - w / 2;
+    let y = region ? region.y : (size.h / 2 - v.y) / v.z - h / 2;
+    // A group put down blind never lands on cards it does not hold, which would look filed and are not: it goes clear
+    // of everything, and the view goes to it. One dragged out goes exactly where the hand put it.
+    const clash = !region && [...layout.cards, ...layout.missing, ...layout.groups].some((r) => x < r.x + r.w && r.x < x + w && y < r.y + r.h && r.y < y + h);
     if (clash && bounds) {
       x = bounds.x + bounds.w + 120;
       y = bounds.y;
@@ -822,6 +1017,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     saveBoard(addGroup(boardRef.current, { id, name, folder, x, y, w, h }));
     setRenaming(id);
     if (clash && bounds) animateTo({ z: v.z, x: size.w / 2 - (x + w / 2) * v.z, y: size.h / 2 - (y + h / 2) * v.z }, 420);
+    history.push({
+      label: 'New group',
+      undo: async () => {
+        const g = layoutRef.current.groups.find((gr) => gr.folder === folder);
+        stale();
+        saveBoard(removeGroup(boardRef.current, g?.id ?? id));
+        await removeFolderIfEmpty(dir, folder);
+        void refresh();
+      },
+      redo: async () => {
+        await makeGroupFolder(dir, folder);
+        stale();
+        saveBoard(addGroup(boardRef.current, { id, name, folder, x, y, w, h }));
+        void refresh();
+      },
+    });
   };
 
   /** A new name. An empty group's folder is renamed to match; a group with pictures keeps its folder, and its links. */
@@ -829,16 +1040,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     setRenaming(null);
     const name = value.trim().slice(0, 60);
     if (!name || name === group.name) return;
+    const was = { id: group.id, name: group.name, folder: group.folder };
     if (group.members.length === 0 && projectRef.current.writable) {
       const others = layout.groups.filter((g) => g.id !== group.id).map((g) => g.folder);
       const folder = groupFolderName(name, [...others, ...files.pictures.flatMap((p) => folderOfPicture(p.path) ?? [])]);
       if (folder !== group.folder) {
         try {
-          await makeGroupFolder(dir, folder);
-          await removeFolderIfEmpty(dir, group.folder);
-          stale();
-          saveBoard(storeGroup(group, { id: `group:${folder}`, name, folder }));
-          void refresh();
+          const now = { id: `group:${folder}`, name, folder };
+          const swap = async (from: typeof was, to: typeof now) => {
+            await makeGroupFolder(dir, to.folder);
+            await removeFolderIfEmpty(dir, from.folder);
+            stale();
+            saveBoard(storeGroup(latestGroup(from.id, group), to));
+            void refresh();
+          };
+          await swap(was, now);
+          history.push({ label: `Rename ${was.name}`, undo: () => swap(now, was), redo: () => swap(was, now) });
           return;
         } catch {
           // The folder keeps its name; the group still takes the new one.
@@ -846,6 +1063,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       }
     }
     saveBoard(storeGroup(group, { name }));
+    history.push({
+      label: `Rename ${was.name}`,
+      undo: () => saveBoard(storeGroup(latestGroup(group.id, group), { name: was.name })),
+      redo: () => saveBoard(storeGroup(latestGroup(group.id, group), { name })),
+    });
   };
 
   /** Takes a group's pictures back out into assets/, then removes the group and its emptied folder. Asks first. */
@@ -860,32 +1082,49 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       notify(`${info.name} is open view-only. Allow editing to take pictures out of ${group.name}.`);
       return;
     }
+    // Every move worked out first, so the step can be taken back and done again with the same names.
     let taken = files.pictures.map((p) => p.path);
-    let next = boardRef.current;
-    let moved = 0;
+    const moves: Array<{ from: string; to: string }> = [];
     for (const id of group.members) {
       const from = id.slice('picture:'.length);
       const to = freeAssetPath(movedPath(from, null), taken);
-      try {
-        await movePicture(dir, from, to);
-        stale();
-        taken = [...taken.filter((t) => t !== from), to];
-        const place = next.cards[id];
-        next = forgetCard(next, id);
-        if (place) next = moveCard(next, pictureCardId(to), place.x, place.y);
-        moved += 1;
-      } catch (cause) {
-        notify(cause instanceof Error ? `Stopped: ${cause.message}` : 'Stopped moving pictures out.');
-        break;
-      }
+      taken = [...taken.filter((t) => t !== from), to];
+      moves.push({ from, to });
     }
-    saveBoard(removeGroup(next, group.id));
-    if (projectRef.current.writable) {
-      await removeFolderIfEmpty(dir, group.folder);
+    const { id, name, folder, x, y, w, h } = group;
+    const rect: BoardGroup = { id, name, folder, x, y, w, h };
+    const takeOut = async () => {
+      await relocate(moves);
       stale();
+      saveBoard(removeGroup(boardRef.current, id));
+      if (projectRef.current.writable) await removeFolderIfEmpty(dir, folder);
+      await refresh();
+    };
+    const putBack = async () => {
+      await makeGroupFolder(dir, folder);
+      await relocate(moves.map((m) => ({ from: m.to, to: m.from })));
+      stale();
+      saveBoard(addGroup(boardRef.current, rect));
+      await refresh();
+    };
+    try {
+      await takeOut();
+    } catch (cause) {
+      notify(cause instanceof Error ? `Stopped: ${cause.message}` : 'Stopped moving pictures out.');
+      await refresh();
+      return;
     }
-    await refresh();
-    notify(moved ? `Took ${plural(moved, 'picture')} out of ${group.name} and removed the group.` : `Removed ${group.name}.`);
+    notify(moves.length ? `Took ${plural(moves.length, 'picture')} out of ${name} and removed the group.` : `Removed ${name}.`);
+    history.push({ label: `Remove ${name}`, undo: putBack, redo: takeOut });
+  };
+
+  /** The board laid out afresh, with the lines in mind: what is linked sits together. One step, undone as one. */
+  const tidy = () => {
+    const before = boardRef.current;
+    const after = tidyBoard(sources, before, files.folders, links);
+    saveBoard(after);
+    history.push({ label: 'Tidy', undo: () => saveBoard(before), redo: () => saveBoard(after) });
+    window.setTimeout(fit, 60);
   };
 
   // --- pictures in ---
@@ -965,11 +1204,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
   // Drafting paper: a fine line every 24 board pixels and a firmer one every fifth, stepping up as the board zooms
   // out so the lines never crowd.
-  const step = 24 * view.z * (view.z < 0.2 ? 20 : view.z < 0.45 ? 5 : 1);
-  const gridStyle = {
-    backgroundSize: `${step}px ${step}px, ${step}px ${step}px, ${step * 5}px ${step * 5}px, ${step * 5}px ${step * 5}px`,
-    backgroundPosition: `${view.x}px ${view.y}px`,
-  };
+  const fine = settings.gridStep * view.z * (view.z < 0.2 ? 20 : view.z < 0.45 ? 5 : 1);
+  const gridStyle = settings.grid
+    ? {
+        backgroundSize: `${fine}px ${fine}px, ${fine}px ${fine}px, ${fine * 5}px ${fine * 5}px, ${fine * 5}px ${fine * 5}px`,
+        backgroundPosition: `${view.x}px ${view.y}px`,
+      }
+    : { backgroundImage: 'none' };
 
   const pictureCount = files.pictures.filter((p) => !p.rendered).length;
   const counts = [
@@ -987,12 +1228,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     <div class="pb-board">
       <div
         ref={stage}
-        class={`pb-stage ${panning ? 'panning' : ''}`}
+        class={`pb-stage ${panning ? 'panning' : ''} ${grouping ? 'grouping' : ''}`}
         style={gridStyle}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onPointerLeave={() => presence.sendCursor(null, null)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           if (!e.dataTransfer?.files.length) return;
@@ -1049,6 +1291,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               </div>
             );
           })}
+          {marquee && <div class="pb-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} aria-hidden="true" />}
           <svg class="pb-links" width="1" height="1" aria-hidden="true">
             {links.map((link) => {
               const a = rects.get(link.from);
@@ -1073,7 +1316,14 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               </header>
               <div class="pb-card-note">
                 <p>This {KIND_LABEL[m.kind].toLowerCase()} is no longer in the folder. If it was moved or renamed, it shows up again as a new card.</p>
-                <button class="pb-link-btn" onClick={() => saveBoard(forgetCard(boardRef.current, m.id))}>
+                <button
+                  class="pb-link-btn"
+                  onClick={() => {
+                    const at = boardRef.current.cards[m.id];
+                    saveBoard(forgetCard(boardRef.current, m.id));
+                    if (at) history.push({ label: 'Forget a place', undo: () => saveBoard(moveCard(boardRef.current, m.id, at.x, at.y)), redo: () => saveBoard(forgetCard(boardRef.current, m.id)) });
+                  }}
+                >
                   Forget its place
                 </button>
               </div>
@@ -1086,6 +1336,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             const picture = picturesById.get(card.id);
             const doc = docsById.get(card.id);
             const madeBy = picture ? recipeOf.get(picture.path) : undefined;
+            const peer = peersBySelected.get(card.id);
             const live = isLive(card);
             const facts = email
               ? `${email.fileName} · saved ${ago(email.modified)}`
@@ -1108,10 +1359,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             return (
               <div
                 key={card.id}
-                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id ? 'lifted' : ''}`}
+                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id ? 'lifted' : ''} ${peer ? 'peer' : ''}`}
                 data-card={card.id}
                 title={facts}
-                style={{ left: card.x, top: card.y, width: card.w, height: card.h }}
+                style={{ left: card.x, top: card.y, width: card.w, height: card.h, ...(peer ? { '--peer': peer.color } : {}) }}
                 onDblClick={() => openCard(card)}
               >
                 <header class="pb-card-head">
@@ -1127,9 +1378,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
                   {doc && <DocBody item={doc} />}
                 </div>
+                {peer && <span class="pb-peer-tag">{peer.name}</span>}
               </div>
             );
           })}
+
+          {/* The others' pointers, at their places on the board, the same size at every zoom. */}
+          {presence.peers
+            .filter((p) => p.x !== null && p.y !== null)
+            .map((p) => (
+              <div key={p.id} class="pb-peer" style={{ left: p.x!, top: p.y!, transform: `scale(${1 / view.z})`, '--peer': p.color }} aria-hidden="true">
+                <svg viewBox="0 0 16 16" width="16" height="16">
+                  <path d="M1.5 1.5l12 5-5 2-2 5z" fill="var(--peer)" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" />
+                </svg>
+                <span class="pb-peer-name">{p.name}</span>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -1139,6 +1403,16 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         </a>
         <span class="pb-sep" aria-hidden="true" />
         <ProjectMenu project={project} counts={counts || 'nothing in it yet'} onCreate={onCreateProject} />
+        <span class="pb-sep" aria-hidden="true" />
+        <button class="pb-ghost" disabled={!past.canUndo} title={past.undoLabel ? `Undo ${past.undoLabel.toLowerCase()}  ·  ⌘Z` : 'Nothing to undo'} onClick={() => void step('undo')}>
+          Undo
+        </button>
+        <button class="pb-ghost" disabled={!past.canRedo} title={past.redoLabel ? `Redo ${past.redoLabel.toLowerCase()}  ·  ⇧⌘Z` : 'Nothing to redo'} onClick={() => void step('redo')}>
+          Redo
+        </button>
+        <button class="pb-ghost" disabled={!writable || cards.length === 0} title="Lay the board out afresh: what is linked sits together, groups line up below. One step, undone as one." onClick={tidy}>
+          Tidy
+        </button>
         <span class="pb-grow" />
         <div class="pb-actions" role="group" aria-label="Add to the project">
           <span class="pb-kicker">Add</span>
@@ -1151,7 +1425,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           <button class="pb-ghost" disabled={!writable} title={writable ? 'Add pictures to assets/. Dropping them on the board works too.' : 'Allow editing to add pictures'} onClick={() => picker.current?.click()}>
             + Pictures
           </button>
-          <button class="pb-ghost" disabled={!writable} title={writable ? 'A group is a folder in assets/: drop pictures on it to file them there' : 'Allow editing to add a group'} onClick={() => void newGroup()}>
+          <button
+            class={`pb-ghost ${grouping ? 'on' : ''}`}
+            disabled={!writable}
+            aria-pressed={grouping}
+            title={writable ? 'Drag out a region for a new group. A group is a folder in assets/: drop pictures on it to file them there.' : 'Allow editing to add a group'}
+            onClick={() => setGrouping((v) => !v)}
+          >
             + Group
           </button>
           <div class="pb-menu">
@@ -1168,6 +1448,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           </div>
         </div>
         <span class="pb-sep" aria-hidden="true" />
+        <CanvasMenu />
         <div class="pb-zoom" role="group" aria-label="Zoom">
           <button title="Zoom out  ·  ⌘−" aria-label="Zoom out" onClick={() => zoomTo(view.z / 1.25, undefined, true)}>
             −
@@ -1198,8 +1479,25 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             <>Saving into {dir.name}</>
           )}
         </span>
+        {presenceHost && (
+          <>
+            <span class="pb-sep" aria-hidden="true" />
+            <span class="pb-presence" title={presence.state === 'online' ? `Everyone with ${info.name} open on ${presenceHost}` : `Presence server: ${presenceHost}`}>
+              {presence.peers.map((p) => (
+                <i key={p.id} class="pb-dot" style={{ background: p.color }} title={p.name} />
+              ))}
+              {presence.state === 'online'
+                ? presence.peers.length
+                  ? `${presence.peers.length === 1 ? presence.peers[0]!.name : plural(presence.peers.length, 'other')} here`
+                  : `Only you here, as ${myName}`
+                : presence.state === 'connecting'
+                  ? 'Connecting…'
+                  : 'Presence offline'}
+            </span>
+          </>
+        )}
         <span class="pb-grow" />
-        <span class="pb-hint">Drag to arrange · drop a picture on a group to file it · double-click opens</span>
+        <span class="pb-hint">{grouping ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels' : 'Drag to arrange · drop a picture on a group to file it · double-click opens'}</span>
         <span class="pb-sep" aria-hidden="true" />
         <span class="pb-count">{counts || 'empty'}</span>
       </footer>
@@ -1231,6 +1529,32 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 }
 
 const KIND_LABEL: Record<CardKind, string> = { email: 'Email', frame: 'Frame', picture: 'Picture', doc: 'Document' };
+
+/** A card's kind from its id, `picture` when the id is not one the board knows. */
+const kindOfCardOr = (id: string): CardKind => kindOfCard(id) ?? 'picture';
+
+/** Where a group and the cards riding with it are, as the board stores them, for a step to put back. */
+interface Places {
+  group: BoardGroup;
+  cards: Record<string, { x: number; y: number }>;
+}
+
+function placesOf(board: BoardDoc, group: PlacedGroup, cardIds: string[]): Places {
+  const stored = board.groups.find((g) => g.id === group.id);
+  const { id, name, folder, x, y, w, h } = stored ?? group;
+  const cards: Places['cards'] = {};
+  for (const cardId of cardIds) {
+    const at = board.cards[cardId];
+    if (at) cards[cardId] = at;
+  }
+  return { group: { id, name, folder, x, y, w, h }, cards };
+}
+
+function restorePlaces(board: BoardDoc, places: Places): BoardDoc {
+  let next = addGroup(removeGroup(board, places.group.id), places.group);
+  for (const [cardId, at] of Object.entries(places.cards)) next = moveCard(next, cardId, at.x, at.y);
+  return next;
+}
 
 function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined, docKind: DocKind | undefined): string {
   if (card.kind === 'email') return 'Open in Template Studio';

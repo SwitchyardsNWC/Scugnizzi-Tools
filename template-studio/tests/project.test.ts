@@ -40,7 +40,9 @@ import {
   projectLinks,
   readBoard,
   readProjectInfo,
+  tidyBoard,
   withPlaces,
+  type CardLink,
   type CardSource,
 } from '../src/model/project.ts';
 import { blankTemplate } from '../src/model/starters.ts';
@@ -155,6 +157,52 @@ describe('the board layout', () => {
     const card = filed.cards[0]!;
     expect(card.x).toBeGreaterThanOrEqual(photos.x);
     expect(card.x + card.w).toBeLessThanOrEqual(photos.x + photos.w);
+  });
+
+  it('puts a card beside the placed card it is linked to, and its own picture beside it in turn', () => {
+    const email: CardSource = { id: 'email:a.template.json', kind: 'email', name: 'a' };
+    const hero: CardSource = { id: 'frame:h', kind: 'frame', name: 'Hero' };
+    const other: CardSource = { id: 'frame:o', kind: 'frame', name: 'Other' };
+    const photo: CardSource = { id: 'picture:p.png', kind: 'picture', name: 'p.png' };
+    const loose: CardSource = { id: 'picture:z.png', kind: 'picture', name: 'z.png' };
+    const links: CardLink[] = [
+      { from: 'frame:h', to: 'email:a.template.json', kind: 'follows' },
+      { from: 'picture:p.png', to: 'frame:h', kind: 'uses' },
+    ];
+    const laid = layoutBoard([email, hero, other, photo, loose], emptyBoard(), [], links);
+    const at = (id: string) => laid.cards.find((c) => c.id === id)!;
+    const e = at(email.id);
+    const h = at(hero.id);
+    // The followed frame sits to the email's right, on the same row; the unlinked frame starts the frames' lane below.
+    expect(h.x).toBe(e.x + e.w + 40);
+    expect(h.y).toBe(e.y);
+    expect(at(other.id).y).toBeGreaterThan(e.y + e.h);
+    // The picture the frame shows sits beside the frame, not in the pictures' lane.
+    const p = at(photo.id);
+    expect(p.x).toBe(h.x + h.w + 40);
+    expect(p.y).toBe(h.y);
+    expect(at(loose.id).y).toBeGreaterThan(p.y + p.h);
+    // Nothing lands on anything else.
+    for (const a of laid.cards) for (const b of laid.cards) if (a !== b) expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h).toBe(false);
+  });
+
+  it('tidies a board afresh with the links in mind, keeping the groups’ names', () => {
+    const email: CardSource = { id: 'email:a.template.json', kind: 'email', name: 'a' };
+    const hero: CardSource = { id: 'frame:h', kind: 'frame', name: 'Hero' };
+    const filed: CardSource = { id: 'picture:photos/p.png', kind: 'picture', name: 'p.png' };
+    const links: CardLink[] = [{ from: 'frame:h', to: 'email:a.template.json', kind: 'follows' }];
+    // Arranged by hand, far apart, with the group renamed.
+    let board = moveCard(moveCard(emptyBoard(), email.id, 0, 0), hero.id, 2000, 900);
+    const first = layoutBoard([email, hero, filed], board, ['photos'], links);
+    board = withPlaces(board, first.cards, first.groups.map((g) => ({ ...g, name: 'Shoot day' })));
+    const tidy = tidyBoard([email, hero, filed], board, ['photos'], links);
+    const laid = layoutBoard([email, hero, filed], tidy, ['photos'], links);
+    const e = laid.cards.find((c) => c.id === email.id)!;
+    const h = laid.cards.find((c) => c.id === hero.id)!;
+    expect(h.x).toBe(e.x + e.w + 40);
+    expect(laid.placed).toEqual([]);
+    expect(laid.groups.map((g) => [g.folder, g.name])).toEqual([['photos', 'Shoot day']]);
+    expect(laid.groups[0]!.members).toEqual([filed.id]);
   });
 
   it('lays out the same once the places are written down', () => {

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "scugnizzi-board",
+  "main": "party/board.ts",
+  "compatibilityDate": "2026-01-01"
+}

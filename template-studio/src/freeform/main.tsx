@@ -40,6 +40,7 @@ import type { AssetFile } from '../workspace/workspace.ts';
 import { canvasBlob, freeformCanvas } from '../app/picture.ts';
 import { keepPicture, loadKeptPictures } from '../app/kept-pictures.ts';
 import { readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, type StudioPresence } from '../model/freeform-link.ts';
+import { CanvasMenu } from '../app/CanvasMenu.tsx';
 import { Surface, type SurfaceApi } from '../app/Surface.tsx';
 import { useEditor } from '../app/useEditor.ts';
 import { listPictures, writePicture, type PictureEntry } from '../project/folder.ts';
@@ -667,6 +668,7 @@ function FreeformTool() {
             ),
             right: (
               <>
+                <CanvasMenu pill />
                 <button class="fig-pill" title="Add a picture from your computer. Dropping one on the canvas works too." onClick={() => picker.current?.click()}>
                   Image
                 </button>

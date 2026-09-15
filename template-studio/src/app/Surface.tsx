@@ -35,7 +35,11 @@ import {
   type Box,
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
-import { BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
+import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
+import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
+import { useCanvasSettings } from './canvas-settings.ts';
+import { TouchGestures } from './gestures.ts';
+import { glide, PanTracker } from './inertia.ts';
 import { HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects } from '../model/effects.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
@@ -99,14 +103,15 @@ interface View {
 }
 
 type Drag =
-  | { kind: 'pan'; x: number; y: number; view: View }
+  | { kind: 'pan'; x: number; y: number; view: View; tracker: PanTracker }
   | { kind: 'move'; layers: FreeformLayer[]; x: number; y: number; moved: boolean }
   | { kind: 'resizeMany'; layers: FreeformLayer[]; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'resize'; layer: FreeformLayer; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'endpoint'; layer: FreeformLayer; which: 1 | 2 }
   | { kind: 'rotate'; layer: FreeformLayer; centre: Point }
   | { kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point }
-  | { kind: 'pen'; points: number[] }
+  /** `still` is where the pen last stopped moving and since when; `snapped` the shape it would become if lifted now. */
+  | { kind: 'pen'; points: number[]; still: { x: number; y: number; since: number } | null; snapped: QuickShape | null }
   | { kind: 'erase'; last: Point; session: string }
   | { kind: 'page'; axis: 'x' | 'y' | 'both'; width: number; height: number; x: number; y: number };
 
@@ -138,7 +143,7 @@ const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string; icon:
     tool: 'pen',
     label: 'Draw',
     key: 'P',
-    help: 'Draw freehand with a pen, marker, highlighter or brush — pick one in the tray.',
+    help: 'Draw freehand with a pen, marker, highlighter or brush — pick one in the tray. Hold still at the end of a stroke and it snaps to a line, box, circle or triangle.',
     icon: () => glyph(<path key="a" d="M4.5 19.5l1-4L15.8 5.2a2 2 0 012.8 0l.2.2a2 2 0 010 2.8L8.5 18.5z" />, <path key="b" d="M13.5 7.5l3 3" />),
   },
   {
@@ -162,6 +167,9 @@ const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string; icon:
     icon: () => glyph(<circle key="a" cx="12" cy="9" r="4.6" />, <path key="b" d="M9.5 13.2L9 16.5h6l-.5-3.3" />, <path key="c" d="M6 19.5h12" />),
   },
 ];
+
+/** With a pencil about, a finger on these tools pans instead of drawing: the pencil draws, the hand moves the page. */
+const DRAW_TOOLS = new Set<Tool>(['pen', 'eraser', 'rect', 'ellipse', 'line', 'text', 'sticky', 'stamp']);
 
 const POP: Keyframe[] = [{ scale: '0.2', opacity: 0 }, { scale: '1.14', opacity: 1, offset: 0.6 }, { scale: '0.97', offset: 0.82 }, { scale: '1', opacity: 1 }];
 const POOF: Keyframe[] = [{ scale: '1', opacity: 1 }, { scale: '1.12', opacity: 1, offset: 0.35 }, { scale: '0', opacity: 0 }];
@@ -222,6 +230,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   // acts on a template, a tool or a colour from an earlier one.
   const editorRef = useRef(editor);
   editorRef.current = editor;
+  // How this canvas moves and draws (canvas-settings.ts): read through a ref by handlers bound once.
+  const settings = useCanvasSettings();
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const rectOfRef = useRef(rectOf);
   rectOfRef.current = rectOf;
   const work = useRef<HTMLDivElement | null>(null);
@@ -263,7 +275,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const pasteCount = useRef(0);
   const [pageDrag, setPageDrag] = useState(false);
   const drag = useRef<Drag | null>(null);
-  const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[] } | null>(null);
+  const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[]; snapped: QuickShape | null } | null>(null);
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
   const [textHeights, setTextHeights] = useState<Record<string, number>>({});
@@ -315,9 +327,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   // --- the view, and flying it ------------------------------------------------------------------
 
+  /** A slide after a pan lets go (inertia.ts), stopped by the next touch. */
+  const glideStop = useRef<(() => void) | null>(null);
   const stopAnim = () => {
     if (anim.current !== null) cancelAnimationFrame(anim.current);
     anim.current = null;
+    glideStop.current?.();
+    glideStop.current = null;
   };
 
   /** Eases the view to another. Zoom moves in log space, so 30% to 200% does not rush its start. */
@@ -448,7 +464,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       viewTouched.current = true;
       const r = el.getBoundingClientRect();
       if (event.ctrlKey || event.metaKey) {
-        zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025), { x: event.clientX - r.left, y: event.clientY - r.top });
+        zoomTo(viewRef.current.z * Math.exp(-event.deltaY * 0.0025 * settingsRef.current.wheelGain), { x: event.clientX - r.left, y: event.clientY - r.top });
       } else {
         stopAnim();
         const v = viewRef.current;
@@ -734,19 +750,72 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   // --- pointer ------------------------------------------------------------------------------------
 
+  /** The pen's dwell timer: fires once the pen has sat still long enough to snap the stroke. */
+  const holdTimer = useRef(0);
+  /** A pencil has touched this canvas, so from now on a finger pans while a drawing tool is in hand. */
+  const penSeen = useRef(false);
+  /** The view when the second finger landed, which a pinch is measured against. */
+  const gestureView = useRef<View | null>(null);
+  // Fingers: pinch to zoom, two-finger tap to undo, three to redo, palms ignored (gestures.ts).
+  const gestures = useRef<TouchGestures | null>(null);
+  if (!gestures.current) {
+    gestures.current = new TouchGestures({
+      onStart: () => {
+        // A second finger: whatever the first was doing is abandoned, a half-drawn stroke included.
+        window.clearTimeout(holdTimer.current);
+        drag.current = null;
+        setGhost(null);
+        setPageDrag(false);
+        setDragging(false);
+        stopAnim();
+        gestureView.current = viewRef.current;
+      },
+      onPinch: ({ start, mid, scale }) => {
+        const from = gestureView.current;
+        const r = svgEl.current?.getBoundingClientRect();
+        if (!from || !r) return;
+        viewTouched.current = true;
+        // The gain makes the zoom more eager than the fingers' own spread: ×1 is one to one.
+        const z = clampZoom(from.z * Math.pow(scale, settingsRef.current.pinchGain));
+        const k = z / from.z;
+        // The point of the page under the fingers' first midpoint stays under their midpoint now.
+        setView({ z, x: mid.x - r.left - (start.x - r.left - from.x) * k, y: mid.y - r.top - (start.y - r.top - from.y) * k });
+      },
+      onEnd: () => {
+        gestureView.current = null;
+      },
+      onTap: (fingers) => {
+        const ed = editorRef.current;
+        if (fingers >= 3) {
+          if (ed.canRedo) ed.redo();
+        } else if (ed.canUndo) ed.undo();
+      },
+    });
+  }
+
   const onPointerDown = (event: PointerEvent) => {
     const b = blockRef.current;
     const svg = svgEl.current;
     if (!b || !svg || phaseRef.current !== 'idle' || editingText) return;
+    const landing = gestures.current!.down(event);
+    if (landing === 'palm' || landing === 'gesture') {
+      event.preventDefault();
+      return;
+    }
+    if (landing === 'pen') penSeen.current = true;
     stopAnim();
     setPaintsOpen(false);
     const p = toSurface(event.clientX, event.clientY);
     const target = event.target as Element;
     const current = toolRef.current;
 
-    if (event.button === 1 || (event.button === 0 && (spaceRef.current || current === 'hand'))) {
+    // Pencil-only drawing: a finger never draws, it moves the page. By default once a pencil has been seen; the
+    // Canvas menu can make it always or never so.
+    const pencilOnly = settingsRef.current.pencilOnly;
+    const fingerPans = event.pointerType === 'touch' && (pencilOnly === 'on' || (pencilOnly === 'auto' && penSeen.current)) && DRAW_TOOLS.has(current);
+    if (event.button === 1 || (event.button === 0 && (spaceRef.current || current === 'hand' || fingerPans))) {
       capture(svg as unknown as HTMLElement, event.pointerId);
-      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current };
+      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
       event.preventDefault();
       return;
     }
@@ -779,8 +848,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     }
 
     if (current === 'pen') {
-      drag.current = { kind: 'pen', points: [p.x, p.y] };
-      setGhost({ kind: 'pen', points: [p.x, p.y] });
+      drag.current = { kind: 'pen', points: [p.x, p.y], still: { x: event.clientX, y: event.clientY, since: performance.now() }, snapped: null };
+      setGhost({ kind: 'pen', points: [p.x, p.y], snapped: null });
       event.preventDefault();
       return;
     }
@@ -836,12 +905,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     } else {
       lastPress.current = null;
       onSelectLayer(null);
-      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current };
+      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
     }
     event.preventDefault();
   };
 
   const onPointerMove = (event: PointerEvent) => {
+    if (gestures.current!.move(event)) return;
     const state = drag.current;
     const b = blockRef.current;
     if (toolRef.current === 'eraser') setEraserAt(toSurface(event.clientX, event.clientY));
@@ -865,6 +935,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     switch (state.kind) {
       case 'pan':
         viewTouched.current = true;
+        state.tracker.push(event.clientX, event.clientY);
         setView({ ...state.view, x: state.view.x + (event.clientX - state.x), y: state.view.y + (event.clientY - state.y) });
         return;
       case 'move': {
@@ -906,10 +977,28 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         setGhost({ kind: 'create', tool: state.tool, from: state.from, to });
         return;
       }
-      case 'pen':
+      case 'pen': {
         state.points.push(p.x, p.y);
-        setGhost({ kind: 'pen', points: [...state.points] });
+        // Quick shape (model/quick-shape.ts): the pen has stopped moving when it stays within a little jitter. Once it has
+        // for QUICK_SHAPE_HOLD_MS, the stroke is classified and the ghost shows what lifting now would leave. Moving on
+        // unsnaps it and starts the clock again.
+        const still = state.still;
+        if (!still || Math.hypot(event.clientX - still.x, event.clientY - still.y) > QUICK_SHAPE_JITTER_PX) {
+          state.still = { x: event.clientX, y: event.clientY, since: performance.now() };
+          state.snapped = null;
+          window.clearTimeout(holdTimer.current);
+          if (settingsRef.current.quickShapes) {
+            holdTimer.current = window.setTimeout(() => {
+              const held = drag.current;
+              if (!held || held.kind !== 'pen') return;
+              held.snapped = quickShape(held.points);
+              setGhost({ kind: 'pen', points: [...held.points], snapped: held.snapped });
+            }, settingsRef.current.holdMs);
+          }
+        }
+        setGhost({ kind: 'pen', points: [...state.points], snapped: state.snapped });
         return;
+      }
       case 'erase':
         eraseAlong(state.last, p, state.session);
         state.last = p;
@@ -926,6 +1015,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    gestures.current!.up(event);
+    window.clearTimeout(holdTimer.current);
     const state = drag.current;
     const svg = svgEl.current;
     if (svg) release(svg as unknown as HTMLElement, event.pointerId);
@@ -934,6 +1025,21 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     setPageDrag(false);
     setDragging(false);
     if (!state) return;
+    if (state.kind === 'pan') {
+      // Let go while moving: the page keeps sliding and eases to a stop (inertia.ts).
+      const v = state.tracker.velocity();
+      if (v && !reduced && settingsRef.current.momentum) {
+        glideStop.current = glide(
+          v,
+          (dx, dy) => {
+            const cur = viewRef.current;
+            setView({ ...cur, x: cur.x + dx, y: cur.y + dy });
+          },
+          { friction: settingsRef.current.friction },
+        );
+      }
+      return;
+    }
     if (state.kind === 'create') {
       const dragged = Math.hypot(state.to.x - state.from.x, state.to.y - state.from.y) * viewRef.current.z > 4;
       const to = dragged ? state.to : { x: state.from.x + 120, y: state.from.y + (state.tool === 'line' ? 0 : 80) };
@@ -946,7 +1052,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       const pen = BRUSHES.find((x) => x.brush === brushRef.current) ?? BRUSHES[1]!;
       // A highlighter left on the default colour stays null, which draws yellow rather than the ink.
       const ink = paintRef.current ?? (pen.brush === 'highlighter' ? null : (Object.keys(ds.colors)[0] ?? null));
-      commit('Draw', drawPath(tpl(), blockId, state.points, ink, pen.width, penGroup.current ?? undefined, pen.brush));
+      if (state.snapped) commit('Draw', addQuickShape(tpl(), blockId, state.snapped, ink, pen.width, penGroup.current ?? undefined, pen.brush));
+      else commit('Draw', drawPath(tpl(), blockId, state.points, ink, pen.width, penGroup.current ?? undefined, pen.brush));
     }
   };
 
@@ -1423,7 +1530,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                 />
               )}
               {ghost?.kind === 'create' && ghostShape(ghost)}
-              {ghost?.kind === 'pen' &&
+              {ghost?.kind === 'pen' && ghost.snapped && snappedGhost(ghost.snapped)}
+              {ghost?.kind === 'pen' && !ghost.snapped &&
                 (brush === 'brush' ? (
                   <path d={brushOutline(ghost.points, penDef.width)} fill={swatch ?? ACCENT} />
                 ) : (
@@ -1769,7 +1877,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
       {hint && idle && (
         <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
-          Double-click text to type · / for styles · hold Space to pan · ⌘C ⌘V copy layers
+          Double-click text to type · / for styles · hold Space to pan · hold still to snap a shape · ⌘C ⌘V copy layers
         </div>
       )}
     </div>
@@ -1791,6 +1899,16 @@ function ghostShape(g: { tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Poi
   const paint = { fill: 'rgba(123,97,255,0.1)', stroke: ACCENT, 'stroke-width': 2 };
   if (g.tool === 'ellipse') return <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2} {...paint} />;
   return <rect x={x} y={y} width={w} height={h} rx={3} {...paint} />;
+}
+
+/** The shape a held stroke will become when the pen lifts, drawn dashed in the accent over the stroke. */
+function snappedGhost(s: QuickShape) {
+  const paint = { fill: 'none', stroke: ACCENT, 'stroke-width': 2.5, 'stroke-linecap': 'round' as const, 'stroke-linejoin': 'round' as const, 'stroke-dasharray': '7 5' };
+  if (s.kind === 'line') return <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} {...paint} />;
+  if (s.kind === 'triangle') return <polyline points={pairs(s.points)} {...paint} />;
+  const transform = s.rotation ? `rotate(${s.rotation} ${s.x + s.width / 2} ${s.y + s.height / 2})` : undefined;
+  if (s.kind === 'ellipse') return <ellipse cx={s.x + s.width / 2} cy={s.y + s.height / 2} rx={s.width / 2} ry={s.height / 2} transform={transform} {...paint} />;
+  return <rect x={s.x} y={s.y} width={s.width} height={s.height} transform={transform} {...paint} />;
 }
 
 /** The id of the last layer of a freeform block in a template — the one just added. */
