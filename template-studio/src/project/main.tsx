@@ -113,33 +113,54 @@ function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomePr
     setProblem(await project.openFor(launch.launcher, launch.fileName));
   };
 
+  const bar = (
+    <header class="pb-bar pb-bar-top">
+      <a class="pb-ghost" href="../../index.html" title="Back to Scugnizzi tools">
+        ← Tools
+      </a>
+      <span class="pb-sep" aria-hidden="true" />
+      <span class="pb-title" aria-hidden="true">
+        <b>Project</b>
+      </span>
+    </header>
+  );
+
   if (launch) {
     return (
       <div class="pb-welcome">
-        <a class="fig-pill pb-back" href="../../index.html" title="Back to Scugnizzi tools">
-          <span aria-hidden="true">←</span> Tools
-        </a>
-        <div class="pb-welcome-card">
-          <p class="pb-kicker">Project</p>
-          <h1>Open {launch.launcher.name}.</h1>
-          <p class="pb-lede">
-            You opened <b>{launch.fileName}</b>, and this browser hasn’t been shown the folder it lives in yet. Choose that folder once. From then on the file
-            opens the project on its own, and so do Template Studio and Freeform.
-          </p>
-          {problem && (
-            <p class="pb-warn" role="alert">
-              {problem}
+        {bar}
+        <div class="pb-welcome-page">
+          <div class="pb-welcome-intro">
+            <p class="pb-eyebrow">Project</p>
+            <h1>Open {launch.launcher.name}.</h1>
+            <p class="pb-lede">
+              You opened <b>{launch.fileName}</b>, and this browser hasn’t been shown the folder it lives in yet. Choose that folder once. From then on the file
+              opens the project on its own, and so do Template Studio and Freeform.
             </p>
-          )}
-          <div class="pb-actions">
-            <button class="pb-primary" onClick={() => void chooseFor()}>
-              Choose the folder…
-            </button>
-            <button class="pb-secondary" onClick={onDropLaunch}>
-              Not now
-            </button>
+            {problem && (
+              <p class="pb-warn" role="alert">
+                {problem}
+              </p>
+            )}
+            <div class="pb-actions-row">
+              <button class="pb-primary" onClick={() => void chooseFor()}>
+                Choose the folder…
+              </button>
+              <button class="pb-secondary" onClick={onDropLaunch}>
+                Not now
+              </button>
+            </div>
+            <p class="pb-foot">When Chrome asks, choose “Edit files”, so the tools can save into it.</p>
           </div>
-          <p class="pb-foot">When Chrome asks, choose “Edit files”, so the tools can save into it.</p>
+          <aside class="pb-welcome-aside">
+            <div class="pb-section-head">The file</div>
+            <ul class="pb-tree">
+              <li>
+                <code>{launch.fileName}</code>
+                <span>names the project by its id, not by where its folder is</span>
+              </li>
+            </ul>
+          </aside>
         </div>
       </div>
     );
@@ -147,92 +168,88 @@ function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomePr
 
   return (
     <div class="pb-welcome">
-      <a class="fig-pill pb-back" href="../../index.html" title="Back to Scugnizzi tools">
-        <span aria-hidden="true">←</span> Tools
-      </a>
-      <div class="pb-welcome-card">
-        <div class="pb-float email" aria-hidden="true">
-          <i>Email</i>
-          <s />
-          <s />
-          <s class="short" />
-        </div>
-        <div class="pb-float frame" aria-hidden="true">
-          <i>Frame</i>
-          <u />
-        </div>
-        <div class="pb-float picture" aria-hidden="true">
-          <i>Picture</i>
-          <em />
-        </div>
-
-        <p class="pb-kicker">Project</p>
-        <h1>One folder for every tool.</h1>
-        <p class="pb-lede">
-          A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, and the pictures they use,
-          with lines showing what is made from what. Create one from a type, or open a folder you already have. Template Studio and Freeform open it on their own
-          from then on.
-        </p>
-
-        {project.status === 'loading' ? null : project.status === 'unsupported' ? (
-          <p class="pb-warn">Opening a folder needs Chrome or Edge on a computer.</p>
-        ) : remembered ? (
-          <div class="pb-actions">
-            <button class="pb-primary" onClick={() => void project.allow()}>
-              Reopen {remembered}
-            </button>
-            <button class="pb-secondary" onClick={onCreate}>
-              Create a project…
-            </button>
-            <button class="pb-secondary" onClick={() => void project.open()}>
-              Open a different folder…
-            </button>
-          </div>
-        ) : (
-          <div class="pb-actions">
-            <button class="pb-primary" onClick={onCreate}>
-              Create a project…
-            </button>
-            <button class="pb-secondary" onClick={() => void project.open()}>
-              Open a folder…
-            </button>
-          </div>
-        )}
-
-        <ul class="pb-tree">
-          <li>
-            <code>templates/</code>
-            <span>emails, from Template Studio</span>
-          </li>
-          <li>
-            <code>frames/</code>
-            <span>Freeform frames, one file each</span>
-          </li>
-          <li>
-            <code>assets/</code>
-            <span>pictures every tool can use</span>
-          </li>
-          <li>
-            <code>design-systems/</code>
-            <span>the colours and type emails follow</span>
-          </li>
-          <li>
-            <code>board.json</code>
-            <span>where each card sits on the board</span>
-          </li>
-        </ul>
-        {install.state === 'installable' && (
-          <p class="pb-install">
-            <button class="pb-secondary" onClick={() => void install.install()}>
-              Install as an app
-            </button>
-            <span>Then a project’s .scug file opens it from Finder.</span>
+      {bar}
+      <div class="pb-welcome-page">
+        <div class="pb-welcome-intro">
+          <p class="pb-eyebrow">Project</p>
+          <h1>One folder for every tool.</h1>
+          <p class="pb-lede">
+            A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, the documents beside
+            them, and the pictures they use, with lines showing what is made from what. Create one from a type, or open a folder you already have. Template
+            Studio and Freeform open it on their own from then on.
           </p>
-        )}
-        <p class="pb-foot">
-          Any folder works, including one Google Drive for desktop or Dropbox keeps in sync, so the team sees the same project. When Chrome asks, choose
-          “Edit files”.
-        </p>
+
+          {project.status === 'loading' ? null : project.status === 'unsupported' ? (
+            <p class="pb-warn">Opening a folder needs Chrome or Edge on a computer.</p>
+          ) : remembered ? (
+            <div class="pb-actions-row">
+              <button class="pb-primary" onClick={() => void project.allow()}>
+                Reopen {remembered}
+              </button>
+              <button class="pb-secondary" onClick={onCreate}>
+                Create a project…
+              </button>
+              <button class="pb-secondary" onClick={() => void project.open()}>
+                Open a different folder…
+              </button>
+            </div>
+          ) : (
+            <div class="pb-actions-row">
+              <button class="pb-primary" onClick={onCreate}>
+                Create a project…
+              </button>
+              <button class="pb-secondary" onClick={() => void project.open()}>
+                Open a folder…
+              </button>
+            </div>
+          )}
+          <p class="pb-foot">
+            Any folder works, including one Google Drive for desktop or Dropbox keeps in sync, so the team sees the same project. When Chrome asks, choose
+            “Edit files”.
+          </p>
+        </div>
+
+        <aside class="pb-welcome-aside">
+          <div class="pb-section-head">
+            The folder
+            <span class="pb-grow" />
+            <span class="pb-hint">What a project is made of</span>
+          </div>
+          <ul class="pb-tree">
+            <li>
+              <code>templates/</code>
+              <span>emails, from Template Studio</span>
+            </li>
+            <li>
+              <code>frames/</code>
+              <span>Freeform frames, one file each</span>
+            </li>
+            <li>
+              <code>assets/</code>
+              <span>pictures every tool can use; each folder in it is a group on the board</span>
+            </li>
+            <li>
+              <code>docs/</code>
+              <span>briefs and copy: Google Docs, Sheets and Slides in a synced folder, or links to them</span>
+            </li>
+            <li>
+              <code>design-systems/</code>
+              <span>the colours and type emails follow</span>
+            </li>
+            <li>
+              <code>board.json</code>
+              <span>where each card sits on the board</span>
+            </li>
+          </ul>
+          {install.state === 'installable' && (
+            <p class="pb-install">
+              <button class="pb-secondary" onClick={() => void install.install()}>
+                Install as an app
+              </button>
+              <span>Then a project’s .scug file opens it from Finder.</span>
+            </p>
+          )}
+        </aside>
       </div>
     </div>
   );

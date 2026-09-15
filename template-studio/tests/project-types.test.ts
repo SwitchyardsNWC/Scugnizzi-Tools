@@ -2,8 +2,9 @@
 //
 // Defended: every type has an id of its own; each plan writes exactly the files its type says, under the
 // project's name; the starter email follows the design system written beside it and compiles; starter frames
-// are frame files at their sizes, with keys and file names of their own; project.json carries the type; and a
-// project's folder name is one every file system takes.
+// are frame files at their sizes, with keys and file names of their own; every type but Blank starts with picture
+// folders under assets/ that the README explains; project.json carries the type; and a project's folder name is
+// one every file system takes.
 
 import { describe, expect, it } from 'vitest';
 
@@ -12,7 +13,7 @@ import { completeDesignSystem } from '../src/model/design-system.ts';
 import { materialiseFolderSystem } from '../src/model/edit.ts';
 import { readFrameFile } from '../src/model/frame-file.ts';
 import { FRAME_PREFIX } from '../src/model/frame-store.ts';
-import { planProject, PROJECT_TYPES, projectFolderName, projectType, type ProjectPlan } from '../src/model/project-types.ts';
+import { folderNote, planProject, PROJECT_TYPES, projectFolderName, projectType, type ProjectPlan } from '../src/model/project-types.ts';
 import { readProjectInfo } from '../src/model/project.ts';
 import { migrate } from '../src/model/schema.ts';
 import type { FreeformBlock } from '../src/model/types.ts';
@@ -41,7 +42,7 @@ describe('project types', () => {
   it('make an email project: the design system, an email that follows it, and a hero frame', () => {
     const p = plan('email');
     expect(p.folder).toBe('Spring launch');
-    expect(p.folders).toEqual(['templates', 'frames', 'assets', 'design-systems', 'exports']);
+    expect(p.folders).toEqual(['templates', 'frames', 'assets', 'design-systems', 'exports', 'docs', 'assets/photos', 'assets/logos']);
     expect(p.files.map((f) => f.path)).toEqual([
       'project.json',
       'README.md',
@@ -83,6 +84,29 @@ describe('project types', () => {
     expect(f).toHaveLength(4);
     expect(new Set(f.map((x) => x.key)).size).toBe(4);
     expect(new Set(f.map((x) => x.path)).size).toBe(4);
+  });
+
+  it('start every type but Blank with picture folders under assets/, each explained in the README', () => {
+    for (const t of PROJECT_TYPES) {
+      const p = plan(t.id);
+      if (t.id === 'blank') {
+        expect(t.groups).toEqual([]);
+        expect(p.folders.some((f) => f.startsWith('assets/'))).toBe(false);
+        continue;
+      }
+      expect(t.groups.length).toBeGreaterThan(0);
+      expect(new Set(t.groups.map((g) => g.folder)).size).toBe(t.groups.length);
+      for (const g of t.groups) {
+        expect(p.folders).toContain(`assets/${g.folder}`);
+        expect(folderNote(`assets/${g.folder}`)).toBe(g.note);
+        expect(text(p, 'README.md')).toContain(`| \`assets/${g.folder}/\` | ${g.note} |`);
+      }
+      expect(p.folders.indexOf('assets')).toBeLessThan(p.folders.indexOf(`assets/${t.groups[0]!.folder}`));
+      expect(p.folders).toContain('docs');
+    }
+    expect(plan('campaign').folders.filter((f) => f.startsWith('assets/'))).toEqual(['assets/photos', 'assets/logos', 'assets/social', 'assets/print']);
+    expect(plan('social').folders.filter((f) => f.startsWith('assets/'))).toEqual(['assets/photos', 'assets/logos', 'assets/social']);
+    expect(plan('print').folders.filter((f) => f.startsWith('assets/'))).toEqual(['assets/photos', 'assets/logos', 'assets/print']);
   });
 
   it('make a blank project of folders and a README that says what goes where', () => {

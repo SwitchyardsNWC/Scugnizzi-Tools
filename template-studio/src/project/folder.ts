@@ -1,4 +1,4 @@
-// A project's own files: project.json, board.json, pictures under assets/, and any file by path.
+// A project's own files: project.json, board.json, pictures under assets/, documents, and any file by path.
 //
 // Template Studio's workspace (workspace/workspace.ts) already reads templates and design systems from the
 // same folder, and the board uses it for those. This is the rest: the files that exist because the folder is
@@ -15,7 +15,9 @@ import {
   type Launcher,
   type ProjectInfo,
 } from '../model/project.ts';
+import { isGroupFolder } from '../model/project.ts';
 import type { ProjectPlan } from '../model/project-types.ts';
+import { docLinkFileName, docLinkJson, DOCS_DIR, isDocFile, readDocLink, type DocLink } from '../model/docs.ts';
 import { readRecipe, RECIPE_TOOLS, type RecipeTool, type ToolRecipe } from '../model/tool-recipes.ts';
 import { renameInRecipe, renameSrc } from '../model/asset-moves.ts';
 import { FRAME_EXT, FRAMES_DIR } from '../model/frame-file.ts';
@@ -181,6 +183,22 @@ export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
 
 // --- groups: folders under assets/ ------------------------------------------------------------------------------
 
+/**
+ * The folders straight under `assets/` a group can own, whether or not anything is in them yet. A project's
+ * starting folders and one made in Finder are groups on the board before any picture is filed in them.
+ */
+export async function listAssetFolders(dir: Dir): Promise<string[]> {
+  const assets = await childDir(dir, ['assets']);
+  const out: string[] = [];
+  if (!assets) return out;
+  try {
+    for await (const [name, entry] of assets.entries()) if (entry.kind === 'directory' && isGroupFolder(name)) out.push(name);
+  } catch {
+    return out;
+  }
+  return out.sort();
+}
+
 export async function makeGroupFolder(dir: Dir, folder: string): Promise<void> {
   if (!(await childDir(dir, ['assets', folder], true))) throw new Error(`Could not make assets/${folder}.`);
 }
@@ -264,6 +282,55 @@ export async function movePicture(dir: Dir, from: string, to: string, now = Date
 
   await removeFile(dir, `assets/${from}`);
   return rewritten;
+}
+
+// --- documents: Google Docs, Sheets and Slides, and links (model/docs.ts) ------------------------------------------
+
+export interface DocEntry {
+  /** In the project: `Brief.gdoc`, `docs/spring-copy.link.json`. */
+  path: string;
+  link: DocLink;
+  modified: number;
+}
+
+/** Where documents are looked for besides the top of the project: the docs folder, and the copy deck's. */
+const DOC_FOLDERS = [DOCS_DIR, 'copy'];
+
+/**
+ * Every document in the project: the files Drive for desktop writes for Google Docs, Sheets and Slides, and the
+ * board's own link files, at the top of the folder and one level down in `docs/` and `copy/`. One that cannot be
+ * read, or names no address, is skipped: a half-synced file is not a card that opens nowhere.
+ */
+export async function listDocuments(dir: Dir): Promise<DocEntry[]> {
+  const out: DocEntry[] = [];
+  const look = async (folder: Dir | null, prefix: string) => {
+    if (!folder) return;
+    try {
+      for await (const [name, entry] of folder.entries()) {
+        if (entry.kind !== 'file' || !isDocFile(name)) continue;
+        try {
+          const file = await (entry as FileSystemFileHandle).getFile();
+          const link = readDocLink(await file.text(), name);
+          if (link) out.push({ path: prefix ? `${prefix}/${name}` : name, link, modified: file.lastModified });
+        } catch {
+          // Being written, or not ours to read.
+        }
+      }
+    } catch {
+      // The folder went while it was being read.
+    }
+  };
+  await look(dir, '');
+  for (const sub of DOC_FOLDERS) await look(await childDir(dir, [sub]), sub);
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Writes a link file into `docs/`, named for the link, and returns its path in the project. */
+export async function writeDocLink(dir: Dir, link: { url: string; name: string }, existing: DocEntry[]): Promise<string> {
+  const taken = existing.filter((d) => d.path.startsWith(`${DOCS_DIR}/`)).map((d) => d.path.slice(DOCS_DIR.length + 1));
+  const path = `${DOCS_DIR}/${docLinkFileName(link.name, taken)}`;
+  await writeFile(dir, path, docLinkJson(link));
+  return path;
 }
 
 // --- what tools made --------------------------------------------------------------------------------------------

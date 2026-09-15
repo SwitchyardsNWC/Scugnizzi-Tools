@@ -366,6 +366,93 @@ and the emails that follow them given new keys on the way, so two projects never
 - Two machines editing the same frame at once is last save wins, with no both-changed prompt.
 - Riso prints at the press size (900 px on the long side), not the picture's full size.
 
+### The board, second pass
+
+*Added 2026-09-14.*
+
+> "take a pass at the projects canvas to feel more like a project management tool. still as a canvas, but more
+> serious with clean ui and modern UX that still hints to the early days of computer interfaces without being
+> cliché. … Make it where images are flat until you hover over and they show their chrome. Think about default
+> image folder structures to bring with templates."
+
+The board is set in the dashboard's system now (Enkel): one sans for words, mono for figures, hairlines for
+structure, square everything but what you press, no shadows, and nothing that bounces. What survives of an older
+screen is the drafting grid under everything, a status line along the bottom, corner marks on the selection, and
+cards as small windows with a thin title bar. `template-studio/src/project/project.css` carries the tokens; the
+board loads no fonts of its own.
+
+- **The bars.** A header across the top holds the project (name, type, the menu) and the verbs: Add + Email, +
+  Frame, + Pictures, + Group, + Link, then zoom and Fit. A status line along the bottom says where the project is
+  saving, the hint, and the counts in mono. The floating pills and the dock are gone.
+- **Cards.** A thin title bar: the name on the left, what it is and its size on the right in mono, ↗ on hover. A
+  selected card gets corner marks; a dragged one a firm border. Lines are 1px in the data palette, ink when they
+  touch the selection, with a square at the arrow end.
+- **Pictures are flat.** A picture is only the picture until the pointer is over it or it is selected; then its
+  title bar slides over the top edge and the frame appears. No checkerboard, no card behind it.
+- **Groups** are hairline regions on the paper: the name, `assets/<folder>/ · n` in mono, Remove on hover, a
+  square resize handle. An empty group says what dropping on it does. Filing and moving are unchanged.
+- **Starter folders.** Every type but Blank starts with picture folders under `assets/`, each a group on the
+  board from the first look: Campaign has `photos/`, `logos/`, `social/` and `print/`; Email `photos/` and
+  `logos/`; Social media `photos/`, `logos/`, `social/`; Print `photos/`, `logos/`, `print/`. They are data in
+  `model/project-types.ts` (`groups`), the README explains each, and the create sheet shows them under `assets/`.
+  With them, a folder under `assets/` is a group whether or not anything is in it yet, so a folder made in Finder
+  shows up before its first picture.
+- **Documents** are a fourth kind of card (below). Every type but Blank also gets a `docs/` folder for them.
+
+### Google Docs, Sheets and Slides
+
+*Added 2026-09-14.*
+
+> "what can we do with google docs, sheets, and slides? can we show and possibly make them editable or pull
+> content from them to use? … a project template creates google docs or sheets that someone that has access to
+> that google drive can edit. another idea google doc with email copy. can we set that as a variable to use
+> across projects?"
+
+**What works today, with nothing to set up.** Google Drive for desktop writes a Google-native file in a synced
+folder as a small file of its own, `Brief.gdoc`, `Budget.gsheet`, `Deck.gslides`, holding the document's
+address. A project on a synced drive therefore already carries every document the team put beside its emails,
+and the board reads them (`model/docs.ts`, `project/folder.ts` `listDocuments`) from the top of the folder and
+from `docs/` and `copy/`. Each is a card: the kind's glyph, where it opens, and ↗ or a double-click opens it in
+Google in a new tab, where anyone with access edits it as usual. A document that lives elsewhere is added with
+**+ Link**, which writes `docs/<name>.link.json`; any address works, and a Google address is recognised for what
+it is. Documents are laid out in a lane of their own between emails and frames.
+
+**What each further step needs.** A page with no server can go a long way with Google, but every step past
+"open it in Google" needs a Google sign-in in the browser and a Google Cloud project with an OAuth client
+allowed for the Pages origin and `localhost:8770`, registered as internal to the Workspace so the consent screen
+is the plain one. Tokens last about an hour and renew while the Google session lasts; an occasional click to
+reconnect is expected.
+
+| Want | How | Needs |
+|---|---|---|
+| Show the document on the board | A link card | nothing, done |
+| Open and edit it | Open in Google, new tab | nothing, done |
+| Show a live preview on the card | Embed the editor in an iframe | Unreliable: the editor in a frame needs third-party cookies, which Chrome is retiring. A document *published to the web* embeds read-only through its `/pub?embedded=true` address; that is a per-document choice in Docs. Not planned. |
+| Pull the words out of a Doc | Docs API `documents.get`, walked into headings and paragraphs | sign-in, `documents.readonly` |
+| Pull rows out of a Sheet | Sheets API `values.get` | sign-in, `spreadsheets.readonly` |
+| Create Docs and Sheets from a template on Create a project | Drive API `files.copy` of template documents into the project's Drive folder | sign-in, `drive.file` for documents the app made or was shown; the template documents are picked once through the Google Picker, which grants them |
+| Write words back into a Doc | Docs API `batchUpdate` | sign-in, `documents`; fragile against a writer's formatting, so only into documents the deck made |
+
+**Copy as a variable, across projects.** This is the copy deck in phases 2 to 5 above, and the Google question
+folds into it rather than replacing it. A deck is pieces and slots; a slot's text is bound into tools as
+`copy:<piece>.<slot>`. A Google Doc becomes a *source* of a deck: the writer names it, the deck reads it through
+the Docs API on request (headings are pieces, the bold label before a paragraph is a slot), and shows what
+changed before taking it. "Across projects" is then a shared deck: a Library project, or a `library/` folder on
+the drive, whose slots any project can bind to as `copy:library/<piece>.<slot>`, so one email footer, one legal
+line or one address lives in one Doc and lands in every template. The board would show a bound slot's source
+document as a card with lines to the emails that use it, the same way it shows pictures.
+
+The first step is the deck itself with Markdown and `.docx` sources, because it needs no sign-in and settles the
+data model. The Google source is the step after, and it is mostly the OAuth client and one API call.
+
+**Recommended order**
+
+1. Link cards (done). Put the brief and the copy Doc in the project folder through Drive, or add them with + Link.
+2. The copy deck, phases 2 and 3, with Markdown and `.docx` sources.
+3. Google sign-in in the browser, and a Doc as a deck source: read only.
+4. Create a project makes the Docs and Sheets the type names, from template documents, in the project's Drive folder.
+5. Writing back, only into documents the deck made.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because
