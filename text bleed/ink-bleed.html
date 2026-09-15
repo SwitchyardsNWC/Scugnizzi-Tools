@@ -1265,7 +1265,7 @@ function syncProject() {
   save.textContent = made && made.output ? `Save to ${made.output.split('/').pop()}` : 'Save to project';
   save.title = Project.status !== 'ready' ? `Chrome needs one click to let this page save into ${Project.name}`
     : made && made.output ? `Save over ${made.output} in ${Project.name}, with its settings in ${made.recipe}`
-    : `Save the PNG into ${Project.name}/assets, with its settings in ink-bleed/`;
+    : `Save the PNG into ${Project.name}/assets, and keep its settings with the project`;
 }
 const afterRestore = () => new Promise(r => { const go = () => setTimeout(r, 0); if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true }); else go(); });
 async function openFromAddress() {
@@ -1313,7 +1313,7 @@ $('#saveProject').addEventListener('click', async () => {
   try {
     const words = (state.layers.find(L => L.kind === 'text' && L.text.trim()) || { text: '' }).text.replace(/[()]/g, ' ').trim().split('\n')[0];
     const output = made && made.output ? made.output : await Project.freePath('assets', slugOf(words.slice(0, 40)), '.png');
-    const recipe = made && made.recipe ? made.recipe : await Project.freePath('ink-bleed', stemOf(output), '.ink-bleed.json');
+    const recipe = made && made.recipe ? made.recipe : await Project.freePath(Project.recipeFolder('ink-bleed'), stemOf(output), '.ink-bleed.json');
     const sources = [...new Set(state.layers.filter(L => L.kind === 'svg' && String(L.asset).startsWith('project:')).map(L => L.asset.slice('project:'.length)))];
     const settings = JSON.parse(JSON.stringify(state, (k, v) => k.startsWith('_') ? undefined : v));
     // The paper as it stands now, not as the last frame drew it: a change still waiting on its frame would otherwise

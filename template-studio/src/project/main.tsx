@@ -217,14 +217,6 @@ function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomePr
           </div>
           <ul class="pb-tree">
             <li>
-              <code>templates/</code>
-              <span>emails, from Template Studio</span>
-            </li>
-            <li>
-              <code>frames/</code>
-              <span>Freeform frames, one file each</span>
-            </li>
-            <li>
               <code>assets/</code>
               <span>pictures every tool can use; each folder in it is a group on the board</span>
             </li>
@@ -233,12 +225,16 @@ function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomePr
               <span>briefs and copy: Google Docs, Sheets and Slides in a synced folder, or links to them</span>
             </li>
             <li>
-              <code>design-systems/</code>
-              <span>the colours and type emails follow</span>
+              <code>exports/</code>
+              <span>what ships: the HubSpot template files</span>
             </li>
             <li>
-              <code>board.json</code>
-              <span>where each card sits on the board</span>
+              <code>.scug/</code>
+              <span>the tools’ own files: the board, the emails and frames as the tools save them, design systems. Finder hides it</span>
+            </li>
+            <li>
+              <code>name.scug</code>
+              <span>double-click in Finder to open the project, once the tools are installed as an app</span>
             </li>
           </ul>
           {install.state === 'installable' && (

@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 
-import { CANVAS_RANGES, DEFAULT_CANVAS_SETTINGS, resetCanvasSettings, useCanvasSettings, writeCanvasSettings, type CanvasSettings } from './canvas-settings.ts';
+import { CANVAS_RANGES, DEFAULT_CANVAS_SETTINGS, resetCanvasSettings, useCanvasSettings, writeCanvasSettings, type CanvasSettings, type GroundKind } from './canvas-settings.ts';
 
 export function CanvasMenu({ pill = false }: { pill?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -32,7 +32,7 @@ export function CanvasMenu({ pill = false }: { pill?: boolean }) {
   }, [open]);
   return (
     <div class={`cv-menu ${pill ? 'pill' : ''}`} ref={root}>
-      <button class={pill ? `fig-pill ${open ? 'on' : ''}` : `pb-ghost ${open ? 'on' : ''}`} aria-expanded={open} title="How the canvas moves and draws: momentum, zoom speed, the grid, quick shapes, the pencil." onClick={() => setOpen((o) => !o)}>
+      <button class={pill ? `fig-pill ${open ? 'on' : ''}` : `pb-ghost ${open ? 'on' : ''}`} aria-expanded={open} title="How the canvas moves and draws: momentum, zoom speed, what lies under the board, quick shapes, the pencil." onClick={() => setOpen((o) => !o)}>
         Canvas
       </button>
       {open && <CanvasSettingsPanel />}
@@ -42,8 +42,10 @@ export function CanvasMenu({ pill = false }: { pill?: boolean }) {
 
 const fmt = {
   friction: (v: number) => `${v} ms`,
+  holdPanMs: (v: number) => `${v} ms`,
   pinchGain: (v: number) => `×${v.toFixed(1)}`,
   wheelGain: (v: number) => `×${v.toFixed(1)}`,
+  groundOpacity: (v: number) => `${Math.round(v * 100)}%`,
   gridStep: (v: number) => `${v} px`,
   holdMs: (v: number) => `${v} ms`,
 };
@@ -53,19 +55,47 @@ export function CanvasSettingsPanel() {
   const set = (patch: Partial<CanvasSettings>) => writeCanvasSettings(patch);
   // The presence name is a person's, not a dial: Reset leaves it alone.
   const changed = JSON.stringify({ ...s, presenceName: '' }) !== JSON.stringify({ ...DEFAULT_CANVAS_SETTINGS, presenceName: '' });
+  /** The ground that is drawn, whose opacity the dial shows; plain paper shows the lines' dial, greyed. */
+  const drawn = s.ground === 'none' ? null : s.ground;
   return (
     <div class="cv-pop" role="dialog" aria-label="Canvas settings" onPointerDown={(e) => e.stopPropagation()}>
       <div class="cv-section">
         <div class="cv-head">Moving</div>
         <Toggle label="Momentum" help="Let go mid-drag and the canvas keeps sliding, then eases to a stop." value={s.momentum} onChange={(v) => set({ momentum: v })} />
         <Slider label="Glide" help="How long the slide lasts: the time it takes to lose two thirds of its speed." value={s.friction} range={CANVAS_RANGES.friction} format={fmt.friction} disabled={!s.momentum} onChange={(v) => set({ friction: v })} />
+        <Slider label="Hold to pan" help="Press and stay still on a card or a layer this long, and the press becomes the hand: dragging then moves the view, not the thing. A quick click still selects it. Space does the same at once." value={s.holdPanMs} range={CANVAS_RANGES.holdPanMs} format={fmt.holdPanMs} onChange={(v) => set({ holdPanMs: v })} />
         <Slider label="Pinch zoom" help="How much a pinch zooms for how far the fingers move." value={s.pinchGain} range={CANVAS_RANGES.pinchGain} format={fmt.pinchGain} onChange={(v) => set({ pinchGain: v })} />
         <Slider label="Wheel zoom" help="The same for ⌘ + wheel and a trackpad pinch." value={s.wheelGain} range={CANVAS_RANGES.wheelGain} format={fmt.wheelGain} onChange={(v) => set({ wheelGain: v })} />
       </div>
       <div class="cv-section">
         <div class="cv-head">Board</div>
-        <Toggle label="Grid" help="The drafting grid under the board." value={s.grid} onChange={(v) => set({ grid: v })} />
-        <Slider label="Grid step" help="The fine line's spacing; the firm line is every fifth." value={s.gridStep} range={CANVAS_RANGES.gridStep} format={fmt.gridStep} disabled={!s.grid} onChange={(v) => set({ gridStep: v })} />
+        <div class="cv-row" title="What lies under the board: plain paper, drafting lines, a dot grid, or a cutting mat.">
+          <span class="cv-label">Background</span>
+          <div class="cv-seg" role="radiogroup" aria-label="Background">
+            {(
+              [
+                ['none', 'Off'],
+                ['lines', 'Lines'],
+                ['dots', 'Dots'],
+                ['mat', 'Mat'],
+              ] as Array<[GroundKind, string]>
+            ).map(([value, label]) => (
+              <button key={value} role="radio" aria-checked={s.ground === value} class={s.ground === value ? 'on' : ''} onClick={() => set({ ground: value })}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Opacity"
+          help="How strongly the background shows over the paper. Each background keeps its own."
+          value={s.groundOpacity[drawn ?? 'lines']}
+          range={CANVAS_RANGES.groundOpacity}
+          format={fmt.groundOpacity}
+          disabled={!drawn}
+          onChange={(v) => drawn && set({ groundOpacity: { ...s.groundOpacity, [drawn]: v } })}
+        />
+        <Slider label="Grid step" help="The fine line's spacing, or the dots'; the firm line, or the bigger dot, is every fifth." value={s.gridStep} range={CANVAS_RANGES.gridStep} format={fmt.gridStep} disabled={!drawn} onChange={(v) => set({ gridStep: v })} />
         <Toggle label="Snap to grid" help="Cards and groups let go on the board land on the grid." value={s.snap} onChange={(v) => set({ snap: v })} />
       </div>
       <div class="cv-section">

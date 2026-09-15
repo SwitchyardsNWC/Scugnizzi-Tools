@@ -21,6 +21,16 @@ body { background: #f5f5f4; }
   --pb-soft: #e6e6e4;
   --pb-grid: rgb(13 13 13 / 0.045);
   --pb-grid-major: rgb(13 13 13 / 0.09);
+  /* What lies under the board, at full strength; the Canvas menu's opacity dial brings each down. Lines at the
+     shipped 50% are the 0.045 and 0.09 above. The mat is the green of a self-healing cutting mat, with its pale lines. */
+  --pb-line: rgb(13 13 13 / 0.09);
+  --pb-line-major: rgb(13 13 13 / 0.18);
+  --pb-dot: rgb(13 13 13 / 0.34);
+  --pb-dot-major: rgb(13 13 13 / 0.5);
+  --pb-mat: #3c7358;
+  --pb-mat-line: rgb(232 240 224 / 0.26);
+  --pb-mat-major: rgb(240 246 234 / 0.6);
+  --pb-mat-diag: rgb(240 246 234 / 0.42);
   --pb-accent: #495472;
   --pb-accent-hover: #3b4560;
   --pb-accent-soft: #e9ecf3;
@@ -122,27 +132,70 @@ body { background: #f5f5f4; }
 .pb-stage {
   position: absolute; left: 0; right: 0; top: 44px; bottom: 28px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
   background-color: var(--pb-ground);
-  background-image:
-    linear-gradient(to right, var(--pb-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-grid) 1px, transparent 1px),
-    linear-gradient(to right, var(--pb-grid-major) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-grid-major) 1px, transparent 1px);
 }
+/* What lies under the board (Canvas › Background): a layer of repeating images that Board.tsx sizes to the zoom and
+   slides with the view (project/ground.ts); its opacity is the dial. A hairline every step and a firm one every fifth;
+   a dot at each crossing, bigger at each fifth; or a cutting mat, its firm lines with the diagonals through their
+   crossings, the fine lines beneath. */
+.pb-under { position: absolute; inset: 0; pointer-events: none; }
+.pb-under-lines {
+  background-image:
+    linear-gradient(to right, var(--pb-line) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-line) 1px, transparent 1px),
+    linear-gradient(to right, var(--pb-line-major) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-line-major) 1px, transparent 1px);
+}
+.pb-under-dots {
+  background-image: radial-gradient(circle, var(--pb-dot-major) 1.5px, transparent 2.2px), radial-gradient(circle, var(--pb-dot) 1px, transparent 1.6px);
+}
+.pb-under-mat {
+  background-color: var(--pb-mat);
+  background-image:
+    linear-gradient(to right, var(--pb-mat-major) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-mat-major) 1px, transparent 1px),
+    linear-gradient(45deg, transparent calc(50% - 0.75px), var(--pb-mat-diag) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+    linear-gradient(-45deg, transparent calc(50% - 0.75px), var(--pb-mat-diag) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+    linear-gradient(to right, var(--pb-mat-line) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-mat-line) 1px, transparent 1px);
+}
+/* On a mat shown strongly the ground is dark: lines keep their colours but lighten, and faint text turns pale. */
+.pb-stage.dark-ground .pb-link { opacity: 0.55; }
+.pb-stage.dark-ground.has-selection .pb-link { opacity: 0.25; }
+.pb-stage.dark-ground .pb-link.follows path { stroke: #aebcf0; }
+.pb-stage.dark-ground .pb-link.follows rect { fill: #aebcf0; }
+.pb-stage.dark-ground .pb-link.uses path { stroke: #d6e8a8; }
+.pb-stage.dark-ground .pb-link.uses rect { fill: #d6e8a8; }
+.pb-stage.dark-ground .pb-link.made path { stroke: #f2b39f; }
+.pb-stage.dark-ground .pb-link.made rect { fill: #f2b39f; }
+.pb-stage.dark-ground .pb-link.picked path:not(.hit) { stroke: #fff; }
+.pb-stage.dark-ground .pb-link.picked rect { fill: #fff; }
+.pb-stage.dark-ground .pb-group-empty { color: rgb(255 255 255 / 0.7); }
 .pb-stage.panning { cursor: grabbing; }
+.pb-stage.hand, .pb-stage.hand .pb-card, .pb-stage.hand .pb-group-head, .pb-stage.hand .pb-group-resize { cursor: grab; }
+.pb-stage.panning .pb-card, .pb-stage.panning .pb-group-head, .pb-stage.hand.panning, .pb-stage.hand.panning .pb-card { cursor: grabbing; }
 .pb-stage.grouping, .pb-stage.grouping .pb-card, .pb-stage.grouping .pb-group-head { cursor: crosshair; }
 .pb-marquee { position: absolute; z-index: 3; border: 1px dashed var(--pb-accent); background: rgb(73 84 114 / 0.08); pointer-events: none; }
 .pb-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 
 .pb-links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .pb-link path { fill: none; stroke-width: 1px; vector-effect: non-scaling-stroke; }
-.pb-link { opacity: 0.7; transition: opacity var(--pb-fast); }
+/* A wide, invisible twin of each line, so a line can be picked without aiming at a hairline. */
+.pb-link path.hit { stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
+.pb-link.picked { opacity: 1; }
+.pb-link.picked path:not(.hit) { stroke: var(--pb-ink); stroke-width: 2px; stroke-dasharray: none; }
+.pb-link.picked rect { fill: var(--pb-ink); }
+.pb-link-break {
+  position: absolute; z-index: 5; height: 24px; padding: 6px 8px 2px; border: 1px solid var(--pb-ink); border-radius: 4px; background: var(--pb-paper); color: var(--pb-ink);
+  font: inherit; font-size: 12px; line-height: 14px; white-space: nowrap; cursor: pointer; transform-origin: 50% 50%;
+}
+.pb-link-break:hover { background: var(--pb-ink); color: #fff; }
+/* Lines rest quiet. Pick a card and its lines are the thick ones, in their colours; every other line fades further. */
+.pb-link { opacity: 0.35; transition: opacity var(--pb-fast); }
+.pb-stage.has-selection .pb-link { opacity: 0.15; }
 .pb-link.follows path { stroke: var(--pb-blue); }
 .pb-link.follows rect { fill: var(--pb-blue); }
 .pb-link.uses path { stroke: var(--pb-green); stroke-dasharray: 4 5; }
 .pb-link.uses rect { fill: var(--pb-green); }
 .pb-link.made path { stroke: var(--pb-brick); }
 .pb-link.made rect { fill: var(--pb-brick); }
-.pb-link.on { opacity: 1; }
-.pb-link.on path { stroke: var(--pb-ink); stroke-width: 1.5px; }
-.pb-link.on rect { fill: var(--pb-ink); }
+.pb-stage.has-selection .pb-link.on, .pb-link.on { opacity: 1; }
+.pb-link.on path:not(.hit) { stroke-width: 2.5px; }
 
 /* --- cards: small windows with a thin title bar ------------------------------------------------------------- */
 .pb-card {
@@ -153,6 +206,10 @@ body { background: #f5f5f4; }
 .pb-card:hover { border-color: var(--pb-ink); }
 .pb-card.on { border-color: var(--pb-ink); }
 .pb-card.lifted { z-index: 2; cursor: grabbing; border-color: var(--pb-ink); }
+.pb-card.drop { border-color: var(--pb-accent); outline: 2px solid var(--pb-accent); outline-offset: 2px; }
+.pb-card.pb-copying { z-index: 2; border: 1px dashed var(--pb-ink); background: var(--pb-paper); pointer-events: none; }
+.pb-card.pb-copying .pb-card-head { border-bottom: 0; }
+.pb-copy-icon { flex: none; margin-right: 6px; color: var(--pb-text); }
 /* Corner marks on the selection: two strips, each painting a square at either end. */
 .pb-card.on::before, .pb-card.on::after {
   content: ""; position: absolute; left: -4px; right: -4px; height: 7px; pointer-events: none;

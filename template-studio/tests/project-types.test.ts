@@ -3,8 +3,8 @@
 // Defended: every type has an id of its own; each plan writes exactly the files its type says, under the
 // project's name; the starter email follows the design system written beside it and compiles; starter frames
 // are frame files at their sizes, with keys and file names of their own; every type but Blank starts with picture
-// folders under assets/ that the README explains; project.json carries the type; and a project's folder name is
-// one every file system takes.
+// folders under assets/ that the README explains; the tools' own files all go under .scug/ so the top of the
+// project reads as work; project.json carries the type; and a project's folder name is one every file system takes.
 
 import { describe, expect, it } from 'vitest';
 
@@ -25,7 +25,7 @@ const plan = (id: string, name = 'Spring launch'): ProjectPlan => {
 const text = (p: ProjectPlan, path: string) => p.files.find((f) => f.path === path)?.text ?? null;
 const frames = (p: ProjectPlan) =>
   p.files
-    .filter((f) => f.path.startsWith('frames/'))
+    .filter((f) => f.path.startsWith('.scug/frames/'))
     .map((f) => {
       const frame = readFrameFile(f.text)!;
       const block = frame.template.sections[0]!.rows[0]!.columns[0]!.blocks[0] as FreeformBlock;
@@ -42,25 +42,25 @@ describe('project types', () => {
   it('make an email project: the design system, an email that follows it, and a hero frame', () => {
     const p = plan('email');
     expect(p.folder).toBe('Spring launch');
-    expect(p.folders).toEqual(['templates', 'frames', 'assets', 'design-systems', 'exports', 'docs', 'assets/photos', 'assets/logos']);
+    expect(p.folders).toEqual(['assets', 'docs', 'exports', 'assets/photos', 'assets/logos', '.scug', '.scug/frames', '.scug/templates', '.scug/design-systems']);
     expect(p.files.map((f) => f.path)).toEqual([
-      'project.json',
+      '.scug/project.json',
       'README.md',
-      'design-systems/switchyards.system.json',
-      'templates/spring-launch.template.json',
-      'frames/email-hero.frame.json',
+      '.scug/design-systems/switchyards.system.json',
+      '.scug/templates/spring-launch.template.json',
+      '.scug/frames/email-hero.frame.json',
     ]);
-    expect(readProjectInfo(text(p, 'project.json'))).toEqual({ version: 1, id: 'project:test', name: 'Spring launch', createdAt: 7, type: 'email' });
+    expect(readProjectInfo(text(p, '.scug/project.json'))).toEqual({ version: 1, id: 'project:test', name: 'Spring launch', createdAt: 7, type: 'email' });
 
-    const template = migrate(JSON.parse(text(p, 'templates/spring-launch.template.json')!));
+    const template = migrate(JSON.parse(text(p, '.scug/templates/spring-launch.template.json')!));
     expect(template).toMatchObject({ name: 'Spring launch', designSystem: 'switchyards' });
-    const systems = { switchyards: completeDesignSystem(JSON.parse(text(p, 'design-systems/switchyards.system.json')!)) };
+    const systems = { switchyards: completeDesignSystem(JSON.parse(text(p, '.scug/design-systems/switchyards.system.json')!)) };
     const { template: followed, warning } = materialiseFolderSystem(template, systems);
     expect(warning).toBeUndefined();
     expect(compile(followed, { mode: 'hubl' }).bytes).toBeGreaterThan(0);
 
     expect(frames(p)).toEqual([
-      { path: 'frames/email-hero.frame.json', key: `${FRAME_PREFIX}id1`, name: 'Email hero', size: [600, 300], label: expect.objectContaining({ kind: 'text', text: 'Email hero', size: 43 }) },
+      { path: '.scug/frames/email-hero.frame.json', key: `${FRAME_PREFIX}id1`, name: 'Email hero', size: [600, 300], label: expect.objectContaining({ kind: 'text', text: 'Email hero', size: 43 }) },
     ]);
   });
 
@@ -76,7 +76,7 @@ describe('project types', () => {
       ['Flyer', 850, 1100],
       ['Postcard', 900, 600],
     ]);
-    for (const id of ['social', 'print']) expect(plan(id).files.some((f) => f.path.startsWith('templates/'))).toBe(false);
+    for (const id of ['social', 'print']) expect(plan(id).files.some((f) => f.path.includes('templates/'))).toBe(false);
   });
 
   it('give a campaign’s frames keys and file names of their own', () => {
@@ -111,10 +111,22 @@ describe('project types', () => {
 
   it('make a blank project of folders and a README that says what goes where', () => {
     const p = plan('blank');
-    expect(p.files.map((f) => f.path)).toEqual(['project.json', 'README.md']);
+    expect(p.folders).toEqual(['assets', '.scug']);
+    expect(p.files.map((f) => f.path)).toEqual(['.scug/project.json', 'README.md']);
     expect(text(p, 'README.md')).toContain('Spring launch is a blank project');
-    expect(text(p, 'README.md')).toContain('| `frames/` | Freeform frames, one file each |');
+    expect(text(p, 'README.md')).toContain('| `assets/` |');
+    expect(text(p, 'README.md')).toContain('| `.scug/` |');
     expect(text(plan('email'), 'README.md')).toContain('is an email project');
+  });
+
+  it('keep every file a person would not open under .scug/, and only work at the top', () => {
+    for (const t of PROJECT_TYPES) {
+      const p = plan(t.id);
+      const top = p.files.map((f) => f.path).filter((f) => !f.includes('/'));
+      expect(top.every((f) => f === 'README.md' || f.endsWith('.scug'))).toBe(true);
+      for (const f of p.files) if (f.path.endsWith('.json')) expect(f.path.startsWith('.scug/')).toBe(true);
+      for (const f of p.folders) if (!f.startsWith('.scug')) expect(['assets', 'docs', 'exports'].includes(f.split('/')[0]!)).toBe(true);
+    }
   });
 
   it('name the folder so every file system takes it', () => {

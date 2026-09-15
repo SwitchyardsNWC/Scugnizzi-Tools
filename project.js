@@ -19,9 +19,11 @@
 //   ScugnizziProject.toast(message)
 //   ScugnizziProject.boardUrl
 //
-// A tool that saves into the project writes its result into assets/ and a recipe beside it in a folder of its own
-// (riso/, ink-bleed/): { version: 1, tool, output: 'assets/…', sources: ['assets/…'], settings, savedAt }. The board
-// reads those to draw what was made from what (template-studio/src/model/tool-recipes.ts).
+// A tool that saves into the project writes its result into assets/ and a recipe in a folder of its own under the
+// project's hidden .scug/ (ScugnizziProject.recipeFolder('riso') is '.scug/riso'): { version: 1, tool, output: 'assets/…',
+// sources: ['assets/…'], settings, savedAt }. The board reads those to draw what was made from what
+// (template-studio/src/model/tool-recipes.ts). Everything the tools need to run a project lives in .scug/, so the rest
+// of the folder reads as work (template-studio/src/model/layout.ts).
 (function () {
   const script = document.currentScript || [...document.scripts].find((s) => /project\.js(\?|$)/.test(s.src));
   const root = new URL('.', script ? script.src : location.href).href;
@@ -65,7 +67,8 @@
     if (!dir) return set({ status: 'none', dir: null, info: null, name: '' });
     const status = (await permission(dir, 'readwrite')) === 'granted' ? 'ready' : (await permission(dir, 'read')) === 'granted' ? 'view-only' : 'asking';
     Object.assign(P, { dir, status });
-    const info = status === 'asking' ? null : await P.readJson('project.json');
+    // In .scug/ since September 2026; at the top of the project before that, until the board opens it for editing.
+    const info = status === 'asking' ? null : ((await P.readJson(`${META}/project.json`)) ?? (await P.readJson('project.json')));
     set({ dir, status, info: info && typeof info === 'object' ? info : null, name: (info && typeof info.name === 'string' && info.name) || dir.name });
   }
   P.ready = settle();
@@ -81,6 +84,10 @@
   };
 
   // ---- files ----
+  const META = '.scug';
+  P.META = META;
+  /** Where a tool's recipes go: `.scug/riso`, `.scug/ink-bleed`. */
+  P.recipeFolder = (tool) => `${META}/${tool}`;
   const parts = (path) => String(path).split('/').filter(Boolean);
   async function folderAt(names, create) {
     let at = P.dir;

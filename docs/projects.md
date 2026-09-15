@@ -433,6 +433,12 @@ ideas were worth taking. They are implemented from scratch here in three small m
   that size, where the hand put it, with its name open for typing. A click without a drag puts one down the usual
   size at that point. Escape cancels. The old behaviour, a box in the middle of the view that steps clear of
   cards, is kept for the click.
+- **The hand, on a thing.** Jared: "if i'm dragging around the canvas and land on an element and click and hold
+  or space + click it should act as a hand. if I single click select the element." So on both canvases a press
+  that stays still on a card or a layer for a beat (Canvas menu, Hold to pan, 320 ms shipped) becomes the hand,
+  and dragging from there moves the view, not the thing; letting go without moving is still a click and selects
+  it. Moving before the beat is up drags the thing as before. Space held makes every press the hand at once, on
+  the board as it already did on the surface.
 
 ### Undo on the board, and the Canvas menu
 
@@ -452,7 +458,8 @@ ideas were worth taking. They are implemented from scratch here in three small m
 - **The Canvas menu** (`app/canvas-settings.ts`, `app/CanvasMenu.tsx`). One set of dials for both canvases, kept
   in this browser and heard at once by every open page. Moving: momentum on or off and its glide time; pinch
   zoom speed and wheel zoom speed, as gains on the fingers' own spread, ×1.5 shipped for the pinch since one to
-  one felt slow. Board: the grid on or off, its step, and snap to grid for cards and groups let go. Drawing: quick
+  one felt slow. Board: what lies under it and how strongly (see *What lies under the board*), the grid step, and
+  snap to grid for cards and groups let go. Drawing: quick
   shapes on or off and how long to hold; whether a finger draws on the Freeform surface: until a pencil is seen,
   always, or never. Reset puts everything back as shipped. On the board it is the Canvas button by the zoom; on
   the Freeform page the Canvas pill.
@@ -489,6 +496,110 @@ when a file was saved. The folder stays the truth; nothing about the project pas
   with no host set, presence is simply off.
 - **Not yet.** Live co-editing of a template: two people in the same email is still last save wins, with the
   conflict banner. Presence makes the collision visible; it does not merge it.
+
+### Into a frame, a copy, and breaking a line
+
+*Added 2026-09-14.*
+
+> "If I hold down Option + drag an asset or item duplicate it. if I drag it into a frame or email, add it to that
+> item. like i'm dropping it into the frame. make the ability to break a node/link an item"
+
+The board's lines say what is in what; now the board can make and unmake them (`model/board-edits.ts`,
+`tests/board-edits.test.ts`). Every one of these changes a file where it lives, so Template Studio and Freeform see
+it as they would any save, and every one is a step Undo takes back.
+
+- **Into a frame or an email.** Drag a picture onto a frame and it becomes an image layer, fitted to half the page
+  and centred, saved as a new version of the frame so every browser takes it. Drag a picture onto an email and it
+  becomes an image block of its own above the footer, with a field name of its own. Drag a frame onto an email and
+  the email follows it, the same block Template Studio's panel would add. The target lights up while the pointer is
+  over it, the notice says where the thing will go, and the dragged card goes back where it was: the file moved
+  into the other file, not the card.
+- **Option-drag copies.** Held at any point of the drag, Option leaves the original where it is and carries a copy,
+  drawn dashed; letting go writes the copy beside the original, `hero-2.png`, `Spring launch copy`, a frame with a
+  key of its own, a link file named for the copy, and places its card where the hand let go. Undo removes the copy.
+- **Breaking a line.** Click a line and it is picked, ink among the others, with one verb at its middle: Break link.
+  Delete does the same. A picture's line to an email or frame takes the picture out of it, blocks and layers both, and
+  any section left empty. A frame's line to an email unlinks the block; it keeps its drawing. A recipe's line
+  forgets that picture was part of the print. Escape, or a click on the paper, lets the line go.
+
+*Same day, after a look:*
+
+> "when you shift drag and make a copy. give the box a little duplicate looking icon in a single line drawing like
+> the goolg docs icons. for the connecting nodes. use the thicker lines when you select an element to see what it's
+> linked too. the reverse of how it is now."
+
+- The copy carried under the hand shows a small two-sheets glyph in its header, one line weight, the way Google
+  Docs draws Make a copy; no words.
+- Lines rest quiet, at a third of their strength. Pick a card and its lines are the ones drawn full and thick, in
+  their own colours, with bigger end squares; every other line fades further, so what a thing is joined to is the
+  only thing the lines say at that moment. Before, every line was thick and the picked card's went thin, which
+  read as the board shouting and the selection whispering.
+
+### What lies under the board
+
+*Added 2026-09-14.*
+
+> "create a couple other background types. cutting mat, dot grid, and give opacity controls for them all."
+
+Canvas › Board › Background is a four-way switch: Off, Lines, Dots, Mat (`project/ground.ts`, `tests/ground.test.ts`;
+the drawing in `project.css` under `.pb-under-*`). The ground is a layer under the cards, a stack of repeating images
+sized to the zoom and slid with the view, so it belongs to the paper and not to the window; zooming out, its step
+grows ×5 and ×20 so the pattern never crowds.
+
+- **Lines** is the drafting grid as before: a hairline every step, a firm line every fifth.
+- **Dots** puts a dot where the lines would cross, and a bigger one every fifth crossing, which is also where snap
+  to grid puts things. Quieter than lines under a board full of pictures.
+- **Mat** is a self-healing cutting mat: the green, pale lines every step, firmer ones every fifth, and the 45°
+  diagonals through their crossings. Shown at 60% or more the ground is dark, and the board's lines lighten a shade
+  (a `dark-ground` class on the stage) so blue, green and brick stay seen against it.
+- **Opacity** is the dial under the switch, and each background keeps its own: 50% shipped for lines (the same ink
+  as before), 60% for dots, 85% for the mat, since a mat wants to be a mat and a grid wants to disappear. The dial
+  blends the whole layer with the paper, so a mat at 30% is a hint of green with faint lines, not a green with
+  strong lines.
+
+The old `grid` flag in a browser's kept settings still reads: off then is Off now.
+
+### One hidden folder for the tools' files
+
+*Added 2026-09-14.*
+
+> "can the file structure be setup in a way the project folder has a 'scug' folder that houses all the backend
+> logistics, leaving a well structured folder depending on the project scope? … the goal is to have someone that is
+> just looking for a file in drive can easily navigate and make sense of the file structure to find what they need
+> and running into a bunch of .json files could cause issues."
+
+A project now reads as work at the top, and everything the tools need to run it sits in one hidden folder
+(`template-studio/src/model/layout.ts`):
+
+```
+Spring launch/
+  Spring launch.scug        double-click in Finder opens the project
+  README.md                 what goes where
+  assets/                   pictures; each folder in it is a group on the board
+  docs/                     briefs, copy, sheets: Google files or links
+  exports/                  what ships
+  .scug/                    the tools' own, hidden by Finder
+    project.json  board.json
+    templates/  frames/  design-systems/  patterns/
+    rendered/               pictures Template Studio draws from text
+    riso/  ink-bleed/       what the image tools made things from
+```
+
+- **Scope shapes the top.** Every type makes `assets/`, `docs/` and `exports/`; Blank makes only `assets/`. The
+  tools' folders under `.scug/` are made only as a type needs them.
+- **Names in documents did not change.** A picture is still `photos/hero.png` to every email and frame, and a
+  rendered picture is still `rendered/lede.png`; only where the file sits moved. Board card ids, recipes and links
+  are all unchanged.
+- **A folder becomes a project when it has `.scug/`.** Template Studio still opens any plain folder as a workspace
+  in the old shape, templates at the top or under `templates/`. Once a folder is opened on the board for editing,
+  its tools' files are moved into `.scug/` and every tool writes there from then on.
+- **Old projects.** The first time an old-shape project is opened for editing, `project/folder.ts` moves
+  `project.json`, `board.json`, the tools' folders (only when they look like the tools' own: empty, or holding a
+  file of the kind the tool writes) and `assets/rendered/` into `.scug/`. Copy first, remove last, the newer copy
+  winning where both have a file. Until then, and for a project open view-only, every reader looks in both places.
+- **Everything that reads a project knows both.** The board, Template Studio's workspace, Freeform's frame sync,
+  the single-file tools' `project.js`, and the dashboard's own reader. Riso and Ink bleed write their recipes to
+  `.scug/riso/` and `.scug/ink-bleed/` through `ScugnizziProject.recipeFolder()`.
 
 ### Google Docs, Sheets and Slides
 

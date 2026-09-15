@@ -303,8 +303,11 @@ async function readJsonAt(dir, name) { try { return await readJson(await dir.get
 
 const TEMPLATE = /\.(template|design)\.json$/;
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
-// Mirrors RECIPE_TOOLS and assetPath in template-studio/src/model/tool-recipes.ts.
-const RECIPE_TOOLS = { riso: { dir: 'riso', ext: '.riso.json' }, 'ink-bleed': { dir: 'ink-bleed', ext: '.ink-bleed.json' } };
+// Mirrors RECIPE_TOOLS and assetPath in template-studio/src/model/tool-recipes.ts, and the layout in model/layout.ts: the
+// tools' files live in .scug/, and at the top of the project in the old layout until the board opens it for editing.
+const META = '.scug';
+const RECIPE_TOOLS = { riso: { dirs: [`${META}/riso`, 'riso'], ext: '.riso.json' }, 'ink-bleed': { dirs: [`${META}/ink-bleed`, 'ink-bleed'], ext: '.ink-bleed.json' } };
+async function childPath(dir, path) { let at = dir; for (const part of path.split('/')) { at = await childDir(at, part); if (!at) return null; } return at; }
 const assetPath = (path) => {
   if (typeof path !== 'string' || !path.startsWith('assets/')) return null;
   const rest = path.slice('assets/'.length);
@@ -316,10 +319,12 @@ async function readFolder(dir, projectJson) {
   const info = projectJson && projectJson.version === 1 && typeof projectJson.id === 'string' && projectJson.id ? projectJson : null;
 
   const emails = [];
-  for (const source of [dir, await childDir(dir, 'templates')]) {
+  const seenEmails = new Set();
+  for (const source of [await childPath(dir, `${META}/templates`), await childDir(dir, 'templates'), dir]) {
     if (!source) continue;
     for await (const [fileName, entry] of source.entries()) {
-      if (entry.kind !== 'file' || !TEMPLATE.test(fileName)) continue;
+      if (entry.kind !== 'file' || !TEMPLATE.test(fileName) || seenEmails.has(fileName)) continue;
+      seenEmails.add(fileName);
       const doc = await readJson(entry);
       const name = (doc && typeof doc.name === 'string' && doc.name.trim()) || fileName.replace(TEMPLATE, '').replace(/[-_]+/g, ' ');
       emails.push({ id: `email:${fileName}`, kind: 'email', name, doc });
@@ -327,12 +332,14 @@ async function readFolder(dir, projectJson) {
   }
 
   const frames = [];
-  const framesDir = await childDir(dir, 'frames');
-  if (framesDir) {
+  const seenFrames = new Set();
+  for (const framesDir of [await childPath(dir, `${META}/frames`), await childDir(dir, 'frames')]) {
+    if (!framesDir) continue;
     for await (const [fileName, entry] of framesDir.entries()) {
       if (entry.kind !== 'file' || !fileName.endsWith('.frame.json')) continue;
       const raw = await readJson(entry);
-      if (!raw || raw.version !== 1 || raw.kind !== 'scuggnizzi.freeform-frame' || typeof raw.key !== 'string' || !raw.key.startsWith('scuggnizzi.freeform.')) continue;
+      if (!raw || raw.version !== 1 || raw.kind !== 'scuggnizzi.freeform-frame' || typeof raw.key !== 'string' || !raw.key.startsWith('scuggnizzi.freeform.') || seenFrames.has(raw.key)) continue;
+      seenFrames.add(raw.key);
       frames.push({ id: `frame:${raw.key}`, kind: 'frame', key: raw.key, name: (typeof raw.name === 'string' && raw.name.trim()) || 'Frame', doc: raw.template });
     }
   }
@@ -352,14 +359,16 @@ async function readFolder(dir, projectJson) {
 
   // What Riso and Ink bleed saved, and from which pictures.
   const recipes = [];
-  for (const [tool, { dir: name, ext }] of Object.entries(RECIPE_TOOLS)) {
-    const folder = await childDir(dir, name);
-    if (!folder) continue;
-    for await (const [fileName, entry] of folder.entries()) {
-      if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
-      const raw = await readJson(entry);
-      const output = raw && raw.version === 1 && raw.tool === tool ? assetPath(raw.output) : null;
-      if (output) recipes.push({ output, sources: [...new Set(arr(raw.sources).map(assetPath).filter((s) => s && s !== output))] });
+  for (const [tool, { dirs, ext }] of Object.entries(RECIPE_TOOLS)) {
+    for (const name of dirs) {
+      const folder = await childPath(dir, name);
+      if (!folder) continue;
+      for await (const [fileName, entry] of folder.entries()) {
+        if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
+        const raw = await readJson(entry);
+        const output = raw && raw.version === 1 && raw.tool === tool ? assetPath(raw.output) : null;
+        if (output) recipes.push({ output, sources: [...new Set(arr(raw.sources).map(assetPath).filter((s) => s && s !== output))] });
+      }
     }
   }
 
@@ -367,7 +376,7 @@ async function readFolder(dir, projectJson) {
     name: (info && typeof info.name === 'string' && info.name.trim().slice(0, 80)) || dir.name,
     type: info && info.type, createdAt: info && info.createdAt,
     emails, frames, pictures,
-    ...layoutBoard([...emails, ...frames, ...pictures], readBoard(await readJsonAt(dir, 'board.json'))),
+    ...layoutBoard([...emails, ...frames, ...pictures], readBoard((await readJsonAt((await childDir(dir, META)) ?? dir, 'board.json')) ?? (await readJsonAt(dir, 'board.json')))),
     links: projectLinks(emails, frames, pictures, recipes),
   };
 }

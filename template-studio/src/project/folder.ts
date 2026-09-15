@@ -8,6 +8,7 @@ import {
   isLauncherFile,
   launcherFileName,
   launcherJson,
+  LEGACY_PROJECT_FILE,
   newProjectInfo,
   PROJECT_FILE,
   projectJson,
@@ -15,12 +16,13 @@ import {
   type Launcher,
   type ProjectInfo,
 } from '../model/project.ts';
+import { LEGACY_META_DIRS, LEGACY_META_FILES, META, META_DIR, RENDERED_PREFIX } from '../model/layout.ts';
 import { isGroupFolder } from '../model/project.ts';
 import type { ProjectPlan } from '../model/project-types.ts';
 import { docLinkFileName, docLinkJson, DOCS_DIR, isDocFile, readDocLink, type DocLink } from '../model/docs.ts';
 import { readRecipe, RECIPE_TOOLS, type RecipeTool, type ToolRecipe } from '../model/tool-recipes.ts';
 import { renameInRecipe, renameSrc } from '../model/asset-moves.ts';
-import { FRAME_EXT, FRAMES_DIR } from '../model/frame-file.ts';
+import { FRAME_EXT, FRAMES_DIR, LEGACY_FRAMES_DIR } from '../model/frame-file.ts';
 import { isImageFile, isTemplateFile } from '../workspace/workspace.ts';
 
 type Dir = FileSystemDirectoryHandle;
@@ -86,7 +88,17 @@ export async function removeFile(dir: Dir, path: string): Promise<void> {
  * it, and once written it stays whatever the folder is renamed to.
  */
 export async function readProject(dir: Dir, writable: boolean): Promise<ProjectInfo> {
-  const found = readProjectInfo((await readText(dir, PROJECT_FILE))?.text ?? null);
+  const modern = readProjectInfo((await readText(dir, PROJECT_FILE))?.text ?? null);
+  const legacy = modern ? null : readProjectInfo((await readText(dir, LEGACY_PROJECT_FILE))?.text ?? null);
+  // Opened for editing: whatever the old layout left at the top of the folder goes into .scug/ (model/layout.ts).
+  if (writable) {
+    try {
+      await migrateLayout(dir);
+    } catch {
+      // Next time. Every reader looks in both places meanwhile.
+    }
+  }
+  const found = modern ?? legacy;
   if (found) return found;
   const info = newProjectInfo(dir.name, `folder:${dir.name}`);
   if (writable) {
@@ -97,6 +109,91 @@ export async function readProject(dir: Dir, writable: boolean): Promise<ProjectI
     }
   }
   return info;
+}
+
+// --- the layout: the tools' files under .scug/ (model/layout.ts) -------------------------------------------------
+
+async function fileAt(dir: Dir, name: string): Promise<FileSystemFileHandle | null> {
+  try {
+    return await dir.getFileHandle(name);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a folder at the top of the project is the tools' own: empty, or holding a file of the kind the tool writes. */
+async function looksOurs(folder: Dir, ext: string): Promise<boolean> {
+  let any = false;
+  for await (const [name, entry] of folder.entries()) {
+    if (name.startsWith('.')) continue;
+    any = true;
+    if (entry.kind === 'file' && name.endsWith(ext)) return true;
+    if (entry.kind === 'directory') return false;
+  }
+  return !any;
+}
+
+/** Copies everything in `from` into `to`, the newer copy winning where both have a file, then leaves `from` as it was. */
+async function mergeTree(from: Dir, to: Dir): Promise<void> {
+  for await (const [name, entry] of from.entries()) {
+    if (entry.kind === 'directory') {
+      await mergeTree(entry as Dir, await to.getDirectoryHandle(name, { create: true }));
+      continue;
+    }
+    const file = await (entry as FileSystemFileHandle).getFile();
+    const existing = await fileAt(to, name);
+    if (existing && (await existing.getFile()).lastModified >= file.lastModified) continue;
+    const handle = await to.getFileHandle(name, { create: true });
+    const out = await handle.createWritable();
+    await out.write(file);
+    await out.close();
+  }
+}
+
+/**
+ * Moves the old layout's files and folders into `.scug/`: project.json and board.json, the tools' folders when they
+ * look like the tools' own, and `assets/rendered/`. Copies first and removes last, so a move that stops half-way
+ * leaves two copies rather than none; the readers take the newer. Returns what moved, as paths.
+ */
+export async function migrateLayout(dir: Dir): Promise<string[]> {
+  const moved: string[] = [];
+  const legacyDirs: Array<{ name: string; handle: Dir }> = [];
+  for (const { name, ext } of LEGACY_META_DIRS) {
+    const handle = await childDir(dir, [name]);
+    if (handle && (await looksOurs(handle, ext))) legacyDirs.push({ name, handle });
+  }
+  const legacyFiles: string[] = [];
+  for (const name of LEGACY_META_FILES) if (await fileAt(dir, name)) legacyFiles.push(name);
+  const assets = await childDir(dir, ['assets']);
+  const rendered = assets ? await childDir(assets, [RENDERED_PREFIX]) : null;
+  if (legacyDirs.length === 0 && legacyFiles.length === 0 && !rendered) return moved;
+
+  const meta = await childDir(dir, [META_DIR], true);
+  if (!meta) throw new Error(`Could not make ${META_DIR}/ in ${dir.name}.`);
+  for (const name of legacyFiles) {
+    const from = (await fileAt(dir, name))!;
+    const file = await from.getFile();
+    const existing = await fileAt(meta, name);
+    if (!existing || (await existing.getFile()).lastModified < file.lastModified) {
+      const handle = await meta.getFileHandle(name, { create: true });
+      const out = await handle.createWritable();
+      await out.write(file);
+      await out.close();
+    }
+    await dir.removeEntry(name);
+    moved.push(name);
+  }
+  for (const { name, handle } of legacyDirs) {
+    await mergeTree(handle, await meta.getDirectoryHandle(name, { create: true }));
+    await dir.removeEntry(name, { recursive: true });
+    moved.push(`${name}/`);
+  }
+  if (rendered && assets) {
+    await mergeTree(rendered, await meta.getDirectoryHandle(RENDERED_PREFIX, { create: true }));
+    await assets.removeEntry(RENDERED_PREFIX, { recursive: true });
+    moved.push(`assets/${RENDERED_PREFIX}/`);
+  }
+  return moved;
 }
 
 // --- the launch file -----------------------------------------------------------------------------------------
@@ -157,13 +254,15 @@ export interface PictureEntry {
 }
 
 /**
- * Every picture under `assets/`, three folders deep, as Template Studio's Assets panel finds them. That
- * includes `assets/rendered/`, the pictures Template Studio draws from an email's own text: the board uses
- * them to draw emails, and leaves them off the board as cards of their own.
+ * Every picture under `assets/`, three folders deep, as Template Studio's Assets panel finds them, and the pictures
+ * Template Studio draws from an email's own text, which live in `.scug/rendered/` and are named `rendered/…` here as
+ * documents name them (model/layout.ts). The board uses those to draw emails and leaves them off the board as
+ * cards of their own.
  */
 export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
   const assets = await childDir(dir, ['assets']);
   const out: PictureEntry[] = [];
+  const seen = new Set<string>();
   const walk = async (folder: Dir, prefix: string, depth: number) => {
     for await (const [name, entry] of folder.entries()) {
       if (name.startsWith('.')) continue;
@@ -172,11 +271,14 @@ export async function listPictures(dir: Dir): Promise<PictureEntry[]> {
         if (depth > 1) await walk(entry as Dir, path, depth - 1);
         continue;
       }
-      if (!isImageFile(name)) continue;
+      if (!isImageFile(name) || seen.has(path)) continue;
+      seen.add(path);
       const file = await (entry as FileSystemFileHandle).getFile();
       out.push({ path, size: file.size, modified: file.lastModified, file });
     }
   };
+  const rendered = await childDir(dir, META.rendered.split('/'));
+  if (rendered) await walk(rendered, RENDERED_PREFIX, 2);
   if (assets) await walk(assets, '', 3);
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
@@ -251,20 +353,22 @@ export async function movePicture(dir: Dir, from: string, to: string, now = Date
     rewritten += 1;
   };
 
-  for (const [prefix, sub] of [['', null], ['templates/', 'templates']] as Array<[string, string | null]>) {
-    const at = sub ? await childDir(dir, [sub]) : dir;
+  // Templates: at the top of the project, in the old `templates/`, and in `.scug/templates/`.
+  for (const sub of ['', 'templates', META.templates]) {
+    const at = sub ? await childDir(dir, sub.split('/')) : dir;
     if (!at) continue;
     const names: Array<[string, FileSystemHandle]> = [];
     for await (const item of at.entries()) if (item[1].kind === 'file' && isTemplateFile(item[0])) names.push(item);
-    for (const [fileName, entry] of names) await rewrite(prefix + fileName, entry, (raw) => renameSrc(raw, from, to));
+    for (const [fileName, entry] of names) await rewrite(sub ? `${sub}/${fileName}` : fileName, entry, (raw) => renameSrc(raw, from, to));
   }
 
-  const frames = await childDir(dir, [FRAMES_DIR]);
-  if (frames) {
+  for (const sub of [FRAMES_DIR, LEGACY_FRAMES_DIR]) {
+    const frames = await childDir(dir, sub.split('/'));
+    if (!frames) continue;
     const names: Array<[string, FileSystemHandle]> = [];
     for await (const item of frames.entries()) if (item[1].kind === 'file' && item[0].endsWith(FRAME_EXT)) names.push(item);
     for (const [fileName, entry] of names) {
-      await rewrite(`${FRAMES_DIR}/${fileName}`, entry, (raw) => {
+      await rewrite(`${sub}/${fileName}`, entry, (raw) => {
         const renamed = renameSrc(raw, from, to);
         return renamed.changed ? { value: { ...(renamed.value as Record<string, unknown>), savedAt: now }, changed: true } : renamed;
       });
@@ -272,12 +376,14 @@ export async function movePicture(dir: Dir, from: string, to: string, now = Date
   }
 
   for (const tool of Object.keys(RECIPE_TOOLS) as RecipeTool[]) {
-    const { dir: sub, ext } = RECIPE_TOOLS[tool];
-    const at = await childDir(dir, [sub]);
-    if (!at) continue;
-    const names: Array<[string, FileSystemHandle]> = [];
-    for await (const item of at.entries()) if (item[1].kind === 'file' && item[0].endsWith(ext)) names.push(item);
-    for (const [fileName, entry] of names) await rewrite(`${sub}/${fileName}`, entry, (raw) => renameInRecipe(raw, from, to));
+    const { dir: modern, legacyDir, ext } = RECIPE_TOOLS[tool];
+    for (const sub of [modern, legacyDir]) {
+      const at = await childDir(dir, sub.split('/'));
+      if (!at) continue;
+      const names: Array<[string, FileSystemHandle]> = [];
+      for await (const item of at.entries()) if (item[1].kind === 'file' && item[0].endsWith(ext)) names.push(item);
+      for (const [fileName, entry] of names) await rewrite(`${sub}/${fileName}`, entry, (raw) => renameInRecipe(raw, from, to));
+    }
   }
 
   await removeFile(dir, `assets/${from}`);
@@ -339,16 +445,18 @@ export async function writeDocLink(dir: Dir, link: { url: string; name: string }
 export async function listRecipes(dir: Dir): Promise<ToolRecipe[]> {
   const out: ToolRecipe[] = [];
   for (const tool of Object.keys(RECIPE_TOOLS) as RecipeTool[]) {
-    const { dir: name, ext } = RECIPE_TOOLS[tool];
-    const folder = await childDir(dir, [name]);
-    if (!folder) continue;
-    for await (const [fileName, entry] of folder.entries()) {
-      if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
-      try {
-        const recipe = readRecipe(await (await (entry as FileSystemFileHandle).getFile()).text(), `${name}/${fileName}`);
-        if (recipe?.tool === tool) out.push(recipe);
-      } catch {
-        // Half-written or unreadable: the rest still count.
+    const { dir: modern, legacyDir, ext } = RECIPE_TOOLS[tool];
+    for (const name of [modern, legacyDir]) {
+      const folder = await childDir(dir, name.split('/'));
+      if (!folder) continue;
+      for await (const [fileName, entry] of folder.entries()) {
+        if (entry.kind !== 'file' || !fileName.endsWith(ext)) continue;
+        try {
+          const recipe = readRecipe(await (await (entry as FileSystemFileHandle).getFile()).text(), `${name}/${fileName}`);
+          if (recipe?.tool === tool) out.push(recipe);
+        } catch {
+          // Half-written or unreadable: the rest still count.
+        }
       }
     }
   }

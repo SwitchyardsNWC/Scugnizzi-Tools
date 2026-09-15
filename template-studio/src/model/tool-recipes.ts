@@ -1,18 +1,21 @@
 // What made a picture in a project: the recipe a tool writes beside what it saved.
 //
 // Jared: "Riso and ink bleed save into the project." They write their result into `assets/`, and a recipe into a
-// folder of their own: `riso/<name>.riso.json`, `ink-bleed/<name>.ink-bleed.json`. A recipe names the pictures the
+// folder of their own under `.scug/`: `.scug/riso/<name>.riso.json`, `.scug/ink-bleed/<name>.ink-bleed.json`
+// (model/layout.ts; the old layout had them at the top of the project). A recipe names the pictures the
 // result was made from and holds the settings, so the board can draw a line from the original to the result, and
 // reopening the result in its tool brings the settings back. `project.js` at the site's root writes them; this
 // reads them.
 //
 // Pure.
 
+import { metaPath } from './layout.ts';
+
 export type RecipeTool = 'riso' | 'ink-bleed';
 
-export const RECIPE_TOOLS: Record<RecipeTool, { dir: string; ext: string; name: string; page: string }> = {
-  riso: { dir: 'riso', ext: '.riso.json', name: 'Riso', page: 'riso/riso.html' },
-  'ink-bleed': { dir: 'ink-bleed', ext: '.ink-bleed.json', name: 'Ink bleed', page: 'text bleed/ink-bleed.html' },
+export const RECIPE_TOOLS: Record<RecipeTool, { dir: string; legacyDir: string; ext: string; name: string; page: string }> = {
+  riso: { dir: metaPath('riso'), legacyDir: 'riso', ext: '.riso.json', name: 'Riso', page: 'riso/riso.html' },
+  'ink-bleed': { dir: metaPath('ink-bleed'), legacyDir: 'ink-bleed', ext: '.ink-bleed.json', name: 'Ink bleed', page: 'text bleed/ink-bleed.html' },
 };
 
 export interface ToolRecipe {

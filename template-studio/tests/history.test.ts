@@ -111,9 +111,19 @@ describe('canvas settings', () => {
   it('keep what is set and clamp what is out of range', () => {
     const s = parseCanvasSettings(JSON.stringify({ momentum: false, friction: 5000, pinchGain: 0.1, gridStep: 24, snap: true, holdMs: 200, pencilOnly: 'on' }));
     expect(s).toMatchObject({ momentum: false, friction: CANVAS_RANGES.friction.max, pinchGain: CANVAS_RANGES.pinchGain.min, gridStep: 24, snap: true, holdMs: 200, pencilOnly: 'on' });
-    expect(s.grid).toBe(true);
+    expect(s.ground).toBe('lines');
+    expect(s.groundOpacity).toEqual(DEFAULT_CANVAS_SETTINGS.groundOpacity);
     expect(s.wheelGain).toBe(DEFAULT_CANVAS_SETTINGS.wheelGain);
     expect(parseCanvasSettings(JSON.stringify({ presenceHost: '  localhost:1999 ', presenceName: 'x'.repeat(60) }))).toMatchObject({ presenceHost: 'localhost:1999', presenceName: 'x'.repeat(40) });
     expect(parseCanvasSettings(JSON.stringify({ presenceHost: 4 })).presenceHost).toBe('');
+  });
+
+  it('know the grounds, each with an opacity of its own, and read the old grid flag', () => {
+    const s = parseCanvasSettings(JSON.stringify({ ground: 'mat', groundOpacity: { mat: 5, dots: 'x' } }));
+    expect(s.ground).toBe('mat');
+    expect(s.groundOpacity).toEqual({ lines: DEFAULT_CANVAS_SETTINGS.groundOpacity.lines, dots: DEFAULT_CANVAS_SETTINGS.groundOpacity.dots, mat: CANVAS_RANGES.groundOpacity.max });
+    expect(parseCanvasSettings(JSON.stringify({ ground: 'plaid' })).ground).toBe('lines');
+    expect(parseCanvasSettings(JSON.stringify({ grid: false })).ground).toBe('none');
+    expect(parseCanvasSettings(JSON.stringify({ grid: false, ground: 'dots' })).ground).toBe('dots');
   });
 });

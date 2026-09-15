@@ -54,11 +54,17 @@ import {
   type BoardGroup,
   type BoardLayout,
   type CardKind,
+  type CardLink,
   type CardSource,
   type PlacedCard,
   type PlacedGroup,
 } from '../model/project.ts';
 import { freeAssetPath, movedPath } from '../model/asset-moves.ts';
+import { addFrameToEmail, addPictureToEmail, addPictureToFrame, dropSourceFromRecipe, duplicateFrameFile, removePictureFrom, unfollowFrame } from '../model/board-edits.ts';
+import { duplicateTemplate } from '../model/edit.ts';
+import { FRAME_PREFIX, newFrameId } from '../model/frame-store.ts';
+import { META } from '../model/layout.ts';
+import { serializeTemplate, templateFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
 import { useCanvasSettings, writeCanvasSettings } from '../app/canvas-settings.ts';
@@ -77,15 +83,17 @@ import {
   makeGroupFolder,
   movePicture,
   readText,
+  removeFile,
   removeFolderIfEmpty,
   writeDocLink,
   writeFile,
   writePicture,
   type DocEntry,
 } from './folder.ts';
-import { copyKeptPictures, syncFrames } from './frame-sync.ts';
+import { copyKeptPictures, readFolderFrames, syncFrames, writeFrame } from './frame-sync.ts';
 import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
+import { underStyle } from './ground.ts';
 import { History, useHistory } from './history.ts';
 import { colorForName, defaultPresenceName, usePresence } from './presence.ts';
 import { DEFAULT_PRESENCE_HOST } from './presence-config.ts';
@@ -645,7 +653,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   // --- selecting, moving, opening ---
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => presence.sendSelect(selected), [selected, presence.sendSelect]);
-  const [moving, setMoving] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** `copy`: Option is held, so the original stays and a copy is being carried. */
+  const [moving, setMoving] = useState<{ id: string; x: number; y: number; copy: boolean } | null>(null);
+  /** A frame or an email a dragged picture, or a dragged frame, would be put into on letting go. */
+  const [dropCard, setDropCard] = useState<string | null>(null);
+  /** A line picked on the board, as `from>to`, ready to be broken. */
+  const [selectedLink, setSelectedLink] = useState<string | null>(null);
   const [panning, setPanning] = useState(false);
   /** A group being moved or resized, as it is drawn until the pointer lets go, with the cards riding along. */
   const [groupDrag, setGroupDrag] = useState<{ id: string; dx: number; dy: number; dw: number; dh: number; riders: string[] } | null>(null);
@@ -659,9 +672,15 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   groupingRef.current = grouping;
   /** The region being dragged out for a new group, on the board. */
   const [marquee, setMarquee] = useState<Rect | null>(null);
+  /** Space is down: every press is the hand, whatever it lands on. */
+  const spaceRef = useRef(false);
+  const [hand, setHand] = useState(false);
+  /** A press held still on a card or group becomes the hand after a beat (Canvas menu, Hold to pan). */
+  const holdTimer = useRef(0);
   const drag = useRef<
-    | { kind: 'pan'; x: number; y: number; view: View; moved: boolean; tracker: PanTracker }
-    | { kind: 'card'; id: string; x: number; y: number; from: { x: number; y: number }; moved: boolean }
+    /** `over`: the card a held press began on, selected when the hand lets go without having moved. */
+    | { kind: 'pan'; x: number; y: number; view: View; moved: boolean; tracker: PanTracker; over?: string | null }
+    | { kind: 'card'; id: string; x: number; y: number; from: { x: number; y: number }; moved: boolean; copy: boolean }
     | { kind: 'group'; id: string; x: number; y: number; riders: string[]; moved: boolean }
     | { kind: 'resize'; id: string; x: number; y: number; moved: boolean }
     | { kind: 'marquee'; from: { x: number; y: number }; moved: boolean }
@@ -702,7 +721,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
   const riding = <T extends { id: string; x: number; y: number }>(c: T): T =>
     groupDrag && groupDrag.riders.includes(c.id) ? { ...c, x: c.x + groupDrag.dx, y: c.y + groupDrag.dy } : c;
-  const cards = layout.cards.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : riding(c)));
+  // A copy being carried leaves the original where it is; the copy is drawn on its own below.
+  const cards = layout.cards.map((c) => (moving?.id === c.id && !moving.copy ? { ...c, x: moving.x, y: moving.y } : riding(c)));
   const missing = layout.missing.map((c) => (moving?.id === c.id ? { ...c, x: moving.x, y: moving.y } : riding(c)));
   const groups = layout.groups.map((g) =>
     groupDrag?.id === g.id ? { ...g, x: g.x + groupDrag.dx, y: g.y + groupDrag.dy, w: Math.max(276, g.w + groupDrag.dw), h: Math.max(286, g.h + groupDrag.dh) } : g,
@@ -750,9 +770,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     if (landing === 'palm' || landing === 'gesture') return;
     const primary = event.button === 0;
     stopMotion();
+    // The hand, wherever it lands: the middle button, or Space held.
+    if (event.button === 1 || (primary && spaceRef.current)) {
+      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, moved: false, tracker: new PanTracker() };
+      setPanning(true);
+      return;
+    }
     if (primary && groupingRef.current) {
       // Drawing out a group: over cards or not, the region is what is being made.
       drag.current = { kind: 'marquee', from: worldAt(event.clientX, event.clientY), moved: false };
+      return;
+    }
+    // A line: picked, and offered to be broken. Nothing else starts.
+    const linkEl = primary ? (target.closest('[data-link]') as SVGElement | null) : null;
+    if (linkEl) {
+      setSelectedLink(linkEl.getAttribute('data-link'));
+      setSelected(null);
       return;
     }
     const cardEl = primary ? (target.closest('[data-card]') as HTMLElement | null) : null;
@@ -761,7 +794,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const id = cardEl?.dataset['card'];
     const rect = id ? rects.get(id) : undefined;
     const group = layout.groups.find((g) => g.id === (resizeEl?.dataset['groupResize'] ?? headEl?.dataset['groupHead']));
-    if (id && rect) drag.current = { kind: 'card', id, x: event.clientX, y: event.clientY, from: { x: rect.x, y: rect.y }, moved: false };
+    if (id && rect) drag.current = { kind: 'card', id, x: event.clientX, y: event.clientY, from: { x: rect.x, y: rect.y }, moved: false, copy: event.altKey };
     else if (group && resizeEl) drag.current = { kind: 'resize', id: group.id, x: event.clientX, y: event.clientY, moved: false };
     else if (group) {
       // The group's pictures, and anything else sitting wholly inside it, go where it goes.
@@ -771,6 +804,19 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     } else {
       drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, moved: false, tracker: new PanTracker() };
       setPanning(true);
+    }
+    // A press on a card or a group that stays still for a beat is the hand from then on: dragging moves the view, not
+    // the thing. Moving before the beat is up drags the thing as before; letting go without moving is a click.
+    const pressed = drag.current;
+    if (pressed && pressed.kind !== 'pan') {
+      const over = pressed.kind === 'card' ? pressed.id : null;
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = window.setTimeout(() => {
+        const d = drag.current;
+        if (!d || d.kind === 'pan' || d.kind === 'marquee' || d.moved) return;
+        drag.current = { kind: 'pan', x: d.x, y: d.y, view: viewRef.current, moved: false, tracker: new PanTracker(), over };
+        setPanning(true);
+      }, settingsRef.current.holdPanMs);
     }
   };
   const onPointerMove = (event: PointerEvent) => {
@@ -796,6 +842,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     // opens a card, to the stage instead of the card.
     if (!d.moved) if (stage.current) capture(stage.current, event.pointerId);
     d.moved = true;
+    window.clearTimeout(holdTimer.current);
     const z = viewRef.current.z;
     if (d.kind === 'pan') {
       d.tracker.push(event.clientX, event.clientY);
@@ -803,19 +850,25 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     } else if (d.kind === 'group') setGroupDrag({ id: d.id, dx: dx / z, dy: dy / z, dw: 0, dh: 0, riders: d.riders });
     else if (d.kind === 'resize') setGroupDrag({ id: d.id, dx: 0, dy: 0, dw: dx / z, dh: dy / z, riders: [] });
     else {
-      setMoving({ id: d.id, x: d.from.x + dx / z, y: d.from.y + dy / z });
-      // A picture over a group other than its own is filed there on letting go; one out of every group, into assets/.
+      // Option, held or let go at any point of the drag, decides whether a copy is being carried.
+      d.copy = event.altKey;
+      setMoving({ id: d.id, x: d.from.x + dx / z, y: d.from.y + dy / z, copy: d.copy });
       const card = layout.cards.find((c) => c.id === d.id);
-      if (card?.kind === 'picture') {
-        const p = worldAt(event.clientX, event.clientY);
+      const p = worldAt(event.clientX, event.clientY);
+      // A picture over a frame or an email, or a frame over an email, is put into it on letting go.
+      const into = card ? cardUnder(layout.cards, p, card) : null;
+      setDropCard(into?.id ?? null);
+      // Otherwise a picture over a group other than its own is filed there; one out of every group, into assets/.
+      if (card?.kind === 'picture' && !into && !d.copy) {
         const over = groupAt(layout.groups, p.x, p.y);
         const next = over ? over.folder : null;
         setDropTarget(next === cardFolder(card) ? null : over ? over.id : 'out');
-      }
+      } else setDropTarget(null);
     }
   };
   const onPointerUp = (event: PointerEvent) => {
     gestures.current!.up(event);
+    window.clearTimeout(holdTimer.current);
     const d = drag.current;
     drag.current = null;
     setPanning(false);
@@ -831,8 +884,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     }
     if (d.kind === 'pan') {
       if (!d.moved) {
-        setSelected(null);
-        setConfirming(null);
+        // A click: on a card it selects the card, even a long one; on the paper it clears the selection.
+        if (d.over) setSelected(d.over);
+        else {
+          setSelected(null);
+          setSelectedLink(null);
+          setConfirming(null);
+        }
         return;
       }
       // Let go while moving: the board keeps sliding and eases to a stop (inertia.ts).
@@ -870,8 +928,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     }
     const target = dropTarget;
     setDropTarget(null);
+    const into = dropCard ? layout.cards.find((c) => c.id === dropCard) : undefined;
+    setDropCard(null);
     if (d.moved && moving) {
       const card = layout.cards.find((c) => c.id === d.id);
+      if (card && into) {
+        // Dropped into a frame or an email: the card goes back where it was, and the picture goes into the file.
+        void putInto(card, into);
+        setSelected(into.id);
+        setMoving(null);
+        return;
+      }
+      if (card && d.copy) {
+        void duplicateCard(card, { x: snap(moving.x), y: snap(moving.y) });
+        setMoving(null);
+        return;
+      }
       if (card && target) void fileIn(card, target === 'out' ? null : (layout.groups.find((g) => g.id === target) ?? null), moving);
       else {
         const id = d.id;
@@ -894,9 +966,21 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
       const mod = event.metaKey || event.ctrlKey;
-      if (event.key === 'Escape') {
+      if (event.key === ' ') {
+        // Space is the hand while it is down, wherever the pointer lands.
+        event.preventDefault();
+        if (!spaceRef.current) {
+          spaceRef.current = true;
+          setHand(true);
+        }
+      } else if (event.key === 'Escape') {
         if (groupingRef.current) setGrouping(false);
+        else if (selectedLinkRef.current) setSelectedLink(null);
         else setSelected(null);
+      } else if ((event.key === 'Backspace' || event.key === 'Delete') && selectedLinkRef.current) {
+        event.preventDefault();
+        const picked = links.find((l) => `${l.from}>${l.to}` === selectedLinkRef.current);
+        if (picked) void breakLink(picked);
       } else if (mod && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         void step(event.shiftKey ? 'redo' : 'undo');
@@ -917,9 +1001,215 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         zoomTo(1, undefined, true);
       }
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== ' ') return;
+      spaceRef.current = false;
+      setHand(false);
+    };
+    const onBlur = () => {
+      spaceRef.current = false;
+      setHand(false);
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selected, layout, openCard, fit, zoomTo]);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, layout, openCard, fit, zoomTo, links]);
+  const selectedLinkRef = useRef<string | null>(null);
+  selectedLinkRef.current = selectedLink;
+
+  // --- into a frame or an email, copies, and breaking a line (model/board-edits.ts) ---
+
+  /** The natural size of a picture, for fitting it into a frame. */
+  const naturalSize = (url: string) =>
+    new Promise<{ width: number; height: number }>((res, rej) => {
+      const img = new Image();
+      img.onload = () => res({ width: img.naturalWidth || 1, height: img.naturalHeight || 1 });
+      img.onerror = () => rej(new Error('The picture could not be read.'));
+      img.src = url;
+    });
+
+  /** Where an email's file is: in .scug/templates/, or where the old layout kept it. */
+  const emailPath = async (fileName: string): Promise<string> => {
+    for (const sub of [META.templates, 'templates']) if (await readText(dir, `${sub}/${fileName}`)) return `${sub}/${fileName}`;
+    return fileName;
+  };
+
+  /** Writes a file, looks at the folder again, tells the others, and records the step with the old text to put back. */
+  const rewriteText = async (path: string, before: string, after: string, label: string) => {
+    const write = async (text: string) => {
+      await writeFile(dir, path, text);
+      stale();
+      await refresh();
+      presence.sendSaved();
+    };
+    await write(after);
+    history.push({ label, undo: () => write(before), redo: () => write(after) });
+  };
+
+  const rewriteEmail = async (email: EmailItem, next: Template, label: string) => {
+    const path = await emailPath(email.fileName);
+    const before = (await readText(dir, path))?.text ?? (email.template ? serializeTemplate(email.template) : '');
+    await rewriteText(path, before, serializeTemplate(next), label);
+  };
+
+  /** Writes a frame as a new save, so every browser that keeps the frame takes the change. Undo saves the old drawing again. */
+  const rewriteFrame = async (frame: FrameItem, next: Template, label: string) => {
+    const write = async (template: Template) => {
+      await writeFrame(dir, { key: frame.key, name: frame.name, savedAt: Date.now(), template }, await readFolderFrames(dir));
+      stale();
+      await refresh();
+      presence.sendSaved();
+    };
+    await write(next);
+    history.push({ label, undo: () => write(frame.template), redo: () => write(next) });
+  };
+
+  const notWritable = (what: string) => notify(`${info.name} is open view-only. Allow editing to ${what}.`);
+  const failedTo = (cause: unknown, what: string) => notify(cause instanceof Error ? `Could not ${what}: ${cause.message}` : `Could not ${what}.`);
+
+  /** A picture into a frame or an email, or a frame into an email: the file changes, and the line appears. */
+  const putInto = async (card: PlacedCard, into: PlacedCard) => {
+    if (!projectRef.current.writable) return notWritable(`put ${card.name} in ${into.name}`);
+    try {
+      if (card.kind === 'picture' && into.kind === 'frame') {
+        const frame = framesById.get(into.id);
+        const picture = picturesById.get(card.id);
+        if (!frame || !picture) return;
+        await rewriteFrame(frame, addPictureToFrame(frame.template, picture.path, await naturalSize(picture.url)), `Put ${card.name} in ${into.name}`);
+      } else if (card.kind === 'picture' && into.kind === 'email') {
+        const email = emailsById.get(into.id);
+        const picture = picturesById.get(card.id);
+        if (!email?.template || !picture) return;
+        await rewriteEmail(email, addPictureToEmail(email.template, picture.path, `bd${Date.now().toString(36)}-`), `Put ${card.name} in ${into.name}`);
+      } else if (card.kind === 'frame' && into.kind === 'email') {
+        const frame = framesById.get(card.id);
+        const email = emailsById.get(into.id);
+        if (!frame?.frame || !email?.template) return;
+        await rewriteEmail(email, addFrameToEmail(email.template, frame.frame, `ff${Date.now().toString(36)}-`), `${into.name} follows ${card.name}`);
+      } else return;
+      notify(`Put ${card.name} in ${into.name}.`);
+    } catch (cause) {
+      failedTo(cause, `put ${card.name} in ${into.name}`);
+    }
+  };
+
+  /** A copy of a card's file beside it, placed where Option-drag let go. Undo removes the copy. */
+  const duplicateCard = async (card: PlacedCard, at: { x: number; y: number }) => {
+    if (!projectRef.current.writable) return notWritable(`copy ${card.name}`);
+    try {
+      let made: { id: string; write(): Promise<void>; remove(): Promise<void> } | null = null;
+      if (card.kind === 'picture') {
+        const picture = picturesById.get(card.id);
+        if (!picture) return;
+        const to = freeAssetPath(picture.path, files.pictures.map((p) => p.path));
+        const blob = await (await fetch(picture.url)).blob();
+        made = { id: pictureCardId(to), write: () => writeFile(dir, `assets/${to}`, blob).then(() => undefined), remove: () => removeFile(dir, `assets/${to}`) };
+      } else if (card.kind === 'email') {
+        const email = emailsById.get(card.id);
+        if (!email?.template) throw new Error(`${card.name} could not be read.`);
+        const copy = duplicateTemplate(email.template, `${email.template.name} copy`);
+        const fileName = templateFileName(copy, files.emails.map((e) => e.fileName));
+        const text = serializeTemplate(copy);
+        made = { id: emailCardId(fileName), write: () => writeFile(dir, `${META.templates}/${fileName}`, text).then(() => undefined), remove: () => removeFile(dir, `${META.templates}/${fileName}`) };
+      } else if (card.kind === 'frame') {
+        const frame = framesById.get(card.id);
+        if (!frame) return;
+        const copy = duplicateFrameFile({ key: frame.key, name: frame.name, savedAt: frame.savedAt, template: frame.template }, FRAME_PREFIX + newFrameId());
+        let written: string | null = null;
+        made = {
+          id: frameCardId(copy.key),
+          write: async () => {
+            written = (await writeFrame(dir, { ...copy, savedAt: Date.now() }, await readFolderFrames(dir))).path;
+          },
+          remove: async () => {
+            if (written) await removeFile(dir, written);
+          },
+        };
+      } else if (card.kind === 'doc') {
+        const doc = docsById.get(card.id);
+        if (!doc) return;
+        let path: string | null = null;
+        made = {
+          id: '',
+          write: async () => {
+            path = await writeDocLink(dir, { url: doc.link.url, name: `${doc.link.name} copy` }, files.docs);
+            made!.id = docCardId(path);
+          },
+          remove: async () => {
+            if (path) await removeFile(dir, path);
+          },
+        };
+      }
+      if (!made) return;
+      const place = async () => {
+        await made!.write();
+        stale();
+        saveBoard(moveCard(boardRef.current, made!.id, at.x, at.y));
+        await refresh();
+        presence.sendSaved();
+      };
+      await place();
+      notify(`Copied ${card.name}.`);
+      history.push({
+        label: `Copy ${card.name}`,
+        undo: async () => {
+          await made!.remove();
+          stale();
+          saveBoard(forgetCard(boardRef.current, made!.id));
+          await refresh();
+          presence.sendSaved();
+        },
+        redo: place,
+      });
+    } catch (cause) {
+      failedTo(cause, `copy ${card.name}`);
+    }
+  };
+
+  /** Takes a line out of the file it is in: the block or layer that shows the picture, the link to the frame, or the recipe's source. */
+  const breakLink = async (link: CardLink) => {
+    if (!projectRef.current.writable) return notWritable('break the link');
+    try {
+      if (link.kind === 'follows') {
+        const frame = framesById.get(link.from);
+        const email = emailsById.get(link.to);
+        if (!frame || !email?.template) return;
+        const { template, unlinked } = unfollowFrame(email.template, frame.key);
+        if (unlinked) await rewriteEmail(email, template, `Unlink ${email.name} from ${frame.name}`);
+      } else if (link.kind === 'uses') {
+        const picture = picturesById.get(link.from);
+        if (!picture) return;
+        const name = picture.path.split('/').pop() ?? picture.path;
+        const email = emailsById.get(link.to);
+        const frame = framesById.get(link.to);
+        if (email?.template) {
+          const { template, removed } = removePictureFrom(email.template, picture.path);
+          if (removed) await rewriteEmail(email, template, `Take ${name} out of ${email.name}`);
+        } else if (frame) {
+          const { template, removed } = removePictureFrom(frame.template, picture.path);
+          if (removed) await rewriteFrame(frame, template, `Take ${name} out of ${frame.name}`);
+        }
+      } else {
+        const made = picturesById.get(link.to);
+        const source = picturesById.get(link.from);
+        const recipe = made ? recipeOf.get(made.path) : undefined;
+        if (!made || !source || !recipe) return;
+        const raw = await readText(dir, recipe.path);
+        if (!raw) return;
+        const { value, changed } = dropSourceFromRecipe(JSON.parse(raw.text) as unknown, source.path);
+        if (changed) await rewriteText(recipe.path, raw.text, `${JSON.stringify(value, null, 2)}\n`, `Forget what made ${made.path.split('/').pop()}`);
+      }
+      setSelectedLink(null);
+    } catch (cause) {
+      failedTo(cause, 'break the link');
+    }
+  };
 
   // --- groups ---
 
@@ -1202,15 +1492,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     return seen.current.has(r.id);
   };
 
-  // Drafting paper: a fine line every 24 board pixels and a firmer one every fifth, stepping up as the board zooms
-  // out so the lines never crowd.
-  const fine = settings.gridStep * view.z * (view.z < 0.2 ? 20 : view.z < 0.45 ? 5 : 1);
-  const gridStyle = settings.grid
-    ? {
-        backgroundSize: `${fine}px ${fine}px, ${fine}px ${fine}px, ${fine * 5}px ${fine * 5}px, ${fine * 5}px ${fine * 5}px`,
-        backgroundPosition: `${view.x}px ${view.y}px`,
-      }
-    : { backgroundImage: 'none' };
+  // What lies under everything: drafting lines, dots or a cutting mat (ground.ts), sized to the zoom and moving
+  // with the view. A mat shown strongly is dark, and the lines over it lighten to stay seen.
+  const under = underStyle(settings, view);
+  const darkGround = settings.ground === 'mat' && settings.groundOpacity.mat >= 0.6;
 
   const pictureCount = files.pictures.filter((p) => !p.rendered).length;
   const counts = [
@@ -1228,8 +1513,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     <div class="pb-board">
       <div
         ref={stage}
-        class={`pb-stage ${panning ? 'panning' : ''} ${grouping ? 'grouping' : ''}`}
-        style={gridStyle}
+        class={`pb-stage ${panning ? 'panning' : ''} ${hand ? 'hand' : ''} ${grouping ? 'grouping' : ''} ${selected ? 'has-selection' : ''} ${darkGround ? 'dark-ground' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1242,6 +1526,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           void addPictures([...e.dataTransfer.files], { x: e.clientX, y: e.clientY });
         }}
       >
+        {under && <div class={`pb-under pb-under-${settings.ground}`} style={under} aria-hidden="true" />}
         <div class="pb-world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
           {groups.map((g) => {
             const count = g.members.length;
@@ -1292,21 +1577,41 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             );
           })}
           {marquee && <div class="pb-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} aria-hidden="true" />}
-          <svg class="pb-links" width="1" height="1" aria-hidden="true">
+          <svg class="pb-links" width="1" height="1">
             {links.map((link) => {
               const a = rects.get(link.from);
               const b = rects.get(link.to);
               if (!a || !b) return null;
+              const key = `${link.from}>${link.to}`;
               const on = selected !== null && (link.from === selected || link.to === selected);
               const { d, end } = linkPath(a, b);
               return (
-                <g key={`${link.from}>${link.to}`} class={`pb-link ${link.kind} ${on ? 'on' : ''}`}>
+                <g key={key} class={`pb-link ${link.kind} ${on ? 'on' : ''} ${selectedLink === key ? 'picked' : ''}`} data-link={key}>
+                  <path class="hit" d={d} />
                   <path d={d} />
-                  <rect x={end.x - 3 / view.z} y={end.y - 3 / view.z} width={6 / view.z} height={6 / view.z} />
+                  <rect x={end.x - (on ? 4 : 3) / view.z} y={end.y - (on ? 4 : 3) / view.z} width={(on ? 8 : 6) / view.z} height={(on ? 8 : 6) / view.z} />
                 </g>
               );
             })}
           </svg>
+          {(() => {
+            // The picked line's one verb, at its middle.
+            const link = selectedLink ? links.find((l) => `${l.from}>${l.to}` === selectedLink) : undefined;
+            const a = link && rects.get(link.from);
+            const b = link && rects.get(link.to);
+            if (!link || !a || !b) return null;
+            const { mid } = linkPath(a, b);
+            return (
+              <button
+                class="pb-link-break"
+                style={{ left: mid.x, top: mid.y, transform: `translate(-50%, -50%) scale(${1 / view.z})` }}
+                title={link.kind === 'follows' ? 'The email keeps the drawing and stops following the frame.' : link.kind === 'uses' ? 'Takes the picture out of what shows it.' : 'The recipe forgets this picture was part of it.'}
+                onClick={() => void breakLink(link)}
+              >
+                Break link
+              </button>
+            );
+          })()}
 
           {missing.map((m) => (
             <div key={m.id} class={`pb-card pb-missing ${selected === m.id ? 'on' : ''}`} data-card={m.id} style={{ left: m.x, top: m.y, width: m.w, height: m.h }}>
@@ -1359,7 +1664,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             return (
               <div
                 key={card.id}
-                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id ? 'lifted' : ''} ${peer ? 'peer' : ''}`}
+                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id && !moving.copy ? 'lifted' : ''} ${dropCard === card.id ? 'drop' : ''} ${peer ? 'peer' : ''}`}
                 data-card={card.id}
                 title={facts}
                 style={{ left: card.x, top: card.y, width: card.w, height: card.h, ...(peer ? { '--peer': peer.color } : {}) }}
@@ -1382,6 +1687,23 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               </div>
             );
           })}
+
+          {moving?.copy &&
+            (() => {
+              // The copy being carried: the original stays put above; this is the one in the hand.
+              const c = layout.cards.find((x) => x.id === moving.id);
+              return c ? (
+                <div class={`pb-card pb-${c.kind} pb-copying`} style={{ left: moving.x, top: moving.y, width: c.w, height: c.h }} aria-hidden="true">
+                  <header class="pb-card-head">
+                    <b class="pb-card-name">{c.name} copy</b>
+                    <svg class="pb-copy-icon" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="5.5" y="5.5" width="9" height="9" rx="1" />
+                      <path d="M10.5 5.5V2.5a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3" />
+                    </svg>
+                  </header>
+                </div>
+              ) : null;
+            })()}
 
           {/* The others' pointers, at their places on the board, the same size at every zoom. */}
           {presence.peers
@@ -1497,11 +1819,19 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           </>
         )}
         <span class="pb-grow" />
-        <span class="pb-hint">{grouping ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels' : 'Drag to arrange · drop a picture on a group to file it · double-click opens'}</span>
+        <span class="pb-hint">
+          {grouping
+            ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels'
+            : selectedLink
+              ? 'A line is picked · Break link, or Delete, takes it out of the file it is in · Esc lets go'
+              : 'Drag to arrange · ⌥ drag copies · drop a picture on a frame or email to put it in · hold still, or Space, to pan'}
+        </span>
         <span class="pb-sep" aria-hidden="true" />
         <span class="pb-count">{counts || 'empty'}</span>
       </footer>
 
+      {dropCard && <div class="pb-notice">Let go to put it in {layout.cards.find((c) => c.id === dropCard)?.name ?? 'it'}</div>}
+      {!dropCard && moving?.copy && <div class="pb-notice">Let go to leave a copy here</div>}
       {dropTarget === 'out' && <div class="pb-notice">Let go to take it out of its group, into assets/</div>}
       {dropTarget && dropTarget !== 'out' && <div class="pb-notice">Let go to file it in {layout.groups.find((g) => g.id === dropTarget)?.name ?? 'the group'}</div>}
       {!files.read && <div class="pb-empty pb-reading">Reading {dir.name}…</div>}
@@ -1571,15 +1901,27 @@ function missingName(id: string, kind: CardKind): string {
   return rest.split('/').pop()?.replace(/\.(template|design)\.json$/, '') ?? rest;
 }
 
-/** A line from one card's side to the facing side of another. */
-function linkPath(a: Rect, b: Rect): { d: string; end: { x: number; y: number } } {
+/** A line from one card's side to the facing side of another, and its middle, where its verb sits. */
+function linkPath(a: Rect, b: Rect): { d: string; end: { x: number; y: number }; mid: { x: number; y: number } } {
   const rightward = a.x + a.w / 2 <= b.x + b.w / 2;
   const sx = rightward ? a.x + a.w : a.x;
   const sy = a.y + a.h / 2;
   const tx = rightward ? b.x : b.x + b.w;
   const ty = b.y + b.h / 2;
   const bend = Math.max(60, Math.abs(tx - sx) / 2) * (rightward ? 1 : -1);
-  return { d: `M${sx},${sy} C${sx + bend},${sy} ${tx - bend},${ty} ${tx},${ty}`, end: { x: tx, y: ty } };
+  // With the two control points mirrored, the curve's midpoint is exactly halfway between the ends.
+  return { d: `M${sx},${sy} C${sx + bend},${sy} ${tx - bend},${ty} ${tx},${ty}`, end: { x: tx, y: ty }, mid: { x: (sx + tx) / 2, y: (sy + ty) / 2 } };
+}
+
+/** The topmost card under a point that the dragged card can be put into: a picture into a frame or an email, a frame into an email. */
+function cardUnder(cards: PlacedCard[], p: { x: number; y: number }, dragged: PlacedCard): PlacedCard | null {
+  const takes = (into: CardKind) => (dragged.kind === 'picture' ? into === 'frame' || into === 'email' : dragged.kind === 'frame' ? into === 'email' : false);
+  for (let i = cards.length - 1; i >= 0; i -= 1) {
+    const c = cards[i]!;
+    if (c.id === dragged.id || !takes(c.kind)) continue;
+    if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) return c;
+  }
+  return null;
 }
 
 // --- card bodies ------------------------------------------------------------------------------------------------
