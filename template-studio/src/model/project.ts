@@ -117,7 +117,7 @@ export function launcherFileName(name: string): string {
 
 // --- cards --------------------------------------------------------------------------------------------------
 
-export type CardKind = 'email' | 'frame' | 'picture';
+export type CardKind = 'email' | 'frame' | 'picture' | 'doc';
 
 /** Something in the folder the board shows. The id says what it is and where it lives. */
 export interface CardSource {
@@ -130,10 +130,12 @@ export const emailCardId = (fileName: string) => `email:${fileName}`;
 export const frameCardId = (key: string) => `frame:${key}`;
 /** By its path under `assets/`, which is the name documents use for it. */
 export const pictureCardId = (path: string) => `picture:${path}`;
+/** A document (a Google Doc, Sheet or Slides file, or a link file) by its path in the project (model/docs.ts). */
+export const docCardId = (path: string) => `doc:${path}`;
 
 export const kindOfCard = (id: string): CardKind | null => {
   const kind = id.slice(0, id.indexOf(':'));
-  return kind === 'email' || kind === 'frame' || kind === 'picture' ? kind : null;
+  return kind === 'email' || kind === 'frame' || kind === 'picture' || kind === 'doc' ? kind : null;
 };
 
 /** One size per kind, so the layout never waits on a picture to load to know where things go. */
@@ -141,6 +143,7 @@ export const CARD_SIZE: Record<CardKind, { w: number; h: number }> = {
   email: { w: 260, h: 380 },
   frame: { w: 300, h: 250 },
   picture: { w: 220, h: 210 },
+  doc: { w: 240, h: 132 },
 };
 
 // --- board.json ---------------------------------------------------------------------------------------------
@@ -337,7 +340,7 @@ export interface BoardLayout {
 export const CARD_GAP = 40;
 const LANE_GAP = 120;
 const COLUMNS = 5;
-const KIND_ORDER: CardKind[] = ['email', 'frame', 'picture'];
+const KIND_ORDER: CardKind[] = ['email', 'doc', 'frame', 'picture'];
 const PICTURE = 'picture:';
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -357,10 +360,12 @@ export function cardFolder(card: { id: string; kind: CardKind }): string | null 
  * everything else. Emails, then frames, then pictures, each by name, so the same folder always lays out the same way.
  *
  * Pictures in a folder belong to that folder's group, and one without a place takes the first free spot inside it.
- * A folder with no group gets one, sized for its pictures, in a row below everything else. A group is drawn at least
- * big enough to hold its members, wherever they have been put.
+ * A folder with no group gets one, sized for its pictures, in a row below everything else; so does a folder in
+ * `folders` with no pictures in it yet, so a project's starting folders and one made in Finder are on the board
+ * before anything is filed in them. A group is drawn at least big enough to hold its members, wherever they have
+ * been put.
  */
-export function layoutBoard(sources: CardSource[], board: BoardDoc): BoardLayout {
+export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = []): BoardLayout {
   const present = new Set(sources.map((s) => s.id));
   const cards: PlacedCard[] = [];
   for (const source of sources) {
@@ -400,9 +405,9 @@ export function layoutBoard(sources: CardSource[], board: BoardDoc): BoardLayout
 
   // A group for every folder that has none, sized for its pictures.
   const groupsPlaced: string[] = [];
-  const folders = [...new Set(sources.map(cardFolder).filter((f): f is string => f !== null))].sort();
+  const wanted = [...new Set([...sources.map(cardFolder), ...[...folders].map((f) => (isGroupFolder(f) ? f : null))].filter((f): f is string => f !== null))].sort();
   let row: { x: number; y: number } | null = null;
-  for (const folder of folders) {
+  for (const folder of wanted) {
     if (groups.some((g) => g.folder === folder)) continue;
     if (!row) {
       const taken: Rect[] = [...cards, ...missing, ...groups];

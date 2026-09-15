@@ -136,6 +136,27 @@ describe('the board layout', () => {
     expect(layout.cards[0]).toMatchObject({ id: 'email:A.template.json', x: 300, y: 0 });
   });
 
+  it('draws a group for a folder with nothing in it yet, and none for a folder a group cannot own', () => {
+    const laid = layoutBoard([], emptyBoard(), ['photos', 'logos', 'rendered', '.hidden', 'a/b']);
+    expect(laid.groups.map((g) => [g.folder, g.name, g.members])).toEqual([
+      ['logos', 'logos', []],
+      ['photos', 'photos', []],
+    ]);
+    expect(laid.groupsPlaced).toEqual(['group:logos', 'group:photos']);
+    // Side by side in a row, and kept once written down.
+    expect(laid.groups[0]!.y).toBe(laid.groups[1]!.y);
+    expect(laid.groups[1]!.x).toBeGreaterThan(laid.groups[0]!.x + laid.groups[0]!.w);
+    const kept = withPlaces(emptyBoard(), laid.cards, laid.groups);
+    expect(layoutBoard([], kept, ['photos', 'logos']).groupsPlaced).toEqual([]);
+    // A picture filed in one later lands inside it.
+    const filed = layoutBoard([{ id: 'picture:photos/a.png', kind: 'picture', name: 'a.png' }], kept, ['photos', 'logos']);
+    const photos = filed.groups.find((g) => g.folder === 'photos')!;
+    expect(photos.members).toEqual(['picture:photos/a.png']);
+    const card = filed.cards[0]!;
+    expect(card.x).toBeGreaterThanOrEqual(photos.x);
+    expect(card.x + card.w).toBeLessThanOrEqual(photos.x + photos.w);
+  });
+
   it('lays out the same once the places are written down', () => {
     const sources = [email('A'), email('B'), picture('p.png')];
     const first = layoutBoard(sources, emptyBoard());

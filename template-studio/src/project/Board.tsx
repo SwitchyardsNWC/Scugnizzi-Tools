@@ -1,11 +1,17 @@
 // The project board: everything in a project folder on one endless canvas.
 //
 // Jared: "this could be a new tool that starts linking all these projects together and can turn into the
-// project canvas that brings everything to one endless canvas." Every email, Freeform frame and picture in
-// the folder is a card. Lines show what is made from what: the frame an email's block follows, the emails
-// and frames a picture appears in. Double-click a card and the board zooms into it and opens the tool that
-// owns it. Where the cards sit is `board.json`; everything else is the folder's own files
+// project canvas that brings everything to one endless canvas." Every email, document, Freeform frame and
+// picture in the folder is a card. Lines show what is made from what: the frame an email's block follows, the
+// emails and frames a picture appears in. Double-click a card and the board zooms into it and opens the tool
+// that owns it. Where the cards sit is `board.json`; everything else is the folder's own files
 // (model/project.ts).
+//
+// Second pass (docs/projects.md, "The board, second pass"): a table to work on rather than a toy. The shape is
+// the dashboard's, Enkel: one sans for words, mono for figures, hairlines for structure, square everything but
+// what you press, and nothing that bounces. A card is a small window with a thin title bar. A picture is only
+// the picture until the pointer is over it. The bar at the top holds the project and the verbs; the strip at
+// the bottom is a status line, as a window used to have.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { MutableRef } from 'preact/hooks';
@@ -13,6 +19,7 @@ import type { MutableRef } from 'preact/hooks';
 import { compile } from '../compile/compile.ts';
 import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
+import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, type DocKind } from '../model/docs.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import { projectType } from '../model/project-types.ts';
@@ -24,6 +31,7 @@ import {
   CARD_GAP,
   CARD_SIZE,
   cardFolder,
+  docCardId,
   emailCardId,
   emptyBoard,
   folderOfPicture,
@@ -53,7 +61,20 @@ import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/works
 import { loadKeptPictures } from '../app/kept-pictures.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
-import { listPictures, listRecipes, makeGroupFolder, movePicture, readText, removeFolderIfEmpty, writeFile, writePicture } from './folder.ts';
+import {
+  listAssetFolders,
+  listDocuments,
+  listPictures,
+  listRecipes,
+  makeGroupFolder,
+  movePicture,
+  readText,
+  removeFolderIfEmpty,
+  writeDocLink,
+  writeFile,
+  writePicture,
+  type DocEntry,
+} from './folder.ts';
 import { copyKeptPictures, syncFrames } from './frame-sync.ts';
 import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
@@ -62,7 +83,11 @@ import type { Project } from './useProject.ts';
 type View = { x: number; y: number; z: number };
 type Rect = { x: number; y: number; w: number; h: number };
 
-const HEAD = 40;
+/** The card's title bar. */
+const HEAD = 28;
+/** The bars at the top and bottom of the board, which the canvas sits between. */
+const BAR_TOP = 44;
+const BAR_BOTTOM = 28;
 /** The width an email is laid out at inside its card, a little wider than the email so its edges show. */
 const EMAIL_PAGE = 640;
 const clampZoom = (z: number) => Math.min(3, Math.max(0.05, z));
@@ -77,6 +102,7 @@ const ago = (t: number) => {
   return new Date(t).toLocaleDateString();
 };
 const sizeOf = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function openTool(url: string) {
   const href = new URL(url, window.location.href).href;
@@ -126,10 +152,18 @@ interface PictureItem {
   rendered: boolean;
 }
 
+interface DocItem extends DocEntry {
+  id: string;
+}
+
 interface Files {
   emails: EmailItem[];
   frames: FrameItem[];
   pictures: PictureItem[];
+  /** Google Docs, Sheets and Slides synced into the folder, and link files (model/docs.ts). */
+  docs: DocItem[];
+  /** The folders under `assets/`, each a group, whether or not anything is filed in it yet. */
+  folders: string[];
   /** What Riso and Ink bleed made, and from what. */
   recipes: ToolRecipe[];
   read: boolean;
@@ -137,8 +171,10 @@ interface Files {
   epoch: number;
 }
 
+const NO_FILES: Files = { emails: [], frames: [], pictures: [], docs: [], folders: [], recipes: [], read: false, epoch: 0 };
+
 function useProjectFiles(project: MutableRef<Project>, notify: (message: string) => void) {
-  const [files, setFiles] = useState<Files>({ emails: [], frames: [], pictures: [], recipes: [], read: false, epoch: 0 });
+  const [files, setFiles] = useState<Files>(NO_FILES);
   const [kept, setKept] = useState<AssetFile[]>([]);
   const cache = useRef({ emails: new Map<string, EmailItem>(), pictures: new Map<string, PictureItem>(), systems: '' });
   const busy = useRef(false);
@@ -159,11 +195,13 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
     const started = epoch.current;
     try {
       const ws = folderWorkspace(dir, writable);
-      const [list, systems, found, recipes] = await Promise.all([
+      const [list, systems, found, recipes, folders, documents] = await Promise.all([
         ws.list().catch(() => []),
         ws.designSystems().catch(() => ({})),
         listPictures(dir).catch(() => []),
         listRecipes(dir).catch(() => [] as ToolRecipe[]),
+        listAssetFolders(dir).catch(() => [] as string[]),
+        listDocuments(dir).catch(() => [] as DocEntry[]),
       ]);
       const c = cache.current;
 
@@ -230,13 +268,15 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
       }
       for (const name of [...c.emails.keys()]) if (!list.some((f) => f.fileName === name)) c.emails.delete(name);
 
+      const docs: DocItem[] = documents.map((d) => ({ ...d, id: docCardId(d.path) }));
+
       // The board moved a file while this read ran, which may have seen both copies or neither: read again rather
       // than lay out what was. Laying it out put a moved picture's old name back on the board.
       if (started !== epoch.current) {
         again.current = true;
         return;
       }
-      setFiles({ emails, frames, pictures, recipes, read: true, epoch: started });
+      setFiles({ emails, frames, pictures, docs, folders, recipes, read: true, epoch: started });
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : 'The project folder could not be read.');
     } finally {
@@ -358,12 +398,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const sources = useMemo<CardSource[]>(
     () => [
       ...files.emails.map((e) => ({ id: e.id, kind: 'email' as const, name: e.name })),
+      ...files.docs.map((d) => ({ id: d.id, kind: 'doc' as const, name: d.link.name })),
       ...files.frames.map((f) => ({ id: f.id, kind: 'frame' as const, name: f.name })),
       ...files.pictures.filter((p) => !p.rendered).map((p) => ({ id: p.id, kind: 'picture' as const, name: p.path.split('/').pop() ?? p.path })),
     ],
     [files],
   );
-  const layout = useMemo(() => layoutBoard(sources, board), [sources, board]);
+  const layout = useMemo(() => layoutBoard(sources, board, files.folders), [sources, board, files.folders]);
 
   // A card that just found a place keeps it, so a file added tomorrow does not shuffle today's board.
   // A group just made for a folder is kept the same way. Not from a read older than a move the board just made: that
@@ -376,6 +417,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const emailsById = useMemo(() => new Map(files.emails.map((e) => [e.id, e])), [files.emails]);
   const framesById = useMemo(() => new Map(files.frames.map((f) => [f.id, f])), [files.frames]);
   const picturesById = useMemo(() => new Map(files.pictures.map((p) => [p.id, p])), [files.pictures]);
+  const docsById = useMemo(() => new Map(files.docs.map((d) => [d.id, d])), [files.docs]);
   const assets = useMemo<AssetFile[]>(
     () => [...files.pictures.map((p) => ({ name: p.path, size: p.size, url: p.url })), ...kept.filter((k) => !files.pictures.some((p) => p.path === k.name))],
     [files.pictures, kept],
@@ -491,8 +533,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
   const fitView = useCallback((): View | null => {
     if (!bounds) return null;
-    const top = 76;
-    const bottom = 110;
+    const top = 40;
+    const bottom = 40;
     const room = { w: size.w - 120, h: size.h - top - bottom };
     const z = clampZoom(Math.min(room.w / bounds.w, room.h / bounds.h, 1));
     return { z, x: (size.w - bounds.w * z) / 2 - bounds.x * z, y: top + (room.h - bounds.h * z) / 2 - bounds.y * z };
@@ -579,8 +621,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       let url: string | null = null;
       const email = emailsById.get(card.id);
       const frame = framesById.get(card.id);
+      const doc = docsById.get(card.id);
       if (email) url = `index.html?open=${encodeURIComponent(email.fileName)}`;
       if (frame) url = `freeform.html?frame=${encodeURIComponent(frame.key)}`;
+      if (doc) url = doc.link.url;
       // A picture opens in the tool that made it, with its settings; otherwise in Riso, or Ink bleed for an SVG.
       const picture = picturesById.get(card.id);
       if (picture) url = toolAddress('../../', picture.path, recipeOf.get(picture.path));
@@ -592,7 +636,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         window.setTimeout(() => animateTo(before, 420), 700);
       });
     },
-    [size, emailsById, framesById, picturesById, recipeOf, animateTo],
+    [size, emailsById, framesById, picturesById, docsById, recipeOf, animateTo],
   );
 
   /** A point on the screen, on the board. */
@@ -751,7 +795,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       notify(`${info.name} is open view-only. Allow editing to add a group.`);
       return;
     }
-    const taken = [...layout.groups.map((g) => g.folder), ...files.pictures.flatMap((p) => folderOfPicture(p.path) ?? [])];
+    const taken = [...layout.groups.map((g) => g.folder), ...files.folders, ...files.pictures.flatMap((p) => folderOfPicture(p.path) ?? [])];
     const names = new Set(layout.groups.map((g) => g.name.toLowerCase()));
     let n = 1;
     while (names.has(`group ${n}`)) n += 1;
@@ -792,7 +836,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         try {
           await makeGroupFolder(dir, folder);
           await removeFolderIfEmpty(dir, group.folder);
+          stale();
           saveBoard(storeGroup(group, { id: `group:${folder}`, name, folder }));
+          void refresh();
           return;
         } catch {
           // The folder keeps its name; the group still takes the new one.
@@ -834,9 +880,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       }
     }
     saveBoard(removeGroup(next, group.id));
-    if (projectRef.current.writable) await removeFolderIfEmpty(dir, group.folder);
+    if (projectRef.current.writable) {
+      await removeFolderIfEmpty(dir, group.folder);
+      stale();
+    }
     await refresh();
-    notify(moved ? `Took ${moved} ${moved === 1 ? 'picture' : 'pictures'} out of ${group.name} and removed the group.` : `Removed ${group.name}.`);
+    notify(moved ? `Took ${plural(moved, 'picture')} out of ${group.name} and removed the group.` : `Removed ${group.name}.`);
   };
 
   // --- pictures in ---
@@ -877,6 +926,32 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     [dir, info.name, notify, refresh, saveBoard, size],
   );
 
+  // --- links to documents ---
+  const [linking, setLinking] = useState(false);
+  const addLink = async (url: string, name: string) => {
+    const address = url.trim();
+    if (!/^https?:\/\//i.test(address)) {
+      notify('A link starts with https://. Paste the address from the browser’s address bar.');
+      return false;
+    }
+    if (!projectRef.current.writable) {
+      notify(`${info.name} is open view-only. Allow editing to add a link.`);
+      return false;
+    }
+    const kind = docKindOfUrl(address);
+    const label = name.trim() || (kind === 'link' ? new URL(address).hostname : DOC_KIND_NAMES[kind]);
+    try {
+      const path = await writeDocLink(dir, { url: address, name: label }, files.docs);
+      stale();
+      await refresh();
+      notify(`Added ${label} as ${path}.`);
+      return true;
+    } catch (cause) {
+      notify(cause instanceof Error ? `The link could not be written: ${cause.message}` : 'The link could not be written.');
+      return false;
+    }
+  };
+
   // --- drawing ---
   const left = -view.x / view.z;
   const top = -view.y / view.z;
@@ -888,21 +963,32 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     return seen.current.has(r.id);
   };
 
-  const spacing = 22 * view.z * (view.z < 0.4 ? 4 : 1);
+  // Drafting paper: a fine line every 24 board pixels and a firmer one every fifth, stepping up as the board zooms
+  // out so the lines never crowd.
+  const step = 24 * view.z * (view.z < 0.2 ? 20 : view.z < 0.45 ? 5 : 1);
+  const gridStyle = {
+    backgroundSize: `${step}px ${step}px, ${step}px ${step}px, ${step * 5}px ${step * 5}px, ${step * 5}px ${step * 5}px`,
+    backgroundPosition: `${view.x}px ${view.y}px`,
+  };
+
+  const pictureCount = files.pictures.filter((p) => !p.rendered).length;
   const counts = [
     [files.emails.length, 'email'],
+    [files.docs.length, 'document'],
     [files.frames.length, 'frame'],
-    [files.pictures.filter((p) => !p.rendered).length, 'picture'],
+    [pictureCount, 'picture'],
   ]
-    .map(([n, word]) => `${n} ${word}${n === 1 ? '' : 's'}`)
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, word]) => plural(n as number, word as string))
     .join(' · ');
+  const writable = project.writable;
 
   return (
     <div class="pb-board">
       <div
         ref={stage}
         class={`pb-stage ${panning ? 'panning' : ''}`}
-        style={{ backgroundSize: `${spacing}px ${spacing}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
+        style={gridStyle}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -947,7 +1033,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                     </b>
                   )}
                   <span class="pb-group-folder">
-                    assets/{g.folder}/ · {count} {count === 1 ? 'picture' : 'pictures'}
+                    assets/{g.folder}/ · {count}
                   </span>
                   <button
                     class={`pb-group-x ${confirm ? 'confirm' : ''}`}
@@ -955,9 +1041,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                     aria-label={`Remove ${g.name}`}
                     onClick={() => void ungroup(g)}
                   >
-                    {confirm ? `Move ${count} out` : '✕'}
+                    {confirm ? `Move ${count} out` : 'Remove'}
                   </button>
                 </header>
+                {count === 0 && <span class="pb-group-empty">Drop pictures here to file them in assets/{g.folder}/</span>}
                 <span class="pb-group-resize" data-group-resize={g.id} title="Drag to resize" />
               </div>
             );
@@ -972,7 +1059,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               return (
                 <g key={`${link.from}>${link.to}`} class={`pb-link ${link.kind} ${on ? 'on' : ''}`}>
                   <path d={d} />
-                  <circle cx={end.x} cy={end.y} r={4 / view.z} />
+                  <rect x={end.x - 3 / view.z} y={end.y - 3 / view.z} width={6 / view.z} height={6 / view.z} />
                 </g>
               );
             })}
@@ -981,11 +1068,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           {missing.map((m) => (
             <div key={m.id} class={`pb-card pb-missing ${selected === m.id ? 'on' : ''}`} data-card={m.id} style={{ left: m.x, top: m.y, width: m.w, height: m.h }}>
               <header class="pb-card-head">
-                <span class="pb-kind">Missing</span>
                 <b class="pb-card-name">{missingName(m.id, m.kind)}</b>
+                <span class="pb-card-meta">missing</span>
               </header>
               <div class="pb-card-note">
-                <p>This {m.kind === 'email' ? 'email' : m.kind === 'frame' ? 'frame' : 'picture'} is no longer in the folder. If it was moved or renamed, it shows up again as a new card.</p>
+                <p>This {KIND_LABEL[m.kind].toLowerCase()} is no longer in the folder. If it was moved or renamed, it shows up again as a new card.</p>
                 <button class="pb-link-btn" onClick={() => saveBoard(forgetCard(boardRef.current, m.id))}>
                   Forget its place
                 </button>
@@ -993,10 +1080,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             </div>
           ))}
 
-          {cards.map((card, i) => {
+          {cards.map((card) => {
             const email = emailsById.get(card.id);
             const frame = framesById.get(card.id);
             const picture = picturesById.get(card.id);
+            const doc = docsById.get(card.id);
             const madeBy = picture ? recipeOf.get(picture.path) : undefined;
             const live = isLive(card);
             const facts = email
@@ -1005,22 +1093,31 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                 ? `${frame.fileName}${frame.frame ? ` · ${frame.frame.page.width} × ${frame.frame.page.height}` : ''}`
                 : picture
                   ? `${picture.path} · ${sizeOf(picture.size)}`
-                  : '';
+                  : doc
+                    ? `${doc.path} · opens in ${DOC_OPENS_IN[doc.link.kind]}`
+                    : '';
+            const meta = email
+              ? 'email'
+              : frame
+                ? `frame${frame.frame ? ` · ${frame.frame.page.width}×${frame.frame.page.height}` : ''}${frame.frame?.page.effects?.length ? ' · riso' : ''}`
+                : picture
+                  ? `${madeBy ? `${RECIPE_TOOLS[madeBy.tool].name.toLowerCase()} · ` : ''}${sizeOf(picture.size)}`
+                  : doc
+                    ? DOC_KIND_NAMES[doc.link.kind].toLowerCase()
+                    : '';
             return (
               <div
                 key={card.id}
                 class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id ? 'lifted' : ''}`}
                 data-card={card.id}
                 title={facts}
-                style={{ left: card.x, top: card.y, width: card.w, height: card.h, animationDelay: `${Math.min(i, 24) * 22}ms` }}
+                style={{ left: card.x, top: card.y, width: card.w, height: card.h }}
                 onDblClick={() => openCard(card)}
               >
                 <header class="pb-card-head">
-                  <span class="pb-kind">{KIND_LABEL[card.kind]}</span>
                   <b class="pb-card-name">{card.name}</b>
-                  {frame?.frame?.page.effects?.length ? <span class="pb-chip">Riso</span> : null}
-                  {madeBy ? <span class={`pb-chip ${madeBy.tool}`}>{RECIPE_TOOLS[madeBy.tool].name}</span> : null}
-                  <button class="pb-card-open" title={openTitle(card, madeBy)} aria-label={`Open ${card.name}`} onClick={() => openCard(card)}>
+                  <span class="pb-card-meta">{meta}</span>
+                  <button class="pb-card-open" title={openTitle(card, madeBy, doc?.link.kind)} aria-label={`Open ${card.name}`} onClick={() => openCard(card)}>
                     ↗
                   </button>
                 </header>
@@ -1028,6 +1125,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   {email && <EmailBody item={email} assets={assets} live={live} width={card.w} height={card.h - HEAD} />}
                   {frame && <FrameBody item={frame} assets={assets} print={printOf(frame)} width={card.w} height={card.h - HEAD} />}
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
+                  {doc && <DocBody item={doc} />}
                 </div>
               </div>
             );
@@ -1035,10 +1133,79 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         </div>
       </div>
 
-      {dropTarget === 'out' && <div class="pb-drop-out">Let go to take it out of its group, into assets/</div>}
-      {dropTarget && dropTarget !== 'out' && (
-        <div class="pb-drop-out">Let go to file it in {layout.groups.find((g) => g.id === dropTarget)?.name ?? 'the group'}</div>
-      )}
+      <header class="pb-bar pb-bar-top">
+        <a class="pb-ghost" href="../../index.html" title="Back to Scugnizzi tools">
+          ← Tools
+        </a>
+        <span class="pb-sep" aria-hidden="true" />
+        <ProjectMenu project={project} counts={counts || 'nothing in it yet'} onCreate={onCreateProject} />
+        <span class="pb-grow" />
+        <div class="pb-actions" role="group" aria-label="Add to the project">
+          <span class="pb-kicker">Add</span>
+          <button class="pb-ghost" title="Open Template Studio on this project, for a new email" onClick={() => openTool('index.html')}>
+            + Email
+          </button>
+          <button class="pb-ghost" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1')}>
+            + Frame
+          </button>
+          <button class="pb-ghost" disabled={!writable} title={writable ? 'Add pictures to assets/. Dropping them on the board works too.' : 'Allow editing to add pictures'} onClick={() => picker.current?.click()}>
+            + Pictures
+          </button>
+          <button class="pb-ghost" disabled={!writable} title={writable ? 'A group is a folder in assets/: drop pictures on it to file them there' : 'Allow editing to add a group'} onClick={() => void newGroup()}>
+            + Group
+          </button>
+          <div class="pb-menu">
+            <button
+              class={`pb-ghost ${linking ? 'on' : ''}`}
+              disabled={!writable}
+              aria-expanded={linking}
+              title={writable ? 'A Google Doc, Sheet or Slides, or any address, as a card on the board' : 'Allow editing to add a link'}
+              onClick={() => setLinking((v) => !v)}
+            >
+              + Link
+            </button>
+            {linking && <LinkForm onClose={() => setLinking(false)} onAdd={addLink} />}
+          </div>
+        </div>
+        <span class="pb-sep" aria-hidden="true" />
+        <div class="pb-zoom" role="group" aria-label="Zoom">
+          <button title="Zoom out  ·  ⌘−" aria-label="Zoom out" onClick={() => zoomTo(view.z / 1.25, undefined, true)}>
+            −
+          </button>
+          <button class="pct" title="Zoom to 100%  ·  ⌘0" onClick={() => zoomTo(1, undefined, true)}>
+            {Math.round(view.z * 100)} %
+          </button>
+          <button title="Zoom in  ·  ⌘+" aria-label="Zoom in" onClick={() => zoomTo(view.z * 1.25, undefined, true)}>
+            +
+          </button>
+        </div>
+        <button class="pb-ghost" title="Fit everything  ·  ⇧1" onClick={fit}>
+          Fit
+        </button>
+      </header>
+
+      <footer class="pb-bar pb-bar-bottom">
+        <span class="pb-status">
+          <i class={`pb-dot ${project.status}`} aria-hidden="true" />
+          {project.status === 'view-only' ? (
+            <>
+              View only
+              <button class="pb-inline" title="Chrome opened the folder view-only. One click asks for edit access." onClick={() => void project.allow()}>
+                Allow editing
+              </button>
+            </>
+          ) : (
+            <>Saving into {dir.name}</>
+          )}
+        </span>
+        <span class="pb-grow" />
+        <span class="pb-hint">Drag to arrange · drop a picture on a group to file it · double-click opens</span>
+        <span class="pb-sep" aria-hidden="true" />
+        <span class="pb-count">{counts || 'empty'}</span>
+      </footer>
+
+      {dropTarget === 'out' && <div class="pb-notice">Let go to take it out of its group, into assets/</div>}
+      {dropTarget && dropTarget !== 'out' && <div class="pb-notice">Let go to file it in {layout.groups.find((g) => g.id === dropTarget)?.name ?? 'the group'}</div>}
       {!files.read && <div class="pb-empty pb-reading">Reading {dir.name}…</div>}
       {files.read && cards.length === 0 && missing.length === 0 && groups.length === 0 && (
         <div class="pb-empty">
@@ -1046,76 +1213,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           <span>Make a frame or an email, or drop pictures here. Everything in the folder shows up on this board.</span>
         </div>
       )}
-
-      <div class="pb-chrome pb-top pb-top-left">
-        <a class="fig-pill" href="../../index.html" title="Back to Scugnizzi tools">
-          <span aria-hidden="true">←</span> Tools
-        </a>
-        <ProjectMenu project={project} counts={counts} onCreate={onCreateProject} />
-      </div>
-
-      <div class="pb-chrome pb-top pb-top-right">
-        {project.status === 'view-only' && (
-          <button class="fig-pill pb-allow" title="Chrome opened the folder view-only. One click asks for edit access." onClick={() => void project.allow()}>
-            <span class="pb-dot view-only" aria-hidden="true" /> View only · Allow editing
-          </button>
-        )}
-        <div class="fig-pill fig-zoom">
-          <button title="Zoom out  ·  ⌘−" aria-label="Zoom out" onClick={() => zoomTo(view.z / 1.25, undefined, true)}>
-            −
-          </button>
-          <button class="pct" title="Zoom to 100%  ·  ⌘0" onClick={() => zoomTo(1, undefined, true)}>
-            {Math.round(view.z * 100)}%
-          </button>
-          <button title="Zoom in  ·  ⌘+" aria-label="Zoom in" onClick={() => zoomTo(view.z * 1.25, undefined, true)}>
-            +
-          </button>
-        </div>
-        <button class="fig-pill" title="Fit everything  ·  ⇧1" onClick={fit}>
-          Fit
-        </button>
-      </div>
-
-      <div class="pb-chrome pb-hint">Drag cards to arrange · drop a picture in a group to file it there · double-click to open</div>
-      <div class="pb-chrome pb-dock">
-        <button class="pb-dock-btn" title="Open Template Studio on this project" onClick={() => openTool('index.html')}>
-          <span class="pb-dock-icon email" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="m3 7 9 6 9-6" />
-            </svg>
-          </span>
-          Template Studio
-        </button>
-        <button class="pb-dock-btn" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1')}>
-          <span class="pb-dock-icon frame" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M7 3v18M17 3v18M3 7h18M3 17h18" />
-            </svg>
-          </span>
-          New frame
-        </button>
-        <button class="pb-dock-btn" disabled={!project.writable} title={project.writable ? 'Add pictures to assets/. Dropping them on the board works too.' : 'Allow editing to add pictures'} onClick={() => picker.current?.click()}>
-          <span class="pb-dock-icon picture" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <circle cx="9" cy="10" r="2" />
-              <path d="m21 16-5-5-9 9" />
-            </svg>
-          </span>
-          Add pictures
-        </button>
-        <button class="pb-dock-btn" disabled={!project.writable} title={project.writable ? 'A group is a folder in assets/: drop pictures in to file them there' : 'Allow editing to add a group'} onClick={() => void newGroup()}>
-          <span class="pb-dock-icon group" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-          </span>
-          New group
-        </button>
-        <span class="fig-sep" aria-hidden="true" />
-        <span class="pb-dock-count">{counts}</span>
-      </div>
 
       <input
         ref={picker}
@@ -1133,11 +1230,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   );
 }
 
-const KIND_LABEL: Record<CardKind, string> = { email: 'Email', frame: 'Frame', picture: 'Picture' };
+const KIND_LABEL: Record<CardKind, string> = { email: 'Email', frame: 'Frame', picture: 'Picture', doc: 'Document' };
 
-function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined): string {
+function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined, docKind: DocKind | undefined): string {
   if (card.kind === 'email') return 'Open in Template Studio';
   if (card.kind === 'frame') return 'Open in Freeform';
+  if (card.kind === 'doc') return `Open in ${DOC_OPENS_IN[docKind ?? 'link']}`;
   if (madeBy) return `Open in ${RECIPE_TOOLS[madeBy.tool].name}, with the settings that made it`;
   return /\.svg$/i.test(card.id) ? 'Stamp it in Ink bleed' : 'Open in Riso';
 }
@@ -1145,6 +1243,7 @@ function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined): string {
 function missingName(id: string, kind: CardKind): string {
   const rest = id.slice(id.indexOf(':') + 1);
   if (kind === 'frame') return 'A frame';
+  if (kind === 'doc') return docDisplayName(rest.split('/').pop() ?? rest);
   return rest.split('/').pop()?.replace(/\.(template|design)\.json$/, '') ?? rest;
 }
 
@@ -1183,7 +1282,7 @@ function FrameBody({ item, assets, print, width, height }: { item: FrameItem; as
   const ds = item.template.ds ?? DEFAULT_DESIGN_SYSTEM;
   const svg = useMemo(() => (page && !print ? withoutMissingPictures(withLocalAssets(freeformSvg(page, ds), assets)) : ''), [page, ds, assets, print]);
   if (!page) return <div class="pb-card-note">This frame could not be drawn.</div>;
-  const pad = 18;
+  const pad = 16;
   const fitZ = Math.min((width - pad * 2) / page.width, (height - pad * 2) / page.height);
   const w = Math.max(1, Math.round(page.width * fitZ));
   const h = Math.max(1, Math.round(page.height * fitZ));
@@ -1196,7 +1295,153 @@ function FrameBody({ item, assets, print, width, height }: { item: FrameItem; as
   );
 }
 
-// --- the project pill -----------------------------------------------------------------------------------------
+/**
+ * A document: what it is and where it opens, with a glyph for the kind. Not a preview: a Google document cannot
+ * be drawn here without signing in to Google, and a card that says plainly what it is beats a blank one that
+ * tried (docs/projects.md, "Google Docs, Sheets and Slides").
+ */
+function DocBody({ item }: { item: DocItem }) {
+  const kind = item.link.kind;
+  let host = '';
+  try {
+    host = new URL(item.link.url).hostname.replace(/^www\./, '');
+  } catch {
+    host = '';
+  }
+  return (
+    <div class="pb-doc">
+      <span class={`pb-doc-glyph ${kind}`} aria-hidden="true">
+        <DocGlyph kind={kind} />
+      </span>
+      <span class="pb-doc-text">
+        <span class="pb-doc-kind">{DOC_KIND_NAMES[kind]}</span>
+        <span class="pb-doc-host">{host}</span>
+      </span>
+    </div>
+  );
+}
+
+function DocGlyph({ kind }: { kind: DocKind }) {
+  const common = { viewBox: '0 0 32 40', width: 32, height: 40, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.25 } as const;
+  if (kind === 'sheet') {
+    return (
+      <svg {...common}>
+        <rect x="1.5" y="1.5" width="29" height="37" />
+        <path d="M1.5 12.5h29M1.5 20.5h29M1.5 28.5h29M11.5 12.5v25.5M21.5 12.5v25.5" />
+      </svg>
+    );
+  }
+  if (kind === 'slides') {
+    return (
+      <svg {...common}>
+        <rect x="1.5" y="1.5" width="29" height="37" />
+        <rect x="6.5" y="12.5" width="19" height="13" />
+        <path d="M11.5 31.5h9" />
+      </svg>
+    );
+  }
+  if (kind === 'drawing') {
+    return (
+      <svg {...common}>
+        <rect x="1.5" y="1.5" width="29" height="37" />
+        <path d="M8 30l6-12 5 7 3-4 3 9z" />
+      </svg>
+    );
+  }
+  if (kind === 'form') {
+    return (
+      <svg {...common}>
+        <rect x="1.5" y="1.5" width="29" height="37" />
+        <rect x="7.5" y="10.5" width="4" height="4" />
+        <rect x="7.5" y="19.5" width="4" height="4" />
+        <rect x="7.5" y="28.5" width="4" height="4" />
+        <path d="M15.5 12.5h9M15.5 21.5h9M15.5 30.5h9" />
+      </svg>
+    );
+  }
+  if (kind === 'link') {
+    return (
+      <svg {...common}>
+        <rect x="1.5" y="1.5" width="29" height="37" />
+        <path d="M13 24l6-6M11 20l-2.5 2.5a3.5 3.5 0 0 0 5 5L16 25M21 22l2.5-2.5a3.5 3.5 0 0 0-5-5L16 17" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <rect x="1.5" y="1.5" width="29" height="37" />
+      <path d="M8.5 11.5h15M8.5 17.5h15M8.5 23.5h15M8.5 29.5h9" />
+    </svg>
+  );
+}
+
+/** The small form under + Link: an address and a name, and a card the moment it is written. */
+function LinkForm({ onClose, onAdd }: { onClose(): void; onAdd(url: string, name: string): Promise<boolean> }) {
+  const [url, setUrl] = useState('');
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const first = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    // Without `preventScroll`, focusing a field that sits partly off-screen scrolls the whole board sideways.
+    first.current?.focus({ preventScroll: true });
+    const onDown = (event: PointerEvent) => {
+      if ((event.target as Element | null)?.closest?.('.pb-menu')) return;
+      onClose();
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, [onClose]);
+  const kind = docKindOfUrl(url.trim());
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await onAdd(url, name);
+    setBusy(false);
+    if (ok) onClose();
+  };
+  return (
+    <form
+      class="pb-pop pb-linkform"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') onClose();
+        // Handled here as well as by the form: implicit submission rides on a keypress that a synthetic Enter does not
+        // always carry (learnings 3.52).
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+          e.preventDefault();
+          void submit();
+        }
+      }}
+    >
+      <label class="pb-field">
+        <span>Address</span>
+        <input ref={first} type="url" value={url} placeholder="https://docs.google.com/document/d/…" spellcheck={false} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} />
+      </label>
+      <label class="pb-field">
+        <span>Name</span>
+        <input type="text" value={name} maxLength={80} placeholder={kind === 'link' ? 'What it is' : `The ${DOC_KIND_NAMES[kind]}’s name`} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+      </label>
+      <div class="pb-linkform-foot">
+        <span class="pb-linkform-kind">{url.trim() ? DOC_KIND_NAMES[kind] : 'A Google Doc, Sheet or Slides, or any address'}</span>
+        <button type="button" class="pb-ghost" disabled={busy} onClick={onClose}>
+          Cancel
+        </button>
+        <button type="submit" class="pb-filled small" disabled={busy || !url.trim()}>
+          {busy ? 'Adding…' : 'Add'}
+        </button>
+      </div>
+      <p class="pb-linkform-note">
+        A Google Doc, Sheet or Slides file placed in the project folder through Drive for desktop shows up on its own. This is for one that lives elsewhere.
+      </p>
+    </form>
+  );
+}
+
+// --- the project menu ------------------------------------------------------------------------------------------
 
 function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: string; onCreate(): void }) {
   const [open, setOpen] = useState(false);
@@ -1211,27 +1456,25 @@ function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: 
     return () => window.removeEventListener('pointerdown', onDown, true);
   }, [open]);
   const info = project.info!;
+  const type = projectType(info.type);
   const status = project.status === 'ready' ? 'Saving into the folder' : 'View only';
   return (
     <div class="pb-menu">
-      <button class={`fig-pill pb-project-pill ${open ? 'on' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span class={`pb-dot ${project.status}`} aria-hidden="true" />
+      <button class={`pb-title ${open ? 'on' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <b>{info.name}</b>
-        <span class="caret" aria-hidden="true">
+        {type && <span class="pb-title-type">{type.name}</span>}
+        <span class="pb-caret" aria-hidden="true">
           ▾
         </span>
       </button>
       {open && (
-        <div class="pb-menu-pop" role="menu">
+        <div class="pb-pop pb-menu-pop" role="menu">
           <div class="pb-menu-head">
             <b>{info.name}</b>
             <span>
               {project.dir?.name} · {status}
             </span>
-            <span>
-              {projectType(info.type) ? `${projectType(info.type)!.name} project · ` : ''}
-              {counts}
-            </span>
+            <span>{counts}</span>
           </div>
           <p class="pb-menu-note">Template Studio and Freeform open this folder too, on their own.</p>
           {install.state === 'installable' && (

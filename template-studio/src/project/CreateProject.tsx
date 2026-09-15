@@ -114,6 +114,9 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
 
   const inFolder = (folder: string) => plan.files.filter((f) => f.path.startsWith(`${folder}/`)).map((f) => f.path.slice(folder.length + 1));
   const atRoot = plan.files.filter((f) => !f.path.includes('/')).map((f) => f.path);
+  // The tree as a tree: `assets/photos` sits under `assets`.
+  const topFolders = plan.folders.filter((f) => !f.includes('/'));
+  const subFolders = (folder: string) => plan.folders.filter((f) => f.startsWith(`${folder}/`)).map((f) => f.slice(folder.length + 1));
   const rootNote = (file: string) => (file.endsWith('.scug') ? 'opens it from Finder' : '');
 
   return (
@@ -121,7 +124,7 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
       <div class="cp-sheet" role="dialog" aria-modal="true" aria-labelledby="cp-title">
         <header class="cp-head">
           <div>
-            <p class="pb-kicker">New project</p>
+            <p class="pb-eyebrow">New project</p>
             <h2 id="cp-title">What are you making?</h2>
           </div>
           <button class="cp-close" aria-label="Close" disabled={busy} onClick={onClose}>
@@ -171,8 +174,8 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
                   <small>email</small>
                 </div>
               ))}
-              {type.frames.map((f, i) => (
-                <div key={f.name} class="cp-size" style={{ animationDelay: `${(i + type.emails.length) * 40}ms` }}>
+              {type.frames.map((f) => (
+                <div key={f.name} class="cp-size">
                   <i style={{ width: Math.round((64 * f.width) / f.height), height: 64 }} />
                   <b>{f.name}</b>
                   <small>
@@ -191,12 +194,18 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
                 <code>{plan.folder}/</code>
               </div>
               <ul>
-                {plan.folders.map((folder) => (
+                {topFolders.map((folder) => (
                   <li key={folder}>
                     <code class="cp-dir">{folder}/</code>
                     <span class="cp-note">{folderNote(folder)}</span>
-                    {inFolder(folder).length > 0 && (
+                    {(subFolders(folder).length > 0 || inFolder(folder).length > 0) && (
                       <ul>
+                        {subFolders(folder).map((sub) => (
+                          <li key={`${folder}/${sub}`}>
+                            <code class="cp-dir">{sub}/</code>
+                            <span class="cp-note">{folderNote(`${folder}/${sub}`)}</span>
+                          </li>
+                        ))}
                         {inFolder(folder).map((file) => (
                           <li key={file}>
                             <code class="cp-file">{file}</code>
