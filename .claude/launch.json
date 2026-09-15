@@ -4,9 +4,22 @@
     {
       "name": "scugnizzi-tools",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["serve.js"],
+      "runtimeArgs": [
+        "serve.js"
+      ],
       "port": 8770,
       "autoPort": true
+    },
+    {
+      "name": "party",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "template-studio",
+        "run",
+        "party"
+      ],
+      "port": 1999
     }
   ]
 }

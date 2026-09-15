@@ -127,6 +127,8 @@ body { background: #f5f5f4; }
     linear-gradient(to right, var(--pb-grid-major) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-grid-major) 1px, transparent 1px);
 }
 .pb-stage.panning { cursor: grabbing; }
+.pb-stage.grouping, .pb-stage.grouping .pb-card, .pb-stage.grouping .pb-group-head { cursor: crosshair; }
+.pb-marquee { position: absolute; z-index: 3; border: 1px dashed var(--pb-accent); background: rgb(73 84 114 / 0.08); pointer-events: none; }
 .pb-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 
 .pb-links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -355,3 +357,12 @@ body { background: #f5f5f4; }
   .cp-foot { flex-wrap: wrap; }
   .cp-hint, .cp-error { flex-basis: 100%; }
 }
+
+/* --- who else is here (presence.ts): their pointers, and the card they have picked ---------------------------- */
+.pb-peer { position: absolute; z-index: 4; display: flex; align-items: flex-start; gap: 2px; transform-origin: 0 0; pointer-events: none; }
+.pb-peer svg { display: block; flex: none; }
+.pb-peer-name, .pb-peer-tag { padding: 3px 6px 1px; background: var(--peer); color: #fff; font-size: 11px; line-height: 14px; white-space: nowrap; }
+.pb-peer-name { margin-top: 10px; }
+.pb-card.peer { outline: 2px solid var(--peer); outline-offset: 2px; }
+.pb-peer-tag { position: absolute; left: -1px; top: -24px; z-index: 2; }
+.pb-presence { display: inline-flex; align-items: center; gap: 6px; color: var(--pb-text); }

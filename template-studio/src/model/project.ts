@@ -355,9 +355,12 @@ export function cardFolder(card: { id: string; kind: CardKind }): string | null 
 }
 
 /**
- * Where every card and group goes. A card with a place keeps it. A card without one joins the others of its kind,
- * in the first free spot of a grid that starts at their top left; the first of a kind starts a lane of its own below
- * everything else. Emails, then frames, then pictures, each by name, so the same folder always lays out the same way.
+ * Where every card and group goes. A card with a place keeps it. A card without one that is linked to a card already
+ * placed (the frame an email follows, a picture an email shows, the picture a print was made from) sits beside that
+ * card: to its right, or below it, in the first free spot. Jared: "love the way files connect to each other. they
+ * need to be grouped closer together." Otherwise it joins the others of its kind, in the first free spot of a grid
+ * that starts at their top left; the first of a kind starts a lane of its own below everything else. Emails, then
+ * documents, frames and pictures, each by name, so the same folder always lays out the same way.
  *
  * Pictures in a folder belong to that folder's group, and one without a place takes the first free spot inside it.
  * A folder with no group gets one, sized for its pictures, in a row below everything else; so does a folder in
@@ -365,7 +368,7 @@ export function cardFolder(card: { id: string; kind: CardKind }): string | null 
  * before anything is filed in them. A group is drawn at least big enough to hold its members, wherever they have
  * been put.
  */
-export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = []): BoardLayout {
+export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = [], links: CardLink[] = []): BoardLayout {
   const present = new Set(sources.map((s) => s.id));
   const cards: PlacedCard[] = [];
   for (const source of sources) {
@@ -391,11 +394,15 @@ export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Ite
     const y0 = same.length ? Math.min(...same.map((c) => c.y)) : taken.length ? Math.max(...taken.map((c) => c.y + c.h)) + LANE_GAP : 0;
     let slot = 0;
     for (const source of waiting) {
-      let spot: Rect;
-      do {
-        spot = { x: x0 + (slot % COLUMNS) * (w + CARD_GAP), y: y0 + Math.floor(slot / COLUMNS) * (h + CARD_GAP), w, h };
-        slot += 1;
-      } while (taken.some((r) => overlaps(r, spot)) && slot < 100_000);
+      let spot = besideLinked(source.id, { w, h }, links, cards, taken);
+      if (!spot) {
+        let candidate: Rect;
+        do {
+          candidate = { x: x0 + (slot % COLUMNS) * (w + CARD_GAP), y: y0 + Math.floor(slot / COLUMNS) * (h + CARD_GAP), w, h };
+          slot += 1;
+        } while (taken.some((r) => overlaps(r, candidate)) && slot < 100_000);
+        spot = candidate;
+      }
       const card = { ...source, ...spot };
       cards.push(card);
       taken.push(card);
@@ -459,6 +466,47 @@ export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Ite
   });
 
   return { cards, missing, placed, groups: placedGroups, groupsPlaced };
+}
+
+const LINK_ORDER: Array<CardLink['kind']> = ['follows', 'uses', 'made'];
+
+/**
+ * A free spot beside the placed card this one is linked to, or null when it is linked to nothing that has a place.
+ * The frame an email follows comes first, then what a card shows, then what it was made from. To the right of the
+ * anchor first, then below it, then on along the row, so a family of files reads left to right.
+ */
+function besideLinked(id: string, size: { w: number; h: number }, links: CardLink[], placed: PlacedCard[], taken: Rect[]): Rect | null {
+  const anchors = links
+    .filter((l) => l.from === id || l.to === id)
+    .sort((a, b) => LINK_ORDER.indexOf(a.kind) - LINK_ORDER.indexOf(b.kind))
+    .map((l) => placed.find((c) => c.id === (l.from === id ? l.to : l.from)))
+    .filter((c): c is PlacedCard => Boolean(c));
+  for (const a of anchors) {
+    const right = a.x + a.w + CARD_GAP;
+    const below = a.y + a.h + CARD_GAP;
+    const spots: Rect[] = [
+      { x: right, y: a.y, ...size },
+      { x: a.x, y: below, ...size },
+      { x: right, y: below, ...size },
+      ...[2, 3, 4].map((k) => ({ x: a.x + k * (size.w + CARD_GAP) + (a.w - size.w), y: a.y, ...size })),
+      ...[2, 3].map((k) => ({ x: a.x, y: a.y + k * (size.h + CARD_GAP) + (a.h - size.h), ...size })),
+    ];
+    const free = spots.find((s) => !taken.some((r) => overlaps(r, s)));
+    if (free) return free;
+  }
+  return null;
+}
+
+/**
+ * The board laid out afresh, with the links in mind: every card's place forgotten and found again beside what it is
+ * linked to, the groups lined up below, keeping their names. One deliberate step, for a board arranged before the
+ * lines were, or one that has drifted.
+ */
+export function tidyBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = [], links: CardLink[] = []): BoardDoc {
+  const fresh = layoutBoard(sources, emptyBoard(), folders, links);
+  const names = new Map(board.groups.map((g) => [g.folder, g.name]));
+  const groups = fresh.groups.map((g) => ({ ...g, name: names.get(g.folder) ?? g.name }));
+  return withPlaces(emptyBoard(), fresh.cards, groups);
 }
 
 /**

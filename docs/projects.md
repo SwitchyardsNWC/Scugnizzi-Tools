@@ -399,6 +399,97 @@ board loads no fonts of its own.
   shows up before its first picture.
 - **Documents** are a fourth kind of card (below). Every type but Blank also gets a `docs/` folder for them.
 
+### Moving around, and drawing, after Canvas Kit
+
+*Added 2026-09-14.*
+
+> "take the good ideas and look at their code for ideas of how to implement some of those features into this
+> canvas. also give the canvas some physics so it slides with momentum and feels natural to move around in."
+
+Canvas Kit (github.com/yaye-work/canvas-kit, MIT) is an Obsidian plugin and no backbone for this, but four of its
+ideas were worth taking. They are implemented from scratch here in three small modules, credited in their headers.
+
+- **Momentum** (`app/inertia.ts`). Both canvases, the board and the Freeform surface, read the hand's speed from
+  the last 120 ms of a pan and keep sliding when it lets go, decaying exponentially (time constant 320 ms) to a
+  stop. A drag that had already stopped stays put; a fling is capped so the board is never thrown away. The next
+  touch, wheel or flight stops the slide. Off under `prefers-reduced-motion`.
+- **Fingers** (`app/gestures.ts`, `tests/gestures.test.ts`). Two fingers pan and pinch either canvas, about their
+  midpoint, whatever tool is in hand; the second finger landing abandons whatever the first was doing, a
+  half-drawn stroke included. On the Freeform surface a two-finger tap undoes and a three-finger tap redoes.
+  Any touch while the pencil is on the glass, or within 400 ms of it lifting, is a palm and is ignored.
+- **The pencil draws, the hand moves.** Once a pencil has been seen on the Freeform surface, a finger with a
+  drawing tool in hand pans instead of drawing. Before any pencil is seen a finger still draws, so a phone is not
+  locked out.
+- **Quick shapes** (`model/quick-shape.ts`, `tests/quick-shape.test.ts`). Hold the pen still for 160 ms at the
+  end of a stroke and the stroke is classified: a wobbly line becomes a line, level or upright when it nearly was;
+  a loop becomes a rectangle or an ellipse at the angle it was drawn; three corners become a triangle. The ghost
+  shows the shape dashed while the pen is held, so moving on unsnaps it. Anything uncertain stays freehand: a
+  scribble, an open arc, a pentagon, a speck. The shape keeps the pen's colour and width and joins the marker
+  session's drawing. The classifier follows Canvas Kit's: a minimum-area *rotated* bounding box, then the radial
+  spread and the edge hug to tell a rectangle from an ellipse, and corner counting on a resampled loop for the
+  triangle. One correction over the original: a near-round ellipse carries no rotation, since a circle's minimum
+  box has the same area at every angle and the angle found is noise.
+- **Drag to make a group.** On the board, + Group now arms a crosshair: drag out the region and the group is made
+  that size, where the hand put it, with its name open for typing. A click without a drag puts one down the usual
+  size at that point. Escape cancels. The old behaviour, a box in the middle of the view that steps clear of
+  cards, is kept for the click.
+
+### Undo on the board, and the Canvas menu
+
+*Added 2026-09-14.*
+
+> "add the undo stack. pinch to zoom could be a little faster. make a menu with options that can be tweaked to
+> dial in the canvas."
+
+- **Undo** (`project/history.ts`, `tests/history.test.ts`). Every arrangement the hand makes on the board is a
+  step that knows how to take itself back and do itself again: moving a card, moving or resizing a group, making,
+  renaming or removing a group, filing a picture into a folder or taking it out, forgetting a missing card's
+  place. ⌘Z and ⇧⌘Z, the Undo and Redo buttons in the header, or a two- and three-finger tap. Steps that move files
+  are asynchronous, run one at a time, and a step that fails half-way is dropped from both stacks and reported,
+  rather than left to be undone twice. What the board does on its own, placing a new file where there is room, is
+  not a step. Adding pictures or links is not undoable either: the files came from outside and are removed in
+  Finder.
+- **The Canvas menu** (`app/canvas-settings.ts`, `app/CanvasMenu.tsx`). One set of dials for both canvases, kept
+  in this browser and heard at once by every open page. Moving: momentum on or off and its glide time; pinch
+  zoom speed and wheel zoom speed, as gains on the fingers' own spread, ×1.5 shipped for the pinch since one to
+  one felt slow. Board: the grid on or off, its step, and snap to grid for cards and groups let go. Drawing: quick
+  shapes on or off and how long to hold; whether a finger draws on the Freeform surface: until a pencil is seen,
+  always, or never. Reset puts everything back as shipped. On the board it is the Canvas button by the zoom; on
+  the Freeform page the Canvas pill.
+
+### Linked cards sit together, and who else is here
+
+*Added 2026-09-14.*
+
+> "love the way files connect to each other. they need to be grouped closer together. What about adding one of
+> these: cursor-party … that way if I have a project open and someone else opens the same project we can see each
+> others cursors and interact."
+
+**Layout.** A card with no place yet that is linked to a placed card now sits beside it rather than in its kind's
+lane: to the right first, then below, then on along the row. The frame an email follows lands next to the email,
+the picture a frame shows lands next to the frame, a Riso print next to the picture it was made from. Pictures in a
+group stay in their group, because the folder is the truth. **Tidy** in the header lays an existing board out
+afresh this way, groups lined up below with their names kept, as one undoable step. The dashboard's map still
+lays new cards out in lanes; the board writes places within a second, so the map reads them.
+
+**Presence.** Cursor Party and its cousin key their rooms by page address and place cursors in window
+coordinates, which is wrong for a board every viewer pans and zooms differently. So this uses the same thing
+underneath, PartyKit, with a server of its own: `template-studio/party/board.ts`, one room per project id, relaying
+three things and keeping nothing: pointers in board coordinates, the card each person has selected, and a nudge
+when a file was saved. The folder stays the truth; nothing about the project passes through but its id.
+
+- On the board: the others' pointers as arrows with their names, the same size at every zoom; the card someone else
+  has picked outlined in their colour with their name on it; the status line says who is here. A save in one
+  browser makes the others look at the folder at once rather than at the next five-second look.
+- Names and colours: a two-word name is picked the first time and kept in the Canvas menu (Together › Your name);
+  the colour follows the name, so it is the same on every machine.
+- **Running it.** `npm run party` in template-studio/ runs the server on `localhost:1999`; put that in Canvas ›
+  Together › Server to try it. To have it on the live site: `npx partykit login`, `npm run party:deploy`, and the
+  host it prints goes into `src/project/presence-config.ts`. PartyKit is the one hosted piece of this project;
+  with no host set, presence is simply off.
+- **Not yet.** Live co-editing of a template: two people in the same email is still last save wins, with the
+  conflict banner. Presence makes the collision visible; it does not merge it.
+
 ### Google Docs, Sheets and Slides
 
 *Added 2026-09-14.*
