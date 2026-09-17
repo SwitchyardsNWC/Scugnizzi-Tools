@@ -302,6 +302,68 @@ but do not use `subject` as a value anywhere it matters.
 
 ---
 
+### 1.16 Drag and drop areas in a coded email template
+
+**Documented, and unverified in this account.** Added 2026-09-17, when Jared asked whether HubSpot
+supports drag and drop and then asked for it. A coded template may mark one region as
+`{% dnd_area %}`, and inside it the team adds, removes and rearranges HubSpot modules themselves.
+Everything outside the area stays ordinary locked template markup, so the shape is locked
+furniture around one free region.
+
+The nesting is area, section, column, module:
+
+```hubl
+{% dnd_area "email_body", label="Email body" %}
+  {% dnd_section padding={'top':'20', 'bottom':'20'}, full_width=False %}
+    {% dnd_column width=12 %}
+      {% dnd_module path="@hubspot/email_body", label="Body" %}
+      {% end_dnd_module %}
+    {% end_dnd_column %}
+  {% end_dnd_section %}
+{% end_dnd_area %}
+```
+
+Four rules, each one a lint rule in `compile/lint.ts` rather than something to remember:
+
+| Rule | Value | Why it bites |
+| --- | --- | --- |
+| Areas per email template | **1** | HubSpot rejects a second at upload |
+| Minimum content width | **624px, not overridable** | The design system ships 600 |
+| `dnd_row` | **Not supported in email** | It exists for web pages, so it looks right and is not |
+| Subscription | Marketing or Content Hub **Professional+** | Unconfirmed for portal 50604449 |
+
+The width is the real cost. A template holding an area has to be designed at 624px or wider, which
+is why `templates/baseline.template.json` carries its own design system at 624 rather than the
+system default.
+
+**`{{ dnd_area_stylesheet }}` is required in the head**, and it is the one thing that qualifies the
+correction in 1.11. A coded template without an area still gets no CSS from HubSpot; a template
+*with* one asks HubSpot for a stylesheet by name, and that sheet carries media queries, Outlook
+fixes and margin and padding resets we did not write. It is emitted only when an area is present,
+so every other template is untouched. `{{ email_header_includes }}` goes with it, on HubSpot's own
+recommendation.
+
+**What does not reach inside the area.** HubSpot renders the modules, so the design system, the
+phone rules and all three dark-mode layers stop at the boundary. Nothing inside is in the colour
+registry, because there is no colour of ours in there to register. That is a genuine limitation
+rather than an oversight, and it is the argument for keeping the area to the body of an email and
+leaving the furniture to the template.
+
+**The first argument is an identifier, not a label.** `{% dnd_area "email_body" %}` is what HubSpot
+stores the team's arrangement against. Rename it and every email built from the template loses the
+layout somebody built — the orphaned-field problem of 1.10, one level up, and worse because it is a
+whole region rather than one string. The label is separate and free to reword.
+
+**Still to confirm in a send** (a coded template with an area has never been uploaded from here):
+
+1. Whether this account can publish one at all. HubSpot's own pages disagree: the email-specific
+   guide reads as generally available, the drag-and-drop reference page says areas "can't be used
+   in blog post and email templates at this time", and a third source calls it beta requiring an
+   ungated account.
+2. Whether ordinary `{% text %}` and `{% module %}` fields **outside** the area still register, and
+   still in document order.
+3. What `{{ dnd_area_stylesheet }}` actually injects, and whether it fights the head CSS.
+
 ## 2. Email client rendering
 
 ### 2.1 Structure

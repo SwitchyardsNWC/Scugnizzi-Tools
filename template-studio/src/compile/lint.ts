@@ -17,6 +17,9 @@ import { pictureHash } from '../model/freeform.ts';
 import { allBlocks } from '../model/edit.ts';
 import { CATALOG } from '../model/catalog.ts';
 import { untidyBlocks } from '../model/tidy.ts';
+import { dndAreas, modulesOf, DND_MIN_WIDTH } from '../model/dnd.ts';
+import { stockModule } from '../model/modules.ts';
+import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import type { Template } from '../model/types.ts';
 
 export type Severity = 'error' | 'warning';
@@ -204,6 +207,55 @@ export function lint({ tree, registry, html, bytes, mode = 'hubl', template }: L
         error('picture-render', `The ${what} "${block.alt || block.type}" has never been rendered. Render it in its Picture panel, upload the PNG to HubSpot Files, and paste the URL.`);
       } else if (block.renderedHash !== pictureHash(block)) {
         warn('picture-render', `The ${what} "${block.alt || block.type}" has changed since its picture was rendered. Render it again, or the email carries the old picture.`);
+      }
+    }
+  }
+
+  // --- the drag and drop area --------------------------------------------------------------------
+  //
+  // Four of HubSpot's rules, enforced here rather than trusted to memory. The first two are hard —
+  // a template breaking either is rejected at upload or renders at a width it was not designed
+  // for — and the upload is the expensive step, so they are errors caught before the file leaves.
+  if (template) {
+    const areas = dndAreas(template);
+
+    if (areas.length > 1) {
+      error(
+        'dnd-area-count',
+        `This template has ${areas.length} drag and drop areas. HubSpot allows one per email template and rejects the rest, so ${areas.length - 1} of them has to go.`,
+      );
+    }
+
+    if (areas.length > 0) {
+      const width = (template.ds ?? DEFAULT_DESIGN_SYSTEM).containerWidth;
+      if (width < DND_MIN_WIDTH) {
+        error(
+          'dnd-container-width',
+          `A drag and drop area is at least ${DND_MIN_WIDTH}px wide and the value cannot be overridden, but this template is ${width}px. The area would sit wider than everything around it. Set Design › Container width to ${DND_MIN_WIDTH} or more.`,
+        );
+      }
+
+      for (const area of areas) {
+        if (area.sections.length === 0 || modulesOf(area).length === 0) {
+          warn(
+            'dnd-empty-area',
+            `The drag and drop area "${area.label || 'Email body'}" has no default content, so the team starts from an empty rectangle. One module is usually a kinder start.`,
+          );
+        }
+        for (const mod of modulesOf(area)) {
+          const known = stockModule(mod.path);
+          if (!known) {
+            warn(
+              'dnd-module-path',
+              `"${truncate(mod.path)}" is not one of HubSpot's stock modules. If it is a module in this account it will work; if it is a typo, HubSpot rejects the template at upload.`,
+            );
+          } else if (known.confidence === 'unverified') {
+            warn(
+              'dnd-module-path',
+              `The path for ${known.name} has never been confirmed in a real send. Check it in Design Manager before relying on it.`,
+            );
+          }
+        }
       }
     }
   }

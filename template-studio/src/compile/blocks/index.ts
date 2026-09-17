@@ -20,6 +20,7 @@ import { renderButton, buttonParts } from './button.ts';
 import { renderLegal } from './legal.ts';
 import { renderFreeform, freeformParts } from './freeform.ts';
 import { renderBrand, brandParts } from './brand.ts';
+import { renderDndArea } from './dndarea.ts';
 import type { BlockParts } from './fields.ts';
 
 /**
@@ -82,6 +83,10 @@ export function renderBlock(block: Block, sec: Section, col: Column, ctx: BuildC
       return renderFreeform(block, sec, col, ctx);
     case 'brand':
       return renderBrand(block, sec, col, ctx);
+    case 'dndarea':
+      // Not in `blockParts`: the area draws its own full-width region and HubSpot's own editor owns
+      // what goes inside it, so it can no more share a cell than the stripes or the legal footer.
+      return renderDndArea(block, sec, ctx);
     default: {
       // Exhaustiveness: a new member of the Block union fails to compile until it is handled here,
       // rather than silently rendering nothing in a send.

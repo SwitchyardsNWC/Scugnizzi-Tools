@@ -42,9 +42,19 @@ export interface HeadOptions {
   mobile: string[];
   /** Per-block rules appended to the block HubSpot inlines at send (learnings 1.9). */
   inlineCss: string[];
+  /**
+   * The template holds a drag and drop area, and this is the exported file rather than the canvas.
+   *
+   * HubSpot requires `{{ dnd_area_stylesheet }}` in the head of any email template containing an
+   * area, and it is the one place HubSpot puts CSS of its own into a coded template — the
+   * 2026-09-11 finding that it injects nothing (learnings 1.11) was about templates without one.
+   * Emitted only when an area is actually present, so every other template stays exactly as it was
+   * and the golden file keeps its meaning.
+   */
+  dndArea?: boolean;
 }
 
-export function headCss({ ds, pageBackground, mobile, inlineCss }: HeadOptions): string {
+export function headCss({ ds, pageBackground, mobile, inlineCss, dndArea = false }: HeadOptions): string {
   // Every number and colour below that a designer could reasonably want to move comes from the
   // design system. The ones that do not — HubSpot's own class names, the 20px gutter, the list
   // indent — are structural rather than stylistic, and a token for each would be a knob nobody
@@ -71,6 +81,10 @@ export function headCss({ ds, pageBackground, mobile, inlineCss }: HeadOptions):
   const ruleColour = colorOf(ds, rt.ruleColor) ?? brandFallback(ds);
 
   return [
+    // Required by HubSpot for a template holding a drag and drop area, and inert in one that does
+    // not — which is why it is conditional rather than always present. `email_header_includes` is
+    // HubSpot's own recommendation alongside it for consistent rendering across clients.
+    ...(dndArea ? ['{{ dnd_area_stylesheet }}', '{{ email_header_includes }}'] : []),
     '<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument xmlns:w="urn:schemas-microsoft-com:office:word"><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml><style>ul > li { text-indent: -1em; }</style><![endif]-->',
     `<!--[if mso]><style type="text/css">body, td { font-family: Arial, Helvetica, sans-serif; } .hse-body-wrapper-table { background-color: ${pageBackground}; }</style><![endif]-->`,
     '<!--[if mso | IE]><style type="text/css">.hse-column-container { border: none !important; padding: 0 !important; }</style><![endif]-->',

@@ -13,7 +13,7 @@ See [`docs/architecture.md`](docs/architecture.md) §4.
 
 ```bash
 npm install && npm run dev     # the app
-npm test                       # 705 tests
+npm test                       # 773 tests
 ```
 
 The built app is checked in at `dist/` so the tools directory can link to it; `npm run build`

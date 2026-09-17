@@ -1,6 +1,7 @@
 import { useRef } from 'preact/hooks';
 
-import { CATALOG } from '../model/catalog.ts';
+import { CATALOG, SINGLETON } from '../model/catalog.ts';
+import { allBlocks } from '../model/edit.ts';
 import { glyphFor } from './icons.tsx';
 import type { BlockType } from '../model/types.ts';
 import type { Editor } from './useEditor.ts';
@@ -53,7 +54,7 @@ const describe = (kind: PaletteKind, patterns: PatternCard[]) => {
 
 const GROUPS: Array<{ name: string; types: PaletteKind[]; help?: string }> = [
   { name: 'Content', types: ['heading', 'richtext', 'image', 'brand', 'button', 'freeform'] },
-  { name: 'Layout', types: ['columns', 'divider', 'stripes', 'spacer'] },
+  { name: 'Layout', types: ['columns', 'divider', 'stripes', 'spacer', 'dndarea'] },
   {
     name: 'Fixed',
     types: ['topbar', 'legal'],
@@ -143,11 +144,20 @@ function Card({
   const Glyph = glyphFor(type);
   const origin = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
 
+  // A block a template may hold only one of, which already has one. HubSpot rejects a second drag
+  // and drop area at upload, so the card is spent rather than merely inadvisable — greyed out here,
+  // and caught by lint for a second that arrives through a paste or an imported file.
+  const spent =
+    !isPatternKind(type) &&
+    type !== 'columns' &&
+    SINGLETON.includes(type) &&
+    allBlocks(editor.template).some((b) => b.type === type);
+
   // Pointer capture is what makes this work over the canvas at all: the preview is an iframe, and
   // without capture its document swallows every `pointermove` the moment the pointer crosses into
   // it. Captured, the events keep arriving in this document, with coordinates we can convert.
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || spent) return;
     capture(event.currentTarget as HTMLElement, event.pointerId);
     origin.current = { x: event.clientX, y: event.clientY, dragging: false };
   };
@@ -180,7 +190,8 @@ function Card({
   return (
     <button
       class={`block-card ${active ? 'lifted' : ''}`}
-      title={spec.summary}
+      title={spent ? `${spec.name}: this template already has one, and HubSpot allows only one.` : spec.summary}
+      disabled={spent}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

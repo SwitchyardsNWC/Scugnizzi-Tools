@@ -85,7 +85,7 @@ import { fileSlug, serializeDesignSystem, serializePattern } from '../model/seri
 import { tidyTemplate } from '../model/tidy.ts';
 import { colorOf, type DesignSystem } from '../model/design-system.ts';
 import { blankTemplate, cardTemplate } from '../model/starters.ts';
-import { ADDABLE, CATALOG } from '../model/catalog.ts';
+import { ADDABLE, CATALOG, SINGLETON } from '../model/catalog.ts';
 import type { Block, BlockType, FreeformBlock } from '../model/types.ts';
 import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
@@ -554,14 +554,19 @@ export function App() {
   // as a full-width section of its own otherwise — the same rule a drop follows.
 
   /** What the palette offers, as the menu wants it: a kind, a name and the one-line summary. */
-  const quickAddKinds = useMemo(
-    () => [
-      ...ADDABLE.slice(0, 4).map((type) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary })),
+  const quickAddKinds = useMemo(() => {
+    // A block the template may hold only one of, and already does, is dropped from the menu rather
+    // than offered and refused. HubSpot rejects a second drag and drop area at upload, so offering
+    // one here would be offering a broken template.
+    const present = new Set(allBlocks(editor.template).map((b) => b.type));
+    const offered = ADDABLE.filter((type) => !(SINGLETON.includes(type) && present.has(type)));
+    const named = (type: BlockType) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary });
+    return [
+      ...offered.slice(0, 4).map(named),
       { kind: 'columns', name: 'Columns', summary: 'Two columns side by side, empty. Drop blocks into them, and set the ratio afterwards.' },
-      ...ADDABLE.slice(4).map((type) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary })),
-    ],
-    [],
-  );
+      ...offered.slice(4).map(named),
+    ];
+  }, [editor.template]);
 
   const insertBlock = useCallback(
     (kind: string, after: string | null) => {

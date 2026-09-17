@@ -16,6 +16,7 @@ import { blockParts, COLUMN_BLOCKS, renderBlock } from './blocks/index.ts';
 import { cell, columnsRow, COLUMN_PHONE_CSS, section as sectionOf, type ColumnCell } from './layout.ts';
 import { boxOf, gapOf, padClass, paddingOf, type BuildContext } from './context.ts';
 import type { Block, Column, Row, Section } from '../model/types.ts';
+import { hasDndArea } from '../model/dnd.ts';
 import { defaultBranch, serialize, type Branch, type Mode } from './serialize.ts';
 import { esc } from './escape.ts';
 import { DEFAULT_DESIGN_SYSTEM, type DesignSystem } from '../model/design-system.ts';
@@ -95,9 +96,14 @@ export function compile(template: Template, options: CompileOptions): CompileRes
   const branch = options.branch ?? defaultBranch(body);
   const rendered = serialize(body, { mode: options.mode, branch });
 
+  // Only the exported file gets HubSpot's drag-and-drop stylesheet tag: in a preview the HubL has
+  // already been substituted away, and a literal `{{ dnd_area_stylesheet }}` in the canvas head
+  // would be text nobody asked for.
+  const dndArea = options.mode === 'hubl' && hasDndArea(template);
+
   const head =
     (template.forceLight ? forceLightHead(registry, pageBackground, ds) : '') +
-    headCss({ ds, pageBackground, mobile: ctx.mobile, inlineCss: ctx.inlineCss });
+    headCss({ ds, pageBackground, mobile: ctx.mobile, inlineCss: ctx.inlineCss, dndArea });
 
   const html =
     shell({

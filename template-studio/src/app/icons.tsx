@@ -133,6 +133,19 @@ export const LegalIcon = svg(
   'Legal footer',
 );
 
+/**
+ * A frame with a dashed interior holding two tiles: a region with a boundary we own and contents
+ * we do not. Dashed rather than solid, which is the same language the canvas draws the area in.
+ */
+export const DndAreaIcon = svg(
+  [
+    <rect key="a" x="2.2" y="2.4" width="11.6" height="11.2" rx="1.4" stroke-dasharray="2.6 1.9" />,
+    <rect key="b" x="4.6" y="5" width="6.8" height="2.3" rx="0.7" />,
+    <rect key="c" x="4.6" y="8.8" width="6.8" height="2.3" rx="0.7" />,
+  ],
+  'Drag and drop area',
+);
+
 /** Two frames, one behind the other: the same thing in more than one place. */
 export const PatternIcon = svg(
   [
@@ -161,6 +174,7 @@ export const BLOCK_ICONS = {
   stripes: StripesIcon,
   divider: DividerIcon,
   spacer: SpacerIcon,
+  dndarea: DndAreaIcon,
   topbar: TopBarIcon,
   legal: LegalIcon,
 } as const;

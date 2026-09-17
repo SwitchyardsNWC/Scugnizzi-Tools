@@ -307,6 +307,16 @@ Manual, checked by Jared.
       theme-aware: it sits over a document with its own colours — cream here, navy two blocks down,
       and whatever a dark override does to both.)*
 - [ ] A custom block created in the compose tier appears in the palette and exports correctly.
+- [x] The drag and drop area is offered once and once only. *(The palette card greys out with a
+      reason once a template has one, the slash menu drops it, and `dnd-area-count` catches a
+      second arriving through a paste or an imported file. HubSpot rejects the second at upload,
+      so this is its rule rather than a preference.)*
+- [x] A template narrower than 624px holding an area says so before it is exported. *(A
+      `dnd-container-width` error naming the fix. Checked live on the standard email at 600px.)*
+- [x] The canvas shows the area as structure rather than pretending to be the email. *(A dashed
+      region carrying the area's name, one labelled tile per module, laid out in its columns. The
+      modules are HubSpot's and their markup is only knowable from a send, so drawing anything
+      more specific would be drawing a guess.)*
 - [x] No horizontal scroll at any window width down to 900px. *(Checked at 900. It did not pass
       first time — the row actions were hidden with `opacity: 0`, which still contributes to scroll
       width, exactly the bug in learnings 3.9.)*
@@ -361,6 +371,15 @@ The part that actually decides it. Run this for every template before calling a 
       order, with the right label, and each one does something when changed.
 - [ ] Optional image blocks are absent from the send when no image is picked, and present with a
       working link when one is.
+- [ ] A template containing a drag and drop area uploads and publishes at all. **This one can stop
+      the feature**: HubSpot's docs disagree about whether email areas are generally available, in
+      beta, or unsupported, and the account's subscription tier is unconfirmed. A rejection here is
+      an answer, not a bug.
+- [ ] With an area present, the fields outside it still appear in the Contents panel, in document
+      order.
+- [ ] The team can add, move and delete modules inside the area, and nothing outside it moves.
+- [ ] What `{{ dnd_area_stylesheet }}` injects does not fight the template's own head CSS —
+      compare a send with an area against one without.
 - [ ] Test send checked in: Gmail on iPhone, Gmail on Android, Gmail on desktop web, Apple Mail
       on macOS, Apple Mail on iPhone in dark mode, Outlook on Windows, Outlook app in dark mode.
 - [ ] On phones the email is edge to edge, apart from the inset Gmail draws itself, and that

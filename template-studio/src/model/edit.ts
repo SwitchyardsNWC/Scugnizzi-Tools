@@ -112,6 +112,23 @@ export function hubspotFields(template: Template, includeLocked = false): FieldE
     for (const row of section.rows) {
       for (const column of row.columns) {
         for (const block of column.blocks) {
+          // The drag and drop area carries no lock and is the most editable thing a template can
+          // hold, so leaving it out would make this view quietly wrong about what the team meets.
+          // Its label is free microcopy and its name is the fixed identifier — the same split every
+          // other row already shows, which is why it fits the shape without one.
+          if (block.type === 'dndarea') {
+            out.push({
+              field: block.name,
+              label: block.label,
+              sectionId: section.id,
+              blockId: block.id,
+              blockType: block.type,
+              path: 'block',
+              editable: true,
+            });
+            continue;
+          }
+
           const named: Array<[string, Lock]> = [];
           if ('lock' in block) named.push(['block.lock', block.lock]);
           // The button declares its label then its link, and they sit together in the panel.

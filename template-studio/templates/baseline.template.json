@@ -1,7 +1,168 @@
 {
+  "ds": {
+    "blockGap": 16,
+    "buttons": {
+      "primary": {
+        "border": "red",
+        "borderWidth": 2,
+        "fill": "cream",
+        "ink": "red",
+        "mobileSize": 0,
+        "padX": 18,
+        "padY": 12,
+        "radius": 25,
+        "size": 16
+      },
+      "secondary": {
+        "border": "white",
+        "borderWidth": 2,
+        "fill": "navy",
+        "ink": "white",
+        "mobileSize": 0,
+        "padX": 17,
+        "padY": 9,
+        "radius": 25,
+        "size": 13
+      }
+    },
+    "colors": {
+      "cream": "#f7f6f3",
+      "navy": "#011272",
+      "offwhite": "#fcfff5",
+      "red": "#d10000",
+      "redBright": "#d20000",
+      "white": "#ffffff"
+    },
+    "containerWidth": 624,
+    "fontStack": "Helvetica, Arial, sans-serif",
+    "fonts": {
+      "arial": "Arial, Helvetica, sans-serif",
+      "courier": "Courier New, Courier, monospace",
+      "georgia": "Georgia, Times New Roman, serif",
+      "helvetica": "Helvetica, Arial, sans-serif",
+      "tahoma": "Tahoma, Verdana, sans-serif",
+      "times": "Times New Roman, Times, serif",
+      "verdana": "Verdana, Geneva, sans-serif"
+    },
+    "image": {
+      "borderColor": "navy",
+      "borderWidth": 0,
+      "defaultWidth": 560,
+      "radius": 0
+    },
+    "mobileBreakpoint": 639,
+    "pageBackground": "#f7f6f3",
+    "pageBorderColor": "navy",
+    "pageBorderWidth": 0,
+    "pageMargin": 0,
+    "pagePadding": 20,
+    "richText": {
+      "listGap": 4,
+      "listIndent": 22,
+      "listLineHeight": 135,
+      "quoteBar": 3,
+      "quoteColor": "red",
+      "quoteInset": 16,
+      "quoteItalic": true,
+      "ruleColor": "red",
+      "ruleWidth": 2
+    },
+    "space": {
+      "l": 40,
+      "m": 20,
+      "s": 10
+    },
+    "themes": {
+      "cream": {
+        "band": null,
+        "button": "primary",
+        "container": "cream",
+        "link": "red",
+        "text": "navy"
+      },
+      "navy": {
+        "band": "navy",
+        "button": "secondary",
+        "container": null,
+        "link": "offwhite",
+        "text": "offwhite"
+      },
+      "offwhite": {
+        "band": "offwhite",
+        "button": "primary",
+        "container": null,
+        "link": "red",
+        "text": "navy"
+      }
+    },
+    "type": {
+      "body": {
+        "lineHeight": 150,
+        "marginBottom": 16,
+        "mobileSize": 17,
+        "size": 18,
+        "weight": "normal"
+      },
+      "h1": {
+        "lineHeight": 120,
+        "marginBottom": 16,
+        "mobileSize": 30,
+        "size": 38,
+        "weight": "bold"
+      },
+      "h2": {
+        "lineHeight": 125,
+        "marginBottom": 12,
+        "mobileSize": 20,
+        "size": 22,
+        "weight": "bold"
+      },
+      "h3": {
+        "lineHeight": 130,
+        "marginBottom": 10,
+        "mobileSize": 17,
+        "size": 17,
+        "weight": "bold"
+      },
+      "h4": {
+        "lineHeight": 135,
+        "marginBottom": 8,
+        "mobileSize": 15,
+        "size": 15,
+        "weight": "bold"
+      },
+      "h5": {
+        "letterSpacing": 0.6,
+        "lineHeight": 135,
+        "marginBottom": 8,
+        "mobileSize": 14,
+        "size": 14,
+        "uppercase": true,
+        "weight": "bold"
+      },
+      "h6": {
+        "letterSpacing": 0.7,
+        "lineHeight": 135,
+        "marginBottom": 8,
+        "mobileSize": 12,
+        "size": 12,
+        "uppercase": true,
+        "weight": "bold"
+      },
+      "topbar": {
+        "lineHeight": 110,
+        "marginBottom": 0,
+        "mobileSize": 10,
+        "size": 12,
+        "uppercase": true,
+        "weight": "bold"
+      }
+    },
+    "version": 1
+  },
   "forceLight": true,
   "hubspotLabel": "Switchyards Baseline — every block and style",
-  "id": "b042",
+  "id": "b04k",
   "name": "Baseline",
   "pageBackground": "#f7f6f3",
   "preview": {
@@ -1515,10 +1676,157 @@
       "theme": "navy"
     },
     {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b03x",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "align": "left",
+                  "id": "b03u",
+                  "level": "h2",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "H2 heading"
+                  },
+                  "text": "Drag and drop area",
+                  "type": "heading"
+                },
+                {
+                  "align": "left",
+                  "html": "<p>Everything in the dashed region is the team’s to arrange in HubSpot. The canvas draws the structure; HubSpot draws the modules.</p>",
+                  "id": "b03v",
+                  "lock": {
+                    "editable": false,
+                    "field": "",
+                    "label": "Copy"
+                  },
+                  "type": "richtext"
+                }
+              ],
+              "id": "b03w",
+              "padBottom": 14,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 14,
+              "span": 12
+            }
+          ],
+          "id": "b03y",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
+      "bandColor": null,
+      "containerColor": "#f7f6f3",
+      "id": "b04a",
+      "linkColor": "#d10000",
+      "padBottom": 0,
+      "padTop": 0,
+      "rows": [
+        {
+          "columns": [
+            {
+              "align": "left",
+              "blocks": [
+                {
+                  "id": "b03z",
+                  "label": "Email body",
+                  "name": "email_body",
+                  "sections": [
+                    {
+                      "background": null,
+                      "columns": [
+                        {
+                          "id": "b041",
+                          "modules": [
+                            {
+                              "id": "b042",
+                              "label": "Headline",
+                              "params": [],
+                              "path": "@hubspot/email_header"
+                            },
+                            {
+                              "id": "b043",
+                              "label": "Body",
+                              "params": [],
+                              "path": "@hubspot/email_body"
+                            }
+                          ],
+                          "width": 12
+                        }
+                      ],
+                      "id": "b040",
+                      "padBottom": 10,
+                      "padTop": 20
+                    },
+                    {
+                      "background": null,
+                      "columns": [
+                        {
+                          "id": "b045",
+                          "modules": [
+                            {
+                              "id": "b046",
+                              "label": "Picture",
+                              "params": [],
+                              "path": "@hubspot/image_email"
+                            }
+                          ],
+                          "width": 6
+                        },
+                        {
+                          "id": "b047",
+                          "modules": [
+                            {
+                              "id": "b048",
+                              "label": "Call to action",
+                              "params": [],
+                              "path": "@hubspot/email_cta"
+                            }
+                          ],
+                          "width": 6
+                        }
+                      ],
+                      "id": "b044",
+                      "padBottom": 20,
+                      "padTop": 10
+                    }
+                  ],
+                  "type": "dndarea"
+                }
+              ],
+              "id": "b049",
+              "padBottom": 0,
+              "padLeft": 20,
+              "padRight": 20,
+              "padTop": 0,
+              "span": 12
+            }
+          ],
+          "id": "b04b",
+          "mobile": "stack"
+        }
+      ],
+      "textColor": "#011272",
+      "theme": "cream"
+    },
+    {
       "bandColor": "#011272",
       "containerColor": null,
       "domId": "section-legal",
-      "id": "b03w",
+      "id": "b04e",
       "linkColor": "#fcfff5",
       "padBottom": 10,
       "padTop": 30,
@@ -1529,7 +1837,7 @@
               "align": "right",
               "blocks": [
                 {
-                  "id": "b03u",
+                  "id": "b04c",
                   "logoSrc": "",
                   "logoWidth": 180,
                   "note": "A note in the legal footer, which is locked so that re-uploading the template fixes every future send.",
@@ -1541,7 +1849,7 @@
                   "type": "legal"
                 }
               ],
-              "id": "b03v",
+              "id": "b04d",
               "padBottom": 0,
               "padLeft": 20,
               "padRight": 0,
@@ -1549,7 +1857,7 @@
               "span": 12
             }
           ],
-          "id": "b03x",
+          "id": "b04f",
           "mobile": "stack"
         }
       ],
@@ -1559,7 +1867,7 @@
     {
       "bandColor": null,
       "containerColor": "#f7f6f3",
-      "id": "b040",
+      "id": "b04i",
       "linkColor": "#d10000",
       "padBottom": 0,
       "padTop": 0,
@@ -1570,7 +1878,7 @@
               "align": "left",
               "blocks": [
                 {
-                  "id": "b03y",
+                  "id": "b04g",
                   "stripes": [
                     {
                       "color": "redBright",
@@ -1584,7 +1892,7 @@
                   "type": "stripes"
                 }
               ],
-              "id": "b03z",
+              "id": "b04h",
               "padBottom": 0,
               "padLeft": 20,
               "padRight": 20,
@@ -1592,7 +1900,7 @@
               "span": 12
             }
           ],
-          "id": "b041",
+          "id": "b04j",
           "mobile": "stack"
         }
       ],
