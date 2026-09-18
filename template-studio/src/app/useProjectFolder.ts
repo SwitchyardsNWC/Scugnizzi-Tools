@@ -8,6 +8,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
+/** Set in this tab once the board has opened a file here. */
+const FROM_BOARD_KEY = 'scuggnizzi.studio.from-board';
+
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { PROJECT_CHANNEL } from '../model/project.ts';
 import type { Template } from '../model/types.ts';
@@ -62,11 +65,29 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
     setReopenable(await recallFolderHandle());
   }, [adopt, openWanted]);
 
+  /**
+   * Whether the board sent this tab here (`?open=<file>` is the board's, and nobody else's), so the back arrow
+   * goes back to the board rather than to the tools. Kept for the tab, so a reload does not forget.
+   */
+  const [fromBoard, setFromBoard] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(FROM_BOARD_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const name = params.get('open');
     if (name) {
       wanted.current = name;
+      setFromBoard(true);
+      try {
+        sessionStorage.setItem(FROM_BOARD_KEY, '1');
+      } catch {
+        // Storage blocked: the arrow knows for this page load only.
+      }
       params.delete('open');
       const rest = params.toString();
       window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
@@ -105,5 +126,5 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
     await openWanted(ws);
   }, [reopenable, adopt, openWanted]);
 
-  return { reopenable: workspace ? null : reopenable, reopen, dismiss: () => setReopenable(null) };
+  return { reopenable: workspace ? null : reopenable, reopen, dismiss: () => setReopenable(null), fromBoard };
 }

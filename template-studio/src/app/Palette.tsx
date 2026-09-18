@@ -1,11 +1,8 @@
-import { useRef } from 'preact/hooks';
-
 import { CATALOG, SINGLETON } from '../model/catalog.ts';
 import { allBlocks } from '../model/edit.ts';
 import { glyphFor } from './icons.tsx';
 import type { BlockType } from '../model/types.ts';
 import type { Editor } from './useEditor.ts';
-import { capture, release } from './pointer.ts';
 
 // What you can add, as things you pick up.
 //
@@ -62,8 +59,6 @@ const GROUPS: Array<{ name: string; types: PaletteKind[]; help?: string }> = [
   },
 ];
 
-/** Below this, the pointer has not moved enough to mean a drag, so it is still a click. */
-const DRAG_THRESHOLD = 4;
 
 export interface PaletteProps {
   editor: Editor;
@@ -93,9 +88,7 @@ export function Palette({ editor, dragging, onDrag, onDrop, patterns, onPlacePat
     : GROUPS;
   return (
     <div class="palette-pane">
-      <p class="hint palette-hint">
-        {dragging ? 'Drop it where it goes.' : 'Drag onto the email, or click to add at the end.'}
-      </p>
+      <p class="hint palette-hint">Click a block to add it at the end of the email.</p>
       {groups.map((group) => (
         <section class="palette-group" key={group.name}>
           <h3 title={group.help}>{group.name}</h3>
@@ -124,8 +117,6 @@ function Card({
   type,
   editor,
   active,
-  onDrag,
-  onDrop,
   patterns,
   onPlacePattern,
   onUsed,
@@ -142,7 +133,6 @@ function Card({
   const spec = describe(type, patterns);
   // The same glyph the layer tree uses, so a card and the row it becomes read as one thing.
   const Glyph = glyphFor(type);
-  const origin = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
 
   // A block a template may hold only one of, which already has one. HubSpot rejects a second drag
   // and drop area at upload, so the card is spent rather than merely inadvisable — greyed out here,
@@ -153,33 +143,13 @@ function Card({
     SINGLETON.includes(type) &&
     allBlocks(editor.template).some((b) => b.type === type);
 
-  // Pointer capture is what makes this work over the canvas at all: the preview is an iframe, and
-  // without capture its document swallows every `pointermove` the moment the pointer crosses into
-  // it. Captured, the events keep arriving in this document, with coordinates we can convert.
-  const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || spent) return;
-    capture(event.currentTarget as HTMLElement, event.pointerId);
-    origin.current = { x: event.clientX, y: event.clientY, dragging: false };
-  };
-
-  const onPointerMove = (event: PointerEvent) => {
-    const from = origin.current;
-    if (!from) return;
-    if (!from.dragging) {
-      if (Math.abs(event.clientX - from.x) < DRAG_THRESHOLD && Math.abs(event.clientY - from.y) < DRAG_THRESHOLD) return;
-      from.dragging = true;
-    }
-    onDrag(type, event.clientX, event.clientY);
-  };
-
-  const onPointerUp = (event: PointerEvent) => {
-    const from = origin.current;
-    release(event.currentTarget as HTMLElement, event.pointerId);
-    origin.current = null;
-    // A press that never moved is a click, and a click appends — which is what you want when you
-    // already know it goes at the bottom.
-    if (from?.dragging) onDrop();
-    else if (isPatternKind(type)) onPlacePattern(patternIdOf(type));
+  // Dragging a card onto the email is put away for now. Jared, 2026-09-18: "hide the drag and drop block option
+  // for now. it's not working." A click adds at the end, which is where most blocks go anyway, and Layers moves
+  // it. The drop plumbing stays where it was (`onDrag`, `onDrop`, the ghost and the probe in App.tsx) for the day
+  // the drag comes back.
+  const add = () => {
+    if (spent) return;
+    if (isPatternKind(type)) onPlacePattern(patternIdOf(type));
     else if (type === 'columns') editor.addColumns(editor.template.sections.length);
     else {
       editor.add(type, null);
@@ -192,9 +162,7 @@ function Card({
       class={`block-card ${active ? 'lifted' : ''}`}
       title={spent ? `${spec.name}: this template already has one, and HubSpot allows only one.` : spec.summary}
       disabled={spent}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onClick={add}
     >
       <Glyph />
       <span class="block-card-name">{spec.name}</span>
