@@ -128,7 +128,12 @@ export interface CardSource {
   id: string;
   kind: CardKind;
   name: string;
+  /** Its own size when it has one, an email measured at its full length; otherwise `CARD_SIZE` for its kind. */
+  size?: { w: number; h: number };
 }
+
+/** A card's size on the board: its own, or the one for its kind. */
+export const cardSize = (card: Pick<CardSource, 'kind' | 'size'>): { w: number; h: number } => card.size ?? CARD_SIZE[card.kind];
 
 export const emailCardId = (fileName: string) => `email:${fileName}`;
 export const frameCardId = (key: string) => `frame:${key}`;
@@ -149,6 +154,16 @@ export const CARD_SIZE: Record<CardKind, { w: number; h: number }> = {
   picture: { w: 220, h: 210 },
   doc: { w: 240, h: 132 },
 };
+
+/**
+ * An email card tall enough for the whole email: the page's height, laid out `pageWidth` wide, scaled to the card's
+ * width, under a title bar `head` tall. Jared: "Show the whole length of an email in this view." Never shorter than
+ * a title bar and a line or two, whatever the page reported.
+ */
+export function emailCardSize(pageHeight: number, pageWidth: number, head: number): { w: number; h: number } {
+  const w = CARD_SIZE.email.w;
+  return { w, h: head + Math.max(40, Math.ceil((pageHeight * w) / pageWidth)) };
+}
 
 // --- board.json ---------------------------------------------------------------------------------------------
 
@@ -377,7 +392,7 @@ export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Ite
   const cards: PlacedCard[] = [];
   for (const source of sources) {
     const at = board.cards[source.id];
-    if (at) cards.push({ ...source, ...CARD_SIZE[source.kind], x: at.x, y: at.y });
+    if (at) cards.push({ ...source, ...cardSize(source), x: at.x, y: at.y });
   }
   const missing: MissingCard[] = [];
   for (const [id, at] of Object.entries(board.cards)) {
@@ -391,13 +406,13 @@ export function layoutBoard(sources: CardSource[], board: BoardDoc, folders: Ite
   for (const kind of KIND_ORDER) {
     const waiting = sources.filter((s) => s.kind === kind && !board.cards[s.id] && !cardFolder(s)).sort(byName);
     if (waiting.length === 0) continue;
-    const { w, h } = CARD_SIZE[kind];
     const taken: Rect[] = [...cards, ...missing, ...groups];
     const same: Rect[] = [...cards.filter((c) => c.kind === kind && !cardFolder(c)), ...missing.filter((m) => m.kind === kind)];
     const x0 = same.length ? Math.min(...same.map((c) => c.x)) : taken.length ? Math.min(...taken.map((c) => c.x)) : 0;
     const y0 = same.length ? Math.min(...same.map((c) => c.y)) : taken.length ? Math.max(...taken.map((c) => c.y + c.h)) + LANE_GAP : 0;
     let slot = 0;
     for (const source of waiting) {
+      const { w, h } = cardSize(source);
       let spot = besideLinked(source.id, { w, h }, links, cards, taken);
       if (!spot) {
         let candidate: Rect;

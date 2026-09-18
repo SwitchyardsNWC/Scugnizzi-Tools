@@ -227,6 +227,13 @@ body { background: #f5f5f4; }
 }
 .pb-card:hover .pb-card-open, .pb-card.on .pb-card-open, .pb-card-open:focus-visible { opacity: 1; }
 .pb-card-open:hover { background: var(--pb-row); color: var(--pb-ink); }
+/* Delete, beside Open: the same quiet button, brick when the pointer is on it. */
+.pb-card-x {
+  flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 15px; line-height: 1;
+  cursor: pointer; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast), color var(--pb-fast);
+}
+.pb-card:hover .pb-card-x, .pb-card.on .pb-card-x, .pb-card-x:focus-visible { opacity: 1; }
+.pb-card-x:hover { background: var(--pb-brick); color: #fff; }
 
 .pb-card-body { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--pb-paper); }
 .pb-email-frame { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }

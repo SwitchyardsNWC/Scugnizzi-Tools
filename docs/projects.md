@@ -559,6 +559,30 @@ grows ×5 and ×20 so the pattern never crowds.
 
 The old `grid` flag in a browser's kept settings still reads: off then is Off now.
 
+### The whole email, and Delete
+
+*Added 2026-09-18.*
+
+> "Show the whole length of an email in this view. allow deleting elements on the project board too"
+
+- **An email card is as tall as the email.** The card used to be one fixed height and cut the email off below the
+  fold. Now the preview measures its own document once it has laid out (the bottom of everything in the body, not
+  the scroll height, which is never less than the frame it sits in) and tells the board, which sizes the card to
+  the whole email at the card's width (`model/project.ts`, `emailCardSize`; a card may now bring its own size to
+  the layout, `CardSource.size`). Until the first measurement the card is the old height, then it grows; Tidy lays
+  a board out with the full heights.
+- **Delete on the board.** Pick a card and press Delete or Backspace, or click the × beside Open in its title bar,
+  and its file leaves the project: the email, the frame file, the picture under `assets/`, the board's own link
+  file for a document. No question asked, the same rule as breaking a line: it happens, and Undo (⌘Z, or the
+  header's button) writes the same bytes back under the same name and puts the card back where it was. What pointed
+  at the file keeps pointing: an email that showed a deleted picture shows it as missing, and the notice says how
+  many still do. Drive's own files for a Google Doc, Sheet or Slides are not deleted from here, since removing that
+  file removes the document for everyone who has it; the notice says to remove it in Drive, whose trash can give
+  it back. Nothing is offered when the folder is open view-only.
+- **Template Studio's Files panel** got its × back the same day: the panel had always been able to show one, but
+  the sidebar between it and the app never passed the delete through, so nothing in Template Studio could remove
+  a file. The open file's × now stays visible, and on a screen without hover every row's does.
+
 ### One hidden folder for the tools' files
 
 *Added 2026-09-14.*
