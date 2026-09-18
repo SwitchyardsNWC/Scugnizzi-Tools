@@ -10,6 +10,7 @@
 // images, and the rule without substitution means designing against grey boxes.
 
 import { describe, expect, it } from 'vitest';
+import { planPackage } from '../src/model/export-package.ts';
 
 import { compile } from '../src/compile/compile.ts';
 import { errorsIn, lint } from '../src/compile/lint.ts';
@@ -131,7 +132,25 @@ describe('refusing to export one', () => {
     const found = errorsIn(lint({ ...out, mode: 'hubl' })).filter((f) => f.rule === 'local-image');
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain('hero.png');
-    expect(found[0]!.message).toContain('HubSpot Files');
+    expect(found[0]!.message).toContain('assets/');
+  });
+
+  it('sees a local picture left as a module default, where the picker in HubSpot would show it', () => {
+    const out = compile(withLocalImage('https://cdn.test/hero.png'), { mode: 'hubl' });
+    const html = `${out.html}{% module "image" path="@hubspot/image_email", img={ "src": "photos/hero.png", "alt": "" } %}`;
+    const found = errorsIn(lint({ ...out, html, mode: 'hubl' })).filter((f) => f.rule === 'local-image');
+    expect(found).toHaveLength(1);
+    expect(found[0]!.message).toContain('photos/hero.png');
+    expect(errorsIn(lint({ ...out, html: planPackage(html).html, mode: 'hubl' })).filter((f) => f.rule === 'local-image')).toEqual([]);
+  });
+
+  it('says nothing once the export has packed the picture beside the template', () => {
+    // The app checks the packed HTML (model/export-package.ts): a picture the folder has travels with the
+    // template and is pointed at with `get_asset_url`, which is HubL, not a local file.
+    const out = compile(withLocalImage('hero.png'), { mode: 'hubl' });
+    const packed = planPackage(out.html);
+    expect(packed.pictures).toEqual([{ src: 'hero.png', file: 'hero.png' }]);
+    expect(errorsIn(lint({ ...out, html: packed.html, mode: 'hubl' })).filter((f) => f.rule === 'local-image')).toEqual([]);
   });
 
   it('says nothing once a hosted URL replaces it', () => {
