@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { compile } from '../compile/compile.ts';
+import { IMAGES_DIR, packageReadme, planPackage } from '../model/export-package.ts';
 import { simulateDark } from '../compile/dark.ts';
 import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
 import { withPrints } from './printed-preview.ts';
@@ -38,6 +39,7 @@ import {
   supportsFolders,
   workspaceFromFiles,
   type AssetFile,
+  type ExportFile,
   type TemplateFile,
   type Workspace,
 } from '../workspace/workspace.ts';
@@ -489,9 +491,16 @@ export function App() {
 
   const hubl = useMemo(() => compile(shownTemplate, { mode: 'hubl' }), [shownTemplate]);
   const variables = useMemo(() => branchVariables(hubl.tree), [hubl]);
+  /**
+   * The export as it would go: local pictures the folder has are packed beside the template and pointed at with
+   * `get_asset_url` (model/export-package.ts). The checks read this, so `local-image` speaks only of a picture
+   * the folder cannot supply.
+   */
+  const inFolder = useCallback((src: string) => assets.some((a) => a.name === src), [assets]);
+  const packaged = useMemo(() => planPackage(hubl.html, inFolder), [hubl, inFolder]);
   const findings = useMemo<Finding[]>(
-    () => lint({ tree: hubl.tree, registry: hubl.registry, html: hubl.html, bytes: hubl.bytes, mode: 'hubl', template: editor.template }),
-    [hubl],
+    () => lint({ tree: hubl.tree, registry: hubl.registry, html: packaged.html, bytes: hubl.bytes, mode: 'hubl', template: editor.template }),
+    [hubl, packaged],
   );
   /**
    * The branch the canvas shows, with the selected block's own switches forced on.
@@ -1572,21 +1581,53 @@ export function App() {
     [editor, workspace, notify, refreshAssets, failed, allAssets],
   );
 
+  /**
+   * The HubSpot template, written. On its own when every picture is hosted already; otherwise as a folder,
+   * `exports/<slug>/`, with the pictures it shows copied into `images/` and the file pointing at them with
+   * `get_asset_url`, plus a README that says how the folder goes up (model/export-package.ts). Jared: "is there a
+   * way to export a email template that includes local images used to be uploaded to hubspot." A picture the
+   * folder does not have stays a local name, and the checks have already said so.
+   */
   const exportTemplate = useCallback(async () => {
-    const name = `${slug(editor.template.name)}.html`;
+    const folder = slug(editor.template.name);
+    const name = `${folder}.html`;
     const out = compile(editor.template, { mode: 'hubl' });
-    if (!workspace?.canWrite) {
-      download(name, out.html);
-      notify(`Downloaded ${name}. Upload it in Design Manager, open it once so it validates, then publish.`);
+    const plan = planPackage(out.html, inFolder);
+    const upload = 'Upload it in Design Manager, open it once so it validates, then publish.';
+    if (plan.pictures.length === 0) {
+      if (!workspace?.canWrite) {
+        download(name, out.html);
+        notify(`Downloaded ${name}. ${upload}`);
+        return;
+      }
+      try {
+        const at = await workspace.writeExport(name, out.html);
+        notify(`Wrote ${at}. ${upload}`);
+      } catch (cause) {
+        failed(cause, `Could not write ${name}. Check the folder is still there and writable.`);
+      }
       return;
     }
     try {
-      const at = await workspace.writeExport(name, out.html);
-      notify(`Wrote ${at}. Upload it in Design Manager, open it once so it validates, then publish.`);
+      const files: ExportFile[] = [{ path: name, data: plan.html }];
+      for (const picture of plan.pictures) {
+        const asset = assets.find((a) => a.name === picture.src);
+        if (!asset) continue;
+        files.push({ path: `${IMAGES_DIR}/${picture.file}`, data: await (await fetch(asset.url)).blob() });
+      }
+      files.push({ path: 'README.md', data: packageReadme({ name: editor.template.name, slug: folder, templateFile: name, pictures: plan.pictures, exportedAt: new Date() }) });
+      const where = workspace ?? workspaceFromFiles([]);
+      const at = await where.writeExportFiles(folder, files);
+      const count = `${plan.pictures.length} picture${plan.pictures.length === 1 ? '' : 's'}`;
+      notify(
+        where.canWrite
+          ? `Wrote ${at}/: the template and its ${count}. Upload that folder whole in Design Manager, or run the line in its README.`
+          : `Downloaded ${at}: the template and its ${count}. Unzip it and upload the folder whole in Design Manager, or run the line in its README.`,
+      );
     } catch (cause) {
-      failed(cause, `Could not write ${name}. Check the folder is still there and writable.`);
+      failed(cause, `Could not write the export for ${editor.template.name}. Check the folder is still there and writable.`);
     }
-  }, [workspace, editor, notify, failed]);
+  }, [workspace, editor, notify, failed, assets, inFolder]);
 
   // --- the keyboard --------------------------------------------------------------------------------
   //
@@ -1764,7 +1805,11 @@ export function App() {
           <b class={hubl.bytes > 92160 ? 'hot' : ''}>{kb(hubl.bytes)}</b>
         </span>
 
-        <button class="btn primary" title="Write the HubSpot coded template file." onClick={() => void exportTemplate()}>
+        <button
+          class="btn primary"
+          title={packaged.pictures.length ? `Write the HubSpot template as a folder with the ${packaged.pictures.length === 1 ? 'picture' : `${packaged.pictures.length} pictures`} it shows, ready to upload whole.` : 'Write the HubSpot coded template file.'}
+          onClick={() => void exportTemplate()}
+        >
           Export
         </button>
       </header>

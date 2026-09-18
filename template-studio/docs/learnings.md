@@ -2198,3 +2198,35 @@ different template on disk is refused.
 *Save anyway*, which writes this editor's version over the folder's (a save with no check), and *Reload theirs*,
 which drops this editor's version for the file as it is and binds to it again. A safety net has to have a door
 in it, or people learn to work around it, which is the one thing worse than last-writer-wins.
+
+### 3.70 The pictures travel with the template
+
+*2026-09-18.* Jared: "is there a way to export a email template that includes local images used to be uploaded to
+hubspot."
+
+There was not. Export refused while any picture was a file in the project's `assets/` folder (`local-image`), and the
+route was by hand: upload the picture to HubSpot Files, paste the hosted URL into the block, export. Inline data
+URLs are no answer; Gmail and Outlook strip them.
+
+**HubSpot hosts the pictures beside the template.** A coded template in Design Manager may say
+`{{ get_asset_url('./images/hero.png') }}` for a file uploaded next to it, and HubSpot turns that into a CDN address
+when the email renders. So an export whose template shows local pictures is now a folder, `exports/<slug>/`: the
+template, an `images/` folder with the pictures it shows (rendered freeform pictures included), and a README with
+the two ways up, the folder dropped into Design Manager whole, or `hs upload <slug> @hubspot/emails/<slug>`. A
+template whose pictures are all hosted exports as the single file it always did. With no folder to write into,
+the same package downloads as one zip, written by us, stored not compressed, forty lines and no dependency
+(`model/zip.ts`).
+
+**Two places a picture hides** (`model/export-package.ts`). An `<img src>`, and the default of a HubSpot module:
+an editable image compiles to `{% module "image" path="@hubspot/image_email", img={ "src": "photos/hero.png" } %}`,
+and the picker in HubSpot shows that default until someone picks another. The first pass packed only the `<img>`
+form, and the check had never looked inside module tags either, so a board-added picture went out as a local name
+with the checks passing. Both places are found by one function now, which the check and the package share. In
+an attribute the call is printed as `{{ get_asset_url(...) }}`; inside a module tag, where the value is an
+expression, it stands unquoted where the string was. That second form is the one thing to watch on the first
+real upload: HubL evaluates tag parameters as expressions, and the call should resolve there, but it has not yet
+been seen resolving in a live account.
+
+**The check reads the export as it would go.** `local-image` used to fire for any local name. Now the app
+checks the packed HTML, so the rule speaks only of a picture the folder cannot supply, with the fix that follows:
+put it under `assets/`, or paste a hosted URL. A safety net should name the thing that is actually wrong.

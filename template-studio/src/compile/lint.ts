@@ -12,6 +12,7 @@
 // checked structurally here and cannot be talked around.
 
 import { walk, type IRNode } from './ir.ts';
+import { localSources } from '../model/export-package.ts';
 import { allColors, type Registry } from './colors.ts';
 import { pictureHash } from '../model/freeform.ts';
 import { allBlocks } from '../model/edit.ts';
@@ -181,15 +182,14 @@ export function lint({ tree, registry, html, bytes, mode = 'hubl', template }: L
   // An `src` that is a file name rather than a URL is a picture sitting in somebody's assets folder.
   // It shows on the canvas because the preview substitutes a blob URL for it, and it would arrive in
   // every inbox as a broken image — which is exactly the kind of defect that only appears after a
-  // send, so it is an error rather than a warning.
+  // send, so it is an error rather than a warning. A picture the folder has is not this: the export
+  // packs it beside the template and points at it with `get_asset_url` (model/export-package.ts), and
+  // the app checks the packed HTML, so what reaches here is a name the folder cannot supply.
   if (mode === 'hubl') {
-    for (const [, src] of html.matchAll(/<img\b[^>]*\bsrc="([^"]*)"/g)) {
-      if (!src || /^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('{{') || src.startsWith('{%')) {
-        continue;
-      }
+    for (const src of localSources(html)) {
       error(
         'local-image',
-        `"${truncate(src)}" is a local file, not a URL an email client can fetch. Upload it to HubSpot Files and paste that URL into the block.`,
+        `"${truncate(src)}" is a local file that is not among the folder's pictures, so the export cannot pack it. Put it under assets/, or paste a hosted URL into the block.`,
       );
     }
   }

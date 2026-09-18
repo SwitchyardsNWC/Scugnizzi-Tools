@@ -17,6 +17,7 @@ import { completeDesignSystem, type DesignSystem } from '../model/design-system.
 import { parsePattern, type Pattern } from '../model/patterns.ts';
 import { patternFileName, systemFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
+import { zip } from '../model/zip.ts';
 
 export interface TemplateFile {
   /** What to show in the list. */
@@ -44,6 +45,12 @@ export interface AssetFile {
   url: string;
 }
 
+/** One file of a folder export: its path inside the folder, and its text or bytes. */
+export interface ExportFile {
+  path: string;
+  data: string | Blob;
+}
+
 /** What a save did. `conflict` means somebody else's version is on disk and this one was not written. */
 export type SaveResult = { ok: true; modified: number } | { ok: false; conflict: true; modified: number };
 
@@ -69,6 +76,12 @@ export interface Workspace {
   requestWrite?(): Promise<Workspace | null>;
   list(): Promise<TemplateFile[]>;
   writeExport(fileName: string, html: string): Promise<string>;
+  /**
+   * Writes an export that is a folder: `exports/<folder>/<path>` for each file, making the folders on the way.
+   * This is how a template travels with its pictures (model/export-package.ts). A workspace that cannot write
+   * downloads the same files as one zip named for the folder. Returns where it went.
+   */
+  writeExportFiles(folder: string, files: ExportFile[]): Promise<string>;
   /**
    * Saves a template, refusing if the file changed on disk since `expectedModified`.
    *
@@ -407,6 +420,25 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
       });
     },
 
+    async writeExportFiles(folder, files) {
+      if (!writable) return downloadZip(folder, files);
+      return writing(dir.name, async () => {
+        const exports = await dir.getDirectoryHandle('exports', { create: true });
+        const root = await exports.getDirectoryHandle(folder, { create: true });
+        for (const file of files) {
+          const parts = file.path.split('/').filter(Boolean);
+          const name = parts.pop()!;
+          let at = root;
+          for (const part of parts) at = await at.getDirectoryHandle(part, { create: true });
+          const handle = await at.getFileHandle(name, { create: true });
+          const out = await handle.createWritable();
+          await out.write(file.data);
+          await out.close();
+        }
+        return `${dir.name}/exports/${folder}`;
+      });
+    },
+
     async assets() {
       const out: AssetFile[] = [];
       // Rendered pictures first, from .scug/rendered/, under the `rendered/` name documents use; then assets/, where
@@ -610,6 +642,7 @@ export function workspaceFromFiles(files: File[]): Workspace {
       download(fileName, html);
       return fileName;
     },
+    writeExportFiles: downloadZip,
     async writeTemplate(fileName, json) {
       // Nothing to write back to — the files were handed over one at a time, not as a folder.
       download(fileName, json);
@@ -623,6 +656,18 @@ export function download(fileName: string, html: string): void {
 }
 
 /** The same, for bytes that are already a blob — a rendered PNG, say. */
+/** The folder export as one zip, downloaded: for a workspace with nowhere to write it. Returns the zip's name. */
+async function downloadZip(folder: string, files: ExportFile[]): Promise<string> {
+  const encoder = new TextEncoder();
+  const entries = await Promise.all(
+    files.map(async (f) => ({ path: `${folder}/${f.path}`, data: typeof f.data === 'string' ? encoder.encode(f.data) : new Uint8Array(await f.data.arrayBuffer()) })),
+  );
+  const name = `${folder}.zip`;
+  // The archive fills its buffer exactly, so the buffer is the file.
+  downloadBlob(name, new Blob([zip(entries).buffer as ArrayBuffer], { type: 'application/zip' }));
+  return name;
+}
+
 export function downloadBlob(fileName: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
