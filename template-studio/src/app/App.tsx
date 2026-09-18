@@ -1690,7 +1690,14 @@ export function App() {
   return (
     <div class={`app ${presenting ? 'presenting' : ''}`}>
       <header class="bar">
-        <a class="brand-back" href="../../index.html" title="Back to Scugnizzi tools" aria-label="Back to Scugnizzi tools">
+        {/* Back to where this tab came from: the project board when it opened the file (Jared: "if I open an email
+            from the board ... I want it to go back to the project board by default"), else the tools. */}
+        <a
+          class="brand-back"
+          href={projectFolder.fromBoard ? 'project.html' : '../../index.html'}
+          title={projectFolder.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}
+          aria-label={projectFolder.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}
+        >
           ←
         </a>
         <div class="brand">Template&nbsp;Studio</div>
