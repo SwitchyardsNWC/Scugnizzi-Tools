@@ -77,8 +77,16 @@ export interface Workspace {
    * writes by silently making a conflicted copy, which is worse than a merge conflict because
    * nobody is told. Last-writer-wins is fine for three people; last-writer-wins *without anyone
    * noticing* is not.
+   *
+   * A newer time alone is not a conflict, though. Drive for desktop (and Dropbox) rewrite a file's
+   * modification time once the upload lands, seconds after the save, so a lone designer saw "someone
+   * else saved this" on every second keystroke. So when the time has moved, what is on disk is read
+   * and compared with `lastKnown`, the template as this editor last read or wrote it: the same
+   * template under a new time is nobody else's work, and the save goes ahead and takes the new time.
+   * Only a different template on disk is refused. `expectedModified` of 0 skips the check: a new
+   * file, or a save the person has asked for anyway.
    */
-  writeTemplate(fileName: string, json: string, expectedModified: number): Promise<SaveResult>;
+  writeTemplate(fileName: string, json: string, expectedModified: number, lastKnown?: string): Promise<SaveResult>;
   /**
    * Removes a template file from the folder.
    *
@@ -179,6 +187,34 @@ function parse(fileName: string, text: string): { template: Template; warnings: 
   // migration chain, which refuses a document written by a newer build rather than downgrading it.
   const looksV1 = Array.isArray(raw?.blocks) && !raw?.sections;
   return looksV1 ? importV1(raw) : { template: migrate(raw), warnings: [] };
+}
+
+/**
+ * Whether two texts hold the same template: each is read the way a file is, so spacing, key order and a v1
+ * shape make no difference. Text that is not a template at all is compared as it is.
+ */
+export function sameTemplate(fileName: string, a: string, b: string): boolean {
+  const seen = (text: string) => {
+    try {
+      return JSON.stringify(canonical(parse(fileName, text).template));
+    } catch {
+      return text.trim();
+    }
+  };
+  return seen(a) === seen(b);
+}
+
+/** The value with every object's keys in order, so two writings of one template stringify alike. */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value as Record<string, unknown>)
+        .sort()
+        .map((k) => [k, canonical((value as Record<string, unknown>)[k])]),
+    );
+  }
+  return value;
 }
 
 const displayName = (fileName: string) => fileName.replace(V2, '').replace(V1, '').replace(/[-_]+/g, ' ');
@@ -393,7 +429,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         .sort((a, b) => a.name.localeCompare(b.name));
     },
 
-    async writeTemplate(fileName, json, expectedModified) {
+    async writeTemplate(fileName, json, expectedModified, lastKnown) {
       if (!writable) throw refused(dir.name);
       return writing(dir.name, async () => {
         // Into .scug/templates/ in a project; otherwise where the workspace keeps them, or the top.
@@ -402,9 +438,11 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         const handle = await source.getFileHandle(fileName, { create: true });
 
         const onDisk = await handle.getFile();
-        // A brand new file reports 0; anything else that moved underneath us is a conflict.
+        // A brand new file reports 0. A file that moved underneath us is a conflict only when what is in it is not
+        // what this editor last saw: a synced folder rewrites the time after every upload (see the interface).
         if (expectedModified > 0 && onDisk.size > 0 && onDisk.lastModified > expectedModified) {
-          return { ok: false as const, conflict: true as const, modified: onDisk.lastModified };
+          const same = lastKnown !== undefined && sameTemplate(fileName, await onDisk.text(), lastKnown);
+          if (!same) return { ok: false as const, conflict: true as const, modified: onDisk.lastModified };
         }
 
         const out = await handle.createWritable();
