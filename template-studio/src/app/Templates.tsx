@@ -39,6 +39,11 @@ export interface TemplatesProps {
   onNew(starter: Starter): void;
   onDuplicate(): void;
   onOpen(file: TemplateFile): void;
+  /**
+   * Removes a file from the folder. Absent when the workspace cannot write, which is what hides
+   * the control rather than showing one that explains itself only after it fails.
+   */
+  onDelete?(file: TemplateFile): void;
   onOpenFolder(): void;
   onChooseFiles(files: File[]): void;
 }
@@ -51,7 +56,7 @@ const when = (at: number) => {
   return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onOpenFolder, onChooseFiles }: TemplatesProps) {
+export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onOpenFolder, onChooseFiles }: TemplatesProps) {
   const [menu, setMenu] = useState(false);
 
   // New and Duplicate, first. The app used to open on the standard email and stop there, so the
@@ -187,7 +192,7 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
       ) : (
         <ul class="list">
           {files.map((file) => (
-            <li key={file.fileName}>
+            <li key={file.fileName} class="file-row">
               <button
                 class={`row ${editor.file?.fileName === file.fileName ? 'on' : ''}`}
                 title={`${file.fileName} · modified ${new Date(file.modified).toLocaleString()}`}
@@ -198,6 +203,20 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
                 {file.kind === 'v1' && <span class="chip-mini">v1</span>}
                 <span class="row-meta">{when(file.modified)}</span>
               </button>
+              {onDelete && (
+                // No confirmation, by the same rule the canvas follows: it happens and offers Undo
+                // (learnings 3.2). The title says both halves, because a file in a folder three
+                // people sync is a heavier thing to remove than a block, and the undo is worth
+                // promising up front rather than discovering after.
+                <button
+                  class="row-delete"
+                  aria-label={`Delete ${file.name}`}
+                  title={`Delete ${file.fileName} from the folder. Undo is offered for a few seconds.`}
+                  onClick={() => onDelete(file)}
+                >
+                  ×
+                </button>
+              )}
             </li>
           ))}
         </ul>

@@ -134,6 +134,8 @@ export interface Editor {
    * a trail of files, one per name it has had.
    */
   adoptFile(file: TemplateFile): void;
+  /** Unbinds the document from its file, leaving the document alone. See the implementation. */
+  releaseFile(): void;
 
   save: SaveState;
   /** Why the last save failed, when it did. Cleared by the next save that succeeds. */
@@ -508,6 +510,23 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
     modified.current = Math.max(modified.current, opened.modified);
   }, []);
 
+  /**
+   * Lets go of the file without touching the document — what deleting the open template does.
+   *
+   * The work stays on the canvas, which is the point: deleting a file should not also throw away
+   * what is on screen, and an undo that has nothing to undo into would be a worse trade. What it
+   * must not do is leave the binding in place, because the next keystroke would autosave and
+   * quietly recreate the file somebody just deleted. `pinned` goes too — it is the other half of
+   * the binding, and clearing only `file` would put the name back on the very next save.
+   */
+  const releaseFile = useCallback(() => {
+    setFile(null);
+    pinned.current = null;
+    modified.current = 0;
+    setSave('clean');
+    setConflictAt(null);
+  }, []);
+
   // --- saving ------------------------------------------------------------------------------------
 
   const write = useCallback(async () => {
@@ -601,6 +620,7 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       saveError,
       saveNow: () => void write(),
       file,
+      releaseFile,
       conflictAt,
       dismissConflict: () => setConflictAt(null),
     }),

@@ -241,6 +241,23 @@ body {
 }
 .row.on .row-meta { color: rgb(255 255 255 / 0.7); }
 
+/* A file row: the row itself, plus a delete that stays out of the way until wanted.
+   Revealed on hover and on keyboard focus — not hidden with `opacity: 0`, which still contributes
+   to scroll width and is exactly the bug in learnings 3.9. */
+.file-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.file-row .row { flex: 1; min-width: 0; }
+.row-delete {
+  flex: none; display: none; width: 22px; height: 22px; padding: 0; line-height: 1;
+  font: inherit; font-size: 15px; border: 0; border-radius: 5px;
+  background: none; color: var(--faint); cursor: pointer;
+}
+.file-row:hover .row-delete, .row-delete:focus-visible { display: block; }
+/* The open file's × stays, so the one file most likely meant is always a click away; and on a screen with no
+   hover, an iPad, every row's shows, since nothing else would ever reveal it. */
+.file-row .row.on + .row-delete { display: block; }
+@media (hover: none) { .row-delete { display: block; } }
+.row-delete:hover { background: var(--sunk); color: var(--ink); }
+
 /* Editable in HubSpot. The one dot in the tree, so it means exactly one thing. */
 .row-open { width: 5px; height: 5px; border-radius: 99px; background: var(--accent); flex: none; }
 .row.on .row-open { background: #fff; }
