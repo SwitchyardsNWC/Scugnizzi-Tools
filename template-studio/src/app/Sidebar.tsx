@@ -65,6 +65,14 @@ export interface SidebarProps {
   device: 'desktop' | 'phone';
   onDevice(device: 'desktop' | 'phone'): void;
   onOpenFile(file: TemplateFile): void;
+  /**
+   * Removes a file from the folder; absent when the folder cannot be written. Passed through to the Files panel,
+   * which shows the × only when it is here. App.tsx handed this in from the start and this list left it out, so
+   * the panel never saw it and nothing in Template Studio could delete a file (Jared: "I need a way to delete
+   * email files from the template studio files system"). A spread prop on JSX is not checked for excess, which
+   * is how it went unnoticed.
+   */
+  onDelete?(file: TemplateFile): void;
   onOpenFolder(): void;
 }
 
@@ -140,6 +148,7 @@ export function Sidebar(props: SidebarProps) {
             onNew={props.onNew}
             onDuplicate={props.onDuplicate}
             onOpen={props.onOpenFile}
+            {...(props.onDelete ? { onDelete: props.onDelete } : {})}
             onOpenFolder={props.onOpenFolder}
             onChooseFiles={props.onChooseFiles}
           />

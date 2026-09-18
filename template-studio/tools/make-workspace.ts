@@ -16,6 +16,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
 import { compile } from '../src/compile/compile.ts';
@@ -27,7 +28,11 @@ import { serializeDesignSystem, serializeTemplate, systemFileName, templateFileN
 import { cardDesignSystem, cardTemplate } from '../src/model/starters.ts';
 import type { Template } from '../src/model/types.ts';
 
-const here = (path: string) => resolve(dirname(new URL(import.meta.url).pathname), '..', path);
+// `fileURLToPath`, not `url.pathname`: a pathname is percent-encoded, so a project living in a
+// folder whose name contains a space resolves to a directory that does not exist — and because
+// `mkdirSync` is recursive, the tool cheerfully creates it and writes the output there. That is
+// exactly what happened when this project moved into a folder with two spaces in its name.
+const here = (path: string) => resolve(dirname(fileURLToPath(import.meta.url)), '..', path);
 const write = (path: string, text: string) => {
   mkdirSync(dirname(here(path)), { recursive: true });
   writeFileSync(here(path), text);

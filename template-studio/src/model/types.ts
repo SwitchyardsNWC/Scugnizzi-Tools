@@ -203,6 +203,7 @@ export type Block =
   | ButtonBlock
   | FreeformBlock
   | BrandBlock
+  | DndAreaBlock
   | LegalBlock;
 
 export type BlockType = Block['type'];
@@ -473,6 +474,72 @@ export interface LegalBlock extends BlockBase {
   logoWidth: number;
   note: string;
   noteLock: Lock;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The drag and drop area
+//
+// The one exception to "fields only" (architecture.md §1). Everywhere else the template owns the
+// layout and the team fills in fields; inside this block the team adds, removes and rearranges
+// HubSpot modules itself. Jared asked for it on 2026-09-17 after seeing that HubSpot supports it.
+//
+// Four constraints from HubSpot's docs shape the types below, and every one of them is a rule in
+// lint.ts rather than a comment somebody has to remember:
+//
+//  1. One area per email template. Not "one recommended" — HubSpot rejects a second.
+//  2. The area is at least 624px wide and the value cannot be overridden, so a template holding
+//     one has to be designed at 624 or wider. The design system ships 600.
+//  3. `dnd_row` exists on web pages and not in email. The nesting here is therefore area, section,
+//     column, module, with no row in between — which is why DndSection holds columns directly.
+//  4. Only a module may live inside a column. Not our blocks: a `dnd_module` names a HubSpot
+//     module by path and HubSpot renders it, so the Block union is the wrong shape and these get
+//     their own small tree.
+//
+// What the designer authors here is the area's *default* content — where the team starts before
+// they touch anything. It is not locked, and nothing in it survives the team deleting it.
+
+/** A region the marketing team lays out itself, inside an otherwise locked template. */
+export interface DndAreaBlock extends BlockBase {
+  type: 'dndarea';
+  /**
+   * The area's identifier in the template — `{% dnd_area "<name>" %}`.
+   *
+   * Stable, and for the same reason a field name is (learnings 1.10): it is what HubSpot stores the
+   * team's arrangement against. Change it and every email built from the template loses the layout
+   * they built, which is a worse version of the orphaned-field problem because it is a whole region
+   * rather than one string. Minted once from the label, then frozen.
+   */
+  name: FieldName;
+  /** Labels the area in HubSpot's editor sidebar. Microcopy, and free to change. */
+  label: string;
+  sections: DndSection[];
+}
+
+export interface DndSection {
+  id: string;
+  /** Null lets the page background through, as everywhere else. */
+  background: ColorRef;
+  padTop: number;
+  padBottom: number;
+  columns: DndColumn[];
+}
+
+export interface DndColumn {
+  id: string;
+  /** Twelfths, 1 to 12. HubSpot's grid, not ours — its own `width` parameter is in twelfths. */
+  width: number;
+  modules: DndModule[];
+}
+
+/** One HubSpot stock module placed as the area's default content. See model/modules.ts. */
+export interface DndModule {
+  id: string;
+  /** e.g. `@hubspot/rich_text`. Checked against the registry by lint. */
+  path: string;
+  /** What the team reads against it in the editor. */
+  label: string;
+  /** Extra HubL parameters, already formatted as HubL values, in declaration order. */
+  params: Array<[string, string]>;
 }
 
 /** One ink on the Riso press: the separator's own settings, shared through `effects/riso.js`. */

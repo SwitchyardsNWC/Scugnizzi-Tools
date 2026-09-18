@@ -19,10 +19,12 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { compile } from '../src/compile/compile.ts';
 import { lint, errorsIn } from '../src/compile/lint.ts';
 import { DEFAULT_DESIGN_SYSTEM, theme } from '../src/model/design-system.ts';
+import { DND_MIN_WIDTH } from '../src/model/dnd.ts';
 import { sequentialIds } from '../src/model/ids.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
 import { serializeTemplate } from '../src/model/serialize.ts';
@@ -100,6 +102,47 @@ const button = (text: string, style: 'primary' | 'secondary', align: Align | 'fu
 });
 
 const spacer = (height: number): Block => ({ id: id(), type: 'spacer', height });
+
+/**
+ * The drag and drop area, with default content the team starts from.
+ *
+ * Two sections, the second of them split in two, because a single column holding one module would
+ * not show the nesting — and the nesting is the part that has never been seen in a real send.
+ */
+const dndArea = (): Block => ({
+  id: id(),
+  type: 'dndarea',
+  name: 'email_body',
+  label: 'Email body',
+  sections: [
+    {
+      id: id(),
+      background: null,
+      padTop: 20,
+      padBottom: 10,
+      columns: [
+        {
+          id: id(),
+          width: 12,
+          modules: [
+            { id: id(), path: '@hubspot/email_header', label: 'Headline', params: [] },
+            { id: id(), path: '@hubspot/email_body', label: 'Body', params: [] },
+          ],
+        },
+      ],
+    },
+    {
+      id: id(),
+      background: null,
+      padTop: 10,
+      padBottom: 20,
+      columns: [
+        { id: id(), width: 6, modules: [{ id: id(), path: '@hubspot/image_email', label: 'Picture', params: [] }] },
+        { id: id(), width: 6, modules: [{ id: id(), path: '@hubspot/email_cta', label: 'Call to action', params: [] }] },
+      ],
+    },
+  ],
+});
 
 /** A rule inside the gutter. Null colour follows the system's rule colour. */
 const divider = (height: number, width = 100, color: string | null = null, align: Align = 'center'): Block => ({
@@ -282,6 +325,11 @@ const sections: Section[] = [
   section([column([heading('Brand marks', 'h2')])], 'cream'),
   section([column([brand('sy')], 3), column([brand('scgnzi')], 3), column([brand('ica')], 3), column([brand('nwca')], 3)], 'navy', { mobile: 'side-by-side' }),
 
+  // The drag and drop area: the one region the team lays out itself. This block is the reason the
+  // page is 624px wide rather than 600 — see the design system below.
+  section([column([heading('Drag and drop area', 'h2'), copy('<p>Everything in the dashed region is the team’s to arrange in HubSpot. The canvas draws the structure; HubSpot draws the modules.</p>')])], 'cream'),
+  section([column([dndArea()], 12, { padTop: 0, padBottom: 0 })], 'cream'),
+
   // The footer HubSpot will not publish without.
   section([column([{ id: id(), type: 'legal', logoSrc: '', logoWidth: 180, note: 'A note in the legal footer, which is locked so that re-uploading the template fixes every future send.', noteLock: fixed('Legal note') }], 12, { padTop: 0, padBottom: 0, padRight: 0, align: 'right' })], 'navy', { padTop: 30, padBottom: 10, domId: 'section-legal' }),
   section([column([stripes('redBright', 4, 'offwhite', 2)], 12, { padTop: 0, padBottom: 0 })], 'cream'),
@@ -294,13 +342,21 @@ const template: Template = {
   hubspotLabel: 'Switchyards Baseline — every block and style',
   pageBackground: ds.pageBackground,
   forceLight: true,
+  // 624 rather than the system's 600, because this page holds a drag and drop area and HubSpot's
+  // minimum for one cannot be overridden. It is the feature's real cost, and the baseline is the
+  // right place to carry it: a page holding every block has to be wide enough for every block.
+  ds: { ...ds, containerWidth: DND_MIN_WIDTH },
   preview: { company: 'SWITCHYARDS U.S.A.', address: '151 Ted Turner Dr SE', city: 'Atlanta', state: 'GA', zip: '30303' },
   sections,
 };
 
 // --- write it out ----------------------------------------------------------------------------------
 
-const here = (path: string) => resolve(dirname(new URL(import.meta.url).pathname), '..', path);
+// `fileURLToPath`, not `url.pathname`: a pathname is percent-encoded, so a project living in a
+// folder whose name contains a space resolves to a directory that does not exist — and because
+// `mkdirSync` is recursive, the tool cheerfully creates it and writes the output there. That is
+// exactly what happened when this project moved into a folder with two spaces in its name.
+const here = (path: string) => resolve(dirname(fileURLToPath(import.meta.url)), '..', path);
 const write = (path: string, text: string) => {
   mkdirSync(dirname(here(path)), { recursive: true });
   writeFileSync(here(path), text);

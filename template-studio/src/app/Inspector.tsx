@@ -9,7 +9,9 @@ import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, rem
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
 import type { FreeformLayer } from '../model/types.ts';
-import type { Lock } from '../model/types.ts';
+import type { DndColumn, DndModule, DndSection, Lock } from '../model/types.ts';
+import { newDndColumn, newDndModule, newDndSection } from '../model/dnd.ts';
+import { STOCK_MODULES, stockModule } from '../model/modules.ts';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
@@ -25,7 +27,7 @@ import { LinkedIcon } from './icons.tsx';
 // Every control carries a one-line explanation on hover. Jared asked for that explicitly, and it is
 // the difference between a designer guessing what "Optional in HubSpot" means and knowing.
 
-const WIDE = new Set(['text', 'textarea', 'html', 'url', 'lock', 'stripes', 'columns']);
+const WIDE = new Set(['text', 'textarea', 'html', 'url', 'lock', 'stripes', 'columns', 'dnd']);
 
 /** What the folder's pattern says about the selected section, and what can be done about it. */
 export interface PatternInfo {
@@ -245,6 +247,7 @@ function ControlField({
   if (control.kind === 'layers') return <LayersField editor={editor} {...(freeform ? { freeform } : {})} />;
   if (control.kind === 'render-picture') return <RenderPictureField editor={editor} {...(onRasterise ? { onRasterise } : {})} busy={Boolean(rasterising)} />;
   if (control.kind === 'stripes') return <StripesField control={control} editor={editor} />;
+  if (control.kind === 'dnd') return <DndField control={control} editor={editor} />;
   if (control.kind === 'columns') return <ColumnsField editor={editor} />;
   if (control.kind === 'preset') return <PresetField control={control} editor={editor} />;
   if (control.kind === 'variant') return <VariantField control={control} editor={editor} />;
@@ -448,6 +451,133 @@ function LockField({ control, editor }: { control: Control; editor: Editor }) {
           Locked.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * The drag and drop area's default content: sections, the columns in each, and the HubSpot modules
+ * in those.
+ *
+ * Deliberately plainer than the rest of the inspector. Everywhere else a designer is arranging the
+ * email itself and the controls should feel like design; here they are writing a *starting point*
+ * that the team will immediately rearrange, so a compact list of rows with add and remove is
+ * honest about how much this is worth fussing over. Nothing here has a colour picker or a dial
+ * beyond padding, because HubSpot styles what goes inside and our tokens do not reach it.
+ */
+function DndField({ control, editor }: { control: Control; editor: Editor }) {
+  const sections = (readValue(editor.template, editor.selection, control.path) as DndSection[]) ?? [];
+  const write = (next: DndSection[]) => editor.set(control.path, next);
+
+  const patchSection = (si: number, patch: Partial<DndSection>) =>
+    write(sections.map((s, i) => (i === si ? { ...s, ...patch } : s)));
+
+  const patchColumn = (si: number, ci: number, patch: Partial<DndColumn>) =>
+    patchSection(si, { columns: sections[si]!.columns.map((c, i) => (i === ci ? { ...c, ...patch } : c)) });
+
+  const setModules = (si: number, ci: number, modules: DndModule[]) => patchColumn(si, ci, { modules });
+
+  return (
+    <div class="field wide dnd-field">
+      {sections.map((section, si) => (
+        <div class="dnd-section" key={section.id}>
+          <div class="dnd-section-head">
+            <span class="dnd-label">Section {si + 1}</span>
+            <div class="dnd-actions">
+              <button
+                type="button"
+                title="Split this section into two columns, or put it back to one."
+                onClick={() =>
+                  patchSection(si, {
+                    columns:
+                      section.columns.length > 1
+                        ? [{ ...section.columns[0]!, width: 12, modules: section.columns.flatMap((c) => c.modules) }]
+                        : [{ ...section.columns[0]!, width: 6 }, newDndColumn(6)],
+                  })
+                }
+              >
+                {section.columns.length > 1 ? 'One column' : 'Two columns'}
+              </button>
+              <button
+                type="button"
+                title="Remove this section from the default content."
+                onClick={() => write(sections.filter((_, i) => i !== si))}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+
+          <div class="dnd-pads">
+            <Dial label="Above" value={section.padTop} onChange={(padTop) => patchSection(si, { padTop })} min={0} max={120} suffix="px" />
+            <Dial label="Below" value={section.padBottom} onChange={(padBottom) => patchSection(si, { padBottom })} min={0} max={120} suffix="px" />
+          </div>
+
+          {section.columns.map((column, ci) => (
+            <div class="dnd-column" key={column.id}>
+              {section.columns.length > 1 && <span class="dnd-label">Column {ci + 1}</span>}
+              {column.modules.map((mod, mi) => (
+                <div class="dnd-module" key={mod.id}>
+                  <select
+                    value={mod.path}
+                    title="Which HubSpot module the team starts with here."
+                    onChange={(e) =>
+                      setModules(
+                        si,
+                        ci,
+                        column.modules.map((m, i) => (i === mi ? { ...m, path: (e.target as HTMLSelectElement).value } : m)),
+                      )
+                    }
+                  >
+                    {STOCK_MODULES.map((m) => (
+                      <option key={m.path} value={m.path}>
+                        {m.name}
+                      </option>
+                    ))}
+                    {!stockModule(mod.path) && <option value={mod.path}>{mod.path}</option>}
+                  </select>
+                  <input
+                    type="text"
+                    value={mod.label}
+                    placeholder="Label"
+                    title="What the team reads against this module in HubSpot."
+                    onInput={(e) =>
+                      setModules(
+                        si,
+                        ci,
+                        column.modules.map((m, i) => (i === mi ? { ...m, label: (e.target as HTMLInputElement).value } : m)),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    class="dnd-remove"
+                    title="Remove this module."
+                    onClick={() => setModules(si, ci, column.modules.filter((_, i) => i !== mi))}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                class="dnd-add"
+                onClick={() => setModules(si, ci, [...column.modules, newDndModule('@hubspot/email_body', 'Body')])}
+              >
+                Add a module
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      <button type="button" class="dnd-add" onClick={() => write([...sections, newDndSection()])}>
+        Add a section
+      </button>
+      <p class="hint">
+        The team can change all of this. HubSpot styles what goes inside, so the design system, the
+        phone rules and the dark-mode layers stop at the edge of this region.
+      </p>
     </div>
   );
 }
@@ -1555,6 +1685,17 @@ function FieldFooter({ editor }: { editor: Editor }) {
   const found = resolve(template, selection);
   const block = found.block;
   if (!block) return null;
+
+  // The area has no locks and is the most editable thing in the template, so the usual sentence
+  // would be exactly backwards. It gets its own.
+  if (block.type === 'dndarea') {
+    return (
+      <p class="inspector-foot">
+        In HubSpot the team builds this region themselves: they add, move and delete modules inside
+        it. Everything else in the template stays locked.
+      </p>
+    );
+  }
 
   const locks: Lock[] = [];
   if ('lock' in block) locks.push(block.lock);

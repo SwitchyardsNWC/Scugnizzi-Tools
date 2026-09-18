@@ -15,6 +15,24 @@
 >
 > The filled-in sheet lives at the Phase 0 Probe Sheet artifact. Kept below as the protocol, so the
 > next round of HubSpot questions has a template to follow.
+>
+> **Queued for the next send (added 2026-09-17, the drag and drop area).** Three questions, and the
+> first one can stop the feature outright, so it is worth running before anyone builds on it:
+>
+> - **L** — Does a coded email template containing `{% dnd_area %}` upload and publish in this
+>   portal at all? HubSpot's own pages disagree: the email guide reads as generally available, the
+>   drag-and-drop reference says areas "can't be used in blog post and email templates at this
+>   time", and a third source calls it beta requiring an ungated account. It also needs Marketing
+>   or Content Hub Professional, which the connected app cannot read. **A rejection is the answer.**
+> - **M** — With an area present, do the ordinary `{% text %}` and `{% module %}` fields *outside*
+>   it still register in the Contents panel, and still in document order? The whole design assumes
+>   locked furniture around one free region.
+> - **N** — What does `{{ dnd_area_stylesheet }}` actually inject? Finding F established that a
+>   coded template gets no stylesheet from HubSpot; this tag asks for one by name, so F does not
+>   cover it. Compare the received source of a send with an area against one without.
+>
+> `exports/baseline.html` already carries an area with two sections, a split row and four stock
+> modules, so it can answer all three without a new probe file.
 
 One upload, one email, one send. Everything in Phase 1 waits on the answers, so this is worth an
 afternoon before anything else happens.

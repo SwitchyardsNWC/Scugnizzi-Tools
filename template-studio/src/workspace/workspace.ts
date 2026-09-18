@@ -79,6 +79,19 @@ export interface Workspace {
    * noticing* is not.
    */
   writeTemplate(fileName: string, json: string, expectedModified: number): Promise<SaveResult>;
+  /**
+   * Removes a template file from the folder.
+   *
+   * Absent on a read-only workspace, which is how the panel knows not to offer it.
+   *
+   * There is no confirmation anywhere above this, by the project's own rule: destructive things
+   * happen and offer Undo rather than asking first (learnings 3.2). That is only honest because
+   * undo here is a real restore — the caller reads the template before deleting and writes the same
+   * bytes back under the same name, so the file that returns is the file that left. The one thing
+   * it cannot put back is the moment: on a synced folder somebody else's client may have already
+   * seen the deletion, which is why the toast says so rather than implying the folder never moved.
+   */
+  deleteTemplate?(fileName: string): Promise<void>;
   /** Images in `assets/`. Empty when there is no such folder, which is not an error. */
   assets(): Promise<AssetFile[]>;
   /**
@@ -170,6 +183,30 @@ function parse(fileName: string, text: string): { template: Template; warnings: 
 
 const displayName = (fileName: string) => fileName.replace(V2, '').replace(V1, '').replace(/[-_]+/g, ' ');
 
+/**
+ * What to call a template in a list: the name it carries, not the name of the file holding it.
+ *
+ * The two are deliberately allowed to differ. A file name is pinned at creation and never follows
+ * the template's name afterwards, because renaming the template would otherwise leave a second file
+ * behind — and because the project board identifies an email card by its file name, so a rename
+ * would move somebody's card. That is the right call, and it had one bad consequence: this list
+ * showed the *file* name, so renaming a template appeared to do nothing at all. A duplicate stayed
+ * "drop step 1 copy" in the list however many times it was renamed, which is what Jared hit.
+ *
+ * So the file name stays an identifier and this reads the real name out of the file, which is what
+ * the project board already did (Board.tsx). Parsed cheaply — the name is a top-level string and a
+ * template is a few tens of kilobytes — and any file that will not parse falls back to its name on
+ * disk rather than vanishing from the list.
+ */
+export function nameInside(text: string, fileName: string): string {
+  try {
+    const raw = JSON.parse(text) as { name?: unknown };
+    return typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : displayName(fileName);
+  } catch {
+    return displayName(fileName);
+  }
+}
+
 // --- the File System Access back end -----------------------------------------------------------
 
 export const supportsFolders = () => typeof (globalThis as Record<string, unknown>)['showDirectoryPicker'] === 'function';
@@ -225,7 +262,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
           const handle = entry as FileSystemFileHandle;
           const file = await handle.getFile();
           out.push({
-            name: displayName(fileName),
+            name: nameInside(await file.text(), fileName),
             fileName,
             kind: fileName.endsWith(V1) ? 'v1' : 'v2',
             modified: file.lastModified,
@@ -376,6 +413,28 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         return { ok: true as const, modified: (await handle.getFile()).lastModified };
       });
     },
+
+    async deleteTemplate(fileName) {
+      if (!writable) throw refused(dir.name);
+      return writing(dir.name, async () => {
+        // Exactly the places `list` walks, in the same order — `toolFolders` plus the folder
+        // itself. Written by hand the first time and it was wrong twice over: it created
+        // `.scug/templates` as a side effect of deleting (`create: true` on a folder that need not
+        // exist), and it left out the top level, so a template sitting directly in a project folder
+        // was listed and then could not be removed. Sharing the helper is what makes "everything
+        // the panel offered can be deleted" true by construction rather than by coincidence.
+        for (const source of [...(await toolFolders('templates')), dir]) {
+          try {
+            await source.getFileHandle(fileName);
+          } catch {
+            continue;
+          }
+          await source.removeEntry(fileName);
+          return;
+        }
+        throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);
+      });
+    },
   };
 }
 
@@ -451,15 +510,16 @@ export function workspaceFromFiles(files: File[]): Workspace {
     kind: 'files',
     canWrite: false,
     async list() {
-      return templates
-        .map((file) => ({
-          name: displayName(file.name),
+      const out = await Promise.all(
+        templates.map(async (file) => ({
+          name: nameInside(await file.text(), file.name),
           fileName: file.name,
           kind: (file.name.endsWith(V1) ? 'v1' : 'v2') as 'v1' | 'v2',
           modified: file.lastModified,
           load: async () => parse(file.name, await file.text()),
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        })),
+      );
+      return out.sort((a, b) => a.name.localeCompare(b.name));
     },
     async assets() {
       // Whatever images were handed over alongside the templates. No folder to walk, so this is all

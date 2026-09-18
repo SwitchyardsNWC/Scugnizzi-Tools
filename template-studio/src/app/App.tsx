@@ -81,11 +81,11 @@ import {
   pushPattern,
   type Pattern,
 } from '../model/patterns.ts';
-import { fileSlug, serializeDesignSystem, serializePattern } from '../model/serialize.ts';
+import { fileSlug, serializeDesignSystem, serializePattern, serializeTemplate } from '../model/serialize.ts';
 import { tidyTemplate } from '../model/tidy.ts';
 import { colorOf, type DesignSystem } from '../model/design-system.ts';
 import { blankTemplate, cardTemplate } from '../model/starters.ts';
-import { ADDABLE, CATALOG } from '../model/catalog.ts';
+import { ADDABLE, CATALOG, SINGLETON } from '../model/catalog.ts';
 import type { Block, BlockType, FreeformBlock } from '../model/types.ts';
 import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
@@ -301,18 +301,28 @@ export function App() {
   const adoptRef = useRef<(file: TemplateFile) => void>(() => {});
   const workspaceRef = useRef<Workspace | null>(null);
   workspaceRef.current = workspace;
-  const onCreated = useCallback(async (fileName: string) => {
+  /** Re-reads the folder into the panel. Every write that adds or removes a file ends with this. */
+  const refreshFiles = useCallback(async () => {
     const where = workspaceRef.current;
-    if (!where) return;
+    if (!where) return [];
     try {
       const list = await where.list();
       setFiles(list);
-      const mine = list.find((f) => f.fileName === fileName);
-      if (mine) adoptRef.current(mine);
+      return list;
     } catch {
-      // The save succeeded; only the listing failed. The next save still goes to the same file.
+      // The write succeeded; only the listing failed. Leaving the old list up is better than
+      // emptying the panel over a transient read.
+      return [];
     }
   }, []);
+  const onCreated = useCallback(
+    async (fileName: string) => {
+      const list = await refreshFiles();
+      const mine = list.find((f) => f.fileName === fileName);
+      if (mine) adoptRef.current(mine);
+    },
+    [refreshFiles],
+  );
   const editor = useEditor({
     initial,
     workspace,
@@ -384,6 +394,65 @@ export function App() {
       );
     },
     [editor, notify, workspace],
+  );
+
+  /**
+   * Removes a template file from the folder, and offers a real restore.
+   *
+   * It reads the file before removing it, so Undo writes the same bytes back under the same name
+   * rather than approximating from whatever is on screen. If the deleted file is the one open, the
+   * document stays on the canvas and is simply unbound: deleting a file should not also throw away
+   * the work in front of you, and `releaseFile` is what stops the next keystroke autosaving it
+   * straight back into existence.
+   *
+   * Not offered at all when the workspace cannot write — `deleteTemplate` is absent there, and the
+   * panel hides the control rather than showing one that fails on click.
+   */
+  const deleteTemplateFile = useCallback(
+    async (file: TemplateFile) => {
+      if (!workspace?.deleteTemplate) return;
+      let json: string | null = null;
+      try {
+        const { template } = await file.load();
+        json = serializeTemplate(template);
+      } catch {
+        // Unreadable — a v1 file with a shape we cannot parse, say. It can still be deleted; the
+        // offer to undo is what goes away, and the toast says so instead of promising one.
+        json = null;
+      }
+
+      try {
+        await workspace.deleteTemplate(file.fileName);
+      } catch (cause) {
+        notify(cause instanceof Error ? cause.message : `Could not delete ${file.fileName}.`);
+        return;
+      }
+
+      const wasOpen = editor.file?.fileName === file.fileName;
+      if (wasOpen) editor.releaseFile();
+      await refreshFiles();
+
+      const message = wasOpen
+        ? `Deleted ${file.name}. It is still open here, but no longer saved to a file.`
+        : `Deleted ${file.name}.`;
+      notify(
+        json ? message : `${message} It could not be read, so there is nothing to undo into.`,
+        json
+          ? () => {
+              void (async () => {
+                try {
+                  await workspace.writeTemplate(file.fileName, json, 0);
+                  await refreshFiles();
+                  notify(`${file.name} is back.`);
+                } catch (cause) {
+                  notify(cause instanceof Error ? cause.message : `Could not restore ${file.fileName}.`);
+                }
+              })();
+            }
+          : undefined,
+      );
+    },
+    [workspace, editor, notify, refreshFiles],
   );
 
   /** A copy of the open template as its own file. Saved now, because a copy should exist the moment you ask. */
@@ -554,14 +623,19 @@ export function App() {
   // as a full-width section of its own otherwise — the same rule a drop follows.
 
   /** What the palette offers, as the menu wants it: a kind, a name and the one-line summary. */
-  const quickAddKinds = useMemo(
-    () => [
-      ...ADDABLE.slice(0, 4).map((type) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary })),
+  const quickAddKinds = useMemo(() => {
+    // A block the template may hold only one of, and already does, is dropped from the menu rather
+    // than offered and refused. HubSpot rejects a second drag and drop area at upload, so offering
+    // one here would be offering a broken template.
+    const present = new Set(allBlocks(editor.template).map((b) => b.type));
+    const offered = ADDABLE.filter((type) => !(SINGLETON.includes(type) && present.has(type)));
+    const named = (type: BlockType) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary });
+    return [
+      ...offered.slice(0, 4).map(named),
       { kind: 'columns', name: 'Columns', summary: 'Two columns side by side, empty. Drop blocks into them, and set the ratio afterwards.' },
-      ...ADDABLE.slice(4).map((type) => ({ kind: type, name: CATALOG[type].name, summary: CATALOG[type].summary })),
-    ],
-    [],
-  );
+      ...offered.slice(4).map(named),
+    ];
+  }, [editor.template]);
 
   const insertBlock = useCallback(
     (kind: string, after: string | null) => {
@@ -1729,6 +1803,7 @@ export function App() {
           starters={STARTERS}
           onNew={startNew}
           onDuplicate={duplicateCurrent}
+          {...(workspace?.deleteTemplate ? { onDelete: (file: TemplateFile) => void deleteTemplateFile(file) } : {})}
           patterns={patternCards}
           onPlacePattern={(id) => placePatternAt(id, null)}
           patternOf={patternOf}

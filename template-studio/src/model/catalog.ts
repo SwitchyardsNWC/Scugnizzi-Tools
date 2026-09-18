@@ -16,6 +16,7 @@
 
 import { bandedPreset, DEFAULT_DESIGN_SYSTEM, firstPreset, theme as themeTokens, type DesignSystem } from './design-system.ts';
 import { fieldName } from './ids.ts';
+import { newDndArea } from './dnd.ts';
 import { MARKS } from './marks.ts';
 import type { Align, Block, BlockType, Column, Row, Section } from './types.ts';
 
@@ -45,6 +46,8 @@ export type ControlKind =
   /** Render a picture block — freeform or brand — to its picture, and where that picture is. */
   | 'render-picture'
   | 'columns'
+  /** The drag and drop area's default content: its sections, columns and HubSpot modules. */
+  | 'dnd'
   /** A background preset, listed from the template's own design system rather than from a fixed set. */
   | 'preset';
 
@@ -616,6 +619,31 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
       hubspot('block.noteLock', 'Note'),
     ],
   },
+
+  dndarea: {
+    type: 'dndarea',
+    name: 'Drag and drop area',
+    summary: 'A region the team lays out themselves in HubSpot. One per template.',
+    outline: (block) => (block.type === 'dndarea' && block.label.trim() ? block.label : 'Drag and drop area'),
+    groups: [
+      {
+        name: 'Default content',
+        open: true,
+        help: 'Where the team starts before they touch anything. They can add, move and delete all of it, so this is a starting point rather than a layout.',
+        controls: [
+          {
+            kind: 'text',
+            path: 'block.label',
+            label: 'Area name',
+            help: 'What the team sees against this region in HubSpot’s sidebar.',
+          },
+          { kind: 'dnd', path: 'block.sections', label: 'Sections' },
+        ],
+      },
+      sectionSpacing(),
+      background(),
+    ],
+  },
 };
 
 /**
@@ -635,7 +663,17 @@ export const GROUP_GROUPS: Group[] = [
 ];
 
 /** Everything a designer may add, in the order the Add menu shows them. */
-export const ADDABLE: BlockType[] = ['heading', 'richtext', 'image', 'brand', 'button', 'freeform', 'divider', 'stripes', 'spacer', 'topbar', 'legal'];
+export const ADDABLE: BlockType[] = ['heading', 'richtext', 'image', 'brand', 'button', 'freeform', 'divider', 'stripes', 'spacer', 'dndarea', 'topbar', 'legal'];
+
+/**
+ * Blocks a template may hold only one of.
+ *
+ * One entry so far, and it is HubSpot's rule rather than ours: a coded email template may contain
+ * exactly one drag and drop area, and a second is rejected at upload. The editor greys out the
+ * second insert and lint catches one that arrives another way — through a paste, an import, or a
+ * file edited by hand.
+ */
+export const SINGLETON: BlockType[] = ['dndarea'];
 
 /**
  * The blocks that can share a column — sit inside a column of a multi-column row, or stack with
@@ -713,6 +751,13 @@ export function createBlock(type: BlockType, ctx: NewBlockContext): Block {
         // Locked by default: anything that must stay current across every future send is rendered
         // by the template, not copied into each email (learnings 1.7).
         return { id: ctx.id(), type, logoSrc: '', logoWidth: 180, note: '', noteLock: lock('Legal note', false) };
+      case 'dndarea':
+        // No `lock`. Every other block's editability is a field the team fills in; this one hands
+        // over the layout itself, which is not a lock and deliberately does not pretend to be one.
+        //
+        // The name goes through the same allocator as a field name, because both end up as
+        // identifiers in one template and a collision between them is HubSpot's problem to hit.
+        return { id: ctx.id(), ...newDndArea(fieldName('Email body', ctx.taken)) };
     }
   })();
 }

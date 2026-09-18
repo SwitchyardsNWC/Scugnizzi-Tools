@@ -21,11 +21,16 @@ Decisions already made, still standing:
 | --- | --- | --- |
 | Delivery | Local app with a shared folder | No server, no login. The app opens a workspace folder (Dropbox, Drive or a git repo) and reads and writes JSON there. Everyone on the folder sees the same templates, modules and design system. |
 | Design freedom | System-guided | Any layout from layout primitives. Colors, type and spacing come from an editable design system. Literal values are allowed but flagged. |
-| HubSpot editing | Fields only | Layout is fixed by the template. The team edits text, images, links and HubSpot modules in the fields the designer unlocks. No HubSpot drag-and-drop areas. |
+| HubSpot editing | Fields, plus one optional region | Layout is fixed by the template and the team edits the fields the designer unlocks. The single exception, added 2026-09-17 at Jared's direction: a designer may place one **drag and drop area**, a region the team lays out themselves. Everything outside it stays locked. |
 | Users | Jared plus a couple of designers | The shared library must be reliable. No roles or permissions. |
 
-Non-goals: HubSpot drag-and-drop email areas, multi-brand, direct API publishing, non-designers
-building templates, any server or login.
+Non-goals: multi-brand, direct API publishing, non-designers building templates, any server or
+login.
+
+HubSpot drag-and-drop areas were a non-goal until 2026-09-17 and are now one block type. The
+reversal is narrow on purpose: one area per template, placed deliberately by a designer, with the
+rest of the email untouched. What it costs is in [`learnings.md`](learnings.md) §1.16 — chiefly a
+624px floor that a 600px design cannot meet, and HubSpot styling everything inside the region.
 
 ## What changed in this revision
 
@@ -205,8 +210,8 @@ Ten to eleven weeks of focused work. Phase 1 alone replaces v1's export, so valu
 **Canvas mode** — every email in a project folder on one endless surface, each live, exported
 together as a flow. Planned in [`canvas-mode.md`](canvas-mode.md) (2026-09-12).
 
-Direct publish through a HubSpot private app. HubSpot drag-and-drop areas as an alternative
-export. Litmus or Email on Acid screenshots from the Validate panel. Multi-brand design systems.
+Direct publish through a HubSpot private app. Litmus or Email on Acid screenshots from the
+Validate panel. Multi-brand design systems.
 
 ## Open items
 

@@ -241,6 +241,23 @@ body {
 }
 .row.on .row-meta { color: rgb(255 255 255 / 0.7); }
 
+/* A file row: the row itself, plus a delete that stays out of the way until wanted.
+   Revealed on hover and on keyboard focus — not hidden with `opacity: 0`, which still contributes
+   to scroll width and is exactly the bug in learnings 3.9. */
+.file-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.file-row .row { flex: 1; min-width: 0; }
+.row-delete {
+  flex: none; display: none; width: 22px; height: 22px; padding: 0; line-height: 1;
+  font: inherit; font-size: 15px; border: 0; border-radius: 5px;
+  background: none; color: var(--faint); cursor: pointer;
+}
+.file-row:hover .row-delete, .row-delete:focus-visible { display: block; }
+/* The open file's × stays, so the one file most likely meant is always a click away; and on a screen with no
+   hover, an iPad, every row's shows, since nothing else would ever reveal it. */
+.file-row .row.on + .row-delete { display: block; }
+@media (hover: none) { .row-delete { display: block; } }
+.row-delete:hover { background: var(--sunk); color: var(--ink); }
+
 /* Editable in HubSpot. The one dot in the tree, so it means exactly one thing. */
 .row-open { width: 5px; height: 5px; border-radius: 99px; background: var(--accent); flex: none; }
 .row.on .row-open { background: #fff; }
@@ -527,6 +544,40 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 
 .stripe-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--line); flex: none; }
+
+/* --- the drag and drop area's default content --------------------------------------------------
+   Plainer than the rest of the inspector on purpose. This is a starting point the team will
+   rearrange, not the email itself, so it reads as a list of rows rather than as design controls. */
+.dnd-field { display: grid; gap: 8px; }
+.dnd-section {
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px; display: grid; gap: 7px;
+  background: var(--panel-soft, transparent);
+}
+.dnd-section-head { display: flex; align-items: center; gap: 6px; }
+.dnd-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); flex: 1;
+}
+.dnd-actions { display: flex; gap: 4px; flex: none; }
+.dnd-actions button, .dnd-add {
+  font: inherit; font-size: 11px; padding: 3px 7px; border: 1px solid var(--line);
+  border-radius: 5px; background: transparent; color: var(--ink); cursor: pointer;
+}
+.dnd-actions button:hover, .dnd-add:hover { border-color: var(--ink); }
+.dnd-pads { display: flex; gap: 6px; }
+.dnd-pads > * { flex: 1; min-width: 0; }
+.dnd-column {
+  display: grid; gap: 5px; padding-left: 8px; border-left: 2px solid var(--line-soft);
+}
+.dnd-module { display: flex; align-items: center; gap: 5px; }
+.dnd-module select { flex: 0 1 45%; min-width: 0; }
+.dnd-module input { flex: 1 1 40%; min-width: 0; }
+.dnd-remove {
+  flex: none; width: 22px; height: 22px; line-height: 1; padding: 0; font-size: 14px;
+  border: 1px solid var(--line); border-radius: 5px; background: transparent;
+  color: var(--faint); cursor: pointer;
+}
+.dnd-remove:hover { color: var(--ink); border-color: var(--ink); }
+.dnd-add { justify-self: start; }
 
 .inspector-foot {
   margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--line-soft);

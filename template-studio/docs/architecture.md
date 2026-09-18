@@ -86,6 +86,11 @@ text, image, link. Style, spacing and alignment are permanently designer-only an
 all. Fewer controls, same outcome, and it removes a category of template where the team can quietly
 break the layout.
 
+**Amended 2026-09-17.** One block type is now exempt: the drag and drop area, where the team owns
+the layout outright. It is not a lock and does not pretend to be one — there is no per-field
+editability inside it, because HubSpot's editor is what runs in there. The rule above still holds
+everywhere else, and the exemption is bounded to one region per template by HubSpot itself.
+
 ### What I pushed back on
 
 **The advanced tier of the custom block builder** — an HTML snippet with `{{field}}` placeholders,
@@ -418,7 +423,7 @@ Settled 2026-09-10, by Jared unless marked otherwise.
 | --- | --- |
 | Golden file | `reference/v1-export-regenerated.html`. `acceptance.md` §1 names it. |
 | Workspace | Synced folder via the File System Access API, with a git-clean file layout so a repo stays an option later. |
-| Editability | Content fields only — text, rich text, image, link. No locks on style or spacing. |
+| Editability | Content fields only — text, rich text, image, link. No locks on style or spacing. One exception from 2026-09-17: a drag and drop area, where the team owns the layout. |
 | Custom blocks | Compose tier only. The advanced raw-HTML tier is cut. |
 | Naming | Reusable sections are **Patterns**; "module" means HubSpot's. *(My call, flagged.)* |
 | Design system | One per workspace, templates pin a version, no picker. *(My call, flagged — say if you meant a picker.)* |
