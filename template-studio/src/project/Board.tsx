@@ -19,7 +19,7 @@ import type { MutableRef } from 'preact/hooks';
 import { compile } from '../compile/compile.ts';
 import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
-import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, type DocKind } from '../model/docs.ts';
+import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, isLinkFile, type DocKind } from '../model/docs.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import { projectType } from '../model/project-types.ts';
@@ -33,6 +33,7 @@ import {
   cardFolder,
   docCardId,
   emailCardId,
+  emailCardSize,
   emptyBoard,
   folderOfPicture,
   forgetCard,
@@ -446,15 +447,23 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     return () => channel?.close();
   }, [refreshAll]);
 
+  /** Each email's height in its own page pixels, once its preview has laid out; its card is then as tall as the whole email. */
+  const [emailHeights, setEmailHeights] = useState<Record<string, number>>({});
+  const measured = useCallback((id: string, height: number) => {
+    setEmailHeights((old) => (old[id] === height ? old : { ...old, [id]: height }));
+  }, []);
   // --- layout ---
   const sources = useMemo<CardSource[]>(
     () => [
-      ...files.emails.map((e) => ({ id: e.id, kind: 'email' as const, name: e.name })),
+      ...files.emails.map((e) => {
+        const measuredHeight = emailHeights[e.id];
+        return { id: e.id, kind: 'email' as const, name: e.name, size: measuredHeight ? emailCardSize(measuredHeight, EMAIL_PAGE, HEAD) : undefined };
+      }),
       ...files.docs.map((d) => ({ id: d.id, kind: 'doc' as const, name: d.link.name })),
       ...files.frames.map((f) => ({ id: f.id, kind: 'frame' as const, name: f.name })),
       ...files.pictures.filter((p) => !p.rendered).map((p) => ({ id: p.id, kind: 'picture' as const, name: p.path.split('/').pop() ?? p.path })),
     ],
-    [files],
+    [files, emailHeights],
   );
   // What is made from what, before the layout: a card with no place yet goes beside what it is linked to.
   const links = useMemo(
@@ -981,6 +990,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         event.preventDefault();
         const picked = links.find((l) => `${l.from}>${l.to}` === selectedLinkRef.current);
         if (picked) void breakLink(picked);
+      } else if ((event.key === 'Backspace' || event.key === 'Delete') && selected) {
+        event.preventDefault();
+        const card = layout.cards.find((c) => c.id === selected);
+        if (card) void deleteCard(card);
       } else if (mod && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         void step(event.shiftKey ? 'redo' : 'undo');
@@ -1208,6 +1221,74 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       setSelectedLink(null);
     } catch (cause) {
       failedTo(cause, 'break the link');
+    }
+  };
+
+  /**
+   * Removes a card's file from the project. Jared: "allow deleting elements on the project board too." No question
+   * asked, by the rule the canvas follows: it happens, and Undo puts back the same bytes under the same name, and
+   * the card's place. What pointed at the file keeps pointing: an email that showed a deleted picture shows it as
+   * missing, which Template Studio's checks report, and the notice says how many do. Drive's own files for a Google
+   * Doc, Sheet or Slides are not deleted from here, since removing that file removes the document for everyone who
+   * has it; only the board's own link files are.
+   */
+  const deleteCard = async (card: PlacedCard) => {
+    if (!projectRef.current.writable) return notWritable(`delete ${card.name}`);
+    try {
+      let file: { path: string; data: string | Blob } | null = null;
+      const textOf = async (path: string, what: string) => {
+        const read = await readText(dir, path);
+        if (!read) throw new Error(`${what} could not be read, so it was left alone.`);
+        return read.text;
+      };
+      if (card.kind === 'email') {
+        const email = emailsById.get(card.id);
+        if (!email) return;
+        const path = await emailPath(email.fileName);
+        file = { path, data: await textOf(path, email.fileName) };
+      } else if (card.kind === 'frame') {
+        const frame = framesById.get(card.id);
+        if (!frame) return;
+        const found = (await readFolderFrames(dir)).find((f) => f.key === frame.key);
+        if (!found) throw new Error(`${frame.fileName} is not in the folder any more.`);
+        file = { path: found.path, data: await textOf(found.path, frame.fileName) };
+      } else if (card.kind === 'picture') {
+        const picture = picturesById.get(card.id);
+        if (!picture) return;
+        file = { path: `assets/${picture.path}`, data: await (await fetch(picture.url)).blob() };
+      } else if (card.kind === 'doc') {
+        const doc = docsById.get(card.id);
+        if (!doc) return;
+        if (!isLinkFile(doc.path)) {
+          notify(`${doc.path} is Drive's own file for ${card.name}. Remove it in Drive, where the trash can give it back.`);
+          return;
+        }
+        file = { path: doc.path, data: await textOf(doc.path, doc.path) };
+      }
+      if (!file) return;
+      const { path, data } = file;
+      const at = boardRef.current.cards[card.id] ?? { x: card.x, y: card.y };
+      const remove = async () => {
+        await removeFile(dir, path);
+        stale();
+        saveBoard(forgetCard(boardRef.current, card.id));
+        await refresh();
+        presence.sendSaved();
+      };
+      const restore = async () => {
+        await writeFile(dir, path, data);
+        stale();
+        saveBoard(moveCard(boardRef.current, card.id, at.x, at.y));
+        await refresh();
+        presence.sendSaved();
+      };
+      const pointing = links.filter((l) => l.from === card.id && l.kind !== 'made').length;
+      await remove();
+      setSelected(null);
+      notify(`Deleted ${card.name}.${pointing ? ` ${plural(pointing, 'document')} still point${pointing === 1 ? 's' : ''} at it.` : ''} ⌘Z puts it back.`);
+      history.push({ label: `Delete ${card.name}`, undo: restore, redo: remove });
+    } catch (cause) {
+      failedTo(cause, `delete ${card.name}`);
     }
   };
 
@@ -1676,9 +1757,14 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   <button class="pb-card-open" title={openTitle(card, madeBy, doc?.link.kind)} aria-label={`Open ${card.name}`} onClick={() => openCard(card)}>
                     ↗
                   </button>
+                  {writable && (
+                    <button class="pb-card-x" title={`Delete ${card.name} from the project. ⌘Z puts it back.`} aria-label={`Delete ${card.name}`} onClick={() => void deleteCard(card)}>
+                      ×
+                    </button>
+                  )}
                 </header>
                 <div class="pb-card-body">
-                  {email && <EmailBody item={email} assets={assets} live={live} width={card.w} height={card.h - HEAD} />}
+                  {email && <EmailBody item={email} assets={assets} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} />}
                   {frame && <FrameBody item={frame} assets={assets} print={printOf(frame)} width={card.w} height={card.h - HEAD} />}
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
                   {doc && <DocBody item={doc} />}
@@ -1824,7 +1910,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels'
             : selectedLink
               ? 'A line is picked · Break link, or Delete, takes it out of the file it is in · Esc lets go'
-              : 'Drag to arrange · ⌥ drag copies · drop a picture on a frame or email to put it in · hold still, or Space, to pan'}
+              : 'Drag to arrange · ⌥ drag copies · drop a picture on a frame or email to put it in · Delete removes the file · hold still, or Space, to pan'}
         </span>
         <span class="pb-sep" aria-hidden="true" />
         <span class="pb-count">{counts || 'empty'}</span>
@@ -1926,11 +2012,32 @@ function cardUnder(cards: PlacedCard[], p: { x: number; y: number }, dragged: Pl
 
 // --- card bodies ------------------------------------------------------------------------------------------------
 
-function EmailBody({ item, assets, live, width, height }: { item: EmailItem; assets: AssetFile[]; live: boolean; width: number; height: number }) {
+/**
+ * How tall an email's document is: the bottom of everything in its body, plus the body's own padding and margin
+ * below. Not the document's scroll height, which is never less than the iframe it is shown in, and would keep a
+ * short email from ever coming down to its own length. Null when the document cannot be read or is empty.
+ */
+function documentHeight(frame: HTMLIFrameElement): number | null {
+  const doc = frame.contentDocument;
+  if (!doc?.body) return null;
+  const range = doc.createRange();
+  range.selectNodeContents(doc.body);
+  const style = doc.defaultView?.getComputedStyle(doc.body);
+  const below = (parseFloat(style?.paddingBottom ?? '0') || 0) + (parseFloat(style?.marginBottom ?? '0') || 0);
+  const height = Math.ceil(range.getBoundingClientRect().bottom + below);
+  return height > 40 ? height : null;
+}
+
+/** The whole email, laid out at its own width and scaled to the card. Tells the board its height once it has one, and again when its fonts land. */
+function EmailBody({ item, assets, live, width, height, onHeight }: { item: EmailItem; assets: AssetFile[]; live: boolean; width: number; height: number; onHeight(px: number): void }) {
   const html = useMemo(() => (item.html && live ? withLocalAssets(item.html, assets) : ''), [item.html, assets, live]);
   if (item.error) return <div class="pb-card-note">{item.error}</div>;
   if (!live) return <div class="pb-card-skeleton" />;
   const scale = width / EMAIL_PAGE;
+  const measure = (frame: HTMLIFrameElement) => {
+    const px = documentHeight(frame);
+    if (px) onHeight(px);
+  };
   return (
     <iframe
       class="pb-email-frame"
@@ -1939,6 +2046,11 @@ function EmailBody({ item, assets, live, width, height }: { item: EmailItem; ass
       sandbox="allow-same-origin"
       tabIndex={-1}
       style={{ width: EMAIL_PAGE, height: height / scale, transform: `scale(${scale})` }}
+      onLoad={(e) => {
+        const frame = e.currentTarget;
+        measure(frame);
+        void frame.contentDocument?.fonts?.ready.then(() => measure(frame));
+      }}
     />
   );
 }

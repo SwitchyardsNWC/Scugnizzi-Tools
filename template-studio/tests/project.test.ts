@@ -33,6 +33,7 @@ import {
   boardJson,
   emptyBoard,
   forgetCard,
+  emailCardSize,
   layoutBoard,
   moveCard,
   newProjectInfo,
@@ -112,6 +113,17 @@ describe('the board layout', () => {
   it('wraps a lane after five cards', () => {
     const layout = layoutBoard(['1', '2', '3', '4', '5', '6'].map((n) => picture(`${n}.png`)), emptyBoard());
     expect(layout.cards.map((c) => [c.x, c.y])).toEqual([[0, 0], [260, 0], [520, 0], [780, 0], [1040, 0], [0, 250]]);
+  });
+
+  it('takes a card at its own size when it has one, an email at its full length', () => {
+    const tall: CardSource = { ...email('A'), size: emailCardSize(2000, 640, 28) };
+    expect(tall.size).toEqual({ w: 260, h: 28 + Math.ceil((2000 * 260) / 640) });
+    const layout = layoutBoard([tall, email('B')], emptyBoard());
+    expect(layout.cards.find((c) => c.id === tall.id)).toMatchObject({ w: 260, h: tall.size!.h });
+    expect(layout.cards.find((c) => c.id === 'email:B.template.json')).toMatchObject({ w: 260, h: 380 });
+    const kept = layoutBoard([tall], moveCard(emptyBoard(), tall.id, 40, 40));
+    expect(kept.cards[0]).toMatchObject({ x: 40, y: 40, h: tall.size!.h });
+    expect(emailCardSize(10, 640, 28).h).toBe(68);
   });
 
   it('keeps a card where it was put, and finds the next free spot beside it', () => {
