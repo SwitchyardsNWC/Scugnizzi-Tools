@@ -141,8 +141,10 @@ export interface Editor {
   /** Why the last save failed, when it did. Cleared by the next save that succeeds. */
   saveError: string | null;
   saveNow(): void;
+  /** Writes over whatever is on disk, conflict or not: the person has looked and chosen theirs. */
+  saveAnyway(): void;
   file: TemplateFile | null;
-  /** Set when a save was refused because the file changed underneath us. */
+  /** Set when a save was refused because a different template was on disk (workspace.ts, writeTemplate). */
   conflictAt: number | null;
   dismissConflict(): void;
 }
@@ -180,6 +182,8 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
 
   const lastCoalesce = useRef<{ key: string; at: number } | null>(null);
   const modified = useRef(0);
+  /** The template as last read from or written to its file, for the save to tell a rewritten time from a rewritten file. */
+  const lastKnown = useRef<string | null>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   /** The file name a new document's first save chose, until the app hands back the real entry. */
   const pinned = useRef<string | null>(null);
@@ -487,6 +491,7 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
     setPast([]);
     setFuture([]);
     modified.current = opened?.modified ?? 0;
+    lastKnown.current = opened ? serializeTemplate(next) : null;
     pinned.current = null;
     lastSystem.current = next.designSystem && next.ds ? serializeDesignSystem(next.ds) : null;
     lastCoalesce.current = null;
@@ -523,52 +528,60 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
     setFile(null);
     pinned.current = null;
     modified.current = 0;
+    lastKnown.current = null;
     setSave('clean');
     setConflictAt(null);
   }, []);
 
   // --- saving ------------------------------------------------------------------------------------
 
-  const write = useCallback(async () => {
-    if (!workspace || !workspace.canWrite) {
-      setSave('local');
-      return;
-    }
-    // The file's own name; else the one the first save chose; else a fresh one that collides with
-    // nothing in the folder.
-    const fresh = !file && !pinned.current;
-    const name = file?.fileName ?? pinned.current ?? templateFileName(template, taken.current);
-    setSave('saving');
-    try {
-      const result = await workspace.writeTemplate(name, serializeTemplate(template), modified.current);
-      if (!result.ok) {
-        setConflictAt(result.modified);
-        setSave('conflict');
+  const write = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (!workspace || !workspace.canWrite) {
+        setSave('local');
         return;
       }
-      modified.current = result.modified;
-      setSaveError(null);
+      // The file's own name; else the one the first save chose; else a fresh one that collides with
+      // nothing in the folder.
+      const fresh = !file && !pinned.current;
+      const name = file?.fileName ?? pinned.current ?? templateFileName(template, taken.current);
+      setSave('saving');
+      try {
+        const json = serializeTemplate(template);
+        // Forced, the check is skipped: the person has seen the conflict and chosen this version.
+        const result = await workspace.writeTemplate(name, json, options.force ? 0 : modified.current, lastKnown.current ?? undefined);
+        if (!result.ok) {
+          setConflictAt(result.modified);
+          setSave('conflict');
+          return;
+        }
+        modified.current = result.modified;
+        lastKnown.current = json;
+        setConflictAt(null);
+        setSaveError(null);
       // The folder's system, when this template follows one and the values moved. The template
       // file above carries no copy of it (serialize.ts), so this write is the only place the
       // panel's edits reach disk — and every template that names the system reads it from here.
-      if (template.designSystem && template.ds) {
-        const json = serializeDesignSystem(template.ds);
-        if (json !== lastSystem.current) {
-          await workspace.writeDesignSystem(template.designSystem, json);
-          lastSystem.current = json;
-          systemWritten.current?.(template.designSystem, template.ds);
+        if (template.designSystem && template.ds) {
+          const system = serializeDesignSystem(template.ds);
+          if (system !== lastSystem.current) {
+            await workspace.writeDesignSystem(template.designSystem, system);
+            lastSystem.current = system;
+            systemWritten.current?.(template.designSystem, template.ds);
+          }
         }
+        setSave('saved');
+        if (fresh) {
+          pinned.current = name;
+          created.current?.(name);
+        }
+      } catch (cause) {
+        setSave('error');
+        setSaveError(cause instanceof Error ? cause.message : 'Could not save.');
       }
-      setSave('saved');
-      if (fresh) {
-        pinned.current = name;
-        created.current?.(name);
-      }
-    } catch (cause) {
-      setSave('error');
-      setSaveError(cause instanceof Error ? cause.message : 'Could not save.');
-    }
-  }, [workspace, file, template]);
+    },
+    [workspace, file, template],
+  );
 
   useEffect(() => {
     if (save !== 'dirty') return;
@@ -619,6 +632,7 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       save,
       saveError,
       saveNow: () => void write(),
+      saveAnyway: () => void write({ force: true }),
       file,
       releaseFile,
       conflictAt,

@@ -2176,3 +2176,25 @@ alt text, render, appearance and spacing. The layer list, the page size and the 
 only inside the canvas. The email canvas no longer edits a freeform block's layers at all; a drag on
 it moves the block.
 
+
+### 3.69 A newer time is not another author
+
+*2026-09-18.* Jared: "I keep getting 'someone else has made changes' not allowing my changes to be saved. I know
+this is a safety net. but i'm also the only one editing the files. unless google drives file sync is causing
+that."
+
+It was. The save refused to write when the file's modification time was later than the time of this editor's
+last save (architecture.md §1), and Drive for desktop rewrites that time once an upload lands, a few seconds after
+the save. So a lone designer in a synced folder saw a conflict on the second keystroke, and because the editor's
+own time never moved, on every keystroke after. Two things were wrong, and both are fixed.
+
+**The time alone decided.** A later time says the file was touched, not that someone else wrote it. Now, when the
+time has moved, the save reads what is on disk and compares it with the template as this editor last read or
+wrote it (`sameTemplate`: both read the way a file is read, keys sorted, so spacing and order do not count). The
+same template under a new time is nobody else's work; the save goes ahead and takes the new time. Only a
+different template on disk is refused.
+
+**A refusal was a wall.** The banner offered Dismiss and advice. It now offers the two things a person can mean:
+*Save anyway*, which writes this editor's version over the folder's (a save with no check), and *Reload theirs*,
+which drops this editor's version for the file as it is and binds to it again. A safety net has to have a door
+in it, or people learn to work around it, which is the one thing worse than last-writer-wins.

@@ -455,6 +455,20 @@ export function App() {
     [workspace, editor, notify, refreshFiles],
   );
 
+  /** Drops this editor's version for the one on disk, when a save was refused: the file as it is now, bound again. */
+  const reloadTheirs = useCallback(async () => {
+    const current = editor.file;
+    if (!current) return editor.dismissConflict();
+    try {
+      const { template } = await current.load();
+      const list = await refreshFiles();
+      editor.load(template, list.find((f) => f.fileName === current.fileName) ?? { ...current, modified: editor.conflictAt ?? current.modified });
+      notify(`Reloaded ${current.name} as it is in the folder.`);
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : `Could not reload ${current.fileName}.`);
+    }
+  }, [editor, notify, refreshFiles]);
+
   /** A copy of the open template as its own file. Saved now, because a copy should exist the moment you ask. */
   const duplicateCurrent = useCallback(() => {
     const copy = duplicateTemplate(editor.template, `${editor.template.name} copy`);
@@ -1778,9 +1792,17 @@ export function App() {
       )}
 
       {editor.conflictAt !== null && (
+        // A different template is on disk than the one this editor read: someone else saved, or the synced folder
+        // brought down another machine's version. Theirs is not touched until the person chooses.
         <div class="banner" role="alert">
-          Someone else saved this template while you were editing, so yours was not written. Save a copy, or
-          reload theirs and redo your change.
+          A different version of this template was saved to the folder while you were editing, so yours was not
+          written. Save anyway to replace it with yours, or reload theirs and redo your change.
+          <button class="link" onClick={editor.saveAnyway}>
+            Save anyway
+          </button>
+          <button class="link" onClick={() => void reloadTheirs()}>
+            Reload theirs
+          </button>
           <button class="link" onClick={editor.dismissConflict}>Dismiss</button>
         </div>
       )}
