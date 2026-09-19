@@ -64,7 +64,7 @@ export function renderBlock(block: Block, sec: Section, col: Column, ctx: BuildC
     case 'topbar':
       return renderTopbar(block, sec, ctx);
     case 'stripes':
-      return renderStripes(block, ctx);
+      return renderStripes(block, sec, ctx);
     case 'spacer':
       return renderSpacer(block, sec, ctx);
     case 'divider':

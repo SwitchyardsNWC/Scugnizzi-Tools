@@ -12,7 +12,7 @@
 
 import { createSection } from './catalog.ts';
 import { DEFAULT_DESIGN_SYSTEM, theme as themeTokens, type DesignSystem } from './design-system.ts';
-import { sequentialIds } from './ids.ts';
+import { bodyFieldName, sequentialIds } from './ids.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import type { Block, Column, Lock, Preview, Section, Template } from './types.ts';
 
@@ -99,6 +99,8 @@ export function cardTemplate(): Template {
     taken.add(name);
     return { editable: true, label, field: name };
   };
+  /** The first body is HubSpot's `email_body` (ids.ts). */
+  const body = (label: string): Lock => ({ editable: true, label, field: bodyFieldName(label, taken) });
   const fixed = (label: string): Lock => ({ editable: false, label, field: '' });
 
   const on = (preset: string, columns: Column[], extra: Partial<Section> = {}): Section => {
@@ -138,7 +140,7 @@ export function cardTemplate(): Template {
         [
           copy(
             '<p>Short copy under the headline. Everything below sits in a card: a box drawn in the palette’s ink, twelve pixels in from the words. The face is monospace, which is a stack the design system names — change it once in Design › Type and every card follows.</p>',
-            open('Intro'),
+            body('Intro'),
           ),
         ],
         { padTop: 0, padBottom: 4 },

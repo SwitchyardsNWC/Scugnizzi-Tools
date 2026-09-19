@@ -13,9 +13,10 @@
 
 import { walk, type IRNode } from './ir.ts';
 import { localSources } from '../model/export-package.ts';
+import { EMAIL_BODY } from '../model/ids.ts';
 import { allColors, type Registry } from './colors.ts';
 import { pictureHash } from '../model/freeform.ts';
-import { allBlocks } from '../model/edit.ts';
+import { allBlocks, hubspotFields } from '../model/edit.ts';
 import { CATALOG } from '../model/catalog.ts';
 import { untidyBlocks } from '../model/tidy.ts';
 import { dndAreas, modulesOf, DND_MIN_WIDTH } from '../model/dnd.ts';
@@ -208,6 +209,24 @@ export function lint({ tree, registry, html, bytes, mode = 'hubl', template }: L
       } else if (block.renderedHash !== pictureHash(block)) {
         warn('picture-render', `The ${what} "${block.alt || block.type}" has changed since its picture was rendered. Render it again, or the email carries the old picture.`);
       }
+    }
+  }
+
+  // --- HubSpot's `email_body` ------------------------------------------------------------------------
+  //
+  // HubSpot warns at upload when no module in the template is named `email_body`, and blog and RSS emails,
+  // which pour the post into that module, cannot use it. The first Text block a template gets takes the name
+  // (ids.ts); a drag and drop area is named it too. What reaches here is a template whose bodies were all
+  // named before that rule, or named while another field held the name and was later removed.
+  if (template && mode === 'hubl') {
+    const fields = hubspotFields(template).filter((f) => f.editable);
+    const bodies = fields.filter((f) => f.blockType === 'richtext');
+    const named = fields.some((f) => f.field === EMAIL_BODY) || dndAreas(template).some((a) => (a.name || EMAIL_BODY) === EMAIL_BODY);
+    if (bodies.length && !named) {
+      warn(
+        'email-body',
+        `No field is named ${EMAIL_BODY}, so HubSpot warns the template will not work for blog and RSS emails. Pick the main Text block, "${bodies[0]!.label}", and in its In HubSpot panel name it ${EMAIL_BODY}; before the template is uploaded that costs nothing.`,
+      );
     }
   }
 

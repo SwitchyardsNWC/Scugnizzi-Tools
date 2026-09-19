@@ -133,6 +133,8 @@ export interface BoxTokens {
   color: string;
   radius: number;
   pad: number;
+  /** A colour behind the contents, with the box's corners. Null is no fill. */
+  fill?: string | null;
 }
 
 /**
@@ -148,6 +150,7 @@ export interface BoxTokens {
  * a full-width rule across the email, and it is the one anybody drawing a card means.
  */
 export function boxed(inner: IRNode, box: BoxTokens): IRNode {
+  const fill = box.fill ?? null;
   return el(
     'table',
     {
@@ -158,11 +161,27 @@ export function boxed(inner: IRNode, box: BoxTokens): IRNode {
       style: style(
         'width:100%',
         'border-collapse:separate',
-        `border:${box.width}px solid ${box.color}`,
+        box.width > 0 && `border:${box.width}px solid ${box.color}`,
         box.radius > 0 && `border-radius:${box.radius}px`,
+        // The fill on the table as well as the cell, so a client that drops one of them still paints the card.
+        fill && `background-color:${fill}`,
       ),
     },
-    [el('tbody', null, [el('tr', null, [el('td', { style: `padding:${box.pad}px` }, inner)])])],
+    [
+      el('tbody', null, [
+        el('tr', null, [
+          el(
+            'td',
+            {
+              bgcolor: fill,
+              style: style(`padding:${box.pad}px`, fill && `background-color:${fill}`, fill && box.radius > 0 && `border-radius:${box.radius}px`),
+            },
+            inner,
+            fill ? { bg: fill } : {},
+          ),
+        ]),
+      ]),
+    ],
   );
 }
 

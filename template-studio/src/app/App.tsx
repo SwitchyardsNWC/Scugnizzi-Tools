@@ -29,7 +29,8 @@ import { canvasBlob, freeformCanvas } from './picture.ts';
 import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
 import type { Branch } from '../compile/serialize.ts';
-import { isPatternKind, patternIdOf, type PaletteKind, type PatternCard } from './Palette.tsx';
+import { isPatternKind, isSyKind, patternIdOf, syIdOf, type PaletteKind, type PatternCard } from './Palette.tsx';
+import { Welcome } from './Welcome.tsx';
 import { importV1 } from '../model/import-v1.ts';
 import {
   download,
@@ -87,6 +88,8 @@ import { fileSlug, serializeDesignSystem, serializePattern, serializeTemplate } 
 import { tidyTemplate } from '../model/tidy.ts';
 import { colorOf, type DesignSystem } from '../model/design-system.ts';
 import { blankTemplate, cardTemplate } from '../model/starters.ts';
+import { SY_BLOCKS, switchyardsShortTemplate, switchyardsTemplate } from '../model/switchyards.ts';
+import { cloneSection as copySection, designSystemOf as systemOf, freshIds as idsFor, takenFieldNames as fieldsTaken } from '../model/edit.ts';
 import { ADDABLE, CATALOG, SINGLETON } from '../model/catalog.ts';
 import type { Block, BlockType, FreeformBlock } from '../model/types.ts';
 import type { Starter } from './Templates.tsx';
@@ -128,9 +131,21 @@ const STARTERS: Starter[] = [
     make: blankTemplate,
   },
   {
+    id: 'switchyards',
+    name: 'Switchyards email',
+    summary: 'The Switchyards email system’s standard send: tagline header, lockup, hero, one heading, the copy, one outline button, the sign-off, the masthead footer. Its own design system comes with it.',
+    make: switchyardsTemplate,
+  },
+  {
+    id: 'switchyards-short',
+    name: 'Switchyards short',
+    summary: 'The system’s short send, for one fact: lockup header, hero, heading, one paragraph, the Callout, one solid button, the sign-off, the stub footer.',
+    make: switchyardsShortTemplate,
+  },
+  {
     id: 'standard',
-    name: 'Standard email',
-    summary: 'The Switchyards email as it ships: top bar, stripes, hero, copy, buttons and footer, on the brand palette.',
+    name: 'Standard email (v1)',
+    summary: 'The Switchyards email as it shipped before the system: top bar, stripes, hero, copy, buttons and footer, on the brand palette.',
     make: () => importV1(starterDesign as never).template,
   },
   {
@@ -234,7 +249,7 @@ export function App() {
   const extending = useRef(false);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const noteRecent = useCallback((kind: string) => {
-    if (isPatternKind(kind as PaletteKind) || kind === 'columns') return;
+    if (isPatternKind(kind as PaletteKind) || isSyKind(kind as PaletteKind) || kind === 'columns') return;
     setRecent((old) => {
       const next = [kind, ...old.filter((k) => k !== kind)].slice(0, 4);
       writeRecent(next);
@@ -296,7 +311,12 @@ export function App() {
       return null;
     }
   }, []);
-  const initial = useMemo(() => restored ?? importV1(starterDesign as never).template, [restored]);
+  // With nothing kept, the app opens on an untouched blank under the Welcome screen (Welcome.tsx), not on somebody's
+  // email: the choice is a folder to open or a starter to begin from. The blank is not kept as a draft until chosen.
+  const initial = useMemo(() => restored ?? blankTemplate(), [restored]);
+  const [choosing, setChoosing] = useState<boolean>(() => !restored);
+  const choosingRef = useRef(choosing);
+  choosingRef.current = choosing;
   // A new document's first save picks a name that collides with nothing here, and once the file
   // exists the folder is re-read so the panel lists it and the editor is bound to the real entry.
   const fileNames = useMemo(() => files.map((f) => f.fileName), [files]);
@@ -386,9 +406,15 @@ export function App() {
   }, [editor.selection]);
 
   /** A fresh document from a starter. Offers the way back, because the one on screen may be unsaved. */
+  // A file opened is a choice made.
+  useEffect(() => {
+    if (editor.file) setChoosing(false);
+  }, [editor.file]);
+
   const startNew = useCallback(
     (starter: Starter) => {
       const before = { template: editor.template, file: editor.file };
+      setChoosing(false);
       editor.create(starter.make());
       notify(
         workspace?.canWrite ? `New template from ${starter.name}. It saves to the folder on your first edit.` : `New template from ${starter.name}.`,
@@ -838,6 +864,33 @@ export function App() {
     [editor, patterns],
   );
 
+  /**
+   * One of the Switchyards email system's blocks (model/switchyards.ts), placed as its sections at a position: made on
+   * this template's design system, then cloned in so ids and field names collide with nothing, the way a pattern is.
+   */
+  const placeSyBlockAt = useCallback(
+    (id: string, index: number | null) => {
+      const block = SY_BLOCKS.find((b) => b.id === id);
+      if (!block) return;
+      const t = editor.template;
+      const nextId = idsFor(t);
+      const taken = fieldsTaken(t);
+      const made = block.make(systemOf(t)).map((s) => copySection(s, nextId, taken));
+      const at = index ?? t.sections.length;
+      const sections = [...t.sections];
+      sections.splice(Math.max(0, Math.min(sections.length, at)), 0, ...made);
+      const first = made[0];
+      const row = first?.rows[0];
+      const firstBlock = row && row.columns.length === 1 ? row.columns[0]!.blocks[0] : undefined;
+      editor.commit(
+        `Place ${block.name}`,
+        { ...t, sections },
+        first ? { select: firstBlock ? { kind: 'block', sectionId: first.id, blockId: firstBlock.id } : { kind: 'section', sectionId: first.id } } : {},
+      );
+    },
+    [editor],
+  );
+
   /** The selected section's standing with the folder's patterns, and the verbs. */
   const patternInfo = useMemo<PatternInfo | undefined>(() => {
     const sel = editor.selection;
@@ -1056,6 +1109,10 @@ export function App() {
       placePatternAt(patternIdOf(type), sectionIndex);
       return;
     }
+    if (isSyKind(type)) {
+      placeSyBlockAt(syIdOf(type), sectionIndex);
+      return;
+    }
     if (type === 'columns') {
       // Columns cannot nest — `Column.blocks` holds blocks, and a row is not one. Dropped onto a
       // column, the new row lands after the one it was aimed at rather than inside it, which is
@@ -1075,7 +1132,7 @@ export function App() {
       s.rows.some((r) => r.columns.some((c) => c.id === place.columnId)),
     );
     if (section) editor.addToColumn(section.id, place.columnId, type, place.index);
-  }, [dragType, placeOf, editor, placePatternAt, noteRecent, sectionAfter]);
+  }, [dragType, placeOf, editor, placePatternAt, placeSyBlockAt, noteRecent, sectionAfter]);
 
   // --- workspace -------------------------------------------------------------------------------
 
@@ -1356,7 +1413,8 @@ export function App() {
   const templateRef = useRef(editor.template);
   templateRef.current = editor.template;
   const keepDraft = () => {
-    if (workspaceRef.current?.canWrite) return;
+    // Nothing chosen yet: the blank under the Welcome screen is nobody's work, and kept it would skip the screen next time.
+    if (workspaceRef.current?.canWrite || choosingRef.current) return;
     try {
       localStorage.setItem(DRAFT_KEY, draftJson(templateRef.current));
       setDraftFailed(false);
@@ -1880,6 +1938,7 @@ export function App() {
           {...(workspace?.deleteTemplate ? { onDelete: (file: TemplateFile) => void deleteTemplateFile(file) } : {})}
           patterns={patternCards}
           onPlacePattern={(id) => placePatternAt(id, null)}
+          onPlaceSyBlock={(id) => placeSyBlockAt(id, null)}
           patternOf={patternOf}
           onUsed={(kind) => noteRecent(kind)}
           also={also}
@@ -1901,6 +1960,21 @@ export function App() {
         />
 
         <main class="canvas">
+          {choosing && (
+            <Welcome
+              starters={STARTERS}
+              files={files}
+              folder={workspace?.label ?? null}
+              folders={supportsFolders()}
+              reopenable={projectFolder.reopenable?.name ?? null}
+              onOpenFolder={pickFolder}
+              onChooseFiles={(picked) => void adopt(workspaceFromFiles(picked))}
+              onReopen={() => void projectFolder.reopen()}
+              onOpenFile={(file) => void open(file)}
+              onNew={startNew}
+              onSkip={() => setChoosing(false)}
+            />
+          )}
           <div class="tools">
             {/* Two glyphs rather than two words. This is the control the eye comes back to most,
                 it sits at the head of a row of named buttons, and a screen and a handset are the
@@ -2222,7 +2296,9 @@ export function App() {
             ? 'Columns'
             : isPatternKind(dragType)
               ? (patternCards.find((p) => p.id === patternIdOf(dragType))?.name ?? 'Pattern')
-              : CATALOG[dragType].name}
+              : isSyKind(dragType)
+                ? (SY_BLOCKS.find((b) => b.id === syIdOf(dragType))?.name ?? 'Block')
+                : CATALOG[dragType].name}
         </div>
       )}
 

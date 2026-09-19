@@ -187,9 +187,9 @@ export const BLOCK_ICONS = {
  * the same thing: the palette card you pick up, the ghost you carry, and the layer row it lands as.
  * That repetition is the point — it is what makes the three read as one object moving.
  */
-export function glyphFor(kind: keyof typeof BLOCK_ICONS | 'columns' | `pattern:${string}`): Glyph {
+export function glyphFor(kind: keyof typeof BLOCK_ICONS | 'columns' | `pattern:${string}` | `sy:${string}`): Glyph {
   if (kind === 'columns') return ColumnsIcon;
-  if (kind.startsWith('pattern:')) return PatternIcon;
+  if (kind.startsWith('pattern:') || kind.startsWith('sy:')) return PatternIcon;
   return BLOCK_ICONS[kind as keyof typeof BLOCK_ICONS];
 }
 

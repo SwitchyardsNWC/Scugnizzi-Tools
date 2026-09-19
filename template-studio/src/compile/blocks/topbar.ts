@@ -80,6 +80,7 @@ export function renderTopbar(block: TopbarBlock, sec: Section, ctx: BuildContext
       container: sec.containerColor,
       padTop: sec.padTop,
       padBottom: sec.padBottom,
+      bleed: sec.bleed ?? false,
     }),
   ]);
 }

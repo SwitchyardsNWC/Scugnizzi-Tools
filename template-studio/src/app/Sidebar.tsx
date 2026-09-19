@@ -45,6 +45,7 @@ export interface SidebarProps {
   /** The folder's patterns, for the palette and the layer tree. */
   patterns: PatternCard[];
   onPlacePattern(id: string): void;
+  onPlaceSyBlock(id: string): void;
   patternOf(sectionId: string): 'current' | 'stale' | 'missing' | null;
   onUsed(kind: PaletteKind): void;
   also: string[];
@@ -132,6 +133,7 @@ export function Sidebar(props: SidebarProps) {
             onDrop={props.onPaletteDrop}
             patterns={props.patterns}
             onPlacePattern={props.onPlacePattern}
+            onPlaceSyBlock={props.onPlaceSyBlock}
             onUsed={props.onUsed}
           />
         )}

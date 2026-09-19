@@ -4,7 +4,7 @@ import { CATALOG, GROUP_GROUPS, type Control, type Group } from '../model/catalo
 import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
 import { colorOf, type ColorRef } from '../model/design-system.ts';
 import type { BlockType } from '../model/types.ts';
-import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans } from '../model/edit.ts';
+import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans, hubspotFields } from '../model/edit.ts';
 import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
@@ -12,6 +12,7 @@ import type { FreeformLayer } from '../model/types.ts';
 import type { DndColumn, DndModule, DndSection, Lock } from '../model/types.ts';
 import { newDndColumn, newDndModule, newDndSection } from '../model/dnd.ts';
 import { STOCK_MODULES, stockModule } from '../model/modules.ts';
+import { EMAIL_BODY } from '../model/ids.ts';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
@@ -416,6 +417,8 @@ function renderInput(control: Control, value: unknown, set: (v: unknown) => void
 function LockField({ control, editor }: { control: Control; editor: Editor }) {
   const lock = readValue(editor.template, editor.selection, control.path) as Lock | undefined;
   if (!lock) return null;
+  const block = readValue(editor.template, editor.selection, 'block') as { type?: string } | undefined;
+  const canBeBody = lock.editable && block?.type === 'richtext' && lock.field !== EMAIL_BODY && !hubspotFields(editor.template).some((f) => f.field === EMAIL_BODY);
 
   return (
     <div class="field wide lockbox">
@@ -444,6 +447,19 @@ function LockField({ control, editor }: { control: Control; editor: Editor }) {
             <code title="Fixed once created. Renaming the label above cannot orphan what the team has already typed into this field.">
               {lock.field}
             </code>
+            {canBeBody && (
+              // The one rename offered, because HubSpot asks for it by name: without a module called email_body the
+              // template warns at upload and cannot be used for blog and RSS emails. Free only before the template is
+              // uploaded; after, every email built from it is bound to the old name (learnings 1.10), which is why
+              // the title says so.
+              <button
+                class="link"
+                title={`Name this field ${EMAIL_BODY}, HubSpot's name for the main body. Do it before the template is uploaded: emails already built from it are bound to “${lock.field}”.`}
+                onClick={() => editor.set(`${control.path}.field`, EMAIL_BODY)}
+              >
+                Name it {EMAIL_BODY}
+              </button>
+            )}
           </p>
         </>
       ) : (

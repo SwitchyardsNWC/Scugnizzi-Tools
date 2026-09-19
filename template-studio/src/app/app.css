@@ -1877,3 +1877,28 @@ button.fig-pill:active { transform: scale(0.96); }
 .cv-text { flex: 1; min-width: 0; height: 24px; padding: 5px 0 1px; border: 0; border-bottom: 1px solid #dededc; border-radius: 0; background: none; color: #0d0d0d; font: inherit; font-size: 12px; letter-spacing: 0.011em; outline: none; }
 .cv-text:focus { border-bottom-color: #0d0d0d; }
 .cv-text::placeholder { color: #a8aaa7; }
+
+/* --- the Welcome screen (Welcome.tsx): a folder to open, or an email to start ---------------------------------- */
+.wl { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding: 40px 24px; overflow: auto; background: var(--paper); }
+.wl-card { width: min(760px, 100%); padding: 28px 32px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 16px 48px -28px rgb(23 26 38 / 0.4); }
+.wl h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.wl-lead { margin: 0 0 22px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.wl-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.wl h2 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.wl .btn.wide { display: flex; width: 100%; justify-content: center; margin-bottom: 8px; }
+.wl-hint { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: var(--faint); }
+.wl-more { margin-top: 12px; }
+.wl-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; }
+.wl-file, .wl-starter { display: flex; width: 100%; margin: 0 0 6px; padding: 9px 12px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+.wl-file { justify-content: space-between; align-items: baseline; gap: 10px; }
+.wl-file span { font-size: 13px; font-weight: 500; }
+.wl-file small { font-family: var(--mono); font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-starter { flex-direction: column; gap: 2px; }
+.wl-starter b { font-size: 13px; font-weight: 600; }
+.wl-starter span { font-size: 12px; line-height: 1.4; color: var(--muted); }
+.wl-file:hover, .wl-starter:hover { background: var(--sunk); border-color: var(--faint); }
+.wl-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 760px) { .wl-cols { grid-template-columns: 1fr; } }
+
+/* The one rename the inspector offers, beside the field name it would replace. */
+.fieldname .link { margin-left: 10px; }
