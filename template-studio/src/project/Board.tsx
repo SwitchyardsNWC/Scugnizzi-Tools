@@ -20,6 +20,7 @@ import { recipesByOutput, RECIPE_TOOLS, toolAddress } from '../model/tool-recipe
 import {
   addGroup,
   addNote,
+  addReply,
   BOARD_FILE,
   boardJson,
   CARD_GAP,
@@ -39,6 +40,7 @@ import {
   moveCard,
   moveGroupWith,
   newNoteId,
+  newReplyId,
   NOTE_KINDS,
   NOTE_WIDTH,
   pictureCardId,
@@ -47,6 +49,7 @@ import {
   readBoard,
   removeGroup,
   removeNote,
+  removeReply,
   sectionLabels,
   tidyBoard,
   updateNote,
@@ -57,6 +60,7 @@ import {
   type BoardNote,
   type CardLink,
   type CardSource,
+  type NoteReply,
   type PlacedCard,
   type PlacedGroup,
 } from '../model/project.ts';
@@ -545,7 +549,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       : p
         ? { x: snap(p.x - 16), y: snap(p.y - 12) }
         : { x: snap((size.w / 2 - v.x) / v.z - NOTE_WIDTH / 2), y: snap((size.h / 2 - v.y) / v.z - 40) };
-    const note: BoardNote = { id: newNoteId(), text: '', x: at.x, y: at.y, w: NOTE_WIDTH, color: 0, on: card?.id ?? null, part: null, at: 0, resolvedAt: 0 };
+    const note: BoardNote = { id: newNoteId(), text: '', x: at.x, y: at.y, w: NOTE_WIDTH, color: 0, on: card?.id ?? null, part: null, at: 0, resolvedAt: 0, replies: [] };
     putNote(note, card ? `Leave a note on ${card.name}` : 'Leave a note');
     setSelected(note.id);
     setEditingNote(note.id);
@@ -579,6 +583,17 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const now = resolved ? Date.now() : 0;
     saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: now }));
     history.push({ label: resolved ? 'Resolve a note' : 'Open a note again', undo: () => saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: was })), redo: () => saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: now })) });
+  };
+  const replyToNote = (note: BoardNote, text: string) => {
+    const reply: NoteReply = { id: newReplyId(), text, at: Date.now() };
+    saveBoard(addReply(boardRef.current, note.id, reply));
+    history.push({ label: 'Reply to a note', undo: () => saveBoard(removeReply(boardRef.current, note.id, reply.id)), redo: () => saveBoard(addReply(boardRef.current, note.id, reply)) });
+  };
+  const removeReplyFrom = (note: BoardNote, replyId: string) => {
+    const reply = note.replies.find((r) => r.id === replyId);
+    if (!reply) return;
+    saveBoard(removeReply(boardRef.current, note.id, replyId));
+    history.push({ label: 'Delete a reply', undo: () => saveBoard(addReply(boardRef.current, note.id, reply)), redo: () => saveBoard(removeReply(boardRef.current, note.id, replyId)) });
   };
   const colourNote = (note: BoardNote, color: number) => {
     if (color === note.color) return;
@@ -1752,6 +1767,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                 onColor={(i) => colourNote(n, i)}
                 onRemove={() => removeNoteWithUndo(n)}
                 onResolve={(resolved) => resolveNote(n, resolved)}
+                onReply={(text) => replyToNote(n, text)}
+                onRemoveReply={(id) => removeReplyFrom(n, id)}
                 onPinDown={(e) => onPinDown(n, e)}
                 {...(n.on && emailsById.get(n.on)?.template
                   ? { parts: sectionLabels(emailsById.get(n.on)!.template!), onPart: (id: string | null) => pointNote(n, id), onPreviewPart: (id: string | null) => setPreviewPart(id ? { note: n.id, part: id } : null) }

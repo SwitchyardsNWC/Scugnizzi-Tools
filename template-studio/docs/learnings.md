@@ -2605,3 +2605,31 @@ outside of the note in the bottom right. and the resolved to the top right of th
 - **The note's tick is at the top right**, after the kind swatches, where a done mark is looked for. Delete is a
   small word just outside the note's bottom right corner, shown on hover, so it is never taken for one of the
   note's own controls and never sits beside the tick.
+
+### 3.88 A bin, and replies
+
+*2026-09-19.* Jared: "change delete to a trashcan icon. add a way to reply to the notes."
+
+- **Delete is a bin.** The word outside the note's corner became the `Trash` glyph (glyphs.tsx), the same 12px
+  stroke as the bar's; the word stays in the title and the label.
+- **A thread under a note.** `NoteReply { id, text, at }` in `replies`, oldest first; `addReply` and `removeReply`
+  on the model, read back checked (a blank reply, one without an id, a repeated id are dropped). On the board the
+  thread sits under the words with a hairline above it, each reply a small block with its time and, on hover, its
+  own bin; a quiet "Reply" opens a field, Enter sends, Shift+Enter breaks the line, Escape drops it. Template
+  Studio's rail shows the thread under each note and has the same Reply, written the same way as resolving: the
+  file read again, one note changed, written back. Both sides undo on the board; Studio's writes are the board's
+  next look.
+- **No author.** A reply has a time and words. The folder does not know who is who, and a name typed once and
+  saved in one browser would be a guess about the next. When there is a way to know, replies have a place for it.
+
+*Later the same day.* Jared: "make the reply at the bottom of the note. and lets make the delete just a text like
+the reply at the bottom right of the note." The bin outside the corner lasted an hour. The note's foot is now a row
+of two quiet words, Reply at the left and Delete at the right, inside the note; the bin stays on each reply, where
+a word would crowd the line. Two controls that do the same kind of thing should look the same, and a verb outside
+the thing it acts on reads as belonging to something else.
+
+*And later still.* Jared: "make it 'delete note'. and only show it once the note has been clicked on. I don't love
+how the input has the outline when editing the note." So: "Delete note", shown only on the picked note, with Reply
+always there; and the note's field and the reply field have no focus ring. The board's ring (`.pb-app :focus-visible`)
+had been drawing a rounded box around the words, since a textarea's own `outline: none` loses to `:focus-visible`;
+the field is the note, and a ring around the words said "form" where the paper said "note".

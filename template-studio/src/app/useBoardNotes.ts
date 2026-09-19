@@ -8,11 +8,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
-import { BOARD_FILE, boardJson, emailCardId, readBoard, updateNote, type BoardNote } from '../model/project.ts';
+import { addReply, BOARD_FILE, boardJson, emailCardId, newReplyId, readBoard, updateNote, type BoardNote } from '../model/project.ts';
 import { readText, writeFile } from '../project/folder.ts';
 import type { Workspace } from '../workspace/workspace.ts';
 
-export function useBoardNotes(workspace: Workspace | null, fileName: string | null): { notes: BoardNote[]; setResolved(id: string, resolved: boolean): Promise<void> } {
+export function useBoardNotes(workspace: Workspace | null, fileName: string | null): { notes: BoardNote[]; setResolved(id: string, resolved: boolean): Promise<void>; reply(id: string, text: string): Promise<void> } {
   const [notes, setNotes] = useState<BoardNote[]>([]);
   const dir = workspace?.kind === 'folder' ? workspace.handle : undefined;
   const lastText = useRef<string | null>(null);
@@ -57,5 +57,18 @@ export function useBoardNotes(workspace: Workspace | null, fileName: string | nu
     },
     [dir, read],
   );
-  return { notes, setResolved };
+  /** A reply under a note, written the same way: the file read again, one note changed, written back. */
+  const reply = useCallback(
+    async (id: string, text: string) => {
+      if (!dir || !text.trim()) return;
+      const found = await readText(dir, BOARD_FILE).catch(() => null);
+      const board = readBoard(found?.text ?? null);
+      if (!board.notes.some((n) => n.id === id)) return;
+      await writeFile(dir, BOARD_FILE, boardJson(addReply(board, id, { id: newReplyId(), text: text.trim(), at: Date.now() })));
+      lastText.current = null;
+      await read();
+    },
+    [dir, read],
+  );
+  return { notes, setResolved, reply };
 }

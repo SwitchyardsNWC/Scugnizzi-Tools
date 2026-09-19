@@ -1905,6 +1905,14 @@ button.fig-pill:active { transform: scale(0.96); }
 .note-card-check { width: 18px; height: 18px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 50%; background: rgb(255 255 255 / 0.6); color: rgb(0 0 0 / 0.55); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
 .note-card-check:hover { border-color: #0d0d0d; color: #0d0d0d; }
 .note-card-check.on { background: #0d0d0d; border-color: #0d0d0d; color: #fff; }
+.note-card-replies { display: grid; gap: 4px; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgb(0 0 0 / 0.12); }
+.note-card-reply { display: grid; gap: 1px; padding: 5px 7px; background: rgb(255 255 255 / 0.45); border-radius: 3px; font-size: 12px; line-height: 1.35; }
+.note-card-reply-when { font-family: var(--mono); font-size: 9.5px; color: rgb(0 0 0 / 0.45); }
+.note-card-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-card-reply-field { display: block; width: 100%; margin-top: 4px; padding: 5px 7px; border: 1px solid rgb(0 0 0 / 0.2); border-radius: 3px; outline: none; resize: none; background: rgb(255 255 255 / 0.7); color: #26261f; font: inherit; font-size: 12px; line-height: 1.35; }
+.note-card-reply-field:focus { border-color: #0d0d0d; }
+.note-card-reply-btn { justify-self: start; padding: 0; border: 0; background: none; color: rgb(0 0 0 / 0.5); font: inherit; font-size: 11px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.note-card-reply-btn:hover { color: #0d0d0d; }
 .note-card.resolved { filter: saturate(0.25); opacity: 0.7; }
 .note-card.resolved:hover { opacity: 1; }
 .note-card-kind { font-family: inherit; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(0 0 0 / 0.7); }

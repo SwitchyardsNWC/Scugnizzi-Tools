@@ -197,7 +197,18 @@ export interface BoardNote {
   at: number;
   /** When it was resolved, ms since the epoch; 0 while it is open. Resolved on the board or in Template Studio. */
   resolvedAt: number;
+  /** The thread under it, oldest first (Jared: "add a way to reply to the notes"). */
+  replies: NoteReply[];
 }
+
+export interface NoteReply {
+  id: string;
+  text: string;
+  /** When it was written, ms since the epoch. */
+  at: number;
+}
+
+export const newReplyId = (): string => `reply:${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * What a note's colour says. Jared: "colors, a purpose. yellow idea, green, move forward with; red, stop before
@@ -272,6 +283,7 @@ export function readBoard(raw: string | null): BoardDoc {
         part: typeof n.part === 'string' && n.part ? n.part : null,
         at: typeof n.at === 'number' && Number.isFinite(n.at) ? n.at : 0,
         resolvedAt: typeof n.resolvedAt === 'number' && Number.isFinite(n.resolvedAt) && n.resolvedAt > 0 ? n.resolvedAt : 0,
+        replies: readReplies(n.replies),
       });
     }
   }
@@ -300,7 +312,33 @@ export function forgetCard(board: BoardDoc, id: string): BoardDoc {
 
 // --- notes --------------------------------------------------------------------------------------------------
 
+/** A note's replies as written, each checked; anything else is no reply. */
+function readReplies(raw: unknown): NoteReply[] {
+  if (!Array.isArray(raw)) return [];
+  const out: NoteReply[] = [];
+  const ids = new Set<string>();
+  for (const item of raw as unknown[]) {
+    const r = (item && typeof item === 'object' ? item : {}) as Partial<Record<keyof NoteReply, unknown>>;
+    if (typeof r.id !== 'string' || !r.id || ids.has(r.id) || typeof r.text !== 'string' || !r.text.trim()) continue;
+    ids.add(r.id);
+    out.push({ id: r.id, text: r.text.slice(0, NOTE_TEXT_MAX), at: typeof r.at === 'number' && Number.isFinite(r.at) ? r.at : 0 });
+  }
+  return out;
+}
+
 export const addNote = (board: BoardDoc, note: BoardNote): BoardDoc => ({ ...board, notes: [...board.notes.filter((n) => n.id !== note.id), note] });
+
+/** A reply under a note, at the end of its thread; nothing when the note is not there. */
+export function addReply(board: BoardDoc, noteId: string, reply: NoteReply): BoardDoc {
+  if (!reply.text.trim() || !board.notes.some((n) => n.id === noteId)) return board;
+  return { ...board, notes: board.notes.map((n) => (n.id === noteId ? { ...n, replies: [...n.replies.filter((r) => r.id !== reply.id), reply] } : n)) };
+}
+
+export function removeReply(board: BoardDoc, noteId: string, replyId: string): BoardDoc {
+  const note = board.notes.find((n) => n.id === noteId);
+  if (!note || !note.replies.some((r) => r.id === replyId)) return board;
+  return { ...board, notes: board.notes.map((n) => (n.id === noteId ? { ...n, replies: n.replies.filter((r) => r.id !== replyId) } : n)) };
+}
 
 export function updateNote(board: BoardDoc, id: string, patch: Partial<Omit<BoardNote, 'id'>>): BoardDoc {
   if (!board.notes.some((n) => n.id === id)) return board;

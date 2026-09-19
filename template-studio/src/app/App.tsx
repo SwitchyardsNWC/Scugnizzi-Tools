@@ -1051,7 +1051,7 @@ export function App() {
   const imageBlockIds = useMemo(() => allBlocks(editor.template).flatMap((b) => (b.type === 'image' ? [b.id] : [])), [editor.template]);
 
   // --- the board's notes for this email (useBoardNotes.ts, NotesRail.tsx) ------------------------------------
-  const { notes: boardNotes, setResolved: resolveBoardNote } = useBoardNotes(workspace, editor.file?.fileName ?? null);
+  const { notes: boardNotes, setResolved: resolveBoardNote, reply: replyToBoardNote } = useBoardNotes(workspace, editor.file?.fileName ?? null);
   const openNotes = boardNotes.filter((n) => !n.resolvedAt).length;
   const [notesShown, setNotesShown] = useState(true);
   const noteLabels = useMemo(() => sectionLabels(editor.template), [editor.template]);
@@ -1979,6 +1979,9 @@ export function App() {
               onPick={goToPart}
               onResolve={(id, resolved) => {
                 void resolveBoardNote(id, resolved).catch((cause: unknown) => notify(cause instanceof Error ? cause.message : 'The note could not be changed.'));
+              }}
+              onReply={(id, text) => {
+                void replyToBoardNote(id, text).catch((cause: unknown) => notify(cause instanceof Error ? cause.message : 'The reply could not be written.'));
               }}
               onOpenBoard={() => void (window.location.href = new URL('project.html', window.location.href).href)}
               onClose={() => setNotesShown(false)}

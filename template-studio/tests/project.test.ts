@@ -31,6 +31,7 @@ import {
 } from '../src/model/frame-store.ts';
 import {
   addNote,
+  addReply,
   boardJson,
   emailCardSize,
   emptyBoard,
@@ -44,6 +45,7 @@ import {
   readBoard,
   readProjectInfo,
   removeNote,
+  removeReply,
   sectionLabels,
   tidyBoard,
   updateNote,
@@ -99,7 +101,7 @@ describe('board.json', () => {
 });
 
 describe('notes on the board', () => {
-  const note = (over: Partial<BoardNote> = {}): BoardNote => ({ id: 'note:a1', text: 'Tighten the headline', x: 300, y: 40, w: NOTE_WIDTH, color: 1, on: 'email:a', part: null, at: 1700000000000, resolvedAt: 0, ...over });
+  const note = (over: Partial<BoardNote> = {}): BoardNote => ({ id: 'note:a1', text: 'Tighten the headline', x: 300, y: 40, w: NOTE_WIDTH, color: 1, on: 'email:a', part: null, at: 1700000000000, resolvedAt: 0, replies: [], ...over });
 
   it('reads back as written, and skips what it cannot use', () => {
     const board = addNote(moveCard(emptyBoard(), 'email:a', 10, 20), note());
@@ -110,7 +112,13 @@ describe('notes on the board', () => {
       groups: [],
       notes: [note({ part: 'sec-2' }), { ...note({ id: 'note:a1' }) }, note({ id: 'sticky:x' }), { ...note({ id: 'note:b' }), x: 'left' }, { ...note({ id: 'note:c', w: 9999, color: 42, on: 'poster:z' }), at: 'now', part: 7, resolvedAt: -5 }, note({ id: 'note:d', resolvedAt: 1700000005000 })],
     });
-    expect(readBoard(raw).notes).toEqual([note({ part: 'sec-2' }), { ...note({ id: 'note:c' }), w: 480, color: 0, on: null, part: null, at: 0, resolvedAt: 0 }, note({ id: 'note:d', resolvedAt: 1700000005000 })]);
+    expect(readBoard(raw).notes).toEqual([note({ part: 'sec-2' }), { ...note({ id: 'note:c' }), w: 480, color: 0, on: null, part: null, at: 0, resolvedAt: 0, replies: [] }, note({ id: 'note:d', resolvedAt: 1700000005000 })]);
+    // Replies read back checked: a blank one, one without an id, and a repeated id are dropped.
+    const threaded = JSON.stringify({ version: 1, cards: {}, groups: [], notes: [note({ replies: [{ id: 'reply:1', text: 'Agreed.', at: 5 }, { id: 'reply:1', text: 'again', at: 6 }, { text: 'no id', at: 7 }, { id: 'reply:2', text: '   ', at: 8 }, { id: 'reply:3', text: 'Done', at: 'now' }] as never })] });
+    expect(readBoard(threaded).notes[0]!.replies).toEqual([
+      { id: 'reply:1', text: 'Agreed.', at: 5 },
+      { id: 'reply:3', text: 'Done', at: 0 },
+    ]);
     // Boards written before notes read as boards with none.
     expect(readBoard(JSON.stringify({ version: 1, cards: {}, groups: [] })).notes).toEqual([]);
   });
@@ -126,6 +134,18 @@ describe('notes on the board', () => {
     expect(updateNote(gone, 'note:a1', { text: 'Done', color: 3 }).notes[0]).toMatchObject({ text: 'Done', color: 3, x: 400 });
     expect(updateNote(gone, 'note:zz', { text: 'x' })).toBe(gone);
     expect(removeNote(gone, 'note:a1').notes).toEqual([]);
+  });
+
+  it('takes replies under a note, oldest first, and lets one go', () => {
+    const board = addNote(emptyBoard(), note());
+    const one = addReply(board, 'note:a1', { id: 'reply:1', text: 'Agreed, doing it.', at: 10 });
+    const two = addReply(one, 'note:a1', { id: 'reply:2', text: 'Done.', at: 20 });
+    expect(two.notes[0]!.replies.map((r) => r.text)).toEqual(['Agreed, doing it.', 'Done.']);
+    expect(addReply(two, 'note:zz', { id: 'reply:3', text: 'x', at: 1 })).toBe(two);
+    expect(addReply(two, 'note:a1', { id: 'reply:3', text: '  ', at: 1 })).toBe(two);
+    expect(removeReply(two, 'note:a1', 'reply:1').notes[0]!.replies.map((r) => r.id)).toEqual(['reply:2']);
+    expect(removeReply(two, 'note:a1', 'reply:9')).toBe(two);
+    expect(readBoard(boardJson(two))).toEqual(two);
   });
 
   it('names an email’s sections for a note to point at', () => {
