@@ -760,7 +760,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                         title={on ? `${f.name}: this block follows it. Opens it in the Freeform app.` : `Follow ${f.name}. It replaces this block's drawing; Undo brings the old one back.`}
                         onClick={() => (on ? app.onOpen(f.key) : app.onLink(f.key))}
                       >
-                        <span class="canvas-frame-thumb">{on && app.print ? <img src={app.print} alt="" /> : <span dangerouslySetInnerHTML={{ __html: f.thumb }} />}</span>
+                        <span class="canvas-frame-thumb">{on && app.print ? <img src={app.print} alt="" draggable={false} /> : <span dangerouslySetInnerHTML={{ __html: f.thumb }} />}</span>
                         <span class="canvas-frame-name">{f.name}</span>
                         <span class="canvas-frame-facts">
                           {f.width} × {f.height}

@@ -31,6 +31,8 @@ import { capture, release } from './pointer.ts';
 const DRAG_THRESHOLD = 4;
 
 export type PaletteKind = BlockType | 'columns' | `pattern:${string}` | `sy:${string}`;
+/** What the drop plumbing can carry: a palette card, or a picture from the Assets panel (place-picture.ts). */
+export type DragKind = PaletteKind | `asset:${string}`;
 
 /** What the palette shows for a folder pattern: its name, and what it holds. */
 export interface PatternCard {
@@ -44,6 +46,10 @@ export const patternIdOf = (kind: `pattern:${string}`): string => kind.slice('pa
 /** One of the Switchyards email system's blocks (model/switchyards.ts), placed like a pattern: as sections at the end. */
 export const isSyKind = (kind: PaletteKind): kind is `sy:${string}` => kind.startsWith('sy:');
 export const syIdOf = (kind: `sy:${string}`): string => kind.slice('sy:'.length);
+/** A picture from the Assets panel on its way to the email, by its name in `assets/`. */
+export const isAssetKind = (kind: DragKind): kind is `asset:${string}` => kind.startsWith('asset:');
+export const assetKind = (name: string): `asset:${string}` => `asset:${name}`;
+export const assetNameOf = (kind: `asset:${string}`): string => kind.slice('asset:'.length);
 
 const COLUMNS_CARD = {
   name: 'Columns',

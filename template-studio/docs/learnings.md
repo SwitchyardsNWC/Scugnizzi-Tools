@@ -2353,3 +2353,87 @@ correct frame preview."
   print shared by the frame's card and every email that follows it.
 - **A leftover.** The two-argument `parse(fileName, text)` that the conflict-guard change made one-argument still
   had one caller, in the files-only workspace; the build did not run before the last report. It does now.
+
+### 3.76 Four small ones from the list
+
+*2026-09-19.* Jared: "start working down the list."
+
+- **Freeform's back arrow.** The board sends `&from=board` with the frame it opens or the new one it asks for,
+  and the canvas keeps that for the tab (`scuggnizzi.freeform.from-board`, its own key, so a Freeform tab that
+  Template Studio opened is not confused by Studio's flag). The pill reads "← Board" and goes to `project.html`;
+  opened any other way it reads "← Tools" as before. The same shape as Studio's arrow (3.6x).
+- **"saved" after a delete.** Deleting the open file left the editor in its `clean` state with no file, and the
+  badge's fallback word for `clean` was "saved". A document with no file now says "not in a file", with the
+  reason in its title. The same badge shows for a new email before its first change, which is also true of it.
+- **Prints let go.** The board printed every page with effects it saw and kept every print for the life of the
+  page. Now prints nothing asks for any more are dropped when the wanted set is worked out, before the missing
+  ones are made.
+- **Thumbnails.** The Assets panel's pictures and the Inspector's frame print are `draggable={false}`: the
+  pointer drag is the drag, and the browser's own image drag only ever carried a picture into another window.
+
+### 3.77 "Deleted", and the file stayed
+
+*2026-09-19.* Found while checking 3.76's badge: the Files panel's × said "Deleted Follows a frame", the badge said
+"not in a file", and the row was still there, with the file.
+
+- **What happened.** A template at the top of a project folder (a plain-folder habit, or one made before `.scug/`)
+  is listed from there. Its first save in Template Studio went to `.scug/templates/`, where every tool writes now,
+  and left the original at the top: a copy, not a move. The panel shows a name once, the first place winning, so
+  nobody saw two. Delete removed the first it found, the copy in `.scug/templates/`, and the original at the top
+  came back into view, with the old content. The board's Delete did the same by path.
+- **Save moves.** `writeTemplate` now looks for the file in the places `list` walks, in `list`'s order, so the
+  first found is the one the panel showed and the editor read. The conflict guard reads that file, not the empty
+  place the write is going to (before, a template being moved had no guard at all on its first save). After the
+  write, a shown copy that sat somewhere else is removed. Other copies hidden behind the name are left alone by a
+  save: an invisible file with different content is not something a save should quietly discard.
+- **Delete takes every copy.** Studio's `deleteTemplate` and the board's Delete remove the name from every place
+  it is in, and Undo writes back the one the panel showed. "Everything the panel offered can be deleted" now also
+  means it stays deleted.
+- **A fake folder for the workspace.** `tests/workspace-folder.test.ts` runs the real `folderWorkspace` over plain
+  objects standing in for directory and file handles: where a save lands, which copy the guard reads, what a delete
+  removes. The first test of the folder workspace's writes at all; `list` had been tested only through the app.
+
+### 3.78 Three files, split along their seams
+
+*2026-09-19.* The last item on the day's list: App.tsx, Board.tsx and Surface.tsx were each around two thousand
+lines or more. A quiet pass, nothing else in flight, and no behaviour changed.
+
+- **What moved, and where.** Only what already stood at module level, or was a self-contained stretch of one
+  component. From Board.tsx: the file-reading hook and the shapes it returns (`project/files.ts`), the card
+  bodies (`project/cards.tsx`), the two popovers (`project/menus.tsx`), and the small pure helpers
+  (`project/board-helpers.ts`). From App.tsx: the starters (`app/starters-list.ts`), the recent-blocks memory
+  (`app/recent-blocks.ts`), the inbox frame and save badge (`app/app-chrome.tsx`), and two hooks cut from the
+  component: `usePrints` (pages with effects, printed for the canvas) and `useDraftKeeping` (the email kept in
+  the browser with no folder). From Surface.tsx: its tools, glyphs, drag shapes, constants and drawing helpers
+  (`app/surface-tools.tsx`).
+- **How.** Text sliced at markers, `export` added to the moved declarations, and every file's imports
+  recomputed from what its body names. The two things that fooled the recomputation are worth writing down: a
+  name used only after a spread (`...defaultsOf(x)`) was taken for unused, and a word in a comment or string
+  ("Template Studio", "View only") was taken for a use. `tsc --noUnusedLocals` caught the second kind; the
+  first kind the ordinary build caught. Both fixed by hand.
+- **What did not move.** The bulk of each component: App's patterns, design systems, clipboard and keyboard;
+  the board's view, selection, groups and drawing; the surface's pointer and its own controls. Each closes over
+  dozens of locals, and cutting those into hooks would mean threading state through props for no change in
+  behaviour. They can go later, one at a time, when something in them has to change anyway.
+- **Sizes.** App.tsx 2420 → 2200, Board.tsx 2345 → 1748, Surface.tsx 1936 → 1803; twelve new files, none over
+  240 lines.
+
+### 3.79 Files first, and a picture dropped into the email
+
+*2026-09-19.* Jared: "in template studio make the files the index screen and move files above blocks. allow the
+ability to drag an asset into the email and it creates the container needed for it."
+
+- **Files is where a session starts.** The rail reads Files, Blocks, Layers, Assets, Design, and Template Studio
+  opens on Files (it opened on Layers). Closing Design goes back to Files when nothing else was chosen.
+- **A picture from Assets lands as an Image block.** The panel's pointer drag, which until now only carried a
+  picture onto an open Freeform surface, goes to the email through the palette's own plumbing: the same ghost
+  (the picture itself, small), the same drop line, the same `DropSpot` → place reading. Dropped beside a block
+  it joins that block's column at that index; dropped on a section edge or at the end it gets a section, row and
+  column of its own, made by `insertBlocksAt` the way a pasted block's is. `model/place-picture.ts` is the pure
+  part, tested: the block, its fresh id and field name, where it lands, and a first alt text read off the file
+  name ("photos/team-photo_2.jpg" → "team photo 2"), to be written properly in the Inspector.
+- **A click still fills the selected Image**, and with no Image selected it adds one at the end, as a palette
+  card does. The press that moved suppresses the click the button fires afterwards, so a drag is one gesture.
+- **The kinds.** `PaletteKind` stayed the palette's own; `DragKind` is what the drop plumbing carries, one
+  member wider. Widening `PaletteKind` itself broke the palette's narrowing in four places, which is the
+  compiler saying the two were never the same thing.

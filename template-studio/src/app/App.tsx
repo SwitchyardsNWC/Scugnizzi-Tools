@@ -1,6 +1,4 @@
-import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-
 import { compile } from '../compile/compile.ts';
 import { IMAGES_DIR, packageReadme, planPackage } from '../model/export-package.ts';
 import { simulateDark } from '../compile/dark.ts';
@@ -8,7 +6,6 @@ import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
 import { withPrints } from './printed-preview.ts';
 import { loadKeptPictures } from './kept-pictures.ts';
 import { freeformSvg } from '../compile/freeform.ts';
-import { recipeHash } from '../model/freeform.ts';
 import {
   addFrameBlock,
   followFrame,
@@ -22,16 +19,16 @@ import {
   unlinkFrame,
   type AppFrame,
 } from '../model/freeform-link.ts';
-import { DRAFT_KEY, draftJson, readDraft } from '../model/draft.ts';
+import { DRAFT_KEY, readDraft } from '../model/draft.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
 import type { Branch } from '../compile/serialize.ts';
-import { isPatternKind, isSyKind, patternIdOf, syIdOf, type PaletteKind, type PatternCard } from './Palette.tsx';
+import { assetKind, assetNameOf, isAssetKind, isPatternKind, isSyKind, patternIdOf, syIdOf, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
+import { placePicture, type PicturePlace } from '../model/place-picture.ts';
 import { Welcome } from './Welcome.tsx';
-import { importV1 } from '../model/import-v1.ts';
 import {
   download,
   downloadBlob,
@@ -49,7 +46,6 @@ import { useProjectFolder } from './useProjectFolder.ts';
 import { readProject } from '../project/folder.ts';
 import { SHORTCUTS } from './slash.ts';
 import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
-import { InboxChrome } from './Inbox.tsx';
 import { Sidebar, type Tab } from './Sidebar.tsx';
 import { Inspector } from './Inspector.tsx';
 import { Surface, type SurfaceApi } from './Surface.tsx';
@@ -75,31 +71,25 @@ import {
 } from '../model/edit.ts';
 import { canStack, STACKABLE } from '../model/catalog.ts';
 import { clipText, parseClip } from '../model/clipboard.ts';
-import {
-  applyPattern,
-  detachPattern,
-  instanceOf,
-  patternFromSection,
-  placePattern,
-  pushPattern,
-  type Pattern,
-} from '../model/patterns.ts';
+import { applyPattern, detachPattern, instanceOf, patternFromSection, placePattern, pushPattern, type Pattern } from '../model/patterns.ts';
 import { fileSlug, serializeDesignSystem, serializePattern, serializeTemplate } from '../model/serialize.ts';
 import { tidyTemplate } from '../model/tidy.ts';
-import { colorOf, type DesignSystem } from '../model/design-system.ts';
-import { blankTemplate, cardTemplate } from '../model/starters.ts';
-import { SY_BLOCKS, switchyardsShortTemplate, switchyardsTemplate } from '../model/switchyards.ts';
+import type { DesignSystem } from '../model/design-system.ts';
+import { blankTemplate } from '../model/starters.ts';
+import { SY_BLOCKS } from '../model/switchyards.ts';
 import { cloneSection as copySection, designSystemOf as systemOf, freshIds as idsFor, takenFieldNames as fieldsTaken } from '../model/edit.ts';
 import { ADDABLE, CATALOG, SINGLETON } from '../model/catalog.ts';
-import type { Block, BlockType, FreeformBlock } from '../model/types.ts';
+import type { Block, BlockType } from '../model/types.ts';
 import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
 import { BranchIcon, CopyIcon, DesktopIcon, EyeIcon, glyphFor, InboxIcon, MoonIcon, PhoneIcon, TickIcon } from './icons.tsx';
 import { TEXT_TARGETS } from './inline-text.ts';
 import { useEditor } from './useEditor.ts';
-import starterDesign from '../../reference/v1-standard-email.design.json';
-
-type Device = 'desktop' | 'phone';
+import { STARTERS } from './starters-list.ts';
+import { readRecent, writeRecent } from './recent-blocks.ts';
+import { type Device, Framed, SaveBadge } from './app-chrome.tsx';
+import { usePrints } from './usePrints.ts';
+import { useDraftKeeping } from './useDraft.ts';
 
 /** Wide enough to show the page background either side of the 600px column, which is a setting. */
 const WIDTHS: Record<Device, number> = { desktop: 680, phone: 375 };
@@ -118,65 +108,6 @@ const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'template';
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)}KB`;
-
-/**
- * Where a new template can start.
- *
- * Three, in the order a designer is likely to want them: nothing, the thing that ships, and the
- * other look this project has produced. The standard email is the v1 import and lives here rather
- * than with the other two, because the fixture it reads is a JSON file the model does not load.
- */
-const STARTERS: Starter[] = [
-  {
-    id: 'blank',
-    name: 'Blank',
-    summary: 'Just the legal footer — the one block HubSpot will not publish without. Everything else is a drag away.',
-    make: blankTemplate,
-  },
-  {
-    id: 'switchyards',
-    name: 'Switchyards email',
-    summary: 'The Switchyards email system’s standard send: tagline header, lockup, hero, one heading, the copy, one outline button, the sign-off, the masthead footer. Its own design system comes with it.',
-    make: switchyardsTemplate,
-  },
-  {
-    id: 'switchyards-short',
-    name: 'Switchyards short',
-    summary: 'The system’s short send, for one fact: lockup header, hero, heading, one paragraph, the Callout, one solid button, the sign-off, the stub footer.',
-    make: switchyardsShortTemplate,
-  },
-  {
-    id: 'standard',
-    name: 'Standard email (v1)',
-    summary: 'The Switchyards email as it shipped before the system: top bar, stripes, hero, copy, buttons and footer, on the brand palette.',
-    make: () => importV1(starterDesign as never).template,
-  },
-  {
-    id: 'card',
-    name: 'Card email',
-    summary: 'A white page, a monospace face, and copy in black-bordered cards — the look of the Phase 0 probe. Its own design system comes with it.',
-    make: cardTemplate,
-  },
-];
-
-/** The last few block kinds added, kept across sessions. A convenience, so it lives in the browser. */
-const RECENT_KEY = 'sy-recent-blocks';
-const readRecent = (): string[] => {
-  try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string').slice(0, 4) : [];
-  } catch {
-    return [];
-  }
-};
-const writeRecent = (kinds: string[]) => {
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(kinds));
-  } catch {
-    // Storage blocked; the list simply does not survive the tab.
-  }
-};
 
 export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -212,8 +143,6 @@ export function App() {
       cancelled = true;
     };
   }, [workspace]);
-  /** Freeform pages with effects, printed, by block id: what the email canvas shows in their place (printed-preview.ts). */
-  const [prints, setPrints] = useState<Record<string, { key: string; url: string }>>({});
   const [device, setDevice] = useState<Device>('desktop');
   const [dark, setDark] = useState(false);
   /**
@@ -241,7 +170,7 @@ export function App() {
   const [copied, setCopied] = useState(false);
   const [rasterising, setRasterising] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
-  const [tab, setTab] = useState<Tab>('layers');
+  const [tab, setTab] = useState<Tab>('templates');
   /** The folder's design systems, by name. */
   const [systems, setSystems] = useState<Record<string, DesignSystem>>({});
   /** The folder's patterns. With no folder open they still live here for the session. */
@@ -276,7 +205,7 @@ export function App() {
   // Design is a tab like the others, and also a mode you toggle from the top bar — so leaving it
   // has to land somewhere. `back` is where you were, which beats always returning to Layers: you
   // opened Design from Blocks mid-build and that is where the next block is coming from.
-  const back = useRef<Tab>('layers');
+  const back = useRef<Tab>('templates');
   const goTab = useCallback(
     (next: Tab) => {
       setTab((current) => {
@@ -513,6 +442,8 @@ export function App() {
 
   // --- the canvas lags the document by a beat --------------------------------------------------
   const [shownTemplate, setShownTemplate] = useState(editor.template);
+  /** Freeform pages with effects, printed, by block id: what the email canvas shows in their place (printed-preview.ts). */
+  const prints = usePrints(shownTemplate, allAssets);
   useEffect(() => {
     const id = setTimeout(() => setShownTemplate(editor.template), CANVAS_LAG);
     return () => clearTimeout(id);
@@ -1086,8 +1017,19 @@ export function App() {
     [editor, placeOf, sectionAfter],
   );
 
+  /** A picture from the folder, as a new Image block at a place; at the end of the email when null. */
+  const placeAssetAt = useCallback(
+    (name: string, place: PicturePlace | null) => {
+      const { template: next, blockId } = placePicture(editor.template, name, place);
+      if (!blockId) return;
+      const site = siteOf(next, blockId);
+      editor.commit(`Add ${name.slice(name.lastIndexOf('/') + 1)}`, next, site ? { select: { kind: 'block', sectionId: site.section.id, blockId } } : {});
+    },
+    [editor],
+  );
+
   // --- the palette ---------------------------------------------------------------------------------
-  const [dragType, setDragType] = useState<PaletteKind | null>(null);
+  const [dragType, setDragType] = useState<DragKind | null>(null);
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
   const spot = useRef<DropSpot | null>(null);
 
@@ -1104,6 +1046,13 @@ export function App() {
     if (!where) return;
     const place = placeOf(where);
     if (!place) return;
+
+    // A picture from the folder lands as a new Image block, beside what it was dropped by or in a section of its
+    // own (model/place-picture.ts).
+    if (isAssetKind(type)) {
+      placeAssetAt(assetNameOf(type), place);
+      return;
+    }
 
     // A pattern is a section, so like columns it lands as a section: after the one it was aimed
     // at when that was inside a column.
@@ -1135,7 +1084,7 @@ export function App() {
       s.rows.some((r) => r.columns.some((c) => c.id === place.columnId)),
     );
     if (section) editor.addToColumn(section.id, place.columnId, type, place.index);
-  }, [dragType, placeOf, editor, placePatternAt, placeSyBlockAt, noteRecent, sectionAfter]);
+  }, [dragType, placeOf, editor, placePatternAt, placeSyBlockAt, placeAssetAt, noteRecent, sectionAfter]);
 
   // --- workspace -------------------------------------------------------------------------------
 
@@ -1263,52 +1212,6 @@ export function App() {
    */
   // --- freeform pages: their prints on the email canvas, and frames from the Freeform app ------------------
 
-  const printsRef = useRef<Record<string, { key: string; url: string }>>({});
-  // Every page with effects is printed once its recipe settles. Jared: "freeform in template studio does
-  // not carry the effect back after hitting done" — the canvas printed it, the email drew it plain.
-  useEffect(() => {
-    const ds = designSystemOf(shownTemplate);
-    const names = allAssets.map((a) => a.name).join('|');
-    const wanted: Array<{ block: FreeformBlock; ground: string; key: string }> = [];
-    for (const s of shownTemplate.sections)
-      for (const r of s.rows)
-        for (const c of r.columns)
-          for (const b of c.blocks) {
-            if (b.type !== 'freeform' || !b.effects?.length) continue;
-            const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
-            wanted.push({ block: b, ground, key: `${recipeHash(b)}|${ground}|${names}` });
-          }
-    if (wanted.length === 0 && Object.keys(printsRef.current).length === 0) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const next: Record<string, { key: string; url: string }> = {};
-      const made: string[] = [];
-      for (const w of wanted) {
-        const old = printsRef.current[w.block.id];
-        if (old?.key === w.key) {
-          next[w.block.id] = old;
-          continue;
-        }
-        try {
-          const blob = await canvasBlob(await freeformCanvas(w.block, ds, { assets: allAssets, scale: 2, ground: w.ground }));
-          const url = URL.createObjectURL(blob);
-          made.push(url);
-          next[w.block.id] = { key: w.key, url };
-        } catch {
-          // The page stays drawn plain.
-        }
-        if (cancelled) break;
-      }
-      if (cancelled) return made.forEach((url) => URL.revokeObjectURL(url));
-      for (const [id, p] of Object.entries(printsRef.current)) if (next[id]?.url !== p.url) URL.revokeObjectURL(p.url);
-      printsRef.current = next;
-      setPrints(next);
-    }, 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [shownTemplate, allAssets]);
 
   // The Freeform app's frames, followed live: its tab writes on every change, and this tab hears it.
   const framesSignature = framesKey(appFrames);
@@ -1409,52 +1312,7 @@ export function App() {
 
   // --- with no folder, the email is kept in this browser (model/draft.ts) ------------------------------------
 
-  const [draftFailed, setDraftFailed] = useState(false);
-  const templateRef = useRef(editor.template);
-  templateRef.current = editor.template;
-  const keepDraft = useCallback(() => {
-    // Nothing chosen yet: the blank under the Welcome screen is nobody's work, and kept it would skip the screen next time.
-    if (workspaceRef.current?.canWrite || choosingRef.current) return;
-    try {
-      localStorage.setItem(DRAFT_KEY, draftJson(templateRef.current));
-      setDraftFailed(false);
-    } catch {
-      setDraftFailed(true);
-    }
-  }, []);
-  // Written as it changes. With a writable folder open the email lives in its file and the draft goes, so a
-  // later visit never brings back something older than the file.
-  useEffect(() => {
-    if (workspace?.canWrite) {
-      try {
-        localStorage.removeItem(DRAFT_KEY);
-      } catch {
-        // Nothing kept to clear.
-      }
-      return;
-    }
-    const timer = window.setTimeout(keepDraft, 400);
-    return () => window.clearTimeout(timer);
-  }, [editor.template, workspace, keepDraft]);
-  // Once, on the way in: everything this reads is stable for the life of the page.
-  useEffect(() => {
-    // Once more on the way out, for the last few keystrokes.
-    const flush = () => keepDraft();
-    window.addEventListener('pagehide', flush);
-    if (restored) notify(`Welcome back: ${restored.name}, as you left it. It is kept in this browser until you open a folder.`);
-    return () => window.removeEventListener('pagehide', flush);
-  }, [keepDraft, restored, notify]);
-
-  // Only when the browser would not keep the email: then leaving the page would lose it, so the browser asks first.
-  useEffect(() => {
-    if (workspace?.canWrite || !draftFailed || !editor.canUndo) return;
-    const onLeave = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onLeave);
-    return () => window.removeEventListener('beforeunload', onLeave);
-  }, [workspace, draftFailed, editor.canUndo]);
+  useDraftKeeping({ editor, workspace, workspaceRef, choosingRef, restored, notify });
 
   // --- the other way: the Freeform app sends a frame here (model/freeform-link.ts) ------------------------
 
@@ -1927,6 +1785,11 @@ export function App() {
             setProbe({ x, y });
           }}
           onPaletteDrop={dropNew}
+          onAssetDrag={(asset, x, y) => {
+            setDragType(assetKind(asset.name));
+            setProbe({ x, y });
+          }}
+          onPlaceAsset={(asset) => placeAssetAt(asset.name, null)}
           files={files}
           assets={assets}
           {...(surfaceOf ? { onDropAsset: (asset: AssetFile, at: { x: number; y: number } | null) => surfaceApi.current?.dropAsset(asset, at) } : {})}
@@ -2286,17 +2149,30 @@ export function App() {
         // is the piece that was missing: a drop indicator alone tells you where it would land but
         // not that anything is in your hand.
         <div class="sy-ghost" style={{ left: `${probe.x}px`, top: `${probe.y}px` }} aria-hidden="true">
-          {(() => {
-            const Glyph = glyphFor(dragType);
-            return <Glyph />;
-          })()}
-          {dragType === 'columns'
-            ? 'Columns'
-            : isPatternKind(dragType)
-              ? (patternCards.find((p) => p.id === patternIdOf(dragType))?.name ?? 'Pattern')
-              : isSyKind(dragType)
-                ? (SY_BLOCKS.find((b) => b.id === syIdOf(dragType))?.name ?? 'Block')
-                : CATALOG[dragType].name}
+          {isAssetKind(dragType) ? (
+            // The picture itself, small: what is in the hand is that file, not "an image".
+            <>
+              {(() => {
+                const picked = assets.find((a) => a.name === assetNameOf(dragType));
+                return picked ? <img class="sy-ghost-thumb" src={picked.url} alt="" /> : null;
+              })()}
+              {assetNameOf(dragType).slice(assetNameOf(dragType).lastIndexOf('/') + 1)}
+            </>
+          ) : (
+            <>
+              {(() => {
+                const Glyph = glyphFor(dragType);
+                return <Glyph />;
+              })()}
+              {dragType === 'columns'
+                ? 'Columns'
+                : isPatternKind(dragType)
+                  ? (patternCards.find((p) => p.id === patternIdOf(dragType))?.name ?? 'Pattern')
+                  : isSyKind(dragType)
+                    ? (SY_BLOCKS.find((b) => b.id === syIdOf(dragType))?.name ?? 'Block')
+                    : CATALOG[dragType].name}
+            </>
+          )}
         </div>
       )}
 
@@ -2348,56 +2224,6 @@ export function App() {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * The message, with or without a client around it.
- *
- * A component rather than a ternary because the stage it wraps is forty lines of props, and
- * writing those twice is writing a bug twice.
- */
-function Framed({
-  inbox,
-  subject,
-  device,
-  children,
-}: {
-  inbox: boolean;
-  subject: string;
-  device: Device;
-  children: ComponentChildren;
-}) {
-  if (!inbox) return <>{children}</>;
-  return (
-    <InboxChrome subject={subject} device={device}>
-      {children}
-    </InboxChrome>
-  );
-}
-
-function SaveBadge({ editor, workspace }: { editor: ReturnType<typeof useEditor>; workspace: Workspace | null }) {
-  const { save } = editor;
-  if (workspace && workspace.kind === 'folder' && !workspace.canWrite) {
-    return (
-      <span class="save error" title={`Chrome opened ${workspace.label} view-only, so nothing saves back. Files has the button that asks for edit access.`}>
-        view only
-      </span>
-    );
-  }
-  if (!workspace?.canWrite) {
-    return (
-      <span class="save" title="No folder open: this email is kept in this browser and comes back when you reopen Template Studio. Open a folder to save it as a file.">
-        kept in this browser
-      </span>
-    );
-  }
-  const text =
-    save === 'saving' ? 'saving…' : save === 'saved' ? 'saved' : save === 'dirty' ? 'unsaved' : save === 'conflict' ? 'not saved' : save === 'error' ? 'could not save' : 'saved';
-  return (
-    <span class={`save ${save}`} title={editor.file ? `Autosaves to ${editor.file.fileName}` : 'Autosaves once the template has a file.'}>
-      {text}
-    </span>
   );
 }
 

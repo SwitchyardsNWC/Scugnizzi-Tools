@@ -101,7 +101,8 @@ export interface Workspace {
    */
   writeTemplate(fileName: string, json: string, expectedModified: number, lastKnown?: string): Promise<SaveResult>;
   /**
-   * Removes a template file from the folder.
+   * Removes a template file from the folder: every copy of that name in the places `list` looks, since the
+   * panel shows a name once however many places hold it.
    *
    * Absent on a read-only workspace, which is how the panel knows not to offer it.
    *
@@ -464,22 +465,41 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     async writeTemplate(fileName, json, expectedModified, lastKnown) {
       if (!writable) throw refused(dir.name);
       return writing(dir.name, async () => {
-        // Into .scug/templates/ in a project; otherwise where the workspace keeps them, or the top.
+        // Where the file goes: .scug/templates/ in a project; otherwise where the workspace keeps them, or the top.
+        // The places it may already be are the ones `list` walks, in `list`'s order, so the first found is the file
+        // the panel showed and the editor read (learnings 3.77: a template at the top of a project was copied into
+        // .scug/templates on its first save and the copy at the top lived on, to come back when the other was deleted).
         const m = await meta();
-        const source = m ? await m.getDirectoryHandle('templates', { create: true }) : ((await subdirectory(dir, 'templates')) ?? dir);
-        const handle = await source.getFileHandle(fileName, { create: true });
-
-        const onDisk = await handle.getFile();
-        // A brand new file reports 0. A file that moved underneath us is a conflict only when what is in it is not
-        // what this editor last saw: a synced folder rewrites the time after every upload (see the interface).
-        if (expectedModified > 0 && onDisk.size > 0 && onDisk.lastModified > expectedModified) {
-          const same = lastKnown !== undefined && sameTemplate(await onDisk.text(), lastKnown);
-          if (!same) return { ok: false as const, conflict: true as const, modified: onDisk.lastModified };
+        const modern = m ? await m.getDirectoryHandle('templates', { create: true }) : null;
+        const legacy = [await subdirectory(dir, 'templates'), dir].filter((h): h is Handle => h !== null);
+        const places = modern ? [modern, ...legacy] : legacy;
+        const target = places[0]!;
+        let shown: { source: Handle; handle: FileSystemFileHandle } | null = null;
+        for (const source of places) {
+          try {
+            shown = { source, handle: await source.getFileHandle(fileName) };
+            break;
+          } catch {
+            // Not in this place.
+          }
         }
 
+        // A file that moved underneath us is a conflict only when what is in it is not what this editor last saw: a
+        // synced folder rewrites the time after every upload (see the interface). Nothing on disk yet is no conflict.
+        if (shown) {
+          const onDisk = await shown.handle.getFile();
+          if (expectedModified > 0 && onDisk.size > 0 && onDisk.lastModified > expectedModified) {
+            const same = lastKnown !== undefined && sameTemplate(await onDisk.text(), lastKnown);
+            if (!same) return { ok: false as const, conflict: true as const, modified: onDisk.lastModified };
+          }
+        }
+
+        const handle = await target.getFileHandle(fileName, { create: true });
         const out = await handle.createWritable();
         await out.write(json);
         await out.close();
+        // The file the panel showed moves to where every tool writes now, so the folder does not keep two of it.
+        if (shown && shown.source !== target) await shown.source.removeEntry(fileName);
         return { ok: true as const, modified: (await handle.getFile()).lastModified };
       });
     },
@@ -487,12 +507,14 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     async deleteTemplate(fileName) {
       if (!writable) throw refused(dir.name);
       return writing(dir.name, async () => {
-        // Exactly the places `list` walks, in the same order — `toolFolders` plus the folder
-        // itself. Written by hand the first time and it was wrong twice over: it created
-        // `.scug/templates` as a side effect of deleting (`create: true` on a folder that need not
-        // exist), and it left out the top level, so a template sitting directly in a project folder
-        // was listed and then could not be removed. Sharing the helper is what makes "everything
-        // the panel offered can be deleted" true by construction rather than by coincidence.
+        // Exactly the places `list` walks — `toolFolders` plus the folder itself — and every copy in them, not the
+        // first: a name that sits in two places shows once in the panel, and removing one copy only brought the other
+        // into view (learnings 3.77). Written by hand the first time and it was wrong twice over: it created
+        // `.scug/templates` as a side effect of deleting (`create: true` on a folder that need not exist), and it
+        // left out the top level, so a template sitting directly in a project folder was listed and then could not
+        // be removed. Sharing the helper is what makes "everything the panel offered can be deleted" true by
+        // construction rather than by coincidence.
+        let removed = 0;
         for (const source of [...(await toolFolders('templates')), dir]) {
           try {
             await source.getFileHandle(fileName);
@@ -500,9 +522,9 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
             continue;
           }
           await source.removeEntry(fileName);
-          return;
+          removed += 1;
         }
-        throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);
+        if (removed === 0) throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);
       });
     },
   };

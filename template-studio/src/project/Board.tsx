@@ -14,17 +14,9 @@
 // the bottom is a status line, as a window used to have.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { MutableRef } from 'preact/hooks';
-
-import { compile } from '../compile/compile.ts';
-import { freeformSvg } from '../compile/freeform.ts';
-import { DEFAULT_DESIGN_SYSTEM, colorOf, type DesignSystem } from '../model/design-system.ts';
-import { recipeHash } from '../model/freeform.ts';
-import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, isLinkFile, type DocKind } from '../model/docs.ts';
-import { materialiseFolderSystem } from '../model/edit.ts';
-import { followFrames, readAppFrame, type AppFrame } from '../model/freeform-link.ts';
-import { projectType } from '../model/project-types.ts';
-import { recipesByOutput, RECIPE_TOOLS, toolAddress, type ToolRecipe } from '../model/tool-recipes.ts';
+import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
+import { DOC_KIND_NAMES, DOC_OPENS_IN, docKindOfUrl, isLinkFile } from '../model/docs.ts';
+import { recipesByOutput, RECIPE_TOOLS, toolAddress } from '../model/tool-recipes.ts';
 import {
   addGroup,
   BOARD_FILE,
@@ -40,7 +32,6 @@ import {
   forgetCard,
   frameCardId,
   groupAt,
-  kindOfCard,
   groupFolderName,
   layoutBoard,
   moveCard,
@@ -55,306 +46,61 @@ import {
   type BoardDoc,
   type BoardGroup,
   type BoardLayout,
-  type CardKind,
   type CardLink,
   type CardSource,
   type PlacedCard,
   type PlacedGroup,
 } from '../model/project.ts';
 import { freeAssetPath, movedPath } from '../model/asset-moves.ts';
-import { addFrameToEmail, addPictureToEmail, addPictureToFrame, dropSourceFromRecipe, duplicateFrameFile, removePictureFrom, unfollowFrame } from '../model/board-edits.ts';
+import {
+  addFrameToEmail,
+  addPictureToEmail,
+  addPictureToFrame,
+  dropSourceFromRecipe,
+  duplicateFrameFile,
+  removePictureFrom,
+  unfollowFrame,
+} from '../model/board-edits.ts';
 import { duplicateTemplate } from '../model/edit.ts';
 import { FRAME_PREFIX, newFrameId } from '../model/frame-store.ts';
 import { META } from '../model/layout.ts';
 import { serializeTemplate, templateFileName } from '../model/serialize.ts';
-import type { FreeformBlock, Template } from '../model/types.ts';
-import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
+import type { Template } from '../model/types.ts';
+import { isImageFile, type AssetFile } from '../workspace/workspace.ts';
 import { useCanvasSettings } from '../app/canvas-settings.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
 import { TouchGestures } from '../app/gestures.ts';
 import { glide, PanTracker } from '../app/inertia.ts';
-import { loadKeptPictures } from '../app/kept-pictures.ts';
 import { capture } from '../app/pointer.ts';
-import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
-import { withPrints } from '../app/printed-preview.ts';
-import {
-  listAssetFolders,
-  listDocuments,
-  listPictures,
-  listRecipes,
-  makeGroupFolder,
-  movePicture,
-  readText,
-  removeFile,
-  removeFolderIfEmpty,
-  writeDocLink,
-  writeFile,
-  writePicture,
-  type DocEntry,
-} from './folder.ts';
-import { copyKeptPictures, readFolderFrames, syncFrames, writeFrame } from './frame-sync.ts';
-import { useInstall } from './launch.ts';
-import { siteStore } from './site-store.ts';
+import { listPictures, makeGroupFolder, movePicture, readText, removeFile, removeFolderIfEmpty, writeDocLink, writeFile, writePicture } from './folder.ts';
+import { readFolderFrames, writeFrame } from './frame-sync.ts';
 import { underStyle } from './ground.ts';
 import { History, useHistory } from './history.ts';
 import type { Project } from './useProject.ts';
-
-type View = { x: number; y: number; z: number };
-type Rect = { x: number; y: number; w: number; h: number };
-
-/** The card's title bar. */
-const HEAD = 28;
-/** The width an email is laid out at inside its card, a little wider than the email so its edges show. */
-const EMAIL_PAGE = 640;
-const clampZoom = (z: number) => Math.min(3, Math.max(0.05, z));
-
-const ago = (t: number) => {
-  const s = Math.round((Date.now() - t) / 1000);
-  if (s < 60) return 'just now';
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h} h ago`;
-  return new Date(t).toLocaleDateString();
-};
-const sizeOf = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-/**
- * Opens what a card is. Our own tools open here, in this tab (Jared, 2026-09-19: "when I open an item from the
- * project board, don't open it in a new window"); their back arrows lead to the board. A document that lives
- * elsewhere, a Google Doc, opens in a new tab, since it leaves the site and has no way back to it.
- */
-function openTool(url: string, elsewhere = false) {
-  const href = new URL(url, window.location.href).href;
-  if (elsewhere && window.open(href, '_blank')) return;
-  window.location.href = href;
-}
-
-function readView(key: string): View | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(key) ?? 'null') as Partial<View> | null;
-    if (v && [v.x, v.y, v.z].every((n) => typeof n === 'number' && Number.isFinite(n))) return { x: v.x!, y: v.y!, z: clampZoom(v.z!) };
-  } catch {
-    // Nothing kept: the board fits itself.
-  }
-  return null;
-}
-
-// --- what is in the folder ------------------------------------------------------------------------------------
-
-interface EmailItem {
-  id: string;
-  fileName: string;
-  name: string;
-  modified: number;
-  /** The email as saved, with every block that follows one of the project's frames brought up to that frame. */
-  template: Template | null;
-  /** The compiled preview, before local pictures are swapped in. */
-  html: string;
-  /** The frames as they were when this was read, so a frame's edit reads the email again. */
-  framesKey: string;
-  error?: string;
-}
-
-interface FrameItem {
-  id: string;
-  key: string;
-  name: string;
-  savedAt: number;
-  fileName: string;
-  template: Template;
-  frame: AppFrame | null;
-}
-
-interface PictureItem {
-  id: string;
-  path: string;
-  size: number;
-  modified: number;
-  url: string;
-  /** Under `assets/rendered/`: drawn by Template Studio from an email's text. Used by previews, not a card. */
-  rendered: boolean;
-}
-
-interface DocItem extends DocEntry {
-  id: string;
-}
-
-interface Files {
-  emails: EmailItem[];
-  frames: FrameItem[];
-  pictures: PictureItem[];
-  /** Google Docs, Sheets and Slides synced into the folder, and link files (model/docs.ts). */
-  docs: DocItem[];
-  /** The folders under `assets/`, each a group, whether or not anything is filed in it yet. */
-  folders: string[];
-  /** What Riso and Ink bleed made, and from what. */
-  recipes: ToolRecipe[];
-  read: boolean;
-  /** How many times the board had changed the folder itself when this was read (see `stale`). */
-  epoch: number;
-}
-
-/** A freeform page with effects, with what it prints on: the frame's ground, or in an email the paper under the block. */
-interface PrintedPage {
-  /** The block in its email; a frame's own page has none. */
-  blockId?: string;
-  page: FreeformBlock;
-  hash: string;
-  ground: string;
-  ds: DesignSystem;
-}
-
-/** One print per recipe on one ground; the count of pictures, since a picture layer draws from them. */
-const printId = (hash: string, ground: string, pictures: number) => `${hash}|${ground}|${pictures}`;
-
-/** The pages with effects in an email, each on the ground Template Studio prints it on (App.tsx). */
-function printedIn(template: Template): PrintedPage[] {
-  const ds = template.ds ?? DEFAULT_DESIGN_SYSTEM;
-  const out: PrintedPage[] = [];
-  for (const s of template.sections)
-    for (const r of s.rows)
-      for (const c of r.columns)
-        for (const b of c.blocks) {
-          if (b.type !== 'freeform' || !b.effects?.length) continue;
-          const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
-          out.push({ blockId: b.id, page: b, hash: recipeHash(b), ground, ds });
-        }
-  return out;
-}
-
-const NO_FILES: Files = { emails: [], frames: [], pictures: [], docs: [], folders: [], recipes: [], read: false, epoch: 0 };
-
-function useProjectFiles(project: MutableRef<Project>, notify: (message: string) => void) {
-  const [files, setFiles] = useState<Files>(NO_FILES);
-  const [kept, setKept] = useState<AssetFile[]>([]);
-  const cache = useRef({ emails: new Map<string, EmailItem>(), pictures: new Map<string, PictureItem>(), systems: '' });
-  const busy = useRef(false);
-  const again = useRef(false);
-  /** Goes up whenever the board itself changes the folder, so a read that started before is not trusted. */
-  const epoch = useRef(0);
-  const keptRef = useRef<AssetFile[] | null>(null);
-  const lastFailure = useRef('');
-
-  const refresh = useCallback(async (): Promise<void> => {
-    const { dir, info, writable } = project.current;
-    if (!dir || !info) return;
-    if (busy.current) {
-      again.current = true;
-      return;
-    }
-    busy.current = true;
-    const started = epoch.current;
-    try {
-      const ws = folderWorkspace(dir, writable);
-      const [list, systems, found, recipes, folders, documents] = await Promise.all([
-        ws.list().catch(() => []),
-        ws.designSystems().catch(() => ({})),
-        listPictures(dir).catch(() => []),
-        listRecipes(dir).catch(() => [] as ToolRecipe[]),
-        listAssetFolders(dir).catch(() => [] as string[]),
-        listDocuments(dir).catch(() => [] as DocEntry[]),
-      ]);
-      const c = cache.current;
-
-      const pictures = found.map((p) => {
-        const old = c.pictures.get(p.path);
-        if (old && old.modified === p.modified && old.size === p.size) return old;
-        if (old) URL.revokeObjectURL(old.url);
-        const item: PictureItem = { id: pictureCardId(p.path), path: p.path, size: p.size, modified: p.modified, url: URL.createObjectURL(p.file), rendered: p.path.startsWith('rendered/') };
-        c.pictures.set(p.path, item);
-        return item;
-      });
-      for (const [path, old] of c.pictures) {
-        if (found.some((p) => p.path === path)) continue;
-        URL.revokeObjectURL(old.url);
-        c.pictures.delete(path);
-      }
-
-      if (!keptRef.current) {
-        keptRef.current = await loadKeptPictures().catch(() => []);
-        setKept(keptRef.current);
-      }
-
-      // Frames drawn in this browser join the project's files, so the board shows them from the first look. Not
-      // into a project made from a type, which starts with its own frames only.
-      const synced = await syncFrames(dir, info.id, siteStore(), writable, !info.type);
-      if (synced.failed && synced.failed !== lastFailure.current) notify(synced.failed);
-      lastFailure.current = synced.failed ?? '';
-      if (writable && keptRef.current.length) {
-        const copied = await copyKeptPictures(dir, synced.folder, found, keptRef.current);
-        if (copied.length) again.current = true;
-      }
-      const frames: FrameItem[] = synced.folder.map((f) => ({
-        id: frameCardId(f.key),
-        key: f.key,
-        name: f.name,
-        savedAt: f.savedAt,
-        fileName: f.fileName,
-        template: f.template,
-        frame: readAppFrame(JSON.stringify(f.template), f.key),
-      }));
-
-      const systemsKey = JSON.stringify(systems);
-      if (systemsKey !== c.systems) {
-        c.emails.clear();
-        c.systems = systemsKey;
-      }
-      // An email that follows a frame shows the frame as it is now, not as it was when the email was last saved in
-      // Template Studio; so an email is read again when any frame moves, not only when its own file does.
-      const appFrames = frames.flatMap((f) => (f.frame ? [f.frame] : []));
-      const framesKey = appFrames.map((f) => `${f.key}:${f.hash}`).join('|');
-      const emails: EmailItem[] = [];
-      for (const file of list) {
-        const old = c.emails.get(file.fileName);
-        if (old && old.modified === file.modified && old.framesKey === framesKey) {
-          emails.push(old);
-          continue;
-        }
-        let item: EmailItem;
-        try {
-          const loaded = await file.load();
-          const { template: saved } = materialiseFolderSystem(loaded.template, systems);
-          const template = followFrames(saved, appFrames);
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey, html: compile(template, { mode: 'preview' }).html };
-        } catch (cause) {
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', framesKey, error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
-        }
-        c.emails.set(file.fileName, item);
-        emails.push(item);
-      }
-      for (const name of [...c.emails.keys()]) if (!list.some((f) => f.fileName === name)) c.emails.delete(name);
-
-      const docs: DocItem[] = documents.map((d) => ({ ...d, id: docCardId(d.path) }));
-
-      // The board moved a file while this read ran, which may have seen both copies or neither: read again rather
-      // than lay out what was. Laying it out put a moved picture's old name back on the board.
-      if (started !== epoch.current) {
-        again.current = true;
-        return;
-      }
-      setFiles({ emails, frames, pictures, docs, folders, recipes, read: true, epoch: started });
-    } catch (cause) {
-      notify(cause instanceof Error ? cause.message : 'The project folder could not be read.');
-    } finally {
-      busy.current = false;
-      if (again.current) {
-        again.current = false;
-        void refresh();
-      }
-    }
-  }, [project, notify]);
-
-  const stale = useCallback(() => {
-    epoch.current += 1;
-  }, []);
-  /** Whether a read has seen every change the board made to the folder: until one has, what it shows is out of date. */
-  const current = useCallback((read: Files) => read.epoch === epoch.current, []);
-
-  return { files, kept, refresh, stale, current };
-}
+import {
+  type View,
+  type Rect,
+  HEAD,
+  EMAIL_PAGE,
+  clampZoom,
+  ago,
+  sizeOf,
+  plural,
+  openTool,
+  readView,
+  KIND_LABEL,
+  kindOfCardOr,
+  placesOf,
+  restorePlaces,
+  openTitle,
+  missingName,
+  linkPath,
+  cardUnder,
+} from './board-helpers.ts';
+import { type EmailItem, type FrameItem, type PrintedPage, printId, printedIn, useProjectFiles } from './files.ts';
+import { EmailBody, FrameBody, DocBody } from './cards.tsx';
+import { LinkForm, ProjectMenu } from './menus.tsx';
 
 // --- the board ------------------------------------------------------------------------------------------------
 
@@ -546,6 +292,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   }, [files.frames, files.emails]);
   useEffect(() => {
     let cancelled = false;
+    // Prints nothing on the board asks for any more (a frame edited on, a picture changed) are let go, so a long
+    // session of edits does not keep every print it ever made.
+    const wanted = new Set(printedPages.map((w) => printId(w.hash, w.ground, assetSignature.length)));
+    if (Object.keys(printsRef.current).some((id) => !wanted.has(id))) {
+      setPrints((p) => Object.fromEntries(Object.entries(p).filter(([id]) => wanted.has(id))));
+    }
     void (async () => {
       for (const w of printedPages) {
         const id = printId(w.hash, w.ground, assetSignature.length);
@@ -798,7 +550,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const frame = framesById.get(card.id);
       const doc = docsById.get(card.id);
       if (email) url = `index.html?open=${encodeURIComponent(email.fileName)}`;
-      if (frame) url = `freeform.html?frame=${encodeURIComponent(frame.key)}`;
+      if (frame) url = `freeform.html?frame=${encodeURIComponent(frame.key)}&from=board`;
       if (doc) url = doc.link.url;
       // A picture opens in the tool that made it, with its settings; otherwise in Riso, or Ink bleed for an SVG.
       const picture = picturesById.get(card.id);
@@ -1126,11 +878,18 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       img.src = url;
     });
 
-  /** Where an email's file is: in .scug/templates/, or where the old layout kept it. */
-  const emailPath = async (fileName: string): Promise<string> => {
-    for (const sub of [META.templates, 'templates']) if (await readText(dir, `${sub}/${fileName}`)) return `${sub}/${fileName}`;
-    return fileName;
+  /**
+   * Every place an email's file is, first the one the board shows: .scug/templates/, then where the old layout kept
+   * it. A name can sit in two places (learnings 3.77), and a delete that took one copy only brought the other into view.
+   */
+  const emailPaths = async (fileName: string): Promise<string[]> => {
+    const out: string[] = [];
+    for (const sub of [META.templates, 'templates']) if (await readText(dir, `${sub}/${fileName}`)) out.push(`${sub}/${fileName}`);
+    if (await readText(dir, fileName)) out.push(fileName);
+    return out;
   };
+  /** Where an email's file is: in .scug/templates/, or where the old layout kept it. */
+  const emailPath = async (fileName: string): Promise<string> => (await emailPaths(fileName))[0] ?? fileName;
 
   /** Writes a file, looks at the folder again, tells the others, and records the step with the old text to put back. */
   const rewriteText = async (path: string, before: string, after: string, label: string) => {
@@ -1310,7 +1069,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const deleteCard = async (card: PlacedCard) => {
     if (!projectRef.current.writable) return notWritable(`delete ${card.name}`);
     try {
-      let file: { path: string; data: string | Blob } | null = null;
+      /** `others`: further copies of the same file, removed with it; Undo writes back the one the board showed. */
+      let file: { path: string; data: string | Blob; others?: string[] } | null = null;
       const textOf = async (path: string, what: string) => {
         const read = await readText(dir, path);
         if (!read) throw new Error(`${what} could not be read, so it was left alone.`);
@@ -1319,8 +1079,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       if (card.kind === 'email') {
         const email = emailsById.get(card.id);
         if (!email) return;
-        const path = await emailPath(email.fileName);
-        file = { path, data: await textOf(path, email.fileName) };
+        const [path = email.fileName, ...others] = await emailPaths(email.fileName);
+        file = { path, data: await textOf(path, email.fileName), others };
       } else if (card.kind === 'frame') {
         const frame = framesById.get(card.id);
         if (!frame) return;
@@ -1341,10 +1101,11 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         file = { path: doc.path, data: await textOf(doc.path, doc.path) };
       }
       if (!file) return;
-      const { path, data } = file;
+      const { path, data, others = [] } = file;
       const at = boardRef.current.cards[card.id] ?? { x: card.x, y: card.y };
       const remove = async () => {
         await removeFile(dir, path);
+        for (const other of others) await removeFile(dir, other).catch(() => undefined);
         stale();
         saveBoard(forgetCard(boardRef.current, card.id));
         await refresh();
@@ -1885,7 +1646,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           <button class="pb-ghost" title="Open Template Studio on this project, for a new email" onClick={() => openTool('index.html?from=board')}>
             + Email
           </button>
-          <button class="pb-ghost" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1')}>
+          <button class="pb-ghost" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1&from=board')}>
             + Frame
           </button>
           <button class="pb-ghost" disabled={!writable} title={writable ? 'Add pictures to assets/. Dropping them on the board works too.' : 'Allow editing to add pictures'} onClick={() => picker.current?.click()}>
@@ -1985,355 +1746,3 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   );
 }
 
-const KIND_LABEL: Record<CardKind, string> = { email: 'Email', frame: 'Frame', picture: 'Picture', doc: 'Document' };
-
-/** A card's kind from its id, `picture` when the id is not one the board knows. */
-const kindOfCardOr = (id: string): CardKind => kindOfCard(id) ?? 'picture';
-
-/** Where a group and the cards riding with it are, as the board stores them, for a step to put back. */
-interface Places {
-  group: BoardGroup;
-  cards: Record<string, { x: number; y: number }>;
-}
-
-function placesOf(board: BoardDoc, group: PlacedGroup, cardIds: string[]): Places {
-  const stored = board.groups.find((g) => g.id === group.id);
-  const { id, name, folder, x, y, w, h } = stored ?? group;
-  const cards: Places['cards'] = {};
-  for (const cardId of cardIds) {
-    const at = board.cards[cardId];
-    if (at) cards[cardId] = at;
-  }
-  return { group: { id, name, folder, x, y, w, h }, cards };
-}
-
-function restorePlaces(board: BoardDoc, places: Places): BoardDoc {
-  let next = addGroup(removeGroup(board, places.group.id), places.group);
-  for (const [cardId, at] of Object.entries(places.cards)) next = moveCard(next, cardId, at.x, at.y);
-  return next;
-}
-
-function openTitle(card: PlacedCard, madeBy: ToolRecipe | undefined, docKind: DocKind | undefined): string {
-  if (card.kind === 'email') return 'Open in Template Studio';
-  if (card.kind === 'frame') return 'Open in Freeform';
-  if (card.kind === 'doc') return `Open in ${DOC_OPENS_IN[docKind ?? 'link']}`;
-  if (madeBy) return `Open in ${RECIPE_TOOLS[madeBy.tool].name}, with the settings that made it`;
-  return /\.svg$/i.test(card.id) ? 'Stamp it in Ink bleed' : 'Open in Riso';
-}
-
-function missingName(id: string, kind: CardKind): string {
-  const rest = id.slice(id.indexOf(':') + 1);
-  if (kind === 'frame') return 'A frame';
-  if (kind === 'doc') return docDisplayName(rest.split('/').pop() ?? rest);
-  return rest.split('/').pop()?.replace(/\.(template|design)\.json$/, '') ?? rest;
-}
-
-/** A line from one card's side to the facing side of another, and its middle, where its verb sits. */
-function linkPath(a: Rect, b: Rect): { d: string; end: { x: number; y: number }; mid: { x: number; y: number } } {
-  const rightward = a.x + a.w / 2 <= b.x + b.w / 2;
-  const sx = rightward ? a.x + a.w : a.x;
-  const sy = a.y + a.h / 2;
-  const tx = rightward ? b.x : b.x + b.w;
-  const ty = b.y + b.h / 2;
-  const bend = Math.max(60, Math.abs(tx - sx) / 2) * (rightward ? 1 : -1);
-  // With the two control points mirrored, the curve's midpoint is exactly halfway between the ends.
-  return { d: `M${sx},${sy} C${sx + bend},${sy} ${tx - bend},${ty} ${tx},${ty}`, end: { x: tx, y: ty }, mid: { x: (sx + tx) / 2, y: (sy + ty) / 2 } };
-}
-
-/** The topmost card under a point that the dragged card can be put into: a picture into a frame or an email, a frame into an email. */
-function cardUnder(cards: PlacedCard[], p: { x: number; y: number }, dragged: PlacedCard): PlacedCard | null {
-  const takes = (into: CardKind) => (dragged.kind === 'picture' ? into === 'frame' || into === 'email' : dragged.kind === 'frame' ? into === 'email' : false);
-  for (let i = cards.length - 1; i >= 0; i -= 1) {
-    const c = cards[i]!;
-    if (c.id === dragged.id || !takes(c.kind)) continue;
-    if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) return c;
-  }
-  return null;
-}
-
-// --- card bodies ------------------------------------------------------------------------------------------------
-
-/**
- * How tall an email's document is: the bottom of everything in its body, plus the body's own padding and margin
- * below. Not the document's scroll height, which is never less than the iframe it is shown in, and would keep a
- * short email from ever coming down to its own length. Null when the document cannot be read or is empty.
- */
-function documentHeight(frame: HTMLIFrameElement): number | null {
-  const doc = frame.contentDocument;
-  if (!doc?.body) return null;
-  const range = doc.createRange();
-  range.selectNodeContents(doc.body);
-  const style = doc.defaultView?.getComputedStyle(doc.body);
-  const below = (parseFloat(style?.paddingBottom ?? '0') || 0) + (parseFloat(style?.marginBottom ?? '0') || 0);
-  const height = Math.ceil(range.getBoundingClientRect().bottom + below);
-  return height > 40 ? height : null;
-}
-
-/** The whole email, laid out at its own width and scaled to the card. Tells the board its height once it has one, and again when its fonts land. */
-function EmailBody({ item, assets, prints, live, width, height, onHeight }: { item: EmailItem; assets: AssetFile[]; prints: Record<string, { url: string }> | undefined; live: boolean; width: number; height: number; onHeight(px: number): void }) {
-  // A page with effects shows its print in its drawing's place, as on Template Studio's canvas (printed-preview.ts).
-  const html = useMemo(() => (item.html && live ? withLocalAssets(prints && item.template ? withPrints(item.html, item.template, prints) : item.html, assets) : ''), [item.html, item.template, prints, assets, live]);
-  if (item.error) return <div class="pb-card-note">{item.error}</div>;
-  if (!live) return <div class="pb-card-skeleton" />;
-  const scale = width / EMAIL_PAGE;
-  const measure = (frame: HTMLIFrameElement) => {
-    const px = documentHeight(frame);
-    if (px) onHeight(px);
-  };
-  return (
-    <iframe
-      class="pb-email-frame"
-      title={item.name}
-      srcdoc={html}
-      sandbox="allow-same-origin"
-      tabIndex={-1}
-      style={{ width: EMAIL_PAGE, height: height / scale, transform: `scale(${scale})` }}
-      onLoad={(e) => {
-        const frame = e.currentTarget;
-        measure(frame);
-        void frame.contentDocument?.fonts?.ready.then(() => measure(frame));
-      }}
-    />
-  );
-}
-
-function FrameBody({ item, assets, print, width, height }: { item: FrameItem; assets: AssetFile[]; print: string | undefined; width: number; height: number }) {
-  const page = item.frame?.page;
-  const ds = item.template.ds ?? DEFAULT_DESIGN_SYSTEM;
-  const svg = useMemo(() => (page && !print ? withoutMissingPictures(withLocalAssets(freeformSvg(page, ds), assets)) : ''), [page, ds, assets, print]);
-  if (!page) return <div class="pb-card-note">This frame could not be drawn.</div>;
-  const pad = 16;
-  const fitZ = Math.min((width - pad * 2) / page.width, (height - pad * 2) / page.height);
-  const w = Math.max(1, Math.round(page.width * fitZ));
-  const h = Math.max(1, Math.round(page.height * fitZ));
-  return (
-    <div class="pb-frame-thumb">
-      <div class="pb-frame-page" style={{ width: w, height: h, background: item.frame?.ground }}>
-        {print ? <img src={print} alt="" draggable={false} /> : <span dangerouslySetInnerHTML={{ __html: svg }} />}
-      </div>
-    </div>
-  );
-}
-
-/**
- * A document: what it is and where it opens, with a glyph for the kind. Not a preview: a Google document cannot
- * be drawn here without signing in to Google, and a card that says plainly what it is beats a blank one that
- * tried (docs/projects.md, "Google Docs, Sheets and Slides").
- */
-function DocBody({ item }: { item: DocItem }) {
-  const kind = item.link.kind;
-  let host = '';
-  try {
-    host = new URL(item.link.url).hostname.replace(/^www\./, '');
-  } catch {
-    host = '';
-  }
-  return (
-    <div class="pb-doc">
-      <span class={`pb-doc-glyph ${kind}`} aria-hidden="true">
-        <DocGlyph kind={kind} />
-      </span>
-      <span class="pb-doc-text">
-        <span class="pb-doc-kind">{DOC_KIND_NAMES[kind]}</span>
-        <span class="pb-doc-host">{host}</span>
-      </span>
-    </div>
-  );
-}
-
-function DocGlyph({ kind }: { kind: DocKind }) {
-  const common = { viewBox: '0 0 32 40', width: 32, height: 40, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.25 } as const;
-  if (kind === 'sheet') {
-    return (
-      <svg {...common}>
-        <rect x="1.5" y="1.5" width="29" height="37" />
-        <path d="M1.5 12.5h29M1.5 20.5h29M1.5 28.5h29M11.5 12.5v25.5M21.5 12.5v25.5" />
-      </svg>
-    );
-  }
-  if (kind === 'slides') {
-    return (
-      <svg {...common}>
-        <rect x="1.5" y="1.5" width="29" height="37" />
-        <rect x="6.5" y="12.5" width="19" height="13" />
-        <path d="M11.5 31.5h9" />
-      </svg>
-    );
-  }
-  if (kind === 'drawing') {
-    return (
-      <svg {...common}>
-        <rect x="1.5" y="1.5" width="29" height="37" />
-        <path d="M8 30l6-12 5 7 3-4 3 9z" />
-      </svg>
-    );
-  }
-  if (kind === 'form') {
-    return (
-      <svg {...common}>
-        <rect x="1.5" y="1.5" width="29" height="37" />
-        <rect x="7.5" y="10.5" width="4" height="4" />
-        <rect x="7.5" y="19.5" width="4" height="4" />
-        <rect x="7.5" y="28.5" width="4" height="4" />
-        <path d="M15.5 12.5h9M15.5 21.5h9M15.5 30.5h9" />
-      </svg>
-    );
-  }
-  if (kind === 'link') {
-    return (
-      <svg {...common}>
-        <rect x="1.5" y="1.5" width="29" height="37" />
-        <path d="M13 24l6-6M11 20l-2.5 2.5a3.5 3.5 0 0 0 5 5L16 25M21 22l2.5-2.5a3.5 3.5 0 0 0-5-5L16 17" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <rect x="1.5" y="1.5" width="29" height="37" />
-      <path d="M8.5 11.5h15M8.5 17.5h15M8.5 23.5h15M8.5 29.5h9" />
-    </svg>
-  );
-}
-
-/** The small form under + Link: an address and a name, and a card the moment it is written. */
-function LinkForm({ onClose, onAdd }: { onClose(): void; onAdd(url: string, name: string): Promise<boolean> }) {
-  const [url, setUrl] = useState('');
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const first = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    // Without `preventScroll`, focusing a field that sits partly off-screen scrolls the whole board sideways.
-    first.current?.focus({ preventScroll: true });
-    const onDown = (event: PointerEvent) => {
-      if ((event.target as Element | null)?.closest?.('.pb-menu')) return;
-      onClose();
-    };
-    window.addEventListener('pointerdown', onDown, true);
-    return () => window.removeEventListener('pointerdown', onDown, true);
-  }, [onClose]);
-  const kind = docKindOfUrl(url.trim());
-  const submit = async () => {
-    if (busy) return;
-    setBusy(true);
-    const ok = await onAdd(url, name);
-    setBusy(false);
-    if (ok) onClose();
-  };
-  return (
-    <form
-      class="pb-pop pb-linkform"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === 'Escape') onClose();
-        // Handled here as well as by the form: implicit submission rides on a keypress that a synthetic Enter does not
-        // always carry (learnings 3.52).
-        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
-          e.preventDefault();
-          void submit();
-        }
-      }}
-    >
-      <label class="pb-field">
-        <span>Address</span>
-        <input ref={first} type="url" value={url} placeholder="https://docs.google.com/document/d/…" spellcheck={false} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} />
-      </label>
-      <label class="pb-field">
-        <span>Name</span>
-        <input type="text" value={name} maxLength={80} placeholder={kind === 'link' ? 'What it is' : `The ${DOC_KIND_NAMES[kind]}’s name`} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-      </label>
-      <div class="pb-linkform-foot">
-        <span class="pb-linkform-kind">{url.trim() ? DOC_KIND_NAMES[kind] : 'A Google Doc, Sheet or Slides, or any address'}</span>
-        <button type="button" class="pb-ghost" disabled={busy} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="submit" class="pb-filled small" disabled={busy || !url.trim()}>
-          {busy ? 'Adding…' : 'Add'}
-        </button>
-      </div>
-      <p class="pb-linkform-note">
-        A Google Doc, Sheet or Slides file placed in the project folder through Drive for desktop shows up on its own. This is for one that lives elsewhere.
-      </p>
-    </form>
-  );
-}
-
-// --- the project menu ------------------------------------------------------------------------------------------
-
-function ProjectMenu({ project, counts, onCreate }: { project: Project; counts: string; onCreate(): void }) {
-  const [open, setOpen] = useState(false);
-  const install = useInstall();
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: PointerEvent) => {
-      if ((event.target as Element | null)?.closest?.('.pb-menu')) return;
-      setOpen(false);
-    };
-    window.addEventListener('pointerdown', onDown, true);
-    return () => window.removeEventListener('pointerdown', onDown, true);
-  }, [open]);
-  const info = project.info!;
-  const type = projectType(info.type);
-  const status = project.status === 'ready' ? 'Saving into the folder' : 'View only';
-  return (
-    <div class="pb-menu">
-      <button class={`pb-title ${open ? 'on' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <b>{info.name}</b>
-        {type && <span class="pb-title-type">{type.name}</span>}
-        <span class="pb-caret" aria-hidden="true">
-          ▾
-        </span>
-      </button>
-      {open && (
-        <div class="pb-pop pb-menu-pop" role="menu">
-          <div class="pb-menu-head">
-            <b>{info.name}</b>
-            <span>
-              {project.dir?.name} · {status}
-            </span>
-            <span>{counts}</span>
-          </div>
-          <p class="pb-menu-note">Template Studio and Freeform open this folder too, on their own.</p>
-          {install.state === 'installable' && (
-            <button
-              onClick={() => {
-                setOpen(false);
-                void install.install();
-              }}
-            >
-              Install as an app…
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setOpen(false);
-              onCreate();
-            }}
-          >
-            Create a project…
-          </button>
-          <button
-            onClick={() => {
-              setOpen(false);
-              void project.open();
-            }}
-          >
-            Open another folder…
-          </button>
-          <button
-            class="danger"
-            onClick={() => {
-              setOpen(false);
-              void project.close();
-            }}
-          >
-            Close project
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}

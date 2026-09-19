@@ -29,6 +29,17 @@ export interface AssetsProps {
    * the surface, and one clicked lands in the middle. Absent otherwise.
    */
   onDropAsset?(asset: AssetFile, at: { x: number; y: number } | null): void;
+  /** Whether a picture from here is being carried towards the email right now. */
+  dragging: boolean;
+  /**
+   * Otherwise a picture dragged out of the panel goes to the email, through the same plumbing a block from the
+   * palette uses: the app follows the pointer with a ghost and a drop line, and `onDrop` lets go. Jared: "allow
+   * the ability to drag an asset into the email and it creates the container needed for it."
+   */
+  onDrag(asset: AssetFile, x: number, y: number): void;
+  onDrop(): void;
+  /** A click with no Image block selected: a new Image block at the end of the email. */
+  onPlace(asset: AssetFile): void;
 }
 
 /** `rendered/lede.png` → `rendered`, and `hero.png` → null. */
@@ -37,33 +48,67 @@ const baseOf = (name: string) => name.slice(name.lastIndexOf('/') + 1);
 
 const kb = (bytes: number) => (bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`);
 
-export function Assets({ editor, assets, folder, onOpenFolder, onDropAsset }: AssetsProps) {
+export function Assets({ editor, assets, folder, onOpenFolder, onDropAsset, dragging: carrying, onDrag, onDrop, onPlace }: AssetsProps) {
   const site = editor.selection.kind === 'block' ? siteOf(editor.template, editor.selection.blockId) : null;
   const picked = site?.column.blocks[site.index];
   const target = picked?.type === 'image' ? picked : null;
-  /** A picture being dragged towards the surface: where it started, and whether it has left. */
+  /** A press that moved: the click the button fires afterwards is the same gesture, and does nothing more. */
+  const skipClick = useRef(false);
+  /** A picture being dragged out of the panel: where it started, and whether it has left. */
   const dragging = useRef<{ asset: AssetFile; x: number; y: number; moved: boolean } | null>(null);
 
+  // Pointer capture, as in the palette: the preview is an iframe, and without capture its document swallows every
+  // `pointermove` the moment the pointer crosses into it.
   const onPointerDown = (event: PointerEvent, asset: AssetFile) => {
-    if (!onDropAsset || event.button !== 0) return;
+    if (event.button !== 0) return;
     capture(event.currentTarget as HTMLElement, event.pointerId);
     dragging.current = { asset, x: event.clientX, y: event.clientY, moved: false };
+    // A new gesture starts clean: a drag whose click never came must not swallow this one's.
+    skipClick.current = false;
   };
   const onPointerMove = (event: PointerEvent) => {
     const d = dragging.current;
-    if (!d || d.moved) return;
-    if (Math.hypot(event.clientX - d.x, event.clientY - d.y) > 5) d.moved = true;
+    if (!d) return;
+    if (!d.moved) {
+      if (Math.hypot(event.clientX - d.x, event.clientY - d.y) <= 5) return;
+      d.moved = true;
+    }
+    if (!onDropAsset) onDrag(d.asset, event.clientX, event.clientY);
   };
   const onPointerUp = (event: PointerEvent) => {
     const d = dragging.current;
     release(event.currentTarget as HTMLElement, event.pointerId);
     dragging.current = null;
-    if (!d || !onDropAsset) return;
-    // Dropped on the surface: there. A plain click: the middle of it.
-    const under = document.elementFromPoint(event.clientX, event.clientY);
+    if (!d) return;
+    if (onDropAsset) {
+      // Dropped on the surface: there. A plain click: the middle of it.
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      if (d.moved) {
+        if (under?.closest('.surface-svg')) onDropAsset(d.asset, { x: event.clientX, y: event.clientY });
+      } else onDropAsset(d.asset, null);
+      skipClick.current = true;
+      return;
+    }
     if (d.moved) {
-      if (under?.closest('.surface-svg')) onDropAsset(d.asset, { x: event.clientX, y: event.clientY });
-    } else onDropAsset(d.asset, null);
+      onDrop();
+      skipClick.current = true;
+    }
+  };
+  // A finger the browser takes for a scroll, or a pen lifted off the edge: the drag is let go, not dropped.
+  const onPointerCancel = (event: PointerEvent) => {
+    const d = dragging.current;
+    release(event.currentTarget as HTMLElement, event.pointerId);
+    dragging.current = null;
+    if (d?.moved && !onDropAsset) onDrop();
+  };
+  /** A click, from a press that did not move or from the keyboard: into the selected Image, else a new one at the end. */
+  const onClick = (asset: AssetFile) => {
+    if (skipClick.current) {
+      skipClick.current = false;
+      return;
+    }
+    if (target) editor.set('block.src', asset.name);
+    else onPlace(asset);
   };
 
   if (!folder) {
@@ -101,7 +146,13 @@ export function Assets({ editor, assets, folder, onOpenFolder, onDropAsset }: As
   return (
     <div class="assets-pane">
       <p class="hint" title="A file name is not a URL an email client can fetch, so Checks will refuse to export until every image points at a hosted one. Design with these, then swap them for HubSpot Files URLs.">
-        {onDropAsset ? 'Drag one onto the surface, or click to drop it in the middle.' : target ? `Click one to use it in the selected ${CATALOG.image.name}.` : 'Select an Image block, then click one of these.'}
+        {onDropAsset
+          ? 'Drag one onto the surface, or click to drop it in the middle.'
+          : carrying
+            ? 'Drop it where it goes.'
+            : target
+              ? `Click one to use it in the selected ${CATALOG.image.name}, or drag one onto the email.`
+              : 'Drag one onto the email, or click to add it at the end.'}
       </p>
 
       {/* One group per folder, the top of `assets/` first. A grid that mixes `hero.png` with
@@ -119,22 +170,22 @@ export function Assets({ editor, assets, folder, onOpenFolder, onDropAsset }: As
           return (
             <button
               key={asset.name}
-              class={`asset ${used ? 'on' : ''} ${onDropAsset ? 'droppable' : ''}`}
-              disabled={!target && !onDropAsset}
+              class={`asset ${used ? 'on' : ''} droppable`}
               title={
                 onDropAsset
                   ? `Drag ${asset.name} onto the surface, or click to drop it in the middle.`
                   : target
-                    ? `Use ${asset.name} in the selected image. It stays a local file until you paste a hosted URL over it.`
-                    : `${asset.name} — select an Image block first.`
+                    ? `Use ${asset.name} in the selected image, or drag it onto the email. It stays a local file until you paste a hosted URL over it.`
+                    : `Drag ${asset.name} onto the email, or click to add it at the end, in an Image block of its own.`
               }
-              onClick={() => !onDropAsset && target && editor.set('block.src', asset.name)}
+              onClick={() => onClick(asset)}
               onPointerDown={(e) => onPointerDown(e, asset)}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
             >
               <span class="asset-thumb">
-                <img src={asset.url} alt="" loading="lazy" />
+                <img src={asset.url} alt="" loading="lazy" draggable={false} />
               </span>
               {/* The folder in front, quieter than the file. A grid of `rendered/…` all reading
                   the same for the first nine characters is a grid you have to read to the middle

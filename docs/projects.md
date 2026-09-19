@@ -700,6 +700,31 @@ data model. The Google source is the step after, and it is mostly the OAuth clie
   and printed on the frame's. The board prints every such page it can see and shows the print in the email's
   preview, one print shared by the frame and the emails that follow it.
 
+### Small fixes, 2026-09-19
+
+- **Freeform goes back to the board.** A frame opened from the board, or a new frame made from it, shows "← Board"
+  in the canvas and returns to the board; the board comes back to the view it left. Opened from the tools it still
+  shows "← Tools".
+- **"not in a file".** Template Studio's save badge says so when the open email has no file: after its file is
+  deleted from Files, or before a new email's first change. It used to say "saved".
+- **The board lets old prints go**, and the Assets panel's thumbnails no longer take the browser's own image drag.
+- **A deleted email stays deleted.** A template that sat at the top of a project was copied into `.scug/templates`
+  on its first save, and deleting it removed only that copy: the original came back. Saving now moves the file, and
+  Delete, in Template Studio and on the board, removes every copy of the name.
+
+### Files first, and pictures into the email
+
+*Added 2026-09-19.*
+
+> "in template studio make the files the index screen and move files above blocks. allow the ability to drag an
+> asset into the email and it creates the container needed for it."
+
+- **Template Studio opens on Files.** The rail is Files, Blocks, Layers, Assets, Design.
+- **Drag a picture from Assets onto the email.** It becomes an Image block where it lands: beside the block it was
+  dropped by, or in a section of its own on a section edge or at the end. A click with no Image block selected adds
+  it at the end; with one selected, the click still fills that block. Its alt text starts as the file's name and is
+  edited in the Inspector. As with every local picture, Checks asks for a hosted URL before export.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

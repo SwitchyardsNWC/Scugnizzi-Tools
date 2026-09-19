@@ -6,7 +6,7 @@
 
 import { colorOf, theme, type DesignSystem } from '../model/design-system.ts';
 import type { BoxTokens } from './layout.ts';
-import type { Column, Preview, Section } from '../model/types.ts';
+import type { Column, Preview } from '../model/types.ts';
 
 export interface BuildContext {
   ds: DesignSystem;
