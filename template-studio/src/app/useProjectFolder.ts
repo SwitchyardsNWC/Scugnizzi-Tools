@@ -80,14 +80,18 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const name = params.get('open');
-    if (name) {
-      wanted.current = name;
+    // The board sends `?open=<file>` to open a file, or `?from=board` for a new email; either way the arrow goes back to it.
+    if (name || params.get('from') === 'board') {
       setFromBoard(true);
       try {
         sessionStorage.setItem(FROM_BOARD_KEY, '1');
       } catch {
         // Storage blocked: the arrow knows for this page load only.
       }
+      params.delete('from');
+    }
+    if (name) {
+      wanted.current = name;
       params.delete('open');
       const rest = params.toString();
       window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);

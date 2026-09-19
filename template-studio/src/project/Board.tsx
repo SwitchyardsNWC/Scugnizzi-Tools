@@ -124,9 +124,15 @@ const ago = (t: number) => {
 const sizeOf = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-function openTool(url: string) {
+/**
+ * Opens what a card is. Our own tools open here, in this tab (Jared, 2026-09-19: "when I open an item from the
+ * project board, don't open it in a new window"); their back arrows lead to the board. A document that lives
+ * elsewhere, a Google Doc, opens in a new tab, since it leaves the site and has no way back to it.
+ */
+function openTool(url: string, elsewhere = false) {
   const href = new URL(url, window.location.href).href;
-  if (!window.open(href, '_blank')) window.location.href = href;
+  if (elsewhere && window.open(href, '_blank')) return;
+  window.location.href = href;
 }
 
 function readView(key: string): View | null {
@@ -754,14 +760,26 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const picture = picturesById.get(card.id);
       if (picture) url = toolAddress('../../', picture.path, recipeOf.get(picture.path));
       setSelected(card.id);
+      const elsewhere = Boolean(doc);
       animateTo(to, 420, () => {
         if (!url) return;
+        if (elsewhere) {
+          openTool(url, true);
+          // Back to where the board was, for when you come back to it.
+          window.setTimeout(() => animateTo(before, 420), 700);
+          return;
+        }
+        // The tool takes this tab. The board is remembered as it was before the zoom, so the way back, the tool's
+        // arrow or the browser's, finds it whole rather than pressed against one card.
+        try {
+          localStorage.setItem(viewKey, JSON.stringify(before));
+        } catch {
+          // Nothing kept: the board fits itself on return.
+        }
         openTool(url);
-        // Back to where the board was, for when you come back to it.
-        window.setTimeout(() => animateTo(before, 420), 700);
       });
     },
-    [size, emailsById, framesById, picturesById, docsById, recipeOf, animateTo],
+    [size, emailsById, framesById, picturesById, docsById, recipeOf, animateTo, viewKey],
   );
 
   /** A point on the screen, on the board. */
@@ -1824,7 +1842,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         <span class="pb-grow" />
         <div class="pb-actions" role="group" aria-label="Add to the project">
           <span class="pb-kicker">Add</span>
-          <button class="pb-ghost" title="Open Template Studio on this project, for a new email" onClick={() => openTool('index.html')}>
+          <button class="pb-ghost" title="Open Template Studio on this project, for a new email" onClick={() => openTool('index.html?from=board')}>
             + Email
           </button>
           <button class="pb-ghost" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1')}>
