@@ -2496,3 +2496,70 @@ menu, "dont forget to clean up the alignment of these dropdown menu buttons acro
   in a 22px box, the project menu's rows 11/7 in 36px: each put the text 2px low, the same habit the bar had.
   Both now centre the line box with a 1px nudge, like the bar's controls. Every other control in the two
   stylesheets was checked: the rest centre by flex or pad evenly.
+
+### 3.83 Notes on the board
+
+*2026-09-19.* Jared: "let's add a 'notes' feature to the project board. so editor notes can be left next to
+objects."
+
+- **A note is the board's.** `BoardNote` in board.json (model/project.ts): its words, where it sits, its colour,
+  when it was written, and the card it is left on. In the project folder, so everyone who opens it reads them;
+  boards written before notes read as boards with none.
+- **Left on a card, it goes with it.** `moveCard` moves the notes on a card by the card's own distance, so a drag,
+  a group ride and Undo all carry them; Tidy shifts them by where their card went. A card whose file goes leaves
+  its note where it was, on its own (`forgetCard`). A dashed hairline joins a note to its card, drawn in the links
+  layer, quieter than a link between files.
+- **Leaving one.** + Note, or N: on the selected card, to its right; otherwise in the middle of the window. The
+  field opens at once; Escape drops the edit, ⌘Enter or a click away keeps it; a note left empty goes as if it had
+  not been. Double-click, or Enter on a selected note, writes again. Four paper colours on hover, Delete, and every
+  change is one undo step.
+- **Its own drag.** The note handles its pointer with capture and stops the event, so the stage under it starts
+  neither a pan nor a marquee; its text field stops keys, so the board's keys stay out of the words. While a card
+  is carried, the notes on it are drawn riding along before the drop writes them.
+- **Not done.** Notes are not resized (200px wide, as tall as their words), carry no author (the folder has no
+  idea who is who), and do not ride with a group they sit in unless they are on a card that does.
+
+### 3.84 What a note's colour says, and the section it is about
+
+*2026-09-19.* Jared: "notes, colors, a purpose. yellow idea, green, move forward with; red, stop before continuing.
+And is there a way to link a note to an email, specifically a section in that email?"
+
+- **Four kinds, not four colours.** `NOTE_KINDS`: Note on plain paper, Idea on yellow, Go on green, Stop on red.
+  The swatches say what they mean in their titles, the note wears the word in its strip, and Undo says "Mark a
+  note Stop". The stored field is still `color`, an index into the kinds.
+- **A note points at a section.** On an email, the note gets an "on" row: the whole email, or one of its sections
+  named for what it holds ("3. Heading: Big news: we're opening 2 more…", "6. Footer"; `sectionLabels`). The email
+  card measures where each section lies as it lays out (`sectionSpans`, from the `data-sy-section` marks the
+  preview already carries) and tells the board, which scales the span to the card. Picking a section moves the
+  note level with it, the tether ends at it, and while the note is picked the section is boxed on the card. A
+  card that goes takes the section with it; the note keeps its words.
+- **Not in Template Studio yet.** The natural next step is for Studio to show an email's notes beside their
+  sections, read from board.json, so the editor sees "Stop" where the stop is. Not built; the board is where notes
+  live today.
+
+### 3.85 Notes, second pass: the section first, a pin, and Template Studio
+
+*2026-09-19.* Jared: "allow me to choose the 'on' for the note before I add text. right now it closes out if I
+try to choose. as I hover over the section options outline them in the email. the timestamp doesnt always render
+right. now make the way to view them in the template studio." And: "is there a way to add a note to a section
+after the note has been created. drag a node from the note directly to a section?"
+
+- **The edit ends when focus leaves the note, not the field.** The field's blur was the end of the edit, so the
+  first click on the section list, or a kind, closed a new empty note and threw it away. Now the note listens for
+  `focusout` and ignores focus moving within itself; the list and the swatches hand focus back to the field when
+  they are done, and only focus leaving the note ends the edit, with the field's words whether or not it had focus
+  at that moment.
+- **The section list is its own list**, not a `<select>`: the pointer passing over an entry outlines that section
+  on the email, dashed, through the same mark the picked note draws solid. A native select cannot say where the
+  pointer is.
+- **A pin.** A dot at the note's left edge. Dragged onto a card it pins the note there; onto a section of an email,
+  to that section, with the card lit and the section outlined as it passes; let go on the paper, the note is
+  unpinned. A line follows the pointer from the note meanwhile. The note stays where it is: the pin is about what
+  the note is about, not where it sits.
+- **"10 min", not "10 min ago" wrapped.** The strip is 200px less the swatches, and the long form broke onto two
+  lines. `agoShort`: now, 3 min, 2 h, 5 d, then the date; and the strip does not wrap.
+- **Template Studio reads them.** `useBoardNotes` reads board.json from the open folder for the open email, on
+  focus and every few seconds, the way the board watches. A "Notes 3" toggle in the tools row opens a rail beside
+  the canvas: each note as it looks on the board, with the section it is about. The pointer over a note outlines
+  its section on the canvas (an inline outline on the section's cells, taken off again); a click selects the
+  section and brings it into view. Writing stays on the board, one line away.

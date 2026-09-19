@@ -16,6 +16,9 @@ import type { Branch } from '../compile/serialize.ts';
 import { assetKind, assetNameOf, isAssetKind, isPatternKind, isSyKind, patternIdOf, syIdOf, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
 import { placePicture, replacePicture, type PicturePlace } from '../model/place-picture.ts';
 import { readFreeformFrames, useAppFrames } from './useAppFrames.ts';
+import { useBoardNotes } from './useBoardNotes.ts';
+import { NotesRail } from './NotesRail.tsx';
+import { sectionLabels } from '../model/project.ts';
 import { Welcome } from './Welcome.tsx';
 import {
   download,
@@ -1047,6 +1050,40 @@ export function App() {
   /** The Image blocks, which a carried picture may land on rather than beside (Preview.tsx, `onto`). */
   const imageBlockIds = useMemo(() => allBlocks(editor.template).flatMap((b) => (b.type === 'image' ? [b.id] : [])), [editor.template]);
 
+  // --- the board's notes for this email (useBoardNotes.ts, NotesRail.tsx) ------------------------------------
+  const boardNotes = useBoardNotes(workspace, editor.file?.fileName ?? null);
+  const [notesShown, setNotesShown] = useState(true);
+  const noteLabels = useMemo(() => sectionLabels(editor.template), [editor.template]);
+  /** Outlines a section on the canvas while a note that points at it is under the pointer. */
+  const outlinePart = useCallback((part: string | null) => {
+    const doc = frame.current?.contentDocument;
+    if (!doc) return;
+    for (const el of doc.querySelectorAll<HTMLElement>('[data-sy-noted]')) {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+      el.removeAttribute('data-sy-noted');
+    }
+    if (!part) return;
+    const cells = doc.querySelectorAll<HTMLElement>(`[data-sy-column][data-sy-section="${part}"]`);
+    const els = cells.length ? cells : doc.querySelectorAll<HTMLElement>(`[data-sy-block][data-sy-section="${part}"]`);
+    for (const el of els) {
+      el.setAttribute('data-sy-noted', '');
+      el.style.outline = '2px dashed #7b61ff';
+      el.style.outlineOffset = '-2px';
+    }
+  }, []);
+  /** Selects the section a note is about and brings it into view. */
+  const goToPart = useCallback(
+    (part: string | null) => {
+      const section = part ? editor.template.sections.find((s) => s.id === part) : undefined;
+      if (!section) return;
+      const first = section.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))[0];
+      editor.select(first ? { kind: 'block', sectionId: section.id, blockId: first.id } : { kind: 'section', sectionId: section.id });
+      if (first) revealInCanvas(scroller.current, frame.current, first.id);
+    },
+    [editor],
+  );
+
   // --- the palette ---------------------------------------------------------------------------------
   const [dragType, setDragType] = useState<DragKind | null>(null);
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
@@ -1912,6 +1949,16 @@ export function App() {
               </div>
             )}
 
+            {boardNotes.length > 0 && (
+              <button
+                class={`btn notes-toggle ${notesShown ? 'on' : ''}`}
+                aria-pressed={notesShown}
+                title={notesShown ? 'Hide the notes left on this email on the project board' : 'Show the notes left on this email on the project board'}
+                onClick={() => setNotesShown((v) => !v)}
+              >
+                Notes <span class="notes-count">{boardNotes.length}</span>
+              </button>
+            )}
             <button
               class={`btn icon-btn help ${showKeys ? 'on' : ''}`}
               aria-label="Keyboard shortcuts"
@@ -1922,6 +1969,9 @@ export function App() {
             </button>
           </div>
 
+          {notesShown && boardNotes.length > 0 && !surfaceOf && (
+            <NotesRail notes={boardNotes} labels={noteLabels} onHover={outlinePart} onPick={goToPart} onOpenBoard={() => void (window.location.href = new URL('project.html', window.location.href).href)} onClose={() => setNotesShown(false)} />
+          )}
           {surfaceOf && (
             <Surface
               editor={editor}

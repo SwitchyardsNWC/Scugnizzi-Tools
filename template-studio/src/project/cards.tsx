@@ -29,8 +29,34 @@ export function documentHeight(frame: HTMLIFrameElement): number | null {
   return height > 40 ? height : null;
 }
 
-/** The whole email, laid out at its own width and scaled to the card. Tells the board its height once it has one, and again when its fonts land. */
-export function EmailBody({ item, assets, prints, live, width, height, onHeight }: { item: EmailItem; assets: AssetFile[]; prints: Record<string, { url: string }> | undefined; live: boolean; width: number; height: number; onHeight(px: number): void }) {
+/** Where a section lies in the email's own page pixels, from the top of the document. */
+export interface SectionSpan {
+  id: string;
+  top: number;
+  height: number;
+}
+
+/** Every section's span, from the blocks and cells that carry its id, in document order. */
+export function sectionSpans(frame: HTMLIFrameElement): SectionSpan[] {
+  const doc = frame.contentDocument;
+  if (!doc?.body) return [];
+  const spans = new Map<string, { top: number; bottom: number }>();
+  for (const el of doc.querySelectorAll<HTMLElement>('[data-sy-section]')) {
+    const id = el.getAttribute('data-sy-section');
+    if (!id) continue;
+    const r = el.getBoundingClientRect();
+    if (r.height <= 0) continue;
+    const span = spans.get(id);
+    spans.set(id, span ? { top: Math.min(span.top, r.top), bottom: Math.max(span.bottom, r.bottom) } : { top: r.top, bottom: r.bottom });
+  }
+  return [...spans.entries()].map(([id, s]) => ({ id, top: Math.round(s.top), height: Math.round(s.bottom - s.top) })).sort((a, b) => a.top - b.top);
+}
+
+/**
+ * The whole email, laid out at its own width and scaled to the card. Tells the board its height once it has one, and
+ * again when its fonts land; and where its sections lie, so a note can point at one.
+ */
+export function EmailBody({ item, assets, prints, live, width, height, onHeight, onSections }: { item: EmailItem; assets: AssetFile[]; prints: Record<string, { url: string }> | undefined; live: boolean; width: number; height: number; onHeight(px: number): void; onSections?(spans: SectionSpan[]): void }) {
   // A page with effects shows its print in its drawing's place, as on Template Studio's canvas (printed-preview.ts).
   const html = useMemo(() => (item.html && live ? withLocalAssets(prints && item.template ? withPrints(item.html, item.template, prints) : item.html, assets) : ''), [item.html, item.template, prints, assets, live]);
   if (item.error) return <div class="pb-card-note">{item.error}</div>;
@@ -39,6 +65,7 @@ export function EmailBody({ item, assets, prints, live, width, height, onHeight 
   const measure = (frame: HTMLIFrameElement) => {
     const px = documentHeight(frame);
     if (px) onHeight(px);
+    if (px && onSections) onSections(sectionSpans(frame));
   };
   return (
     <iframe
