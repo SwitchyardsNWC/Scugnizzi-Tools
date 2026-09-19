@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { allBlocks, siteOf } from '../src/model/edit.ts';
-import { altFor, placePicture } from '../src/model/place-picture.ts';
+import { altFor, placePicture, replacePicture } from '../src/model/place-picture.ts';
 import { blankTemplate } from '../src/model/starters.ts';
 import type { ImageBlock } from '../src/model/types.ts';
 
@@ -35,6 +35,20 @@ describe('a picture dropped into the email', () => {
     const { template: three, blockId: c } = placePicture(two, 'c.png', { kind: 'column', columnId: column.id, index: 99 });
     expect(siteOf(three, c!)!.column.blocks.map((x) => (x as ImageBlock).src)).toEqual(['b.png', 'a.png', 'c.png']);
     expect(placePicture(two, 'd.png', { kind: 'column', columnId: 'nowhere', index: 0 })).toEqual({ template: two, blockId: null });
+  });
+
+  it('dropped on an Image block, replaces its picture and writes an alt text only when there was none', () => {
+    const t = blankTemplate();
+    const { template: one, blockId } = placePicture(t, 'a.png', null);
+    const swapped = replacePicture(one, blockId!, 'photos/b-side.png');
+    expect(imageAt(swapped, blockId)).toMatchObject({ src: 'photos/b-side.png', alt: 'a' });
+    const blank = { ...one, sections: one.sections.map((s) => ({ ...s, rows: s.rows.map((r) => ({ ...r, columns: r.columns.map((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === blockId ? { ...b, alt: '' } : b)) })) })) })) };
+    expect(imageAt(replacePicture(blank, blockId!, 'photos/b-side.png'), blockId)?.alt).toBe('b side');
+    // The same picture again, or not an Image, or not there: the same template back.
+    expect(replacePicture(swapped, blockId!, 'photos/b-side.png')).toBe(swapped);
+    const legal = allBlocks(one).find((b) => b.type === 'legal')!;
+    expect(replacePicture(one, legal.id, 'x.png')).toBe(one);
+    expect(replacePicture(one, 'nowhere', 'x.png')).toBe(one);
   });
 
   it('reads a first alt text off the file name', () => {

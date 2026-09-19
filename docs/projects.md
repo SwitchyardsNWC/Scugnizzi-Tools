@@ -725,6 +725,14 @@ data model. The Google source is the step after, and it is mostly the OAuth clie
   it at the end; with one selected, the click still fills that block. Its alt text starts as the file's name and is
   edited in the Inspector. As with every local picture, Checks asks for a hosted URL before export.
 
+### Follow-ups, 2026-09-19
+
+- **"2 copies" in Files.** A name the folder holds in two places shows a small chip; clicking it removes the copies
+  the list does not show, and Undo puts them back.
+- **Drop a picture onto an Image block** and it replaces that block's picture; drop it beside and it is a new block.
+- **Edit in Freeform opens in the same tab**, and the canvas's arrow goes back to that email in Template Studio.
+- **The board** re-reads an email only when a frame it follows changes.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

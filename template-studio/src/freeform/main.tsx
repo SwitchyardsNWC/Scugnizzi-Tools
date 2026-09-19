@@ -86,34 +86,47 @@ function frameDoc(key: string, name: string): Template {
 /** The frame `?new=1` made, which belongs to whatever project is open once it is known. */
 let freshKey: string | null = null;
 
-/** Kept for the tab once the board sends it here, so a reload does not forget where the arrow goes. */
-const FROM_BOARD_KEY = 'scuggnizzi.freeform.from-board';
+/** Where the back arrow goes, kept for the tab once a tool sends this page here, so a reload does not forget. */
+const BACK_KEY = 'scuggnizzi.freeform.back';
+interface Back {
+  href: string;
+  label: string;
+  title: string;
+}
 
 /**
  * What the address asks for, read once and taken off it: a frame to open (Template Studio's "Edit in
- * Freeform" and the project board say which), or a new frame (the board's New frame). `from=board` is the
- * board's alone, and sends the back arrow to it rather than to the tools (Jared: when opened from the board,
- * "I want it to go back to the project board by default"), as Template Studio's does.
+ * Freeform" and the project board say which), or a new frame (the board's New frame). `from=board` sends the
+ * back arrow to the board (Jared: when opened from the board, "I want it to go back to the project board by
+ * default"); `from=studio`, with `back=<file>`, sends it to that email in Template Studio; neither, to the tools.
  */
 const request = (() => {
   const params = new URLSearchParams(window.location.search);
   const frame = params.get('frame');
   const fresh = params.get('new') === '1';
-  let fromBoard = params.get('from') === 'board';
+  const from = params.get('from');
+  const file = params.get('back');
+  let back: Back | null =
+    from === 'board'
+      ? { href: 'project.html', label: 'Board', title: 'Back to the project board' }
+      : from === 'studio'
+        ? { href: file ? `index.html?open=${encodeURIComponent(file)}` : 'index.html', label: 'Studio', title: file ? `Back to ${file} in Template Studio` : 'Back to Template Studio' }
+        : null;
   try {
-    if (fromBoard) sessionStorage.setItem(FROM_BOARD_KEY, '1');
-    else fromBoard = sessionStorage.getItem(FROM_BOARD_KEY) === '1';
+    if (back) sessionStorage.setItem(BACK_KEY, JSON.stringify(back));
+    else {
+      const kept = JSON.parse(sessionStorage.getItem(BACK_KEY) ?? 'null') as Partial<Back> | null;
+      if (kept && typeof kept.href === 'string' && typeof kept.label === 'string' && typeof kept.title === 'string') back = { href: kept.href, label: kept.label, title: kept.title };
+    }
   } catch {
-    // Storage blocked: the arrow knows for this page load only.
+    // Storage blocked, or nothing kept: the arrow knows for this page load only.
   }
-  if (frame || fresh || params.has('from')) {
-    params.delete('frame');
-    params.delete('new');
-    params.delete('from');
+  if (frame || fresh || params.has('from') || params.has('back')) {
+    for (const key of ['frame', 'new', 'from', 'back']) params.delete(key);
     const rest = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
   }
-  return { frame, fresh, fromBoard };
+  return { frame, fresh, back };
 })();
 
 function startingFrames(): FrameIndex {
@@ -649,8 +662,8 @@ function FreeformTool() {
           standalone={{
             left: (
               <>
-                <a class="fig-pill fig-back" href={request.fromBoard ? 'project.html' : '../../index.html'} title={request.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}>
-                  <span aria-hidden="true">←</span> {request.fromBoard ? 'Board' : 'Tools'}
+                <a class="fig-pill fig-back" href={request.back?.href ?? '../../index.html'} title={request.back?.title ?? 'Back to Scugnizzi tools'}>
+                  <span aria-hidden="true">←</span> {request.back?.label ?? 'Tools'}
                 </a>
                 <ProjectPill project={project} />
                 <FramesMenu

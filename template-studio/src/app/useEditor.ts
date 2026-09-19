@@ -140,7 +140,8 @@ export interface Editor {
   save: SaveState;
   /** Why the last save failed, when it did. Cleared by the next save that succeeds. */
   saveError: string | null;
-  saveNow(): void;
+  /** Writes now rather than after the autosave pause; resolves once written (or refused). */
+  saveNow(): Promise<void>;
   /** Writes over whatever is on disk, conflict or not: the person has looked and chosen theirs. */
   saveAnyway(): void;
   file: TemplateFile | null;
@@ -631,7 +632,9 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       adoptFile,
       save,
       saveError,
-      saveNow: () => void write(),
+      saveNow: async () => {
+        await write();
+      },
       saveAnyway: () => void write({ force: true }),
       file,
       releaseFile,

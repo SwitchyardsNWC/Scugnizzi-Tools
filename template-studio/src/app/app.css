@@ -256,6 +256,13 @@ body {
    hover, an iPad, every row's shows, since nothing else would ever reveal it. */
 .file-row .row.on + .row-delete { display: block; }
 @media (hover: none) { .row-delete { display: block; } }
+/* A name the folder holds in more than one place: a small warning that is also the fix. */
+.row-copies {
+  flex: none; margin-left: 2px; padding: 1px 7px; border-radius: 999px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); background: transparent;
+  color: var(--warn); font: inherit; font-size: 10px; line-height: 1.5; white-space: nowrap;
+}
+.row-copies:hover { background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .row-delete:hover { background: var(--sunk); color: var(--ink); }
 
 /* Editable in HubSpot. The one dot in the tree, so it means exactly one thing. */

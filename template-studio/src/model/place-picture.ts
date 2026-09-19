@@ -21,6 +21,28 @@ export function altFor(name: string): string {
   return base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/** The email with the picture in the named Image block, its alt text written when it had none. Unchanged when the block is not an Image. */
+export function replacePicture(template: Template, blockId: string, name: string): Template {
+  let changed = false;
+  const sections = template.sections.map((s) => ({
+    ...s,
+    rows: s.rows.map((r) => ({
+      ...r,
+      columns: r.columns.map((c) => ({
+        ...c,
+        blocks: c.blocks.map((b) => {
+          if (b.id !== blockId || b.type !== 'image') return b;
+          // The same picture again is not a change, so it is not an undo step either.
+          if (b.src === name && b.alt.trim()) return b;
+          changed = true;
+          return { ...b, src: name, alt: b.alt.trim() ? b.alt : altFor(name) };
+        }),
+      })),
+    })),
+  }));
+  return changed ? { ...template, sections } : template;
+}
+
 /** The email with the picture placed, and the new block's id (null only when the column is not there). */
 export function placePicture(template: Template, name: string, place: PicturePlace | null): { template: Template; blockId: string | null } {
   const made = createBlock('image', { id: freshIds(template), taken: takenFieldNames(template) }) as ImageBlock;

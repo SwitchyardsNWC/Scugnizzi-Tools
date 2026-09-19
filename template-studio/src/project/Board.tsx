@@ -549,7 +549,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       const email = emailsById.get(card.id);
       const frame = framesById.get(card.id);
       const doc = docsById.get(card.id);
-      if (email) url = `index.html?open=${encodeURIComponent(email.fileName)}`;
+      if (email) url = `index.html?open=${encodeURIComponent(email.fileName)}&from=board`;
       if (frame) url = `freeform.html?frame=${encodeURIComponent(frame.key)}&from=board`;
       if (doc) url = doc.link.url;
       // A picture opens in the tool that made it, with its settings; otherwise in Riso, or Ink bleed for an SVG.

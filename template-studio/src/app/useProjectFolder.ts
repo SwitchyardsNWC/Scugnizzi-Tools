@@ -80,8 +80,9 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const name = params.get('open');
-    // The board sends `?open=<file>` to open a file, or `?from=board` for a new email; either way the arrow goes back to it.
-    if (name || params.get('from') === 'board') {
+    // The board sends `?from=board`, with `?open=<file>` for a file or alone for a new email, and the arrow goes back
+    // to it. `?open=` on its own is also how the Freeform canvas returns here, so it does not decide by itself.
+    if (params.get('from') === 'board') {
       setFromBoard(true);
       try {
         sessionStorage.setItem(FROM_BOARD_KEY, '1');
