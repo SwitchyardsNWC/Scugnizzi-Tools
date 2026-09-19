@@ -18,7 +18,8 @@ import type { MutableRef } from 'preact/hooks';
 
 import { compile } from '../compile/compile.ts';
 import { freeformSvg } from '../compile/freeform.ts';
-import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
+import { DEFAULT_DESIGN_SYSTEM, colorOf, type DesignSystem } from '../model/design-system.ts';
+import { recipeHash } from '../model/freeform.ts';
 import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, isLinkFile, type DocKind } from '../model/docs.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { followFrames, readAppFrame, type AppFrame } from '../model/freeform-link.ts';
@@ -66,7 +67,7 @@ import { duplicateTemplate } from '../model/edit.ts';
 import { FRAME_PREFIX, newFrameId } from '../model/frame-store.ts';
 import { META } from '../model/layout.ts';
 import { serializeTemplate, templateFileName } from '../model/serialize.ts';
-import type { Template } from '../model/types.ts';
+import type { FreeformBlock, Template } from '../model/types.ts';
 import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
 import { useCanvasSettings } from '../app/canvas-settings.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
@@ -76,6 +77,7 @@ import { loadKeptPictures } from '../app/kept-pictures.ts';
 import { capture } from '../app/pointer.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
 import { freeformCanvas } from '../app/picture.ts';
+import { withPrints } from '../app/printed-preview.ts';
 import {
   listAssetFolders,
   listDocuments,
@@ -193,6 +195,34 @@ interface Files {
   read: boolean;
   /** How many times the board had changed the folder itself when this was read (see `stale`). */
   epoch: number;
+}
+
+/** A freeform page with effects, with what it prints on: the frame's ground, or in an email the paper under the block. */
+interface PrintedPage {
+  /** The block in its email; a frame's own page has none. */
+  blockId?: string;
+  page: FreeformBlock;
+  hash: string;
+  ground: string;
+  ds: DesignSystem;
+}
+
+/** One print per recipe on one ground; the count of pictures, since a picture layer draws from them. */
+const printId = (hash: string, ground: string, pictures: number) => `${hash}|${ground}|${pictures}`;
+
+/** The pages with effects in an email, each on the ground Template Studio prints it on (App.tsx). */
+function printedIn(template: Template): PrintedPage[] {
+  const ds = template.ds ?? DEFAULT_DESIGN_SYSTEM;
+  const out: PrintedPage[] = [];
+  for (const s of template.sections)
+    for (const r of s.rows)
+      for (const c of r.columns)
+        for (const b of c.blocks) {
+          if (b.type !== 'freeform' || !b.effects?.length) continue;
+          const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
+          out.push({ blockId: b.id, page: b, hash: recipeHash(b), ground, ds });
+        }
+  return out;
 }
 
 const NO_FILES: Files = { emails: [], frames: [], pictures: [], docs: [], folders: [], recipes: [], read: false, epoch: 0 };
@@ -494,36 +524,61 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   );
   const recipeOf = useMemo(() => recipesByOutput(files.recipes), [files.recipes]);
 
-  // --- printed frames ---
+  // --- printed pages ---
+  // A freeform page with effects is pixels its drawing cannot show, so the board prints it: the frame's own
+  // card, and every page in an email that has effects, which is how a followed riso frame looks the same on the
+  // email's card as on the frame's and in Template Studio. One print per recipe on one ground, so a frame and
+  // the emails that follow it share one.
   const [prints, setPrints] = useState<Record<string, string>>({});
   const printsRef = useRef(prints);
   printsRef.current = prints;
   const assetSignature = assets.map((a) => a.url).join('|');
   const assetsRef = useRef(assets);
   assetsRef.current = assets;
+  const printedPages = useMemo(() => {
+    const wanted: PrintedPage[] = [];
+    for (const f of files.frames) {
+      const fr = f.frame;
+      if (fr?.page.effects?.length) wanted.push({ page: fr.page, hash: fr.hash, ground: fr.ground, ds: f.template.ds ?? DEFAULT_DESIGN_SYSTEM });
+    }
+    for (const e of files.emails) if (e.template) wanted.push(...printedIn(e.template));
+    return wanted;
+  }, [files.frames, files.emails]);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      for (const f of files.frames) {
-        const fr = f.frame;
-        if (!fr?.page.effects?.length) continue;
-        const id = `${f.key}:${fr.hash}:${assetSignature.length}`;
+      for (const w of printedPages) {
+        const id = printId(w.hash, w.ground, assetSignature.length);
         if (printsRef.current[id]) continue;
         try {
-          const canvas = await freeformCanvas(fr.page, f.template.ds ?? DEFAULT_DESIGN_SYSTEM, { assets: assetsRef.current, scale: 1, ground: fr.ground });
+          const canvas = await freeformCanvas(w.page, w.ds, { assets: assetsRef.current, scale: 1, ground: w.ground });
           if (cancelled) return;
           const url = canvas.toDataURL('image/png');
           setPrints((p) => ({ ...p, [id]: url }));
         } catch {
-          // The drawing without its print is still a fair picture of the frame.
+          // The drawing without its print is still a fair picture of the page.
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [files.frames, assetSignature]);
-  const printOf = (f: FrameItem) => (f.frame?.page.effects?.length ? prints[`${f.key}:${f.frame.hash}:${assetSignature.length}`] : undefined);
+  }, [printedPages, assetSignature]);
+  const printOf = (f: FrameItem) => (f.frame?.page.effects?.length ? prints[printId(f.frame.hash, f.frame.ground, assetSignature.length)] : undefined);
+  /** For each email, the prints of its pages with effects by block id: what its card shows in the drawings' place. */
+  const emailPrints = useMemo(() => {
+    const out = new Map<string, Record<string, { url: string }>>();
+    for (const e of files.emails) {
+      if (!e.template) continue;
+      const byBlock: Record<string, { url: string }> = {};
+      for (const w of printedIn(e.template)) {
+        const url = prints[printId(w.hash, w.ground, assetSignature.length)];
+        if (url && w.blockId) byBlock[w.blockId] = { url };
+      }
+      if (Object.keys(byBlock).length > 0) out.set(e.id, byBlock);
+    }
+    return out;
+  }, [files.emails, prints, assetSignature]);
 
   // --- view ---
   const stage = useRef<HTMLDivElement | null>(null);
@@ -1779,7 +1834,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   )}
                 </header>
                 <div class="pb-card-body">
-                  {email && <EmailBody item={email} assets={assets} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} />}
+                  {email && <EmailBody item={email} assets={assets} prints={emailPrints.get(email.id)} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} />}
                   {frame && <FrameBody item={frame} assets={assets} print={printOf(frame)} width={card.w} height={card.h - HEAD} />}
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
                   {doc && <DocBody item={doc} />}
@@ -2015,8 +2070,9 @@ function documentHeight(frame: HTMLIFrameElement): number | null {
 }
 
 /** The whole email, laid out at its own width and scaled to the card. Tells the board its height once it has one, and again when its fonts land. */
-function EmailBody({ item, assets, live, width, height, onHeight }: { item: EmailItem; assets: AssetFile[]; live: boolean; width: number; height: number; onHeight(px: number): void }) {
-  const html = useMemo(() => (item.html && live ? withLocalAssets(item.html, assets) : ''), [item.html, assets, live]);
+function EmailBody({ item, assets, prints, live, width, height, onHeight }: { item: EmailItem; assets: AssetFile[]; prints: Record<string, { url: string }> | undefined; live: boolean; width: number; height: number; onHeight(px: number): void }) {
+  // A page with effects shows its print in its drawing's place, as on Template Studio's canvas (printed-preview.ts).
+  const html = useMemo(() => (item.html && live ? withLocalAssets(prints && item.template ? withPrints(item.html, item.template, prints) : item.html, assets) : ''), [item.html, item.template, prints, assets, live]);
   if (item.error) return <div class="pb-card-note">{item.error}</div>;
   if (!live) return <div class="pb-card-skeleton" />;
   const scale = width / EMAIL_PAGE;

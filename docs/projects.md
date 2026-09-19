@@ -685,6 +685,21 @@ data model. The Google source is the step after, and it is mostly the OAuth clie
 4. Create a project makes the Docs and Sheets the type names, from template documents, in the project's Drive folder.
 5. Writing back, only into documents the deck made.
 
+### An email's card shows its frame as it is now
+
+*Added 2026-09-19.*
+
+> "I have a frame with edits on it being used in an email. but the email does not show the correct frame preview."
+
+- **The board follows the frame before it draws.** An email that follows a frame keeps its own copy of the drawing,
+  which Template Studio brings up to date while it is open. The board used to draw the email file as saved, so a
+  frame edited since showed two ways: current on its own card, old on the email's. Now the board brings every
+  followed block up to the project's frame files first, and reads the emails again whenever a frame changes. The
+  email file itself is not rewritten from here; it catches up the next time Studio saves it or the board writes it.
+- **Effects print on email cards too.** A page with riso or another effect used to draw flat on the email's card
+  and printed on the frame's. The board prints every such page it can see and shows the print in the email's
+  preview, one print shared by the frame and the emails that follow it.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

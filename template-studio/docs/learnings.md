@@ -2333,3 +2333,23 @@ not needed or used, clean them up. fix the drag plumbing. do what is best for th
 - **The built files are no longer tracked.** The Pages workflow builds Template Studio before it uploads, so a
   stale `dist` can no longer ship by being forgotten. Locally it is still made by `npm run build`. The unreferenced
   GIFs and a stock photo in the sample templates folder are gone.
+
+### 3.75 The board shows a frame as it is now
+
+*2026-09-19.* Jared: "I have a frame with edits on it being used in an email. but the email does not show the
+correct frame preview."
+
+- **What was stale.** An email that follows a frame carries its own copy of the drawing, and only Template Studio
+  brought that copy up to the frame, while it was open. The board compiled the email file as saved, so a frame
+  edited after the email's last save showed on the frame's card as it is and on the email's card as it was.
+- **The board follows first.** Before it compiles an email for its card, the board brings every linked block up
+  to the project's frame files (`followFrames`, `model/freeform-link.ts`, the same step Studio takes on every
+  change it hears). The email cache is keyed by the frames' hashes as well as the file's own time, so editing a
+  frame reads the emails that follow it again, on the next look. The file on disk is not touched: it is brought up
+  when Studio next saves it, or when the board next writes it for a drop, as before.
+- **Prints, too.** The email's card drew a page with effects flat, while the frame's card printed it. The board
+  now prints every page with effects it can see, in frames and in emails, one print per recipe on one ground, and
+  swaps each into the email's preview with `withPrints` (the canvas's own helper). A followed riso frame is one
+  print shared by the frame's card and every email that follows it.
+- **A leftover.** The two-argument `parse(fileName, text)` that the conflict-guard change made one-argument still
+  had one caller, in the files-only workspace; the build did not run before the last report. It does now.
