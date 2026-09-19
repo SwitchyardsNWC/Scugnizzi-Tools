@@ -153,6 +153,32 @@ describe('deleting a template file', () => {
     expect(await ws.list()).toEqual([]);
   });
 
+  it('counts the places a name is in, and tidies down to the one shown, with a way back', async () => {
+    const dir = new FakeDir('Spring');
+    dir.put(`.scug/templates/${NAME}`, tpl('Newer'), 2000);
+    dir.put(`templates/${NAME}`, tpl('Older'), 1500);
+    dir.put(NAME, tpl('Oldest'), 1000);
+    dir.put('.scug/templates/other.template.json', tpl('Other'), 1000);
+    const ws = workspace(dir);
+    expect((await ws.list()).map((f) => [f.name, f.copies])).toEqual([
+      ['Newer', 3],
+      ['Other', 1],
+    ]);
+
+    const removed = await ws.tidyTemplate!(NAME);
+    expect(removed.map((r) => r.where)).toEqual(['templates/', 'the top of the folder']);
+    expect((dir.at(`.scug/templates/${NAME}`) as FakeFile).text).toBe(tpl('Newer'));
+    expect(dir.at(`templates/${NAME}`)).toBeNull();
+    expect(dir.at(NAME)).toBeNull();
+    expect((await ws.list()).find((f) => f.fileName === NAME)?.copies).toBe(1);
+
+    for (const r of removed) await r.restore();
+    expect((dir.at(`templates/${NAME}`) as FakeFile).text).toBe(tpl('Older'));
+    expect((dir.at(NAME) as FakeFile).text).toBe(tpl('Oldest'));
+    // Nothing hidden: nothing removed, and the shown file untouched.
+    expect(await ws.tidyTemplate!('other.template.json')).toEqual([]);
+  });
+
   it('says so when there is nothing of that name to remove', async () => {
     const dir = new FakeDir('Spring');
     dir.put('.scug/project.json', '{}');

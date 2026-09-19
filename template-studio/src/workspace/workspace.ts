@@ -26,6 +26,11 @@ export interface TemplateFile {
   /** A v1 `.design.json` is imported on read; a v2 `.template.json` is migrated. */
   kind: 'v1' | 'v2';
   modified: number;
+  /**
+   * How many places in the folder hold this name (learnings 3.77). The panel shows a name once, the first place
+   * winning; more than one is a copy left where an older layout kept it, which `tidyTemplate` removes.
+   */
+  copies?: number;
   load(): Promise<{ template: Template; warnings: string[] }>;
 }
 
@@ -114,6 +119,11 @@ export interface Workspace {
    * seen the deletion, which is why the toast says so rather than implying the folder never moved.
    */
   deleteTemplate?(fileName: string): Promise<void>;
+  /**
+   * Removes every copy of a template's name except the one `list` shows, and says where each was, with a way to
+   * put it back. Absent on a read-only workspace.
+   */
+  tidyTemplate?(fileName: string): Promise<Array<{ where: string; restore(): Promise<void> }>>;
   /** Images in `assets/`. Empty when there is no such folder, which is not an error. */
   assets(): Promise<AssetFile[]>;
   /**
@@ -301,23 +311,31 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
 
     async list() {
       const out: TemplateFile[] = [];
-      const seen = new Set<string>();
+      const seen = new Map<string, TemplateFile>();
       // Templates live in `.scug/templates/` in a project, and at the top level or under `templates/` in a
-      // workspace that has not been organised yet, so all three are walked; the first place wins a name.
+      // workspace that has not been organised yet, so all three are walked; the first place wins a name, and the
+      // others are counted on it, so the panel can say a name is in two places.
       for (const source of [...(await toolFolders('templates')), dir]) {
         for await (const [fileName, entry] of source.entries()) {
-          if (entry.kind !== 'file' || !isTemplateFile(fileName) || seen.has(fileName)) continue;
-          seen.add(fileName);
+          if (entry.kind !== 'file' || !isTemplateFile(fileName)) continue;
+          const shown = seen.get(fileName);
+          if (shown) {
+            shown.copies = (shown.copies ?? 1) + 1;
+            continue;
+          }
           // The DOM lib does not discriminate the handle union on `kind`, so this narrows by hand.
           const handle = entry as FileSystemFileHandle;
           const file = await handle.getFile();
-          out.push({
+          const item: TemplateFile = {
             name: nameInside(await file.text(), fileName),
             fileName,
             kind: fileName.endsWith(V1) ? 'v1' : 'v2',
             modified: file.lastModified,
+            copies: 1,
             load: async () => parse(await (await handle.getFile()).text()),
-          });
+          };
+          seen.set(fileName, item);
+          out.push(item);
         }
       }
       return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -525,6 +543,47 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
           removed += 1;
         }
         if (removed === 0) throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);
+      });
+    },
+
+    async tidyTemplate(fileName) {
+      if (!writable) throw refused(dir.name);
+      return writing(dir.name, async () => {
+        // The places `list` walks, in its order, each with a name for the notice. The first that holds the file is
+        // the one the panel shows and stays; every other copy goes, its text kept for Undo.
+        const m = await meta();
+        const places: Array<[Handle | null, string]> = [
+          [m ? await subdirectory(m, 'templates') : null, `${META_DIR}/templates/`],
+          [await subdirectory(dir, 'templates'), 'templates/'],
+          [dir, 'the top of the folder'],
+        ];
+        const removed: Array<{ where: string; restore(): Promise<void> }> = [];
+        let shown = false;
+        for (const [source, where] of places) {
+          if (!source) continue;
+          let handle: FileSystemFileHandle;
+          try {
+            handle = await source.getFileHandle(fileName);
+          } catch {
+            continue;
+          }
+          if (!shown) {
+            shown = true;
+            continue;
+          }
+          const text = await (await handle.getFile()).text();
+          await source.removeEntry(fileName);
+          removed.push({
+            where,
+            restore: async () => {
+              const back = await source.getFileHandle(fileName, { create: true });
+              const out = await back.createWritable();
+              await out.write(text);
+              await out.close();
+            },
+          });
+        }
+        return removed;
       });
     },
   };

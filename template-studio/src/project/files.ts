@@ -8,7 +8,7 @@ import { compile } from '../compile/compile.ts';
 import { DEFAULT_DESIGN_SYSTEM, colorOf, type DesignSystem } from '../model/design-system.ts';
 import { recipeHash } from '../model/freeform.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
-import { followFrames, readAppFrame, type AppFrame } from '../model/freeform-link.ts';
+import { followFrames, linkedBlocks, readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import type { ToolRecipe } from '../model/tool-recipes.ts';
 import { docCardId, emailCardId, frameCardId, pictureCardId } from '../model/project.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
@@ -30,7 +30,7 @@ export interface EmailItem {
   template: Template | null;
   /** The compiled preview, before local pictures are swapped in. */
   html: string;
-  /** The frames as they were when this was read, so a frame's edit reads the email again. */
+  /** The frames this email follows, as they were when it was read, so an edit to one of them reads the email again. */
   framesKey: string;
   error?: string;
 }
@@ -180,13 +180,22 @@ export function useProjectFiles(project: MutableRef<Project>, notify: (message: 
         c.systems = systemsKey;
       }
       // An email that follows a frame shows the frame as it is now, not as it was when the email was last saved in
-      // Template Studio; so an email is read again when any frame moves, not only when its own file does.
+      // Template Studio; so an email is read again when a frame it follows moves, not only when its own file does.
+      // Only the frames it follows: a project with many frames and emails would otherwise re-read every email on
+      // every edit to any frame.
       const appFrames = frames.flatMap((f) => (f.frame ? [f.frame] : []));
-      const framesKey = appFrames.map((f) => `${f.key}:${f.hash}`).join('|');
+      const hashOf = new Map(appFrames.map((f) => [f.key, f.hash]));
+      const framesKeyOf = (t: Template | null) =>
+        t
+          ? [...new Set(linkedBlocks(t).flatMap((b) => (b.source ? [b.source.key] : [])))]
+              .sort()
+              .map((key) => `${key}:${hashOf.get(key) ?? ''}`)
+              .join('|')
+          : '';
       const emails: EmailItem[] = [];
       for (const file of list) {
         const old = c.emails.get(file.fileName);
-        if (old && old.modified === file.modified && old.framesKey === framesKey) {
+        if (old && old.modified === file.modified && old.framesKey === framesKeyOf(old.template)) {
           emails.push(old);
           continue;
         }
@@ -195,9 +204,9 @@ export function useProjectFiles(project: MutableRef<Project>, notify: (message: 
           const loaded = await file.load();
           const { template: saved } = materialiseFolderSystem(loaded.template, systems);
           const template = followFrames(saved, appFrames);
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey, html: compile(template, { mode: 'preview' }).html };
+          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey: framesKeyOf(template), html: compile(template, { mode: 'preview' }).html };
         } catch (cause) {
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', framesKey, error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
+          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', framesKey: '', error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
         }
         c.emails.set(file.fileName, item);
         emails.push(item);

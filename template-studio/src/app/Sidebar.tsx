@@ -78,6 +78,8 @@ export interface SidebarProps {
    * is how it went unnoticed.
    */
   onDelete?(file: TemplateFile): void;
+  /** Removes the hidden copies of a file's name; absent when the folder cannot be written. */
+  onTidy?(file: TemplateFile): void;
   onOpenFolder(): void;
 }
 
@@ -157,6 +159,7 @@ export function Sidebar(props: SidebarProps) {
             onDuplicate={props.onDuplicate}
             onOpen={props.onOpenFile}
             {...(props.onDelete ? { onDelete: props.onDelete } : {})}
+            {...(props.onTidy ? { onTidy: props.onTidy } : {})}
             onOpenFolder={props.onOpenFolder}
             onChooseFiles={props.onChooseFiles}
           />

@@ -4,21 +4,8 @@ import { IMAGES_DIR, packageReadme, planPackage } from '../model/export-package.
 import { simulateDark } from '../compile/dark.ts';
 import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
 import { withPrints } from './printed-preview.ts';
-import { loadKeptPictures } from './kept-pictures.ts';
 import { freeformSvg } from '../compile/freeform.ts';
-import {
-  addFrameBlock,
-  followFrame,
-  isCurrent,
-  linkedBlocks,
-  readAppFrames,
-  type FrameScope,
-  readStudioPresence,
-  STUDIO_PRESENCE,
-  STUDIO_REQUEST,
-  unlinkFrame,
-  type AppFrame,
-} from '../model/freeform-link.ts';
+import { addFrameBlock, followFrame, isCurrent, linkedBlocks, type FrameScope, readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, unlinkFrame } from '../model/freeform-link.ts';
 import { DRAFT_KEY, readDraft } from '../model/draft.ts';
 import { revealInCanvas } from './reveal.ts';
 import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './rasterise.ts';
@@ -27,7 +14,8 @@ import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
 import type { Branch } from '../compile/serialize.ts';
 import { assetKind, assetNameOf, isAssetKind, isPatternKind, isSyKind, patternIdOf, syIdOf, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
-import { placePicture, type PicturePlace } from '../model/place-picture.ts';
+import { placePicture, replacePicture, type PicturePlace } from '../model/place-picture.ts';
+import { readFreeformFrames, useAppFrames } from './useAppFrames.ts';
 import { Welcome } from './Welcome.tsx';
 import {
   download,
@@ -103,8 +91,6 @@ const WIDTHS: Record<Device, number> = { desktop: 680, phone: 375 };
  */
 const CANVAS_LAG = 180;
 
-/** One string for a set of frames, so two reads that saw the same frames compare equal. */
-const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:${f.name}`).join('|');
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'template';
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)}KB`;
@@ -113,11 +99,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, setFiles] = useState<TemplateFile[]>([]);
   const [assets, setAssets] = useState<AssetFile[]>([]);
-  /** Pictures the Freeform app keeps (kept-pictures.ts), so a block linked to its frame shows them. The folder's win a clash of names. */
-  const [kept, setKept] = useState<AssetFile[]>([]);
-  const allAssets = useMemo(() => [...assets, ...kept.filter((k) => !assets.some((a) => a.name === k.name))], [assets, kept]);
   /** The Freeform app's frames, read from this site's storage (model/frame-store.ts, model/freeform-link.ts). */
-  const [appFrames, setAppFrames] = useState<AppFrame[]>(readFreeformFrames);
   /**
    * With a project open, the frames it offers are that project's (model/freeform-link.ts): the browser keeps every
    * project's frames, and a list of all of them was the other projects' clutter.
@@ -285,6 +267,11 @@ export function App() {
     onCreated: (name) => void onCreated(name),
     onSystemWritten: (name, system) => setSystems((old) => ({ ...old, [name]: system })),
   });
+
+  // The Freeform app's frames, followed live, and the pictures it keeps (useAppFrames.ts). The folder's pictures
+  // win a clash of names.
+  const { appFrames, kept } = useAppFrames(editor, frameScope, frameScopeRef);
+  const allAssets = useMemo(() => [...assets, ...kept.filter((k) => !assets.some((a) => a.name === k.name))], [assets, kept]);
   adoptRef.current = editor.adoptFile;
 
   // Autosave has no click to show a dialog from, so a refusal there surfaces here, with the button.
@@ -368,6 +355,35 @@ export function App() {
    * Not offered at all when the workspace cannot write — `deleteTemplate` is absent there, and the
    * panel hides the control rather than showing one that fails on click.
    */
+  /** Removes the copies of a file's name the panel does not show (learnings 3.77), and offers to put them back. */
+  const tidyTemplateFile = useCallback(
+    async (file: TemplateFile) => {
+      if (!workspace?.tidyTemplate) return;
+      let removed: Array<{ where: string; restore(): Promise<void> }>;
+      try {
+        removed = await workspace.tidyTemplate(file.fileName);
+      } catch (cause) {
+        notify(cause instanceof Error ? cause.message : `Could not tidy ${file.fileName}.`);
+        return;
+      }
+      await refreshFiles();
+      if (removed.length === 0) return notify(`${file.name} is in one place now.`);
+      const what = removed.length === 1 ? `the copy at ${removed[0]!.where}` : `${removed.length} copies (${removed.map((r) => r.where).join(', ')})`;
+      notify(`Removed ${what} of ${file.name}. The one shown stays.`, () => {
+        void (async () => {
+          try {
+            for (const r of removed) await r.restore();
+            await refreshFiles();
+            notify(`${file.name}: ${removed.length === 1 ? 'the copy is' : 'the copies are'} back.`);
+          } catch (cause) {
+            notify(cause instanceof Error ? cause.message : `Could not put the copies of ${file.fileName} back.`);
+          }
+        })();
+      });
+    },
+    [workspace, notify, refreshFiles],
+  );
+
   const deleteTemplateFile = useCallback(
     async (file: TemplateFile) => {
       if (!workspace?.deleteTemplate) return;
@@ -1028,6 +1044,9 @@ export function App() {
     [editor],
   );
 
+  /** The Image blocks, which a carried picture may land on rather than beside (Preview.tsx, `onto`). */
+  const imageBlockIds = useMemo(() => allBlocks(editor.template).flatMap((b) => (b.type === 'image' ? [b.id] : [])), [editor.template]);
+
   // --- the palette ---------------------------------------------------------------------------------
   const [dragType, setDragType] = useState<DragKind | null>(null);
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
@@ -1044,15 +1063,23 @@ export function App() {
     // somewhere the pointer never was is the kind of surprise undo exists to fix and should not
     // have to.
     if (!where) return;
-    const place = placeOf(where);
-    if (!place) return;
 
-    // A picture from the folder lands as a new Image block, beside what it was dropped by or in a section of its
-    // own (model/place-picture.ts).
+    // A picture from the folder: dropped on an Image block it replaces that block's picture; otherwise it lands as
+    // a new Image block, beside what it was dropped by or in a section of its own (model/place-picture.ts).
     if (isAssetKind(type)) {
-      placeAssetAt(assetNameOf(type), place);
+      const name = assetNameOf(type);
+      if (where.at === 'block' && where.onto) {
+        const site = siteOf(editor.template, where.blockId);
+        const next = replacePicture(editor.template, where.blockId, name);
+        if (site && next !== editor.template) editor.commit(`Replace with ${name.slice(name.lastIndexOf('/') + 1)}`, next, { select: { kind: 'block', sectionId: site.section.id, blockId: where.blockId } });
+        return;
+      }
+      const place = placeOf(where);
+      if (place) placeAssetAt(name, place);
       return;
     }
+    const place = placeOf(where);
+    if (!place) return;
 
     // A pattern is a section, so like columns it lands as a section: after the one it was aimed
     // at when that was inside a column.
@@ -1213,69 +1240,21 @@ export function App() {
   // --- freeform pages: their prints on the email canvas, and frames from the Freeform app ------------------
 
 
-  // The Freeform app's frames, followed live: its tab writes on every change, and this tab hears it.
-  const framesSignature = framesKey(appFrames);
-  // Frames this email already follows stay listed whatever project they belong to, so a link is never hidden.
-  const followedKeys = useRef<string[]>([]);
-  followedKeys.current = linkedBlocks(editor.template).flatMap((b) => (b.source ? [b.source.key] : []));
-  useEffect(() => {
-    const next = readFreeformFrames(frameScope, followedKeys.current);
-    setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
-  }, [frameScope]);
-  useEffect(() => {
-    const read = () => {
-      const next = readFreeformFrames(frameScopeRef.current, followedKeys.current);
-      setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key.startsWith('scuggnizzi.freeform.')) read();
-    };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', read);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', read);
-    };
-  }, []);
 
-  // The pictures the Freeform app keeps, read again whenever a frame changes, since that is when one may have been dropped.
-  useEffect(() => {
-    let cancelled = false;
-    loadKeptPictures()
-      .then((list) => {
-        if (cancelled) return list.forEach((p) => URL.revokeObjectURL(p.url));
-        setKept((old) => {
-          old.forEach((p) => URL.revokeObjectURL(p.url));
-          return list;
-        });
-      })
-      .catch(() => {
-        // No IndexedDB here: a linked frame's pictures show as missing.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [framesSignature]);
-
-  // Linked blocks follow their frames. A burst of changes in the Freeform tab is one undo step here. A block
-  // whose frame was deleted keeps the drawing it has.
-  useEffect(() => {
-    let next = editor.template;
-    for (const b of linkedBlocks(next)) {
-      const frame = appFrames.find((f) => f.key === b.source?.key);
-      if (frame && !isCurrent(b, frame)) next = followFrame(next, b.id, frame);
-    }
-    if (next !== editor.template) editor.commit('Update from Freeform', next, { coalesce: 'freeform-link' });
-  }, [appFrames, editor]);
-
-  /** Opens the Freeform app in a new tab, on a frame when one is named. */
+  /**
+   * Opens the Freeform canvas in this tab, on a frame when one is named. Its back arrow returns here, to this email
+   * (`?back=`), the way every tool opened from the board returns to the board. The last keystrokes are written
+   * first; with no folder, the draft is flushed as the page goes.
+   */
   const openFreeformApp = useCallback(
-    (key?: string) => {
-      const url = new URL(`freeform.html${key ? `?frame=${encodeURIComponent(key)}` : ''}`, window.location.href).href;
-      const tab = window.open(url, '_blank');
-      notify(tab ? 'Freeform is open in a new tab. What you change there shows up here.' : 'The browser blocked the new tab. Allow pop-ups for this page, or open Freeform from the dashboard.');
+    async (key?: string) => {
+      const params = new URLSearchParams({ from: 'studio' });
+      if (key) params.set('frame', key);
+      if (editor.file) params.set('back', editor.file.fileName);
+      if (editor.save === 'dirty') await editor.saveNow();
+      window.location.href = new URL(`freeform.html?${params}`, window.location.href).href;
     },
-    [notify],
+    [editor],
   );
 
   /** The Freeform app's frames, for the selected freeform block's panel: see them, pick one to follow, open it. */
@@ -1306,7 +1285,7 @@ export function App() {
         if (frame) editor.commit(linkedKey ? `Follow ${frame.name}` : 'Link to Freeform', followFrame(editor.template, block.id, frame));
       },
       onUnlink: () => editor.commit('Unlink from Freeform', unlinkFrame(editor.template, block.id)),
-      onOpen: (key?: string) => openFreeformApp(key ?? linkedKey ?? undefined),
+      onOpen: (key?: string) => void openFreeformApp(key ?? linkedKey ?? undefined),
     };
   }, [editor, appFrames, allAssets, prints, openFreeformApp]);
 
@@ -1797,6 +1776,7 @@ export function App() {
           onNew={startNew}
           onDuplicate={duplicateCurrent}
           {...(workspace?.deleteTemplate ? { onDelete: (file: TemplateFile) => void deleteTemplateFile(file) } : {})}
+          {...(workspace?.tidyTemplate ? { onTidy: (file: TemplateFile) => void tidyTemplateFile(file) } : {})}
           patterns={patternCards}
           onPlacePattern={(id) => placePatternAt(id, null)}
           onPlaceSyBlock={(id) => placeSyBlockAt(id, null)}
@@ -2022,6 +2002,7 @@ export function App() {
               onProbe={(found) => {
                 spot.current = found;
               }}
+              onto={dragType && isAssetKind(dragType) ? imageBlockIds : null}
               quickAdd={quickAdd}
               api={previewApi}
               autoEdit={autoEdit}
@@ -2225,13 +2206,4 @@ export function App() {
       )}
     </div>
   );
-}
-
-/** The Freeform app's frames, from this site's storage; none when it cannot be read. */
-function readFreeformFrames(scope: FrameScope | null = null, keep: string[] = []): AppFrame[] {
-  try {
-    return readAppFrames((key) => localStorage.getItem(key), scope, keep);
-  } catch {
-    return [];
-  }
 }

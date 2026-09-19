@@ -109,6 +109,8 @@ export interface PreviewProps {
    */
   probe?: { x: number; y: number } | null;
   onProbe?(spot: DropSpot | null): void;
+  /** Blocks a probe may land *on* rather than beside (`DropSpot.onto`): the Image blocks, while a picture is carried. */
+  onto?: string[] | null;
   /** Handed the iframe once it exists, so the scroller outside can find a block inside it. */
   frameRef?(frame: HTMLIFrameElement | null): void;
   /**
@@ -188,8 +190,11 @@ interface SlashState {
  * markup and rectangles, and the editor knows about structure.
  */
 export type DropSpot =
-  /** Into the block's column, before or after it — alongside it in the same cell. */
-  | { at: 'block'; blockId: string; before: boolean }
+  /**
+   * Into the block's column, before or after it — alongside it in the same cell. `onto` is the block itself, its
+   * middle band, offered only for blocks the caller named in `onto`: a picture dropped on an Image replaces it.
+   */
+  | { at: 'block'; blockId: string; before: boolean; onto?: boolean }
   /** A full-width section of its own, before or after this one. */
   | { at: 'section'; sectionId: string; before: boolean }
   /** Into a column's own padding: the start of it, or with `tail` the end. */
@@ -302,6 +307,7 @@ export function Preview({
   onDropBlock,
   probe,
   onProbe,
+  onto = null,
   frameRef,
   selectedLabel,
   onDuplicate,
@@ -613,6 +619,11 @@ export function Preview({
       const cell = cellOf(block);
       const content = cell ? contentBox(cell) : box;
       const host = column ?? cell ?? block;
+      // The block itself, when the caller allows it: its middle band, with the block boxed rather than a line beside it.
+      const middle = box.height * 0.3;
+      if (onto?.includes(block.dataset['syBlock']) && y > box.top + middle && y < box.bottom - middle) {
+        return { spot: { at: 'block', blockId: block.dataset['syBlock'], before: midway, onto: true }, hint: { ...rectOf(box), box: true } };
+      }
       return {
         spot: { at: 'block', blockId: block.dataset['syBlock'], before: midway },
         hint: line(midway ? content.top : content.bottom, content.left, content.width, host.getBoundingClientRect()),

@@ -44,6 +44,8 @@ export interface TemplatesProps {
    * the control rather than showing one that explains itself only after it fails.
    */
   onDelete?(file: TemplateFile): void;
+  /** Removes the copies of a name the list does not show (`TemplateFile.copies`); absent when the folder cannot be written. */
+  onTidy?(file: TemplateFile): void;
   onOpenFolder(): void;
   onChooseFiles(files: File[]): void;
 }
@@ -56,7 +58,7 @@ const when = (at: number) => {
   return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onOpenFolder, onChooseFiles }: TemplatesProps) {
+export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onTidy, onOpenFolder, onChooseFiles }: TemplatesProps) {
   const [menu, setMenu] = useState(false);
 
   // New and Duplicate, first. The app used to open on the standard email and stop there, so the
@@ -203,6 +205,17 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
                 {file.kind === 'v1' && <span class="chip-mini">v1</span>}
                 <span class="row-meta">{when(file.modified)}</span>
               </button>
+              {onTidy && (file.copies ?? 1) > 1 && (
+                // The same name in more than one place in the folder (learnings 3.77): only this one is listed.
+                <button
+                  class="row-copies"
+                  aria-label={`Remove the hidden copies of ${file.name}`}
+                  title={`${file.fileName} is in ${file.copies} places in the folder; only this one is shown. Click to remove the other ${file.copies === 2 ? 'copy' : 'copies'}. Undo puts them back.`}
+                  onClick={() => onTidy(file)}
+                >
+                  {file.copies} copies
+                </button>
+              )}
               {onDelete && (
                 // No confirmation, by the same rule the canvas follows: it happens and offers Undo
                 // (learnings 3.2). The title says both halves, because a file in a folder three

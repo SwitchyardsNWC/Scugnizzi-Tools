@@ -2437,3 +2437,26 @@ ability to drag an asset into the email and it creates the container needed for 
 - **The kinds.** `PaletteKind` stayed the palette's own; `DragKind` is what the drop plumbing carries, one
   member wider. Widening `PaletteKind` itself broke the palette's narrowing in four places, which is the
   compiler saying the two were never the same thing.
+
+### 3.80 Five follow-ups
+
+*2026-09-19.* Jared: "run through each of these", the list after Files-first.
+
+- **The Files panel says "2 copies".** `list` counts the places a name is in (`TemplateFile.copies`), and a row held
+  in more than one place gets a small warning chip that is also the fix: `tidyTemplate` removes every copy but the
+  one shown, says where each was, and Undo writes them back. A save moves only the copy it was reading (3.77);
+  this is how the folders that already have hidden copies get clean, one click each.
+- **A picture dropped on an Image replaces it.** The canvas resolves the middle band of a block to
+  `{ at: 'block', onto: true }` only for blocks the app names in the new `onto` prop, the Image blocks while a
+  picture is carried, and boxes the block instead of drawing a line beside it. `replacePicture` (place-picture.ts)
+  swaps the src and writes an alt text only when the block had none. Every other drag sees before and after as it
+  did.
+- **Edit in Freeform stays in the tab.** Studio writes the last keystrokes (`saveNow` now resolves once written),
+  then goes to `freeform.html?frame=…&from=studio&back=<file>`. The canvas keeps where it came from
+  (`scuggnizzi.freeform.back`: board, or that email in Studio) and its arrow reads "← Board" or "← Studio".
+  `?open=` alone no longer means "from the board" in Studio, since it is also how the canvas returns; the board
+  sends `from=board` with it.
+- **The board re-reads an email only for the frames it follows.** The cache key is the hashes of those frames, not
+  of every frame in the project.
+- **`useAppFrames`.** The Freeform-frames stretch of App: the frames read from storage and on every storage event,
+  the app's kept pictures, and the follow effect. App.tsx is around 2,200 lines; the rest waits for a reason.
