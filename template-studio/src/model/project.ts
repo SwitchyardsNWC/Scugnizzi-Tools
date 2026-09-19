@@ -195,6 +195,8 @@ export interface BoardNote {
   part: string | null;
   /** When it was last written, ms since the epoch. */
   at: number;
+  /** When it was resolved, ms since the epoch; 0 while it is open. Resolved on the board or in Template Studio. */
+  resolvedAt: number;
 }
 
 /**
@@ -269,6 +271,7 @@ export function readBoard(raw: string | null): BoardDoc {
         on: typeof n.on === 'string' && kindOfCard(n.on) ? n.on : null,
         part: typeof n.part === 'string' && n.part ? n.part : null,
         at: typeof n.at === 'number' && Number.isFinite(n.at) ? n.at : 0,
+        resolvedAt: typeof n.resolvedAt === 'number' && Number.isFinite(n.resolvedAt) && n.resolvedAt > 0 ? n.resolvedAt : 0,
       });
     }
   }
@@ -631,22 +634,139 @@ function besideLinked(id: string, size: { w: number; h: number }, links: CardLin
   return null;
 }
 
+/** How wide a row of clusters may run before the next email starts a new row. */
+const TIDY_ROW = 2400;
+
 /**
- * The board laid out afresh, with the links in mind: every card's place forgotten and found again beside what it is
- * linked to, the groups lined up below, keeping their names. One deliberate step, for a board arranged before the
- * lines were, or one that has drifted.
+ * The board laid out afresh, with the links in mind, as families (Jared: "bring all linked items close to each
+ * other in an organized way with clear hierarchy"), and on the grid (Jared: "use the grid system to lock everything
+ * into a nicely spaced grid"). Each email is a cluster: the email at the left, the frames it follows in a column to
+ * its right, and beyond them the pictures the email and those frames show, with what those pictures were made from.
+ * Clusters run in rows, emails by name, so the same folder always tidies the same way. Below the clusters, in a lane
+ * per kind, everything no email holds: documents, frames and pictures on their own; and last the folders as groups,
+ * their pictures inside, since a group is drawn around its members and a filed picture beside an email would stretch
+ * its group across the board. Every edge lands on a multiple of `step`, gaps are the usual ones rounded up to it.
+ * Groups keep their names. One deliberate step, undone as one.
  */
-export function tidyBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = [], links: CardLink[] = []): BoardDoc {
-  const fresh = layoutBoard(sources, emptyBoard(), folders, links);
+export function tidyBoard(sources: CardSource[], board: BoardDoc, folders: Iterable<string> = [], links: CardLink[] = [], step = 1): BoardDoc {
+  const unit = Math.max(1, Math.round(step));
+  /** `v`, or the next multiple of the grid step above it. */
+  const grid = (v: number) => Math.ceil(v / unit) * unit;
+  const gap = grid(CARD_GAP);
+  const lane = grid(LANE_GAP);
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const used = new Set<string>();
+  const cards: PlacedCard[] = [];
+  /** What feeds `id` by `kind`: the frames an email follows, the pictures an email or a frame shows, the picture a picture was made from. */
+  const feeding = (id: string, kind: CardLink['kind']): CardSource[] =>
+    links
+      .filter((l) => l.kind === kind && l.to === id)
+      .map((l) => byId.get(l.from))
+      .filter((s): s is CardSource => Boolean(s))
+      .sort(byName);
+  /** Those of `list` that are `kind`, not yet placed, and (for pictures) not filed in a folder; taken, so a card joins one family only. */
+  const take = (list: CardSource[], kind: CardKind): CardSource[] => {
+    const out: CardSource[] = [];
+    for (const s of list) {
+      if (s.kind !== kind || used.has(s.id) || (kind === 'picture' && cardFolder(s))) continue;
+      used.add(s.id);
+      out.push(s);
+    }
+    return out;
+  };
+  const widest = (list: CardSource[]) => (list.length ? Math.max(...list.map((s) => cardSize(s).w)) : 0);
+  /** A column of cards, each starting on the grid line after the one above it and a gap. */
+  const stacked = (list: CardSource[]) => list.reduce((h, s, i) => h + (i ? grid(cardSize(list[i - 1]!).h + gap) : 0) + (i === list.length - 1 ? cardSize(s).h : 0), 0);
+
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  for (const email of sources.filter((s) => s.kind === 'email').sort(byName)) {
+    used.add(email.id);
+    const frames = take(feeding(email.id, 'follows'), 'frame');
+    const shown = [...take(feeding(email.id, 'uses'), 'picture'), ...frames.flatMap((f) => take(feeding(f.id, 'uses'), 'picture'))];
+    const pictures = [...shown, ...shown.flatMap((p) => take(feeding(p.id, 'made'), 'picture'))];
+    const e = cardSize(email);
+    const fw = widest(frames);
+    const pw = widest(pictures);
+    const w = grid(e.w + gap) + (fw ? grid(fw + gap) : 0) + (pw ? pw : fw ? -gap : -gap);
+    const h = Math.max(e.h, stacked(frames), stacked(pictures));
+    if (x > 0 && x + w > TIDY_ROW) {
+      x = 0;
+      y += grid(rowH + lane);
+      rowH = 0;
+    }
+    cards.push({ ...email, ...e, x, y });
+    const fx = x + grid(e.w + gap);
+    let fy = y;
+    for (const f of frames) {
+      const s = cardSize(f);
+      cards.push({ ...f, ...s, x: fx, y: fy });
+      fy += grid(s.h + gap);
+    }
+    const px = fx + (fw ? grid(fw + gap) : 0);
+    let py = y;
+    for (const p of pictures) {
+      const s = cardSize(p);
+      cards.push({ ...p, ...s, x: px, y: py });
+      py += grid(s.h + gap);
+    }
+    x += grid(w + lane);
+    rowH = Math.max(rowH, h);
+  }
+  let below = cards.length ? grid(Math.max(...cards.map((c) => c.y + c.h)) + lane) : 0;
+
+  // What no email holds, a lane per kind, on the grid.
+  for (const kind of ['doc', 'frame', 'picture'] as CardKind[]) {
+    const waiting = sources.filter((s) => s.kind === kind && !used.has(s.id) && !cardFolder(s)).sort(byName);
+    if (waiting.length === 0) continue;
+    let lx = 0;
+    let ly = below;
+    let laneH = 0;
+    for (const s of waiting) {
+      const size = cardSize(s);
+      if (lx > 0 && lx + size.w > TIDY_ROW) {
+        lx = 0;
+        ly += grid(laneH + gap);
+        laneH = 0;
+      }
+      cards.push({ ...s, ...size, x: lx, y: ly });
+      used.add(s.id);
+      lx += grid(size.w + gap);
+      laneH = Math.max(laneH, size.h);
+    }
+    below = grid(ly + laneH + lane);
+  }
+
+  // The folders as groups, their pictures inside, moved as one onto the grid; names kept.
+  const filed = sources.filter((s) => !used.has(s.id));
+  const fresh = layoutBoard(filed, emptyBoard(), folders, links);
   const names = new Map(board.groups.map((g) => [g.folder, g.name]));
-  const groups = fresh.groups.map((g) => ({ ...g, name: names.get(g.folder) ?? g.name }));
+  const groups: BoardGroup[] = [];
+  const inGroups: PlacedCard[] = [];
+  for (const g of fresh.groups) {
+    const gx = grid(g.x);
+    const gy = below + grid(g.y);
+    // The pictures inside on the grid too, each at its offset from the group's corner rounded up; the group grows to hold them.
+    const members: PlacedCard[] = [];
+    for (const id of g.members) {
+      const m = fresh.cards.find((c) => c.id === id);
+      if (m) members.push({ ...m, x: gx + grid(m.x - g.x), y: gy + grid(m.y - g.y) });
+    }
+    inGroups.push(...members);
+    const w = grid(Math.max(g.w, ...members.map((m) => m.x + m.w + GROUP_PAD - gx)));
+    const h = grid(Math.max(g.h, ...members.map((m) => m.y + m.h + GROUP_PAD - gy)));
+    groups.push({ id: g.id, name: names.get(g.folder) ?? g.name, folder: g.folder, x: gx, y: gy, w, h });
+  }
+  const loose = fresh.cards.filter((c) => !inGroups.some((m) => m.id === c.id)).map((c) => ({ ...c, x: grid(c.x), y: below + grid(c.y) }));
+  const all = [...cards, ...inGroups, ...loose];
   // A note left on a card goes where its card went; one on its own, or on a card that has gone, stays put.
   const notes = board.notes.map((n) => {
     const was = n.on ? board.cards[n.on] : undefined;
-    const now = n.on ? fresh.cards.find((c) => c.id === n.on) : undefined;
+    const now = n.on ? all.find((c) => c.id === n.on) : undefined;
     return was && now ? { ...n, x: n.x + (now.x - was.x), y: n.y + (now.y - was.y) } : n;
   });
-  return withPlaces({ ...emptyBoard(), notes }, fresh.cards, groups);
+  return withPlaces({ ...emptyBoard(), notes }, all, groups);
 }
 
 /**

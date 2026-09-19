@@ -530,15 +530,22 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     saveBoard(addNote(boardRef.current, note));
     history.push({ label, undo: () => saveBoard(removeNote(boardRef.current, note.id)), redo: () => saveBoard(addNote(boardRef.current, note)) });
   };
-  /** Leaves a new note: on the selected card, to its right, or else in the middle of the window; and opens it to write. */
+  /**
+   * Leaves a new note: on the selected card, to its right; else where the pointer is over the board (Jared: "place
+   * close to the pointer by default"); else in the middle of the window. Opens it to write, and its strip can be
+   * dragged at once.
+   */
   const leaveNote = () => {
     if (!projectRef.current.writable) return notWritable('leave a note');
     const card = selected ? layout.cards.find((c) => c.id === selected) : undefined;
     const v = viewRef.current;
+    const p = pointerAt.current;
     const at = card
       ? { x: card.x + card.w + 24, y: card.y }
-      : { x: snap((size.w / 2 - v.x) / v.z - NOTE_WIDTH / 2), y: snap((size.h / 2 - v.y) / v.z - 40) };
-    const note: BoardNote = { id: newNoteId(), text: '', x: at.x, y: at.y, w: NOTE_WIDTH, color: 0, on: card?.id ?? null, part: null, at: 0 };
+      : p
+        ? { x: snap(p.x - 16), y: snap(p.y - 12) }
+        : { x: snap((size.w / 2 - v.x) / v.z - NOTE_WIDTH / 2), y: snap((size.h / 2 - v.y) / v.z - 40) };
+    const note: BoardNote = { id: newNoteId(), text: '', x: at.x, y: at.y, w: NOTE_WIDTH, color: 0, on: card?.id ?? null, part: null, at: 0, resolvedAt: 0 };
     putNote(note, card ? `Leave a note on ${card.name}` : 'Leave a note');
     setSelected(note.id);
     setEditingNote(note.id);
@@ -566,6 +573,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const now = { text, at: Date.now() };
     saveBoard(updateNote(boardRef.current, note.id, now));
     history.push({ label: 'Write a note', undo: () => saveBoard(updateNote(boardRef.current, note.id, was)), redo: () => saveBoard(updateNote(boardRef.current, note.id, now)) });
+  };
+  const resolveNote = (note: BoardNote, resolved: boolean) => {
+    const was = note.resolvedAt;
+    const now = resolved ? Date.now() : 0;
+    saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: now }));
+    history.push({ label: resolved ? 'Resolve a note' : 'Open a note again', undo: () => saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: was })), redo: () => saveBoard(updateNote(boardRef.current, note.id, { resolvedAt: now })) });
   };
   const colourNote = (note: BoardNote, color: number) => {
     if (color === note.color) return;
@@ -629,8 +642,14 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   // A note's own drag, with capture, so the stage under it does not start a pan or a marquee.
   const onNoteDown = (note: BoardNote, event: PointerEvent) => {
     event.stopPropagation();
-    if (event.button !== 0 || (event.target as Element).closest('button, textarea, select, label')) return;
-    if (editingNote === note.id) return;
+    const target = event.target as Element;
+    if (event.button !== 0 || target.closest('button, textarea, select, label, .pb-note-part')) return;
+    // While the words are being written, the strip still moves the note (Jared: "when you create a new note allow
+    // the user to move it"); the press must not take focus from the field, or the edit would end and an empty note go.
+    if (editingNote === note.id) {
+      if (!target.closest('.pb-note-head')) return;
+      event.preventDefault();
+    }
     capture(event.currentTarget as HTMLElement, event.pointerId);
     noteDrag.current = { id: note.id, x: event.clientX, y: event.clientY, from: { x: note.x, y: note.y }, moved: false };
   };
@@ -833,7 +852,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       }, settingsRef.current.holdPanMs);
     }
   };
+  /** Where the pointer last was over the board, in board coordinates; null once it has left. A new note lands by it. */
+  const pointerAt = useRef<{ x: number; y: number } | null>(null);
   const onPointerMove = (event: PointerEvent) => {
+    pointerAt.current = worldAt(event.clientX, event.clientY);
     if (gestures.current!.move(event)) return;
     const d = drag.current;
     if (!d) return;
@@ -1533,7 +1555,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   /** The board laid out afresh, with the lines in mind: what is linked sits together. One step, undone as one. */
   const tidy = () => {
     const before = boardRef.current;
-    const after = tidyBoard(sources, before, files.folders, links);
+    const after = tidyBoard(sources, before, files.folders, links, settingsRef.current.gridStep);
     saveBoard(after);
     history.push({ label: 'Tidy', undo: () => saveBoard(before), redo: () => saveBoard(after) });
     window.setTimeout(fit, 60);
@@ -1625,7 +1647,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     [files.docs.length, 'document'],
     [files.frames.length, 'frame'],
     [pictureCount, 'picture'],
-    [board.notes.length, 'note'],
+    [board.notes.filter((n) => !n.resolvedAt).length, 'note'],
   ]
     .filter(([n]) => (n as number) > 0)
     .map(([n, word]) => plural(n as number, word as string))
@@ -1641,6 +1663,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onPointerLeave={() => {
+          pointerAt.current = null;
+        }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           if (!e.dataTransfer?.files.length) return;
@@ -1726,6 +1751,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                 onEndEdit={(text) => endNoteEdit(n, text)}
                 onColor={(i) => colourNote(n, i)}
                 onRemove={() => removeNoteWithUndo(n)}
+                onResolve={(resolved) => resolveNote(n, resolved)}
                 onPinDown={(e) => onPinDown(n, e)}
                 {...(n.on && emailsById.get(n.on)?.template
                   ? { parts: sectionLabels(emailsById.get(n.on)!.template!), onPart: (id: string | null) => pointNote(n, id), onPreviewPart: (id: string | null) => setPreviewPart(id ? { note: n.id, part: id } : null) }

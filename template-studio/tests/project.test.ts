@@ -99,7 +99,7 @@ describe('board.json', () => {
 });
 
 describe('notes on the board', () => {
-  const note = (over: Partial<BoardNote> = {}): BoardNote => ({ id: 'note:a1', text: 'Tighten the headline', x: 300, y: 40, w: NOTE_WIDTH, color: 1, on: 'email:a', part: null, at: 1700000000000, ...over });
+  const note = (over: Partial<BoardNote> = {}): BoardNote => ({ id: 'note:a1', text: 'Tighten the headline', x: 300, y: 40, w: NOTE_WIDTH, color: 1, on: 'email:a', part: null, at: 1700000000000, resolvedAt: 0, ...over });
 
   it('reads back as written, and skips what it cannot use', () => {
     const board = addNote(moveCard(emptyBoard(), 'email:a', 10, 20), note());
@@ -108,9 +108,9 @@ describe('notes on the board', () => {
       version: 1,
       cards: {},
       groups: [],
-      notes: [note({ part: 'sec-2' }), { ...note({ id: 'note:a1' }) }, note({ id: 'sticky:x' }), { ...note({ id: 'note:b' }), x: 'left' }, { ...note({ id: 'note:c', w: 9999, color: 42, on: 'poster:z' }), at: 'now', part: 7 }],
+      notes: [note({ part: 'sec-2' }), { ...note({ id: 'note:a1' }) }, note({ id: 'sticky:x' }), { ...note({ id: 'note:b' }), x: 'left' }, { ...note({ id: 'note:c', w: 9999, color: 42, on: 'poster:z' }), at: 'now', part: 7, resolvedAt: -5 }, note({ id: 'note:d', resolvedAt: 1700000005000 })],
     });
-    expect(readBoard(raw).notes).toEqual([note({ part: 'sec-2' }), { ...note({ id: 'note:c' }), w: 480, color: 0, on: null, part: null, at: 0 }]);
+    expect(readBoard(raw).notes).toEqual([note({ part: 'sec-2' }), { ...note({ id: 'note:c' }), w: 480, color: 0, on: null, part: null, at: 0, resolvedAt: 0 }, note({ id: 'note:d', resolvedAt: 1700000005000 })]);
     // Boards written before notes read as boards with none.
     expect(readBoard(JSON.stringify({ version: 1, cards: {}, groups: [] })).notes).toEqual([]);
   });
@@ -285,6 +285,78 @@ describe('the board layout', () => {
     expect(laid.placed).toEqual([]);
     expect(laid.groups.map((g) => [g.folder, g.name])).toEqual([['photos', 'Shoot day']]);
     expect(laid.groups[0]!.members).toEqual([filed.id]);
+  });
+
+  it('tidies into families: the email, the frames it follows beside it, their pictures beyond, and the rest below', () => {
+    const email: CardSource = { id: 'email:a', kind: 'email', name: 'A' };
+    const other: CardSource = { id: 'email:b', kind: 'email', name: 'B' };
+    const frame: CardSource = { id: 'frame:f', kind: 'frame', name: 'F' };
+    const hero: CardSource = { id: 'picture:hero.png', kind: 'picture', name: 'hero.png' };
+    const inFrame: CardSource = { id: 'picture:in-frame.png', kind: 'picture', name: 'in-frame.png' };
+    const source: CardSource = { id: 'picture:hero-source.png', kind: 'picture', name: 'hero-source.png' };
+    const lone: CardSource = { id: 'frame:lone', kind: 'frame', name: 'Lone' };
+    const brief: CardSource = { id: 'doc:docs/brief.gdoc', kind: 'doc', name: 'Brief' };
+    const filed: CardSource = { id: 'picture:photos/p.png', kind: 'picture', name: 'p.png' };
+    const sources = [filed, brief, lone, source, inFrame, hero, frame, other, email];
+    const links: CardLink[] = [
+      { from: frame.id, to: email.id, kind: 'follows' },
+      { from: hero.id, to: email.id, kind: 'uses' },
+      { from: inFrame.id, to: frame.id, kind: 'uses' },
+      { from: source.id, to: hero.id, kind: 'made' },
+      { from: filed.id, to: email.id, kind: 'uses' },
+    ];
+    const tidy = tidyBoard(sources, emptyBoard(), ['photos'], links);
+    const laid = layoutBoard(sources, tidy, ['photos'], links);
+    const at = (s: CardSource) => laid.cards.find((c) => c.id === s.id)!;
+    const e = at(email);
+    expect([e.x, e.y]).toEqual([0, 0]);
+    // The frame in the column beside the email; the pictures in the column beyond, the email's first, then the frame's, then what they were made from.
+    expect([at(frame).x, at(frame).y]).toEqual([e.w + 40, 0]);
+    expect(at(hero).x).toBe(at(frame).x + at(frame).w + 40);
+    expect(at(hero).y).toBe(0);
+    expect(at(inFrame).y).toBe(at(hero).h + 40);
+    expect(at(source).y).toBe(at(inFrame).y + at(inFrame).h + 40);
+    // The next email starts the next family along the row.
+    expect(at(other).x).toBeGreaterThan(at(hero).x + at(hero).w);
+    expect(at(other).y).toBe(0);
+    // A picture filed in a folder stays in its group, below, with the document and the frame no email follows.
+    const bottom = Math.max(e.h, at(source).y + at(source).h);
+    for (const s of [lone, brief, filed]) expect(at(s).y).toBeGreaterThanOrEqual(bottom + 120);
+    expect(laid.groups.map((g) => [g.folder, g.members])).toEqual([['photos', [filed.id]]]);
+    expect(laid.placed).toEqual([]);
+  });
+
+  it('tidies onto the grid: every edge on a multiple of the step, gaps no smaller than usual', () => {
+    const sources: CardSource[] = [
+      { id: 'email:a', kind: 'email', name: 'A', size: { w: 260, h: 613 } },
+      { id: 'frame:f', kind: 'frame', name: 'F' },
+      { id: 'picture:hero.png', kind: 'picture', name: 'hero.png' },
+      { id: 'picture:two.png', kind: 'picture', name: 'two.png' },
+      { id: 'doc:docs/brief.gdoc', kind: 'doc', name: 'Brief' },
+      { id: 'picture:photos/p.png', kind: 'picture', name: 'p.png' },
+    ];
+    const links: CardLink[] = [
+      { from: 'frame:f', to: 'email:a', kind: 'follows' },
+      { from: 'picture:hero.png', to: 'email:a', kind: 'uses' },
+      { from: 'picture:two.png', to: 'frame:f', kind: 'uses' },
+    ];
+    const tidy = tidyBoard(sources, emptyBoard(), ['photos'], links, 24);
+    const laid = layoutBoard(sources, tidy, ['photos'], links);
+    for (const c of laid.cards) {
+      expect(c.x % 24).toBe(0);
+      expect(c.y % 24).toBe(0);
+    }
+    for (const g of laid.groups) {
+      expect(g.x % 24).toBe(0);
+      expect(g.y % 24).toBe(0);
+    }
+    const at = (id: string) => laid.cards.find((c) => c.id === id)!;
+    expect(at('frame:f').x - (at('email:a').x + at('email:a').w)).toBeGreaterThanOrEqual(40);
+    expect(at('picture:hero.png').x - (at('frame:f').x + at('frame:f').w)).toBeGreaterThanOrEqual(40);
+    expect(at('picture:two.png').y - (at('picture:hero.png').y + at('picture:hero.png').h)).toBeGreaterThanOrEqual(40);
+    expect(at('doc:docs/brief.gdoc').y).toBeGreaterThanOrEqual(at('email:a').h + 120);
+    expect(laid.groups[0]!.members).toEqual(['picture:photos/p.png']);
+    expect(laid.placed).toEqual([]);
   });
 
   it('lays out the same once the places are written down', () => {

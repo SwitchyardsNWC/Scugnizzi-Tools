@@ -1901,6 +1901,12 @@ button.fig-pill:active { transform: scale(0.96); }
 }
 .note-card:hover { transform: translateX(-2px); box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.5); }
 .note-card-head { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: rgb(0 0 0 / 0.5); }
+.note-card-when { flex: 1; }
+.note-card-check { width: 18px; height: 18px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 50%; background: rgb(255 255 255 / 0.6); color: rgb(0 0 0 / 0.55); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
+.note-card-check:hover { border-color: #0d0d0d; color: #0d0d0d; }
+.note-card-check.on { background: #0d0d0d; border-color: #0d0d0d; color: #fff; }
+.note-card.resolved { filter: saturate(0.25); opacity: 0.7; }
+.note-card.resolved:hover { opacity: 1; }
 .note-card-kind { font-family: inherit; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(0 0 0 / 0.7); }
 .note-card-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-card-on { font-size: 11px; color: rgb(0 0 0 / 0.55); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
