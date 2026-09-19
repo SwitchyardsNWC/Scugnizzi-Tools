@@ -86,21 +86,34 @@ function frameDoc(key: string, name: string): Template {
 /** The frame `?new=1` made, which belongs to whatever project is open once it is known. */
 let freshKey: string | null = null;
 
+/** Kept for the tab once the board sends it here, so a reload does not forget where the arrow goes. */
+const FROM_BOARD_KEY = 'scuggnizzi.freeform.from-board';
+
 /**
  * What the address asks for, read once and taken off it: a frame to open (Template Studio's "Edit in
- * Freeform" and the project board say which), or a new frame (the board's New frame).
+ * Freeform" and the project board say which), or a new frame (the board's New frame). `from=board` is the
+ * board's alone, and sends the back arrow to it rather than to the tools (Jared: when opened from the board,
+ * "I want it to go back to the project board by default"), as Template Studio's does.
  */
 const request = (() => {
   const params = new URLSearchParams(window.location.search);
   const frame = params.get('frame');
   const fresh = params.get('new') === '1';
-  if (frame || fresh) {
+  let fromBoard = params.get('from') === 'board';
+  try {
+    if (fromBoard) sessionStorage.setItem(FROM_BOARD_KEY, '1');
+    else fromBoard = sessionStorage.getItem(FROM_BOARD_KEY) === '1';
+  } catch {
+    // Storage blocked: the arrow knows for this page load only.
+  }
+  if (frame || fresh || params.has('from')) {
     params.delete('frame');
     params.delete('new');
+    params.delete('from');
     const rest = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
   }
-  return { frame, fresh };
+  return { frame, fresh, fromBoard };
 })();
 
 function startingFrames(): FrameIndex {
@@ -636,8 +649,8 @@ function FreeformTool() {
           standalone={{
             left: (
               <>
-                <a class="fig-pill fig-back" href="../../index.html" title="Back to Scugnizzi tools">
-                  <span aria-hidden="true">←</span> Tools
+                <a class="fig-pill fig-back" href={request.fromBoard ? 'project.html' : '../../index.html'} title={request.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}>
+                  <span aria-hidden="true">←</span> {request.fromBoard ? 'Board' : 'Tools'}
                 </a>
                 <ProjectPill project={project} />
                 <FramesMenu

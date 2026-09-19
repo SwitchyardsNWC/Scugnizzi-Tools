@@ -1,7 +1,7 @@
 import { Assets } from './Assets.tsx';
 import { DesignPanel } from './DesignPanel.tsx';
 import { Outline } from './Outline.tsx';
-import { Palette, type PaletteKind, type PatternCard } from './Palette.tsx';
+import { isAssetKind, Palette, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
 import type { DesignSystem } from '../model/design-system.ts';
 import { Templates, type Starter } from './Templates.tsx';
 import { RailAssets, RailBlocks, RailDesign, RailLayers, RailTemplates } from './icons.tsx';
@@ -32,13 +32,17 @@ export interface SidebarProps {
   onTab(tab: Tab): void;
   /** Leaving Design goes back where you were, which only the app knows. */
   onCloseDesign(): void;
-  dragging: PaletteKind | null;
+  dragging: DragKind | null;
   onPaletteDrag(kind: PaletteKind, x: number, y: number): void;
   onPaletteDrop(): void;
   files: TemplateFile[];
   assets: AssetFile[];
   /** While a freeform surface is open: a picture from the panel, dropped on it or clicked into its middle. */
   onDropAsset?(asset: AssetFile, at: { x: number; y: number } | null): void;
+  /** A picture dragged towards the email, through the same drop plumbing as a block; released with `onPaletteDrop`. */
+  onAssetDrag(asset: AssetFile, x: number, y: number): void;
+  /** A picture clicked with no Image block selected: a new Image block at the end of the email. */
+  onPlaceAsset(asset: AssetFile): void;
   starters: Starter[];
   onNew(starter: Starter): void;
   onDuplicate(): void;
@@ -78,8 +82,10 @@ export interface SidebarProps {
 }
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof RailBlocks; title: string }> = [
-  { id: 'blocks', label: 'Blocks', icon: RailBlocks, title: 'Everything you can add. Drag one onto the email.' },
+  // Files first, and the panel Template Studio opens on (Jared: "make the files the index screen and move files
+  // above blocks"): what is in the folder is where a session starts, and adding blocks comes after.
   { id: 'templates', label: 'Files', icon: RailTemplates, title: 'The templates in the folder everyone shares.' },
+  { id: 'blocks', label: 'Blocks', icon: RailBlocks, title: 'Everything you can add. Drag one onto the email.' },
   { id: 'layers', label: 'Layers', icon: RailLayers, title: 'The structure of this email, top to bottom.' },
   { id: 'assets', label: 'Assets', icon: RailAssets, title: 'Images in the folder’s assets directory.' },
 ];
@@ -94,7 +100,7 @@ const DESIGN: (typeof TABS)[number] = {
 export function Sidebar(props: SidebarProps) {
   // Picking a block up is a statement about what you are doing; switching the panel out from under
   // the pointer mid-drag is not.
-  const shown = props.dragging ? 'blocks' : props.tab;
+  const shown = props.dragging ? (isAssetKind(props.dragging) ? 'assets' : 'blocks') : props.tab;
   const label = props.workspaceLabel ?? null;
 
   const button = ({ id, label: name, icon: Icon, title }: (typeof TABS)[number]) => (
@@ -128,7 +134,7 @@ export function Sidebar(props: SidebarProps) {
         {shown === 'blocks' && (
           <Palette
             editor={props.editor}
-            dragging={props.dragging}
+            dragging={props.dragging && !isAssetKind(props.dragging) ? props.dragging : null}
             onDrag={props.onPaletteDrag}
             onDrop={props.onPaletteDrop}
             patterns={props.patterns}
@@ -157,7 +163,17 @@ export function Sidebar(props: SidebarProps) {
         )}
         {shown === 'layers' && <Outline editor={props.editor} patternOf={props.patternOf} also={props.also} />}
         {shown === 'assets' && (
-          <Assets editor={props.editor} assets={props.assets} folder={label} onOpenFolder={props.onOpenFolder} {...(props.onDropAsset ? { onDropAsset: props.onDropAsset } : {})} />
+          <Assets
+            editor={props.editor}
+            assets={props.assets}
+            folder={label}
+            onOpenFolder={props.onOpenFolder}
+            dragging={Boolean(props.dragging && isAssetKind(props.dragging))}
+            onDrag={props.onAssetDrag}
+            onDrop={props.onPaletteDrop}
+            onPlace={props.onPlaceAsset}
+            {...(props.onDropAsset ? { onDropAsset: props.onDropAsset } : {})}
+          />
         )}
         {shown === 'design' && (
           <DesignPanel

@@ -73,7 +73,7 @@ const SAMPLES: Array<[string, Block]> = [
   ['legal', { id: 'b', type: 'legal', logoSrc: '', logoWidth: 180, note: 'A note.', noteLock: lock('Legal note', 'legal_note', false) }],
 ];
 
-describe.each(SAMPLES)('%s', (name, block) => {
+describe.each(SAMPLES)('%s', (_name, block) => {
   it.each(THEMES)('renders on the %s theme', (themeName) => {
     const html = compile(only(block, themeName), { mode: 'hubl', date: '2026-09-11' }).html;
     expect(snapshotOf(html)).toMatchSnapshot();
