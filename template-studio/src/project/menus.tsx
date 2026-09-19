@@ -6,6 +6,7 @@ import { DOC_KIND_NAMES, docKindOfUrl } from '../model/docs.ts';
 import { projectType } from '../model/project-types.ts';
 import { useInstall } from './launch.ts';
 import type { Project } from './useProject.ts';
+import { Chevron } from './glyphs.tsx';
 
 /** The small form under + Link: an address and a name, and a card the moment it is written. */
 export function LinkForm({ onClose, onAdd }: { onClose(): void; onAdd(url: string, name: string): Promise<boolean> }) {
@@ -89,14 +90,14 @@ export function ProjectMenu({ project, counts, onCreate }: { project: Project; c
   }, [open]);
   const info = project.info!;
   const type = projectType(info.type);
-  const status = project.status === 'ready' ? 'Saving into the folder' : 'View only';
+  const status = project.status === 'ready' ? 'Saves to the folder' : 'View only';
   return (
     <div class="pb-menu">
       <button class={`pb-title ${open ? 'on' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <b>{info.name}</b>
         {type && <span class="pb-title-type">{type.name}</span>}
         <span class="pb-caret" aria-hidden="true">
-          ▾
+          <Chevron />
         </span>
       </button>
       {open && (

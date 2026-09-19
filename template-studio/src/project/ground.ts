@@ -23,6 +23,12 @@ export type UnderStyle = {
 /** The fine step on screen: the board's step at this zoom, ×5 and ×20 as the board zooms out so the pattern never crowds. */
 export const fineStep = (step: number, z: number): number => step * z * (z < 0.2 ? 20 : z < 0.45 ? 5 : 1);
 
+/**
+ * How much of the ground's own opacity shows at this zoom: all of it from 60% up, then less as the board zooms out,
+ * down to about a third. Zoomed out, the cards are small and the pattern behind them would otherwise compete.
+ */
+export const groundFade = (z: number): number => (z >= 0.6 ? 1 : Math.max(0.35, (z - 0.2) / 0.4));
+
 const square = (n: number) => `${n}px ${n}px`;
 const same = <T,>(value: T, n: number): T[] => Array.from({ length: n }, () => value);
 
@@ -36,7 +42,7 @@ export function underStyle(settings: Pick<CanvasSettings, 'ground' | 'groundOpac
   const fine = fineStep(settings.gridStep, view.z);
   const major = fine * 5;
   const at = `${view.x}px ${view.y}px`;
-  const opacity = settings.groundOpacity[settings.ground];
+  const opacity = settings.groundOpacity[settings.ground] * groundFade(view.z);
   switch (settings.ground) {
     case 'lines':
       return { backgroundSize: [square(fine), square(fine), square(major), square(major)].join(', '), backgroundPosition: same(at, 4).join(', '), opacity };

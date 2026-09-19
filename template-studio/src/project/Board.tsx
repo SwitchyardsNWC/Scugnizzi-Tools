@@ -101,8 +101,24 @@ import {
 import { type EmailItem, type FrameItem, type PrintedPage, printId, printedIn, useProjectFiles } from './files.ts';
 import { EmailBody, FrameBody, DocBody } from './cards.tsx';
 import { LinkForm, ProjectMenu } from './menus.tsx';
+import { ArrowLeft, FitAll, FitOne, Minus, Plus } from './glyphs.tsx';
 
 // --- the board ------------------------------------------------------------------------------------------------
+
+/** What the keyboard does on the board, as the sheet `?` opens lists it. Keep it beside `onKey`, which is the truth. */
+const BOARD_KEYS: Array<[string[], string]> = [
+  [['⌘Z', '⇧⌘Z'], 'Undo, redo'],
+  [['Enter'], 'Open the selected card in its tool'],
+  [['⌫', '⌦'], 'Remove the selected file; press twice, ⌘Z puts it back'],
+  [['Esc'], 'Let go of the selection, a picked line or a new group'],
+  [['⇧1'], 'Fit everything'],
+  [['⇧2'], 'Zoom to the selected card'],
+  [['⌘+', '⌘−'], 'Zoom in and out'],
+  [['⌘0'], 'Zoom to 100%'],
+  [['Space'], 'Pan with any drag while held; holding still on the board pans too'],
+  [['⌥ drag'], 'Leave a copy of a card behind'],
+  [['?'], 'This sheet'],
+];
 
 export interface BoardProps {
   project: Project;
@@ -443,6 +459,14 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const f = fitView();
     if (f) animateTo(f, 420);
   }, [fitView, animateTo]);
+  /** The view with one rectangle filling most of the window, the way a double-click zooms into a card. */
+  const fitTo = useCallback(
+    (r: Rect) => {
+      const z = clampZoom(Math.min((size.w * 0.72) / r.w, (size.h * 0.72) / r.h, 2.5));
+      animateTo({ z, x: size.w / 2 - (r.x + r.w / 2) * z, y: size.h / 2 - (r.y + r.h / 2) * z }, 420);
+    },
+    [size, animateTo],
+  );
 
   // Wheel: ⌘ or a pinch zooms about the pointer, a plain wheel pans. Non-passive, or the page scrolls.
   useEffect(() => {
@@ -470,6 +494,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const [dropCard, setDropCard] = useState<string | null>(null);
   /** A line picked on the board, as `from>to`, ready to be broken. */
   const [selectedLink, setSelectedLink] = useState<string | null>(null);
+  /** ⇧2, and the zoom group's Selection: the selected card fills the window. */
+  const fitSelection = useCallback(() => {
+    const card = layout.cards.find((c) => c.id === selected);
+    if (card) fitTo(card);
+  }, [layout, selected, fitTo]);
+  /** The sheet `?` opens: every key the board answers to, in one place. */
+  const [showKeys, setShowKeys] = useState(false);
   const [panning, setPanning] = useState(false);
   /** A group being moved or resized, as it is drawn until the pointer lets go, with the cards riding along. */
   const [groupDrag, setGroupDrag] = useState<{ id: string; dx: number; dy: number; dw: number; dh: number; riders: string[] } | null>(null);
@@ -795,8 +826,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         spaceRef.current = true;
         setHand(true);
       }
+    } else if (event.key === '?') {
+      event.preventDefault();
+      setShowKeys((v) => !v);
     } else if (event.key === 'Escape') {
-      if (armedDelete.current) {
+      if (showKeys) setShowKeys(false);
+      else if (armedDelete.current) {
         armedDelete.current = null;
         notify(`${layout.cards.find((c) => c.id === selected)?.name ?? 'The card'} stays.`);
       } else if (groupingRef.current) setGrouping(false);
@@ -829,6 +864,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     } else if (event.shiftKey && event.code === 'Digit1') {
       event.preventDefault();
       fit();
+    } else if (event.shiftKey && event.code === 'Digit2') {
+      event.preventDefault();
+      fitSelection();
     } else if (mod && (event.key === '=' || event.key === '+')) {
       event.preventDefault();
       zoomTo(viewRef.current.z * 1.25, undefined, true);
@@ -1598,6 +1636,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   {email && <EmailBody item={email} assets={assets} prints={emailPrints.get(email.id)} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} />}
                   {frame && <FrameBody item={frame} assets={assets} print={printOf(frame)} width={card.w} height={card.h - HEAD} />}
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
+                  {picture && <span class="pb-picture-name">{card.name}</span>}
                   {doc && <DocBody item={doc} />}
                 </div>
               </div>
@@ -1626,7 +1665,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
       <header class="pb-bar pb-bar-top">
         <a class="pb-ghost" href="../../index.html" title="Back to Scugnizzi tools">
-          ← Tools
+          <ArrowLeft /> Tools
         </a>
         <span class="pb-sep" aria-hidden="true" />
         <ProjectMenu project={project} counts={counts || 'nothing in it yet'} onCreate={onCreateProject} />
@@ -1641,16 +1680,16 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           Tidy
         </button>
         <span class="pb-grow" />
+        <span class="pb-sep" aria-hidden="true" />
         <div class="pb-actions" role="group" aria-label="Add to the project">
-          <span class="pb-kicker">Add</span>
           <button class="pb-ghost" title="Open Template Studio on this project, for a new email" onClick={() => openTool('index.html?from=board')}>
-            + Email
+            <Plus /> Email
           </button>
           <button class="pb-ghost" title="A new Freeform frame, saved into this project" onClick={() => openTool('freeform.html?new=1&from=board')}>
-            + Frame
+            <Plus /> Frame
           </button>
           <button class="pb-ghost" disabled={!writable} title={writable ? 'Add pictures to assets/. Dropping them on the board works too.' : 'Allow editing to add pictures'} onClick={() => picker.current?.click()}>
-            + Pictures
+            <Plus /> Pictures
           </button>
           <button
             class={`pb-ghost ${grouping ? 'on' : ''}`}
@@ -1659,7 +1698,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             title={writable ? 'Drag out a region for a new group. A group is a folder in assets/: drop pictures on it to file them there.' : 'Allow editing to add a group'}
             onClick={() => setGrouping((v) => !v)}
           >
-            + Group
+            <Plus /> Group
           </button>
           <div class="pb-menu">
             <button
@@ -1669,7 +1708,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               title={writable ? 'A Google Doc, Sheet or Slides, or any address, as a card on the board' : 'Allow editing to add a link'}
               onClick={() => setLinking((v) => !v)}
             >
-              + Link
+              <Plus /> Link
             </button>
             {linking && <LinkForm onClose={() => setLinking(false)} onAdd={addLink} />}
           </div>
@@ -1678,18 +1717,21 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         <CanvasMenu />
         <div class="pb-zoom" role="group" aria-label="Zoom">
           <button title="Zoom out  ·  ⌘−" aria-label="Zoom out" onClick={() => zoomTo(view.z / 1.25, undefined, true)}>
-            −
+            <Minus />
           </button>
           <button class="pct" title="Zoom to 100%  ·  ⌘0" onClick={() => zoomTo(1, undefined, true)}>
             {Math.round(view.z * 100)} %
           </button>
           <button title="Zoom in  ·  ⌘+" aria-label="Zoom in" onClick={() => zoomTo(view.z * 1.25, undefined, true)}>
-            +
+            <Plus />
+          </button>
+          <button title="Fit everything  ·  ⇧1" aria-label="Fit everything" onClick={fit}>
+            <FitAll />
+          </button>
+          <button title={selected ? 'Zoom to the selected card  ·  ⇧2' : 'Select a card to zoom to it  ·  ⇧2'} aria-label="Zoom to the selection" disabled={!selected} onClick={fitSelection}>
+            <FitOne />
           </button>
         </div>
-        <button class="pb-ghost" title="Fit everything  ·  ⇧1" onClick={fit}>
-          Fit
-        </button>
       </header>
 
       <footer class="pb-bar pb-bar-bottom">
@@ -1703,7 +1745,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               </button>
             </>
           ) : (
-            <>Saving into {dir.name}</>
+            <>Saves to {dir.name}</>
           )}
         </span>
         <span class="pb-grow" />
@@ -1712,12 +1754,41 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels'
             : selectedLink
               ? 'A line is picked · Break link, or Delete, takes it out of the file it is in · Esc lets go'
-              : 'Drag to arrange · ⌥ drag copies · drop a picture on a frame or email to put it in · Delete removes the file · hold still, or Space, to pan'}
+              : selected
+                ? 'Enter opens · ⇧2 zooms to it · ⌥ drag copies · Delete removes the file, ⌘Z puts it back · Esc lets go'
+                : 'Drag to arrange · drop a picture on a frame or email to put it in · Space, or holding still, pans · ? for the keys'}
         </span>
         <span class="pb-sep" aria-hidden="true" />
         <span class="pb-count">{counts || 'empty'}</span>
       </footer>
 
+      {showKeys && (
+        <div class="pb-keys-backdrop" onClick={() => setShowKeys(false)}>
+          <div class="pb-keys" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <b>Keys</b>
+              <button class="pb-ghost" onClick={() => setShowKeys(false)}>
+                Done
+              </button>
+            </header>
+            <table>
+              {BOARD_KEYS.map(([keys, what]) => (
+                <tr key={what}>
+                  <td>
+                    {keys.map((k, i) => (
+                      <span key={k}>
+                        {i > 0 && <span class="pb-keys-or"> / </span>}
+                        <kbd>{k}</kbd>
+                      </span>
+                    ))}
+                  </td>
+                  <td>{what}</td>
+                </tr>
+              ))}
+            </table>
+          </div>
+        </div>
+      )}
       {dropCard && <div class="pb-notice">Let go to put it in {layout.cards.find((c) => c.id === dropCard)?.name ?? 'it'}</div>}
       {!dropCard && moving?.copy && <div class="pb-notice">Let go to leave a copy here</div>}
       {dropTarget === 'out' && <div class="pb-notice">Let go to take it out of its group, into assets/</div>}
