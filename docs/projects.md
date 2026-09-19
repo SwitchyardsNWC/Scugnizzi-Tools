@@ -733,6 +733,17 @@ data model. The Google source is the step after, and it is mostly the OAuth clie
 - **Edit in Freeform opens in the same tab**, and the canvas's arrow goes back to that email in Template Studio.
 - **The board** re-reads an email only when a frame it follows changes.
 
+### The board bar, aligned
+
+*Added 2026-09-19.* The bar's arrow, plus, minus and caret are drawn glyphs now, on the same line as the words; the
+zoom steps are squares. Nothing moved or changed meaning.
+
+### The board, six small things
+
+*Added 2026-09-19.* The bar lost its Add label; Fit and a new Selection (⇧2) sit in the zoom group. The status line
+says "Saves to" and shows one hint for the moment. Pictures carry their names. `?` opens the keys. The ground fades
+as the board zooms out. The Canvas menu's segmented buttons and the project menu's rows sit on their line.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

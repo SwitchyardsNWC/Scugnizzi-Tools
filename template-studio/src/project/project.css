@@ -60,20 +60,21 @@ body { background: #f5f5f4; }
 .pb-grow { flex: 1; min-width: 8px; }
 .pb-sep { flex: none; width: 1px; height: 16px; margin: 0 8px; background: var(--pb-soft); }
 .pb-bar-bottom .pb-sep { height: 12px; }
-.pb-kicker { margin: 0 4px 0 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pb-muted); }
 .pb-hint { overflow: hidden; text-overflow: ellipsis; }
 .pb-count { flex: none; color: var(--pb-text); }
 .pb-status { display: inline-flex; align-items: center; gap: 8px; color: var(--pb-text); }
 .pb-inline { padding: 0; border: 0; background: none; color: var(--pb-accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-inline:hover { color: var(--pb-ink); }
 
-/* Controls. Height from padding, never centring: 28 = 7 / 14 / 3 + hairline, top padding 4px more than bottom to
-   land the cap height on the true middle of the face. */
+/* Controls. 28px tall, the text's 14px line box centred by flex and nudged 1px down (padding 7 over 5), which puts
+   the x-height, where the words' weight is, on the bar's middle. Glyphs are drawn (glyphs.tsx), 12px squares
+   centred the same way, so an arrow, a plus and the words beside them share one line. */
 .pb-ghost, .pb-filled, .pb-outline, .pb-title, .pb-zoom button {
-  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 8px 8px 4px; border: 1px solid transparent; border-radius: 4px;
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 7px 8px 5px; border: 1px solid transparent; border-radius: 4px;
   background: none; color: var(--pb-text); font-size: 13px; line-height: 14px; white-space: nowrap; cursor: pointer; text-decoration: none;
   transition: background-color var(--pb-fast), border-color var(--pb-fast), color var(--pb-fast);
 }
+.pb-glyph { flex: none; display: block; width: 12px; height: 12px; margin-top: -1px; }
 .pb-ghost:hover, .pb-zoom button:hover { background: var(--pb-row); color: var(--pb-ink); }
 .pb-ghost.on { background: var(--pb-row); color: var(--pb-ink); }
 .pb-ghost:disabled, .pb-filled:disabled, .pb-outline:disabled { color: var(--pb-faint); background: none; cursor: default; }
@@ -85,15 +86,20 @@ body { background: #f5f5f4; }
 .pb-filled.small { height: 28px; }
 .pb-zoom { display: inline-flex; align-items: center; border: 1px solid var(--pb-soft); border-radius: 4px; }
 .pb-zoom button { height: 26px; border-radius: 0; }
+/* The two steps are squares, the glyph dead centre; the figure between them keeps the text rule. */
+.pb-zoom button:not(.pct) { width: 26px; padding: 0; justify-content: center; }
+.pb-zoom button:not(.pct) .pb-glyph { margin-top: 0; }
 .pb-zoom button + button { border-left: 1px solid var(--pb-soft); }
 .pb-zoom .pct { min-width: 58px; justify-content: center; font-size: 12px; color: var(--pb-ink); }
+.pb-zoom button:disabled { color: var(--pb-faint); background: none; cursor: default; }
 .pb-actions { display: inline-flex; align-items: center; gap: 2px; }
 
 .pb-title { gap: 8px; padding-left: 6px; padding-right: 6px; color: var(--pb-ink); }
 .pb-title b { max-width: 300px; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
 .pb-title-type { font-size: 11px; color: var(--pb-muted); }
 .pb-title:hover, .pb-title.on { background: var(--pb-row); }
-.pb-caret { font-size: 12px; line-height: 1; color: var(--pb-muted); }
+.pb-caret { display: inline-flex; color: var(--pb-muted); }
+.pb-caret .pb-glyph { margin-top: 0; }
 
 .pb-dot { display: inline-block; flex: none; width: 8px; height: 8px; background: var(--pb-faint); }
 .pb-dot.ready { background: var(--pb-moss); }
@@ -108,7 +114,7 @@ body { background: #f5f5f4; }
 .pb-menu-head span { font-size: 11px; color: var(--pb-muted); }
 .pb-menu-note { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--pb-soft); font-size: 12px; line-height: 1.4; color: var(--pb-muted); }
 .pb-menu-pop button {
-  height: 36px; padding: 11px 12px 7px; border: 0; border-top: 1px solid var(--pb-soft); background: none; color: var(--pb-ink); font: inherit; font-size: 13px; line-height: 16px;
+  display: flex; align-items: center; height: 36px; padding: 1px 12px 0; border: 0; border-top: 1px solid var(--pb-soft); background: none; color: var(--pb-ink); font: inherit; font-size: 13px; line-height: 16px;
   text-align: left; cursor: pointer; transition: background-color var(--pb-fast);
 }
 .pb-menu-pop .pb-menu-note + button { border-top: 0; }
@@ -255,6 +261,13 @@ body { background: #f5f5f4; }
 .pb-picture .pb-card-body { background: none; }
 .pb-picture-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .pb-picture:hover, .pb-picture.on, .pb-picture.lifted { border-color: var(--pb-ink); }
+/* The file's name under the picture, always: a board of photos is otherwise a board of anonymous thumbnails. */
+.pb-picture-name {
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 5px; overflow: hidden;
+  font-family: var(--pb-mono); font-size: 10px; line-height: 12px; letter-spacing: 0; color: var(--pb-muted);
+  white-space: nowrap; text-overflow: ellipsis; pointer-events: none;
+}
+.pb-picture.on .pb-picture-name { color: var(--pb-ink); }
 
 /* A document: the kind's glyph and where it opens. */
 .pb-doc { display: flex; align-items: center; gap: 14px; height: 100%; padding: 12px 14px; }
@@ -303,6 +316,18 @@ body { background: #f5f5f4; }
 .pb-group-empty { position: absolute; left: 12px; right: 12px; top: 44px; font-size: 12px; color: var(--pb-faint); pointer-events: none; }
 .pb-group-resize { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 1px solid var(--pb-card-border); border-left: 0; border-top: 0; background: var(--pb-paper); cursor: nwse-resize; }
 .pb-group:hover .pb-group-resize { border-color: var(--pb-ink); }
+
+/* --- the keys sheet: paper, one hairline, mono for the keys ------------------------------------------------ */
+.pb-keys-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / 0.18); }
+.pb-keys { width: 460px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px); overflow-y: auto; padding: 0 0 6px; background: var(--pb-paper); border: 1px solid var(--pb-hairline); color: var(--pb-text); }
+.pb-keys header { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--pb-soft); }
+.pb-keys header b { font-size: 13px; font-weight: 500; color: var(--pb-ink); }
+.pb-keys table { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.4; }
+.pb-keys td { padding: 6px 14px; vertical-align: top; border-top: 1px solid var(--pb-row); }
+.pb-keys tr:first-child td { border-top: 0; }
+.pb-keys td:first-child { width: 120px; white-space: nowrap; color: var(--pb-ink); }
+.pb-keys kbd { font-family: var(--pb-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--pb-soft); background: var(--pb-row); }
+.pb-keys-or { color: var(--pb-faint); }
 
 /* --- notices --------------------------------------------------------------------------------------------- */
 .pb-notice, .pb-toast {

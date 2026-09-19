@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CANVAS_SETTINGS } from '../src/app/canvas-settings.ts';
-import { fineStep, underStyle } from '../src/project/ground.ts';
+import { fineStep, groundFade, underStyle } from '../src/project/ground.ts';
 
 const settings = (patch: Partial<typeof DEFAULT_CANVAS_SETTINGS> = {}) => ({ ...DEFAULT_CANVAS_SETTINGS, ...patch });
 
@@ -42,5 +42,17 @@ describe('the ground under the board', () => {
     expect(fineStep(24, 0.5)).toBe(12);
     expect(fineStep(24, 0.3)).toBeCloseTo(36);
     expect(fineStep(24, 0.1)).toBeCloseTo(48);
+  });
+});
+
+describe('the ground as the board zooms out', () => {
+  it('shows all of its opacity from 60% up, then fades to about a third', () => {
+    expect(groundFade(1)).toBe(1);
+    expect(groundFade(0.6)).toBe(1);
+    expect(groundFade(0.4)).toBeCloseTo(0.5);
+    expect(groundFade(0.1)).toBe(0.35);
+    const at = (z: number) => underStyle(settings({ ground: 'dots', groundOpacity: { lines: 1, dots: 0.8, mat: 1 } }), { x: 0, y: 0, z })!.opacity;
+    expect(at(1)).toBeCloseTo(0.8);
+    expect(at(0.4)).toBeCloseTo(0.4);
   });
 });

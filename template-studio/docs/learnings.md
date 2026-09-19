@@ -2460,3 +2460,39 @@ ability to drag an asset into the email and it creates the container needed for 
   of every frame in the project.
 - **`useAppFrames`.** The Freeform-frames stretch of App: the frames read from storage and on every storage event,
   the app's kept pictures, and the follow effect. App.tsx is around 2,200 lines; the rest waits for a reason.
+
+### 3.81 The board bar's glyphs, drawn
+
+*2026-09-19.* Jared: "the toolbars icons are not aligned."
+
+- **They were characters.** The arrow before Tools, the minus and plus of the zoom, the caret on the project name
+  and the plus before each Add verb were typed from the text face. Each sat where its font put it: the minus and
+  plus on the maths axis, the caret and arrow wherever Helvetica draws them, and every button's text nudged 2px
+  down by a 8/4 padding meant to centre cap height. Words survived that; symbols did not.
+- **Now they are 12px strokes** (`project/glyphs.tsx`: ArrowLeft, Plus, Minus, Chevron), centred by flex like
+  any other child, so a glyph and the word beside it share a line. The buttons' nudge is 1px (padding 7/5), which
+  puts the x-height on the bar's middle; measured, every control's text and glyph centres are within half a pixel
+  of it. The zoom steps are 26px squares with the glyph dead centre; the figure between keeps the text rule. The
+  Add kicker sits on the buttons' line rather than 2px above it.
+
+### 3.82 The board, six small things
+
+*2026-09-19.* Jared: "run through all of these", the suggestions after the bar was aligned; and, from the Canvas
+menu, "dont forget to clean up the alignment of these dropdown menu buttons across the whole project."
+
+- **The bar is shorter.** The uppercase Add label is gone; the five plus verbs sit between two hairlines and read
+  as a group on their own. Fit moved into the zoom group as a glyph (four corners), and Selection joined it (a
+  card in a window): the selected card fills the window, ⇧2, the same view a double-click gives before it opens
+  the tool. Glyphs rather than words because with the words the bar overflowed an 800px window.
+- **The status line is a state.** "Saves to Delete test", not "Saving into". The hint beside it is one line for
+  the moment: a card selected gets the open, zoom, copy and delete keys; nothing selected gets arranging, dropping
+  and panning, and a pointer to `?`.
+- **Pictures carry their names**, in mono under the card, always; the title bar still comes on hover.
+- **`?` opens a keys sheet**, paper and one hairline like the board's popovers, listing every key `onKey` answers
+  to. The list sits beside the handler in Board.tsx so the two stay one.
+- **The ground fades as the board zooms out**: all of its opacity from 60% up, down to about a third by 35%
+  (`groundFade`, ground.ts, tested). The Opacity dial still sets the ceiling.
+- **The same nudge, everywhere.** The Canvas menu's segmented control (Off · Lines · Dots · Mat) had 5/1 padding
+  in a 22px box, the project menu's rows 11/7 in 36px: each put the text 2px low, the same habit the bar had.
+  Both now centre the line box with a 1px nudge, like the bar's controls. Every other control in the two
+  stylesheets was checked: the rest centre by flex or pad evenly.
