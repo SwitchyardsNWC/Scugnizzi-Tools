@@ -19,7 +19,7 @@ import {
   resetDesignSystem,
   resetPalette,
 } from '../model/edit.ts';
-import { colorOf, DEFAULT_DESIGN_SYSTEM, type ColorRef, type DesignSystem, type TypeStyle } from '../model/design-system.ts';
+import { colorOf, DEFAULT_DESIGN_SYSTEM, type DesignSystem, type TypeStyle } from '../model/design-system.ts';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';

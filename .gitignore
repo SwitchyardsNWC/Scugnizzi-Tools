@@ -11,5 +11,5 @@ node_modules/
 # Output of template-studio/tools/regenerate-v1-export.js
 regen-*.html
 
-# PartyKit dev cache (template-studio/party)
-.partykit/
+# Template Studio's build: made by the Pages workflow, and locally by `npm run build`
+template-studio/dist/

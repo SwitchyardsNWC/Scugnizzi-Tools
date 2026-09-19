@@ -18,19 +18,19 @@ describe('the same template on disk', () => {
     const spaced = JSON.stringify(JSON.parse(text), null, 4);
     const raw = JSON.parse(text) as Record<string, unknown>;
     const reordered = JSON.stringify(Object.fromEntries(Object.entries(raw).reverse()));
-    expect(sameTemplate('spring.template.json', text, spaced)).toBe(true);
-    expect(sameTemplate('spring.template.json', text, reordered)).toBe(true);
-    expect(sameTemplate('spring.template.json', text, `${text}\n\n`)).toBe(true);
+    expect(sameTemplate(text, spaced)).toBe(true);
+    expect(sameTemplate(text, reordered)).toBe(true);
+    expect(sameTemplate(text, `${text}\n\n`)).toBe(true);
   });
 
   it('is not the same once the template differs', () => {
     const other = serializeTemplate({ ...template, name: 'Summer launch' });
-    expect(sameTemplate('spring.template.json', text, other)).toBe(false);
+    expect(sameTemplate(text, other)).toBe(false);
   });
 
   it('compares anything unreadable as it is', () => {
-    expect(sameTemplate('odd.template.json', 'not json', ' not json ')).toBe(true);
-    expect(sameTemplate('odd.template.json', 'not json', 'still not json')).toBe(false);
-    expect(sameTemplate('odd.template.json', text, 'not json')).toBe(false);
+    expect(sameTemplate('not json', ' not json ')).toBe(true);
+    expect(sameTemplate('not json', 'still not json')).toBe(false);
+    expect(sameTemplate(text, 'not json')).toBe(false);
   });
 });

@@ -497,6 +497,12 @@ when a file was saved. The folder stays the truth; nothing about the project pas
 - **Not yet.** Live co-editing of a template: two people in the same email is still last save wins, with the
   conflict banner. Presence makes the collision visible; it does not merge it.
 
+*Removed 2026-09-19.* Presence never ran for anyone: it needed a deployed PartyKit host that was never set up, so
+the board showed nothing and the server did nothing. Jared: "Currently the party server does nothing … Remove the
+partykit." The server, the presence hook and config, the cursors and peer outlines on the board, the Together
+section of the Canvas menu, the npm scripts and the dependency are gone. What the folder says is still the truth,
+and two people on one project still meet the conflict banner rather than each other's cursors.
+
 ### Into a frame, a copy, and breaking a line
 
 *Added 2026-09-14.*

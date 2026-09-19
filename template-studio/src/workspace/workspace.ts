@@ -194,7 +194,7 @@ const V1 = '.design.json';
 
 export const isTemplateFile = (name: string) => name.endsWith(V2) || name.endsWith(V1);
 
-function parse(fileName: string, text: string): { template: Template; warnings: string[] } {
+function parse(text: string): { template: Template; warnings: string[] } {
   const raw = JSON.parse(text);
   // A v1 design has a flat `blocks` array and no `sections`; anything else goes through the
   // migration chain, which refuses a document written by a newer build rather than downgrading it.
@@ -206,10 +206,10 @@ function parse(fileName: string, text: string): { template: Template; warnings: 
  * Whether two texts hold the same template: each is read the way a file is, so spacing, key order and a v1
  * shape make no difference. Text that is not a template at all is compared as it is.
  */
-export function sameTemplate(fileName: string, a: string, b: string): boolean {
+export function sameTemplate(a: string, b: string): boolean {
   const seen = (text: string) => {
     try {
-      return JSON.stringify(canonical(parse(fileName, text).template));
+      return JSON.stringify(canonical(parse(text).template));
     } catch {
       return text.trim();
     }
@@ -315,7 +315,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
             fileName,
             kind: fileName.endsWith(V1) ? 'v1' : 'v2',
             modified: file.lastModified,
-            load: async () => parse(fileName, await (await handle.getFile()).text()),
+            load: async () => parse(await (await handle.getFile()).text()),
           });
         }
       }
@@ -473,7 +473,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         // A brand new file reports 0. A file that moved underneath us is a conflict only when what is in it is not
         // what this editor last saw: a synced folder rewrites the time after every upload (see the interface).
         if (expectedModified > 0 && onDisk.size > 0 && onDisk.lastModified > expectedModified) {
-          const same = lastKnown !== undefined && sameTemplate(fileName, await onDisk.text(), lastKnown);
+          const same = lastKnown !== undefined && sameTemplate(await onDisk.text(), lastKnown);
           if (!same) return { ok: false as const, conflict: true as const, modified: onDisk.lastModified };
         }
 
@@ -586,7 +586,7 @@ export function workspaceFromFiles(files: File[]): Workspace {
           fileName: file.name,
           kind: (file.name.endsWith(V1) ? 'v1' : 'v2') as 'v1' | 'v2',
           modified: file.lastModified,
-          load: async () => parse(file.name, await file.text()),
+          load: async () => parse(await file.text()),
         })),
       );
       return out.sort((a, b) => a.name.localeCompare(b.name));

@@ -19,7 +19,6 @@ import type { Block, Template } from './types.ts';
 export const PROJECT_FILE = metaPath('project.json');
 export const BOARD_FILE = metaPath('board.json');
 export const LEGACY_PROJECT_FILE = 'project.json';
-export const LEGACY_BOARD_FILE = 'board.json';
 /** Pages on this site tell each other a project was opened or closed. */
 export const PROJECT_CHANNEL = 'scuggnizzi.project';
 

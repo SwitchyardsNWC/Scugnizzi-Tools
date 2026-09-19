@@ -1,9 +1,12 @@
+import { useRef } from 'preact/hooks';
+
 import { CATALOG, SINGLETON } from '../model/catalog.ts';
 import { SY_BLOCKS } from '../model/switchyards.ts';
 import { allBlocks } from '../model/edit.ts';
 import { glyphFor } from './icons.tsx';
 import type { BlockType } from '../model/types.ts';
 import type { Editor } from './useEditor.ts';
+import { capture, release } from './pointer.ts';
 
 // What you can add, as things you pick up.
 //
@@ -24,6 +27,9 @@ import type { Editor } from './useEditor.ts';
  * you already had, which asked a designer to know that a block they can see sits inside a row they
  * cannot. Now it is something you drop and then fill.
  */
+/** Below this, the pointer has not moved enough to mean a drag, so it is still a click. */
+const DRAG_THRESHOLD = 4;
+
 export type PaletteKind = BlockType | 'columns' | `pattern:${string}` | `sy:${string}`;
 
 /** What the palette shows for a folder pattern: its name, and what it holds. */
@@ -103,7 +109,7 @@ export function Palette({ editor, dragging, onDrag, onDrop, patterns, onPlacePat
     : GROUPS;
   return (
     <div class="palette-pane">
-      <p class="hint palette-hint">Click a block to add it at the end of the email.</p>
+      <p class="hint palette-hint">{dragging ? 'Drop it where it goes.' : 'Drag onto the email, or click to add at the end.'}</p>
       {groups.map((group) => (
         <section class="palette-group" key={group.name}>
           <h3 title={group.help}>{group.name}</h3>
@@ -133,6 +139,8 @@ function Card({
   type,
   editor,
   active,
+  onDrag,
+  onDrop,
   patterns,
   onPlacePattern,
   onPlaceSyBlock,
@@ -162,12 +170,9 @@ function Card({
     SINGLETON.includes(type) &&
     allBlocks(editor.template).some((b) => b.type === type);
 
-  // Dragging a card onto the email is put away for now. Jared, 2026-09-18: "hide the drag and drop block option
-  // for now. it's not working." A click adds at the end, which is where most blocks go anyway, and Layers moves
-  // it. The drop plumbing stays where it was (`onDrag`, `onDrop`, the ghost and the probe in App.tsx) for the day
-  // the drag comes back.
+  // A press that moves is a drag onto the email; a press that does not is a click, which adds at the end.
+  const origin = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const add = () => {
-    if (spent) return;
     if (isPatternKind(type)) onPlacePattern(patternIdOf(type));
     else if (isSyKind(type)) onPlaceSyBlock(syIdOf(type));
     else if (type === 'columns') editor.addColumns(editor.template.sections.length);
@@ -176,13 +181,47 @@ function Card({
       onUsed?.(type);
     }
   };
+  // Pointer capture is what makes this work over the canvas at all: the preview is an iframe, and without capture
+  // its document swallows every `pointermove` the moment the pointer crosses into it. Captured, the events keep
+  // arriving in this document, with coordinates the preview can convert.
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0 || spent) return;
+    capture(event.currentTarget as HTMLElement, event.pointerId);
+    origin.current = { x: event.clientX, y: event.clientY, dragging: false };
+  };
+  const onPointerMove = (event: PointerEvent) => {
+    const from = origin.current;
+    if (!from) return;
+    if (!from.dragging) {
+      if (Math.abs(event.clientX - from.x) < DRAG_THRESHOLD && Math.abs(event.clientY - from.y) < DRAG_THRESHOLD) return;
+      from.dragging = true;
+    }
+    onDrag(type, event.clientX, event.clientY);
+  };
+  const onPointerUp = (event: PointerEvent) => {
+    const from = origin.current;
+    release(event.currentTarget as HTMLElement, event.pointerId);
+    origin.current = null;
+    if (from?.dragging) onDrop();
+    else if (from) add();
+  };
+  // A finger that the browser takes for a scroll, or a pen lifted off the edge: the drag is let go, not dropped.
+  const onPointerCancel = (event: PointerEvent) => {
+    const from = origin.current;
+    release(event.currentTarget as HTMLElement, event.pointerId);
+    origin.current = null;
+    if (from?.dragging) onDrop();
+  };
 
   return (
     <button
       class={`block-card ${active ? 'lifted' : ''}`}
       title={spent ? `${spec.name}: this template already has one, and HubSpot allows only one.` : spec.summary}
       disabled={spent}
-      onClick={add}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       <Glyph />
       <span class="block-card-name">{spec.name}</span>

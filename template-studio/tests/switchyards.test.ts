@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { compile } from '../src/compile/compile.ts';
-import { hostOf, noteHtml, socialLinks } from '../src/compile/blocks/legal.ts';
+import { noteHtml, socialLinks } from '../src/compile/blocks/legal.ts';
 import { errorsIn, lint } from '../src/compile/lint.ts';
 import { allBlocks, cloneSection, freshIds, hubspotFields, takenFieldNames } from '../src/model/edit.ts';
 import { blankTemplate } from '../src/model/starters.ts';
@@ -126,7 +126,6 @@ describe('the footer layouts', () => {
     expect(html).toMatch(/<td[^>]*>(?:(?!<\/td>).)*Instagram(?:(?!<\/td>).)*YouTube(?:(?!<\/td>).)*LinkedIn(?:(?!<\/td>).)*<\/td>/);
     expect(footerHtml('stub')).toContain('&nbsp;&middot;&nbsp;');
     expect(footerHtml('letterhead')).toContain('>Instagram<');
-    expect(hostOf('https://www.switchyards.com/')).toBe('switchyards.com');
     expect(socialLinks({ instagram: ' https://instagram.com/x ', youtube: '', linkedin: 'https://linkedin.com/company/x' }).map((l) => l.name)).toEqual(['Instagram', 'LinkedIn']);
   });
 

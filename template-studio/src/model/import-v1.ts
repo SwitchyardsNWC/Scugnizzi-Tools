@@ -63,11 +63,6 @@ function stripeColor(pick: unknown, custom: unknown): string {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex) ? hex.toLowerCase() : '';
 }
 
-function pickColor(pick: unknown, custom: unknown): string | null {
-  if (!pick) return null;
-  return stripeColor(pick, custom) || null;
-}
-
 export interface ImportResult {
   template: Template;
   /** Anything the import could not carry across. Shown rather than swallowed. */

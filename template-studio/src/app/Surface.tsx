@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preac
 import type { ComponentChildren, JSX } from 'preact';
 
 import { canvasTypeSampleSvg, freeformLayersSvg } from '../compile/freeform.ts';
-import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type ColorRef } from '../model/design-system.ts';
+import { canvasTypeOf, colorOf, firstPreset, theme, type ColorRef } from '../model/design-system.ts';
 import { designSystemOf, siteOf } from '../model/edit.ts';
 import {
   addImageLayerAt,
@@ -312,7 +312,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const anim = useRef<number | null>(null);
   const reduced = useRef(typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)).current;
 
-  const tpl = () => editorRef.current.template;
+  const tpl = useCallback(() => editorRef.current.template, []);
   const commit = useCallback((label: string, next: Template, coalesce?: string) => {
     const ed = editorRef.current;
     if (next !== ed.template) ed.commit(label, next, coalesce ? { coalesce } : {});
@@ -385,8 +385,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     return { z: r.width / Math.max(1, b.width), x: r.left - w.left, y: r.top - w.top };
   }, []);
 
-  // In: one frame with the page on the block, then the flight out.
-  useLayoutEffect(() => {
+  // In: one frame with the page on the block, then the flight out. Once, on the way in: the effect runs the
+  // first render's flight, held in a ref, so the list below is honest about what it responds to, which is nothing.
+  const enter = useRef<() => (() => void) | undefined>(() => undefined);
+  enter.current = () => {
     // Focus leaves the email's frame, where a double-click put it, so every key and every copy and
     // paste from here on arrives in this document and nowhere near the block around the canvas.
     (document.activeElement as HTMLElement | null)?.blur?.();
@@ -396,7 +398,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (!fit || !from) {
       if (fit) setView(fit);
       setPhase('idle');
-      return;
+      return undefined;
     }
     setView(from);
     setPhase('start');
@@ -408,9 +410,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       cancelAnimationFrame(id);
       stopAnim();
     };
-    // Once, on the way in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
+  useLayoutEffect(() => enter.current(), []);
 
   /** Out: the flight home, and then the email. */
   const leave = useCallback(() => {
@@ -520,19 +521,22 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   const boxOf = useCallback((l: FreeformLayer): Box => layerBox(l, textHeights[l.id]), [textHeights]);
 
-  const layerEl = (id: string) => svgEl.current?.querySelector(`[data-sy-layer="${CSS.escape(id)}"]`) as SVGGraphicsElement | null;
+  const layerEl = useCallback((id: string) => svgEl.current?.querySelector(`[data-sy-layer="${CSS.escape(id)}"]`) as SVGGraphicsElement | null, []);
 
   /**
    * Motion that composes with a layer's own rotation. The individual `scale` property, not
    * `transform`: CSS `transform` on an SVG element replaces its transform attribute, which would
    * snap a rotated layer straight for the length of the animation.
    */
-  const springy = (el: SVGGraphicsElement, frames: Keyframe[], ms: number, fill: FillMode = 'none') => {
-    if (reduced || typeof el.animate !== 'function') return null;
-    el.style.transformBox = 'fill-box';
-    el.style.transformOrigin = 'center';
-    return el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2,.9,.3,1)', fill });
-  };
+  const springy = useCallback(
+    (el: SVGGraphicsElement, frames: Keyframe[], ms: number, fill: FillMode = 'none') => {
+      if (reduced || typeof el.animate !== 'function') return null;
+      el.style.transformBox = 'fill-box';
+      el.style.transformOrigin = 'center';
+      return el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2,.9,.3,1)', fill });
+    },
+    [reduced],
+  );
 
   // Pop: the layers just made, once they are on the page.
   useLayoutEffect(() => {
@@ -544,7 +548,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       else waiting.push(id);
     }
     fresh.current = waiting;
-  }, [block]);
+  }, [block, layerEl, springy]);
 
   /** Poof: a quick swell and shrink, and then what was picked is gone from the recipe. */
   const poof = useCallback(
@@ -560,8 +564,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       if (first) first.onfinish = gone;
       else gone();
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blockId, commit, onSelectLayer],
+    [blockId, commit, onSelectLayer, tpl, layerEl, springy],
   );
 
   /** New layers: committed, popped in, and picked unless the tool is one for doing it again. */
@@ -594,10 +597,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   dsRef.current = ds;
   const fxKey = block?.type === 'freeform' && block.effects?.length ? recipeHash(block) : null;
   /** What the page sits on. A print needs an opaque ground: it reads a transparent pixel as black ink. */
-  const groundOf = (b: FreeformBlock) => {
-    const s = siteOf(editorRef.current.template, blockId);
-    return colorOf(dsRef.current, b.background) ?? s?.section.containerColor ?? s?.section.bandColor ?? '#ffffff';
-  };
+  const groundOf = useCallback(
+    (b: FreeformBlock) => {
+      const s = siteOf(editorRef.current.template, blockId);
+      return colorOf(dsRef.current, b.background) ?? s?.section.containerColor ?? s?.section.bandColor ?? '#ffffff';
+    },
+    [blockId],
+  );
 
   // Printed again once a change settles — never mid-drag or mid-word, which would stutter.
   useEffect(() => {
@@ -620,8 +626,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       cancelled = true;
       window.clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fxKey, dragging, editingText, assets]);
+  }, [fxKey, dragging, editingText, assets, groundOf]);
   useEffect(() => () => void (fxUrl.current && URL.revokeObjectURL(fxUrl.current)), []);
 
   /** The plain page and its settings, left for the Riso tool, which opens in a tab of its own. */
@@ -684,12 +689,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   // --- words being typed: a rich editor, so some of them can be bold -------------------------------------
 
   /** The layer being typed into, as it stands now. */
-  const typingLayer = () => {
+  const typingLayer = useCallback(() => {
     const l = blockRef.current?.layers.find((x) => x.id === editingRef.current);
     return l && (l.kind === 'text' || l.kind === 'sticky') ? l : null;
-  };
+  }, []);
 
-  const refreshFormat = () => {
+  const refreshFormat = useCallback(() => {
     const el = textRef.current;
     const l = typingLayer();
     if (!el || !l) return;
@@ -700,7 +705,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const to = whole ? text.length : Math.max(o.start, o.end);
     const st = textStyleOf(l, dsRef.current);
     setFmt({ ...markState(text, styles, from, to, { bold: st.weight === 'bold', italic: st.italic }), scope: whole ? 'all' : 'selection' });
-  };
+  }, [typingLayer]);
 
   // Filled once, when typing starts. From then on the browser owns the caret, and the words and their
   // formatting are read back out of the editor on every keystroke.
@@ -719,8 +724,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const onSelection = () => refreshFormat();
     doc.addEventListener('selectionchange', onSelection);
     return () => doc.removeEventListener('selectionchange', onSelection);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingText]);
+  }, [editingText, typingLayer, refreshFormat]);
 
   const choosePaint = (color: ColorRef) => {
     setPaint(color);
@@ -1147,83 +1151,89 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   };
 
   // --- keys, while the canvas is open ----------------------------------------------------------------
+  //
+  // The handlers are made every render, so they see the latest of everything; one subscription reads them through a
+  // ref, so it is bound once and its dependency list is empty and true.
 
+  const onKey = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
+    if (phaseRef.current !== 'idle') return;
+    const meta = event.metaKey || event.ctrlKey;
+    const b = blockRef.current;
+    if (!b) return;
+    if (event.key === ' ') {
+      spaceRef.current = true;
+      setSpace(true);
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (editingText) setEditingText(null);
+      else if (toolRef.current !== 'select') setTool('select');
+      else if (layerRef.current) onSelectLayer(null);
+      else leave();
+      return;
+    }
+    if (meta && (event.key === '0' || event.key === '1')) {
+      event.preventDefault();
+      if (event.key === '0') fitSmooth();
+      else zoomTo(1, undefined, true);
+      return;
+    }
+    if (meta && (event.key === '=' || event.key === '+' || event.key === '-')) {
+      event.preventDefault();
+      zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
+      return;
+    }
+    if (!meta && !event.altKey && event.key.length === 1) {
+      const found = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase());
+      if (found) {
+        setTool(found.tool);
+        return;
+      }
+    }
+    const picked = layerRef.current;
+    const sel = selectionOf(b, picked);
+    if (!picked || !sel) return;
+    if (meta && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      if (sel.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, sel.group), sel.layers.length);
+      else place('Duplicate layer', duplicateLayer(tpl(), blockId, picked));
+      return;
+    }
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault();
+      poof(picked);
+      return;
+    }
+    const step = event.shiftKey ? 10 : 1;
+    const arrows: Record<string, [number, number]> = { ArrowUp: [0, -step], ArrowDown: [0, step], ArrowLeft: [-step, 0], ArrowRight: [step, 0] };
+    const move = arrows[event.key];
+    if (move) {
+      event.preventDefault();
+      commit('Nudge', replaceLayers(tpl(), blockId, sel.layers.map((l) => translateLayer(l, move[0], move[1]))), `surface:${blockId}:nudge:${picked}`);
+    }
+  };
+  const onKeyUp = (event: KeyboardEvent) => {
+    if (event.key === ' ') {
+      spaceRef.current = false;
+      setSpace(false);
+    }
+  };
+  const keyHandlers = useRef({ onKey, onKeyUp });
+  keyHandlers.current = { onKey, onKeyUp };
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
-      if (phaseRef.current !== 'idle') return;
-      const meta = event.metaKey || event.ctrlKey;
-      const b = blockRef.current;
-      if (!b) return;
-      if (event.key === ' ') {
-        spaceRef.current = true;
-        setSpace(true);
-        event.preventDefault();
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (editingText) setEditingText(null);
-        else if (toolRef.current !== 'select') setTool('select');
-        else if (layerRef.current) onSelectLayer(null);
-        else leave();
-        return;
-      }
-      if (meta && (event.key === '0' || event.key === '1')) {
-        event.preventDefault();
-        if (event.key === '0') fitSmooth();
-        else zoomTo(1, undefined, true);
-        return;
-      }
-      if (meta && (event.key === '=' || event.key === '+' || event.key === '-')) {
-        event.preventDefault();
-        zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
-        return;
-      }
-      if (!meta && !event.altKey && event.key.length === 1) {
-        const found = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase());
-        if (found) {
-          setTool(found.tool);
-          return;
-        }
-      }
-      const picked = layerRef.current;
-      const sel = selectionOf(b, picked);
-      if (!picked || !sel) return;
-      if (meta && event.key.toLowerCase() === 'd') {
-        event.preventDefault();
-        if (sel.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, sel.group), sel.layers.length);
-        else place('Duplicate layer', duplicateLayer(tpl(), blockId, picked));
-        return;
-      }
-      if (event.key === 'Backspace' || event.key === 'Delete') {
-        event.preventDefault();
-        poof(picked);
-        return;
-      }
-      const step = event.shiftKey ? 10 : 1;
-      const arrows: Record<string, [number, number]> = { ArrowUp: [0, -step], ArrowDown: [0, step], ArrowLeft: [-step, 0], ArrowRight: [step, 0] };
-      const move = arrows[event.key];
-      if (move) {
-        event.preventDefault();
-        commit('Nudge', replaceLayers(tpl(), blockId, sel.layers.map((l) => translateLayer(l, move[0], move[1]))), `surface:${blockId}:nudge:${picked}`);
-      }
-    };
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === ' ') {
-        spaceRef.current = false;
-        setSpace(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keyup', onKeyUp);
+    const down = (event: KeyboardEvent) => keyHandlers.current.onKey(event);
+    const up = (event: KeyboardEvent) => keyHandlers.current.onKeyUp(event);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockId, commit, onSelectLayer, leave, zoomTo, fitSmooth, editingText, setTool, place, placeMany, poof]);
+  }, []);
 
   // --- the canvas's own clipboard -------------------------------------------------------------------
   //
@@ -1267,8 +1277,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       document.removeEventListener('cut', cut, true);
       document.removeEventListener('paste', onPaste, true);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockId, placeMany, poof]);
+  }, [blockId, placeMany, poof, tpl]);
 
   // --- pictures from the folder ------------------------------------------------------------------
 
@@ -1281,8 +1290,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       };
       img.src = asset.url;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blockId, place, toSurface],
+    [blockId, place, toSurface, tpl],
   );
   if (api) api.current = { dropAsset };
 
@@ -1926,10 +1934,3 @@ function snappedGhost(s: QuickShape) {
   return <rect x={s.x} y={s.y} width={s.width} height={s.height} transform={transform} {...paint} />;
 }
 
-/** The id of the last layer of a freeform block in a template — the one just added. */
-function lastLayerId(template: Template, blockId: string): string | null {
-  const s = siteOf(template, blockId);
-  const b = s?.column.blocks[s.index];
-  if (!b || b.type !== 'freeform') return null;
-  return b.layers[b.layers.length - 1]?.id ?? null;
-}

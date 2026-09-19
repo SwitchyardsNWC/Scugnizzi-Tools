@@ -2305,3 +2305,31 @@ sites: instagram, youtube, linkedin. give footers and top bars the option to be 
   stripes and the footer, in their Spacing (or Width) panel. The column stays at the email's width; only the colour
   behind it widens, in Outlook too, whose band table goes to 100%. Gmail's apps keep their own inset around every
   message, which the switch's hover text admits.
+
+### 3.74 An audit, and what it took out
+
+*2026-09-19.* Jared asked for an audit, then: "Remove the partykit. add a confirmation to delete from a board when
+using backspace. anything you can do about the 22 suppressed hook dependency? if any of the unused locals are truly
+not needed or used, clean them up. fix the drag plumbing. do what is best for the repo hygiene."
+
+- **PartyKit is gone.** It never ran for anyone: presence needed a deployed host nobody set up. The server, the
+  hook, the config, the cursors on the board, the Together menu, the scripts and the dependency, about six hundred
+  lines. The folder was always the truth; it still is.
+- **Backspace asks first.** The first press names the file and asks; a second press on the same card within five
+  seconds removes it, and Undo still puts it back. Escape, another card, or waiting lets it go. The × on the card
+  is a click on a control and stays direct.
+- **The 22 suppressed hook warnings are 0.** None was fixed by adding a dependency and hoping. Pure helpers moved
+  to module scope; helpers that read refs became `useCallback`s and joined the lists; keyboard and clipboard
+  handlers are made every render and read through one ref by a subscription bound once; the callbacks a parent
+  rebuilds every render are read the same way. The Preview keeps its measuring helpers in one `live` ref for the
+  same reason. Every list now says only what the effect responds to, and nothing runs more or less often than
+  before.
+- **Unused code went**: eight imports and locals the compiler could prove, four exports nothing referenced, a
+  parameter the template parser never read.
+- **The palette drag is back on.** It was hidden as "not working". Driven with synthetic pointer events it works
+  end to end, ghost, drop line and landing; the cards already refuse touch scrolling. What was added is a
+  `pointercancel` handler, so a finger the browser reclaims lets the drag go instead of leaving it armed. If it
+  still fails in a hand, the report needs to say what is seen.
+- **The built files are no longer tracked.** The Pages workflow builds Template Studio before it uploads, so a
+  stale `dist` can no longer ship by being forgotten. Locally it is still made by `npm run build`. The unreferenced
+  GIFs and a stock photo in the sample templates folder are gone.

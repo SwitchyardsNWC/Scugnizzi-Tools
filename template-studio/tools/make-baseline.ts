@@ -29,7 +29,7 @@ import { sequentialIds } from '../src/model/ids.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
 import { serializeTemplate } from '../src/model/serialize.ts';
 import { pictureHash, recipeHash } from '../src/model/freeform.ts';
-import type { Align, Block, Column, Lock, MobileBehaviour, Row, Section, Template } from '../src/model/types.ts';
+import type { Align, Block, Column, Lock, MobileBehaviour, Section, Template } from '../src/model/types.ts';
 
 const id = sequentialIds();
 const ds = DEFAULT_DESIGN_SYSTEM;

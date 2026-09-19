@@ -249,8 +249,7 @@ function FreeformTool() {
     framesRef.current = next;
     setFrames(next);
     schedulePush(key);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor.template]);
+  }, [editor.template, schedulePush]);
 
   /** The project's pictures, as assets the canvas can draw. */
   const usePictures = useCallback((pictures: PictureEntry[]) => {
@@ -343,9 +342,14 @@ function FreeformTool() {
     [run, notify, usePictures, pushKey],
   );
 
+  // Runs when the project is looked at again, and reads the newest resync and status through refs rather than
+  // running again whenever either of those changes.
+  const resyncRef = useRef(resync);
+  resyncRef.current = resync;
+  const statusRef = useRef(project.status);
+  statusRef.current = project.status;
   useEffect(() => {
-    if (project.status === 'ready' || project.status === 'view-only') void resync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (statusRef.current === 'ready' || statusRef.current === 'view-only') void resyncRef.current();
   }, [project.generation]);
 
   useEffect(() => {
