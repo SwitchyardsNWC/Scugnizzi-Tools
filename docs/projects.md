@@ -779,6 +779,11 @@ as the board zooms out. The Canvas menu's segmented buttons and the project menu
 *Added 2026-09-19.* Tidy places every card and group on the grid, gaps rounded up to the step; Snap to grid is on by
 default. On a note, the tick to resolve sits at the top right and Delete floats just outside the bottom right corner.
 
+### Replies
+
+*Added 2026-09-19.* Every note takes a thread: Reply under the note on the board, or under it in Template Studio's
+rail; each reply shows its time, and a bin on the reply removes it. Reply sits at the note's foot; "Delete note" joins it once the note is picked.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

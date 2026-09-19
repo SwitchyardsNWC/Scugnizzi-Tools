@@ -6,6 +6,8 @@
 // done from here (Jared: "a final state of 'resolved' ... changed in the template studio and canvas"); writing
 // stays on the board, where notes live.
 
+import { useState } from 'preact/hooks';
+
 import { noteKind, type BoardNote } from '../model/project.ts';
 import { agoShort } from '../project/board-helpers.ts';
 
@@ -18,11 +20,14 @@ export interface NotesRailProps {
   onHover(part: string | null): void;
   onPick(part: string | null): void;
   onResolve(id: string, resolved: boolean): void;
+  onReply(id: string, text: string): void;
   onOpenBoard(): void;
   onClose(): void;
 }
 
-export function NotesRail({ notes, labels, writable, onHover, onPick, onResolve, onOpenBoard, onClose }: NotesRailProps) {
+export function NotesRail({ notes, labels, writable, onHover, onPick, onResolve, onReply, onOpenBoard, onClose }: NotesRailProps) {
+  /** The note whose reply field is open. */
+  const [replying, setReplying] = useState<string | null>(null);
   const open = notes.filter((n) => !n.resolvedAt).length;
   const done = notes.length - open;
   return (
@@ -73,6 +78,53 @@ export function NotesRail({ notes, labels, writable, onHover, onPick, onResolve,
             </span>
             <span class="note-card-text">{n.text.trim() || 'Nothing written yet'}</span>
             {(part || gone) && <span class="note-card-on">{part ? `on ${part.label}` : 'on a section that is gone'}</span>}
+            {n.replies.length > 0 && (
+              <span class="note-card-replies">
+                {n.replies.map((r) => (
+                  <span class="note-card-reply" key={r.id}>
+                    <span class="note-card-reply-when">{r.at ? agoShort(r.at) : 'now'}</span>
+                    <span class="note-card-reply-text">{r.text}</span>
+                  </span>
+                ))}
+              </span>
+            )}
+            {writable &&
+              (replying === n.id ? (
+                <textarea
+                  class="note-card-reply-field"
+                  placeholder="Reply…"
+                  rows={2}
+                  aria-label="Reply"
+                  ref={(el) => el?.focus({ preventScroll: true })}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Escape') {
+                      e.currentTarget.value = '';
+                      e.currentTarget.blur();
+                    } else if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const text = e.currentTarget.value.trim();
+                    setReplying(null);
+                    if (text) onReply(n.id, text);
+                  }}
+                />
+              ) : (
+                <button
+                  class="note-card-reply-btn"
+                  title="Answer this note; the reply shows here and on the board"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReplying(n.id);
+                  }}
+                >
+                  Reply
+                </button>
+              ))}
           </div>
         );
       })}

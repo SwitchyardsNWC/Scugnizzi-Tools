@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { NOTE_KINDS, noteKind, type BoardNote } from '../model/project.ts';
 import { agoShort } from './board-helpers.ts';
+import { Trash } from './glyphs.tsx';
 
 export interface NoteCardProps {
   note: BoardNote;
@@ -31,6 +32,9 @@ export interface NoteCardProps {
   onRemove(): void;
   /** Resolved, or opened again: the note's last state (Jared: "a final state of 'resolved'"). */
   onResolve(resolved: boolean): void;
+  /** A reply under the note, and one taken away. */
+  onReply(text: string): void;
+  onRemoveReply(id: string): void;
   /** On an email: its sections, for the note to point at one. Absent otherwise. */
   parts?: Array<{ id: string; label: string }>;
   onPart?(id: string | null): void;
@@ -43,7 +47,7 @@ export interface NoteCardProps {
   onPinDown?(event: PointerEvent): void;
 }
 
-export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPointerDown, onPointerMove, onPointerUp, onBeginEdit, onEndEdit, onColor, onRemove, onResolve, parts, onPart, onPreviewPart, onPinDown }: NoteCardProps) {
+export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPointerDown, onPointerMove, onPointerUp, onBeginEdit, onEndEdit, onColor, onRemove, onResolve, onReply, onRemoveReply, parts, onPart, onPreviewPart, onPinDown }: NoteCardProps) {
   const root = useRef<HTMLDivElement | null>(null);
   const field = useRef<HTMLTextAreaElement | null>(null);
   /** Escape closes the field without keeping what was typed; the focus leaving must know. */
@@ -63,6 +67,16 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
   /** Back to the words after a kind or a section was picked, so the edit is one sitting. */
   const refocus = () => {
     if (editing) window.setTimeout(() => field.current?.focus({ preventScroll: true }), 0);
+  };
+  /** The reply field is open. */
+  const [replying, setReplying] = useState(false);
+  const replyField = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (replying) replyField.current?.focus({ preventScroll: true });
+  }, [replying]);
+  const sendReply = (text: string) => {
+    setReplying(false);
+    if (text.trim()) onReply(text.trim());
   };
   const when = note.at ? agoShort(note.at) : 'new';
   const kind = noteKind(note);
@@ -126,12 +140,6 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
           </span>
         )}
       </div>
-      {writable && (
-        // Delete sits just outside the note's bottom right corner, so it is never mistaken for one of the note's own controls.
-        <button class="pb-note-delete" title="Remove this note. ⌘Z puts it back." onClick={onRemove}>
-          Delete
-        </button>
-      )}
       {parts && parts.length > 0 && (writable || part) && (
         <PartPicker
           parts={parts}
@@ -167,6 +175,60 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
         />
       ) : (
         <div class={`pb-note-body ${note.text.trim() ? '' : 'empty'}`}>{note.text.trim() ? note.text : writable ? 'Double-click to write' : 'Nothing written yet'}</div>
+      )}
+      {(note.replies.length > 0 || replying) && (
+        <div class="pb-note-replies">
+          {note.replies.map((r) => (
+            <div class="pb-note-reply" key={r.id}>
+              <span class="pb-note-reply-when">{r.at ? agoShort(r.at) : 'now'}</span>
+              <span class="pb-note-reply-text">{r.text}</span>
+              {writable && (
+                <button class="pb-note-reply-x" aria-label="Delete this reply" title="Delete this reply. ⌘Z puts it back." onClick={() => onRemoveReply(r.id)}>
+                  <Trash />
+                </button>
+              )}
+            </div>
+          ))}
+          {replying && (
+            <textarea
+              ref={replyField}
+              class="pb-note-reply-field"
+              placeholder="Reply…"
+              rows={2}
+              aria-label="Reply"
+              onKeyDown={(e) => {
+                // Enter sends, Shift+Enter breaks the line, Escape drops it; the board's keys stay out of the words.
+                e.stopPropagation();
+                if (e.key === 'Escape') {
+                  e.currentTarget.value = '';
+                  e.currentTarget.blur();
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              onBlur={(e) => sendReply(e.currentTarget.value)}
+            />
+          )}
+        </div>
+      )}
+      {writable && (
+        // The note's two verbs, as words along its foot: Reply at the left, Delete at the right (Jared: "make the reply at
+        // the bottom of the note. and lets make the delete just a text like the reply at the bottom right").
+        <div class="pb-note-foot">
+          {!editing && !replying ? (
+            <button class="pb-note-verb" title="Answer this note; the reply sits under it" onClick={() => setReplying(true)}>
+              Reply
+            </button>
+          ) : (
+            <span />
+          )}
+          {selected && (
+            <button class="pb-note-verb pb-note-verb-delete" title="Delete this note. ⌘Z puts it back." onClick={onRemove}>
+              Delete note
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

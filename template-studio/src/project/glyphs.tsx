@@ -18,5 +18,7 @@ export const Minus = () => glyph('M2 6h8', 'Less');
 export const Chevron = () => glyph('M3 4.75L6 7.75l3-3', 'Menu');
 /** Four corners: everything, brought into the window. */
 export const FitAll = () => glyph('M1.5 4V1.5H4M8 1.5h2.5V4M10.5 8v2.5H8M4 10.5H1.5V8', 'Fit everything');
+/** A bin: what Delete does, without the word. */
+export const Trash = () => glyph('M2.5 3.5h7M4.5 3.5V2.25h3V3.5M3.5 3.5l.5 6.5h4l.5-6.5M5.25 5.25v3.25M6.75 5.25v3.25', 'Delete');
 /** A card inside the window: the selection, brought in close. */
 export const FitOne = () => glyph('M1.5 1.5h9v9h-9zM4 4h4v4H4z', 'Zoom to the selection');
