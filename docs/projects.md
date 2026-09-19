@@ -744,6 +744,26 @@ zoom steps are squares. Nothing moved or changed meaning.
 says "Saves to" and shows one hint for the moment. Pictures carry their names. `?` opens the keys. The ground fades
 as the board zooms out. The Canvas menu's segmented buttons and the project menu's rows sit on their line.
 
+### Notes on the board
+
+*Added 2026-09-19.*
+
+> "let's add a 'notes' feature to the project board. so editor notes can be left next to objects."
+
+- **Leave a note** with + Note, or N. With a card selected it is left on that card, to its right, and a dashed line
+  joins them; it moves when the card moves, and stays behind if the card's file goes. Otherwise it lands in the
+  middle of the window.
+- **Write** at once, or double-click a note later. Escape drops the edit, ⌘Enter keeps it. Four paper colours and a
+  Delete show on hover; ⌘Z undoes any of it.
+- **Saved in board.json**, so everyone who opens the project folder sees the notes.
+- **A colour is a kind.** Plain, Idea (yellow), Go (green), Stop (red). The word shows on the note.
+- **On an email, a note can point at one section.** Pick it from the note's "on" row, before or after writing; each
+  section is outlined on the email as the pointer passes over it in the list. Or drag the pin at the note's edge onto
+  a card or a section; onto the paper unpins it. The line joins note and section, and the section is boxed while the
+  note is picked.
+- **Template Studio shows them.** Open an email that has notes and a "Notes" toggle appears in the tools row; the
+  rail lists each note, outlines its section on hover, and selects it on click. Writing happens on the board.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

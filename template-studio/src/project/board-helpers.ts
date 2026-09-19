@@ -34,6 +34,18 @@ export const ago = (t: number) => {
   if (h < 24) return `${h} h ago`;
   return new Date(t).toLocaleDateString();
 };
+/** `ago`, shorter, for a note's strip: "now", "3 min", "2 h", "5 d", then the date. */
+export const agoShort = (t: number) => {
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return 'now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24);
+  if (d < 7) return `${d} d`;
+  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 export const sizeOf = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

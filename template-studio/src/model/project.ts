@@ -172,13 +172,54 @@ export interface BoardDoc {
   cards: Record<string, { x: number; y: number }>;
   /** Named regions of the board, each a folder under `assets/` (see groups, below). */
   groups: BoardGroup[];
+  /** An editor's words left on the board, beside a card or on their own (see notes, below). */
+  notes: BoardNote[];
 }
 
-export const emptyBoard = (): BoardDoc => ({ version: 1, cards: {}, groups: [] });
+/**
+ * A note on the board. Jared: "add a 'notes' feature to the project board. so editor notes can be left next to
+ * objects." It is the board's own, in board.json, so everyone who opens the folder reads it. Left on a card (`on`)
+ * it moves with the card and a hairline joins the two; a card that goes leaves the note where it was.
+ */
+export interface BoardNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  /** What kind of note: an index into `NOTE_KINDS`, whose colour it wears. */
+  color: number;
+  /** The card it is left on, or null for one on its own. */
+  on: string | null;
+  /** On an email, the section it is about (its id), or null for the whole email. */
+  part: string | null;
+  /** When it was last written, ms since the epoch. */
+  at: number;
+}
+
+/**
+ * What a note's colour says. Jared: "colors, a purpose. yellow idea, green, move forward with; red, stop before
+ * continuing." Plain paper for a note that is only a note.
+ */
+export const NOTE_KINDS: Array<{ id: string; name: string; meaning: string; color: string }> = [
+  { id: 'note', name: 'Note', meaning: 'A note, nothing more', color: '#F5F1E4' },
+  { id: 'idea', name: 'Idea', meaning: 'An idea to consider', color: '#FFE58A' },
+  { id: 'go', name: 'Go', meaning: 'Agreed: move forward with this', color: '#CDEFC6' },
+  { id: 'stop', name: 'Stop', meaning: 'Stop before continuing: this needs an answer', color: '#FFC9BF' },
+];
+export const NOTE_COLORS = NOTE_KINDS.map((k) => k.color);
+export const noteKind = (note: Pick<BoardNote, 'color'>) => NOTE_KINDS[note.color] ?? NOTE_KINDS[0]!;
+export const NOTE_WIDTH = 200;
+const NOTE_TEXT_MAX = 4000;
+export const NOTE_PREFIX = 'note:';
+export const isNoteId = (id: string): boolean => id.startsWith(NOTE_PREFIX);
+export const newNoteId = (): string => `${NOTE_PREFIX}${Math.random().toString(36).slice(2, 10)}`;
+
+export const emptyBoard = (): BoardDoc => ({ version: 1, cards: {}, groups: [], notes: [] });
 
 /** The board, checked. Anything unreadable is an empty board: every card then finds a place again. */
 export function readBoard(raw: string | null): BoardDoc {
-  type RawBoard = Partial<Omit<BoardDoc, 'groups'>> & { groups?: unknown };
+  type RawBoard = Partial<Omit<BoardDoc, 'groups' | 'notes'>> & { groups?: unknown; notes?: unknown };
   let value: RawBoard | null = null;
   try {
     value = raw ? (JSON.parse(raw) as RawBoard) : null;
@@ -208,21 +249,96 @@ export function readBoard(raw: string | null): BoardDoc {
       groups.push(sizedGroup({ id: g.id, name: name || g.folder, folder: g.folder, x: x as number, y: y as number, w: w as number, h: h as number }));
     }
   }
-  return { version: 1, cards, groups };
+  const notes: BoardNote[] = [];
+  if (value && value.version === 1 && Array.isArray(value.notes)) {
+    const ids = new Set<string>();
+    for (const item of value.notes as unknown[]) {
+      const n = (item && typeof item === 'object' ? item : {}) as Partial<Record<keyof BoardNote, unknown>>;
+      if (typeof n.id !== 'string' || !isNoteId(n.id) || ids.has(n.id)) continue;
+      if (typeof n.x !== 'number' || typeof n.y !== 'number' || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+      ids.add(n.id);
+      const w = typeof n.w === 'number' && Number.isFinite(n.w) ? Math.max(120, Math.min(480, Math.round(n.w))) : NOTE_WIDTH;
+      const color = typeof n.color === 'number' && Number.isInteger(n.color) && n.color >= 0 && n.color < NOTE_COLORS.length ? n.color : 0;
+      notes.push({
+        id: n.id,
+        text: typeof n.text === 'string' ? n.text.slice(0, NOTE_TEXT_MAX) : '',
+        x: Math.round(n.x),
+        y: Math.round(n.y),
+        w,
+        color,
+        on: typeof n.on === 'string' && kindOfCard(n.on) ? n.on : null,
+        part: typeof n.part === 'string' && n.part ? n.part : null,
+        at: typeof n.at === 'number' && Number.isFinite(n.at) ? n.at : 0,
+      });
+    }
+  }
+  return { version: 1, cards, groups, notes };
 }
 
 export const boardJson = (board: BoardDoc): string => `${JSON.stringify(board, null, 2)}\n`;
 
-export const moveCard = (board: BoardDoc, id: string, x: number, y: number): BoardDoc => ({
-  ...board,
-  cards: { ...board.cards, [id]: { x: Math.round(x), y: Math.round(y) } },
-});
+/** A card put somewhere. The notes left on it go with it, by the same distance, when it had a place before. */
+export const moveCard = (board: BoardDoc, id: string, x: number, y: number): BoardDoc => {
+  const to = { x: Math.round(x), y: Math.round(y) };
+  const was = board.cards[id];
+  const dx = was ? to.x - was.x : 0;
+  const dy = was ? to.y - was.y : 0;
+  const notes = dx || dy ? board.notes.map((n) => (n.on === id ? { ...n, x: n.x + dx, y: n.y + dy } : n)) : board.notes;
+  return { ...board, cards: { ...board.cards, [id]: to }, notes };
+};
 
+/** A card's place forgotten. A note left on it stays where it is, on its own from now on. */
 export function forgetCard(board: BoardDoc, id: string): BoardDoc {
   if (!board.cards[id]) return board;
   const cards = { ...board.cards };
   delete cards[id];
-  return { ...board, cards };
+  return { ...board, cards, notes: board.notes.map((n) => (n.on === id ? { ...n, on: null, part: null } : n)) };
+}
+
+// --- notes --------------------------------------------------------------------------------------------------
+
+export const addNote = (board: BoardDoc, note: BoardNote): BoardDoc => ({ ...board, notes: [...board.notes.filter((n) => n.id !== note.id), note] });
+
+export function updateNote(board: BoardDoc, id: string, patch: Partial<Omit<BoardNote, 'id'>>): BoardDoc {
+  if (!board.notes.some((n) => n.id === id)) return board;
+  return { ...board, notes: board.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
+}
+
+export const removeNote = (board: BoardDoc, id: string): BoardDoc => ({ ...board, notes: board.notes.filter((n) => n.id !== id) });
+
+const SECTION_WORDS: Record<string, string> = {
+  heading: 'Heading',
+  richtext: 'Text',
+  image: 'Image',
+  button: 'Button',
+  topbar: 'Top bar',
+  stripes: 'Stripes',
+  legal: 'Footer',
+  freeform: 'Freeform',
+  brand: 'Mark',
+  spacer: 'Space',
+  divider: 'Rule',
+  dndarea: 'Drop area',
+};
+
+/**
+ * Each section of an email, named for a note to point at: its number, what it is, and the first words in it.
+ * "3. Heading: Big news: we're opening 2 more clubs", "6. Footer".
+ */
+export function sectionLabels(template: Template): Array<{ id: string; label: string }> {
+  const words = (b: Block): string => {
+    const raw = b.type === 'heading' || b.type === 'topbar' || b.type === 'button' ? b.text : b.type === 'richtext' ? b.html.replace(/<[^>]+>/g, ' ') : '';
+    const flat = raw.replace(/&nbsp;|&amp;|&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    return flat.length > 32 ? `${flat.slice(0, 31).trimEnd()}…` : flat;
+  };
+  return (template.sections ?? []).map((section, i) => {
+    const blocks = (section.rows ?? []).flatMap((r) => (r.columns ?? []).flatMap((c) => c.blocks ?? []));
+    const first = blocks[0];
+    const spoken = blocks.find((b) => words(b));
+    const what = section.domId === 'section-legal' ? 'Footer' : first ? (SECTION_WORDS[first.type] ?? first.type) : 'Empty';
+    const said = spoken ? words(spoken) : '';
+    return { id: section.id, label: `${i + 1}. ${what}${said ? `: ${said}` : ''}` };
+  });
 }
 
 // --- layout -------------------------------------------------------------------------------------------------
@@ -524,7 +640,13 @@ export function tidyBoard(sources: CardSource[], board: BoardDoc, folders: Itera
   const fresh = layoutBoard(sources, emptyBoard(), folders, links);
   const names = new Map(board.groups.map((g) => [g.folder, g.name]));
   const groups = fresh.groups.map((g) => ({ ...g, name: names.get(g.folder) ?? g.name }));
-  return withPlaces(emptyBoard(), fresh.cards, groups);
+  // A note left on a card goes where its card went; one on its own, or on a card that has gone, stays put.
+  const notes = board.notes.map((n) => {
+    const was = n.on ? board.cards[n.on] : undefined;
+    const now = n.on ? fresh.cards.find((c) => c.id === n.on) : undefined;
+    return was && now ? { ...n, x: n.x + (now.x - was.x), y: n.y + (now.y - was.y) } : n;
+  });
+  return withPlaces({ ...emptyBoard(), notes }, fresh.cards, groups);
 }
 
 /**

@@ -204,7 +204,8 @@ export function useProjectFiles(project: MutableRef<Project>, notify: (message: 
           const loaded = await file.load();
           const { template: saved } = materialiseFolderSystem(loaded.template, systems);
           const template = followFrames(saved, appFrames);
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey: framesKeyOf(template), html: compile(template, { mode: 'preview' }).html };
+          // Annotated, as Studio's preview is: the section marks are what lets a note point at one section (cards.tsx, sectionSpans).
+          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey: framesKeyOf(template), html: compile(template, { mode: 'preview', annotate: true }).html };
         } catch (cause) {
           item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', framesKey: '', error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
         }

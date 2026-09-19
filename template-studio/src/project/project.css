@@ -317,6 +317,57 @@ body { background: #f5f5f4; }
 .pb-group-resize { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 1px solid var(--pb-card-border); border-left: 0; border-top: 0; background: var(--pb-paper); cursor: nwse-resize; }
 .pb-group:hover .pb-group-resize { border-color: var(--pb-ink); }
 
+/* --- notes: an editor's words on a paper colour, beside the thing they are about (notes.tsx) ---------------- */
+.pb-note {
+  position: absolute; z-index: 3; display: flex; flex-direction: column; min-height: 56px; padding: 0 0 10px;
+  border: 1px solid rgb(0 0 0 / 0.14); box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 6px 14px -10px rgb(0 0 0 / 0.35);
+  color: #26261f; font-size: 13px; line-height: 1.4; cursor: grab; user-select: none;
+  transition: border-color var(--pb-fast), box-shadow var(--pb-fast);
+}
+.pb-note:hover { border-color: rgb(0 0 0 / 0.35); }
+.pb-note.on { border-color: var(--pb-ink); }
+.pb-note.lifted { z-index: 4; cursor: grabbing; box-shadow: 0 2px 4px rgb(0 0 0 / 0.12), 0 14px 28px -12px rgb(0 0 0 / 0.45); }
+.pb-note.editing { cursor: text; user-select: text; }
+.pb-note-head { display: flex; align-items: center; justify-content: space-between; height: 24px; padding: 0 5px 0 12px; }
+.pb-note-when { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; font-family: var(--pb-mono); font-size: 10px; letter-spacing: 0; color: rgb(0 0 0 / 0.5); white-space: nowrap; text-overflow: ellipsis; }
+/* What the colour says, in a word: Idea, Go, Stop. */
+.pb-note-kind { font-family: inherit; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(0 0 0 / 0.7); }
+/* Which part of the email the note is about: a row, and a list under it that outlines each section as the pointer passes. */
+.pb-note-part { position: relative; margin: 0 12px 6px; font-size: 11px; color: rgb(0 0 0 / 0.55); }
+.pb-note-part-btn { display: flex; align-items: center; gap: 5px; width: 100%; padding: 2px 0; border: 0; border-bottom: 1px solid rgb(0 0 0 / 0.2); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pb-note-part-btn:disabled { cursor: default; }
+.pb-note-part-btn:not(:disabled):hover { border-bottom-color: rgb(0 0 0 / 0.5); color: rgb(0 0 0 / 0.8); }
+.pb-note-part-word { flex: none; }
+.pb-note-part-value { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: rgb(0 0 0 / 0.78); }
+.pb-note-part-caret { flex: none; width: 6px; height: 6px; margin-right: 2px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.pb-note-parts { position: absolute; left: -12px; right: -12px; top: calc(100% + 2px); z-index: 6; margin: 0; padding: 4px 0; list-style: none; max-height: 220px; overflow-y: auto; background: var(--pb-paper); border: 1px solid var(--pb-hairline); }
+.pb-note-part-option { display: block; width: 100%; padding: 5px 12px; border: 0; background: none; color: var(--pb-text); font: inherit; font-size: 11.5px; line-height: 1.35; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-note-part-option:hover { background: var(--pb-row); color: var(--pb-ink); }
+.pb-note-part-option.on { color: var(--pb-ink); font-weight: 500; }
+/* The section a picked note is about, marked on its email. */
+.pb-part { position: absolute; z-index: 2; border: 2px solid var(--pb-ink); background: rgb(13 13 13 / 0.04); pointer-events: none; }
+.pb-part.preview { border-style: dashed; }
+.pb-tether-drag { stroke: var(--pb-ink); stroke-dasharray: 4 3; }
+/* The pin: a dot at the note's left edge, taken hold of and dragged to a card or a section. */
+.pb-note-pin {
+  position: absolute; left: -7px; top: 9px; z-index: 1; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--pb-paper); border: 1.5px solid rgb(0 0 0 / 0.45); cursor: crosshair; opacity: 0; transition: opacity var(--pb-fast), transform var(--pb-fast);
+}
+.pb-note-pin.pinned { background: var(--pb-ink); border-color: var(--pb-ink); }
+.pb-note:hover .pb-note-pin, .pb-note.on .pb-note-pin { opacity: 1; }
+.pb-note-pin:hover { transform: scale(1.25); }
+.pb-note-tools { flex: none; display: inline-flex; align-items: center; gap: 5px; opacity: 0; transition: opacity var(--pb-fast); }
+.pb-note:hover .pb-note-tools, .pb-note.on .pb-note-tools { opacity: 1; }
+.pb-note-swatch { width: 12px; height: 12px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 50%; cursor: pointer; }
+.pb-note-swatch.on { border-color: var(--pb-ink); box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.9); }
+.pb-note-x { width: 18px; height: 18px; margin-left: 2px; padding: 0; border: 0; border-radius: 3px; background: none; color: rgb(0 0 0 / 0.55); font-size: 15px; line-height: 1; cursor: pointer; }
+.pb-note-x:hover { background: var(--pb-brick); color: #fff; }
+.pb-note-body, .pb-note-text { display: block; margin: 0; padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pb-note-body.empty { color: rgb(0 0 0 / 0.42); font-style: italic; }
+.pb-note-text { width: 100%; min-height: 40px; border: 0; outline: none; resize: none; background: none; color: inherit; font: inherit; line-height: inherit; }
+.pb-tether { fill: none; stroke: var(--pb-muted); stroke-width: 1px; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.pb-stage.dark-ground .pb-tether { stroke: rgb(255 255 255 / 0.6); }
+
 /* --- the keys sheet: paper, one hairline, mono for the keys ------------------------------------------------ */
 .pb-keys-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / 0.18); }
 .pb-keys { width: 460px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px); overflow-y: auto; padding: 0 0 6px; background: var(--pb-paper); border: 1px solid var(--pb-hairline); color: var(--pb-text); }

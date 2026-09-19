@@ -19,6 +19,7 @@ import { DOC_KIND_NAMES, DOC_OPENS_IN, docKindOfUrl, isLinkFile } from '../model
 import { recipesByOutput, RECIPE_TOOLS, toolAddress } from '../model/tool-recipes.ts';
 import {
   addGroup,
+  addNote,
   BOARD_FILE,
   boardJson,
   CARD_GAP,
@@ -33,19 +34,27 @@ import {
   frameCardId,
   groupAt,
   groupFolderName,
+  isNoteId,
   layoutBoard,
   moveCard,
   moveGroupWith,
+  newNoteId,
+  NOTE_KINDS,
+  NOTE_WIDTH,
   pictureCardId,
   PROJECT_CHANNEL,
   projectLinks,
   readBoard,
   removeGroup,
+  removeNote,
+  sectionLabels,
   tidyBoard,
+  updateNote,
   withPlaces,
   type BoardDoc,
   type BoardGroup,
   type BoardLayout,
+  type BoardNote,
   type CardLink,
   type CardSource,
   type PlacedCard,
@@ -71,36 +80,18 @@ import { useCanvasSettings } from '../app/canvas-settings.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
 import { TouchGestures } from '../app/gestures.ts';
 import { glide, PanTracker } from '../app/inertia.ts';
-import { capture } from '../app/pointer.ts';
+import { capture, release } from '../app/pointer.ts';
 import { freeformCanvas } from '../app/picture.ts';
 import { listPictures, makeGroupFolder, movePicture, readText, removeFile, removeFolderIfEmpty, writeDocLink, writeFile, writePicture } from './folder.ts';
 import { readFolderFrames, writeFrame } from './frame-sync.ts';
 import { underStyle } from './ground.ts';
 import { History, useHistory } from './history.ts';
 import type { Project } from './useProject.ts';
-import {
-  type View,
-  type Rect,
-  HEAD,
-  EMAIL_PAGE,
-  clampZoom,
-  ago,
-  sizeOf,
-  plural,
-  openTool,
-  readView,
-  KIND_LABEL,
-  kindOfCardOr,
-  placesOf,
-  restorePlaces,
-  openTitle,
-  missingName,
-  linkPath,
-  cardUnder,
-} from './board-helpers.ts';
+import { ago, cardUnder, clampZoom, EMAIL_PAGE, HEAD, KIND_LABEL, kindOfCardOr, linkPath, missingName, openTitle, openTool, placesOf, plural, readView, restorePlaces, sizeOf, type Rect, type View } from './board-helpers.ts';
 import { type EmailItem, type FrameItem, type PrintedPage, printId, printedIn, useProjectFiles } from './files.ts';
-import { EmailBody, FrameBody, DocBody } from './cards.tsx';
+import { DocBody, EmailBody, FrameBody, type SectionSpan } from './cards.tsx';
 import { LinkForm, ProjectMenu } from './menus.tsx';
+import { NoteCard } from './notes.tsx';
 import { ArrowLeft, FitAll, FitOne, Minus, Plus } from './glyphs.tsx';
 
 // --- the board ------------------------------------------------------------------------------------------------
@@ -108,7 +99,8 @@ import { ArrowLeft, FitAll, FitOne, Minus, Plus } from './glyphs.tsx';
 /** What the keyboard does on the board, as the sheet `?` opens lists it. Keep it beside `onKey`, which is the truth. */
 const BOARD_KEYS: Array<[string[], string]> = [
   [['⌘Z', '⇧⌘Z'], 'Undo, redo'],
-  [['Enter'], 'Open the selected card in its tool'],
+  [['Enter'], 'Open the selected card in its tool; write in the selected note'],
+  [['N'], 'Leave a note, on the selected card when one is picked'],
   [['⌫', '⌦'], 'Remove the selected file; press twice, ⌘Z puts it back'],
   [['Esc'], 'Let go of the selection, a picked line or a new group'],
   [['⇧1'], 'Fit everything'],
@@ -501,6 +493,174 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   }, [layout, selected, fitTo]);
   /** The sheet `?` opens: every key the board answers to, in one place. */
   const [showKeys, setShowKeys] = useState(false);
+
+  // --- notes (model/project.ts, BoardNote) ---
+  /** The note whose field is open. */
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  /** A note being carried: where it is right now. */
+  const [noteMoving, setNoteMoving] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** A section under the pointer in a note's list, outlined on its email while the choice is made. */
+  const [previewPart, setPreviewPart] = useState<{ note: string; part: string | null; on?: string } | null>(null);
+  /** Where each email's sections lie, in its own page pixels, once its preview has laid out (cards.tsx). */
+  const [emailSections, setEmailSections] = useState<Record<string, SectionSpan[]>>({});
+  const sectionsMeasured = useCallback((id: string, spans: SectionSpan[]) => {
+    setEmailSections((old) => (JSON.stringify(old[id]) === JSON.stringify(spans) ? old : { ...old, [id]: spans }));
+  }, []);
+  /** The section a note points at, as a rectangle on the board: its span on the email, scaled to the card. */
+  const partRect = (note: BoardNote): Rect | null => {
+    if (!note.on || !note.part) return null;
+    const card = rects.get(note.on);
+    const span = emailSections[note.on]?.find((s) => s.id === note.part);
+    if (!card || !span) return null;
+    const scale = card.w / EMAIL_PAGE;
+    return { x: card.x, y: card.y + HEAD + span.top * scale, w: card.w, h: Math.max(8, span.height * scale) };
+  };
+  /** The note now speaks about one section of its email (or the whole of it again), and sits level with it. */
+  const pointNote = (note: BoardNote, part: string | null) => {
+    if (part === note.part) return;
+    const was = { part: note.part, x: note.x, y: note.y };
+    const target = part ? partRect({ ...note, part }) : null;
+    const now = { part, x: note.x, y: target ? snap(target.y) : note.y };
+    saveBoard(updateNote(boardRef.current, note.id, now));
+    history.push({ label: part ? 'Point a note at a section' : 'Point a note at the email', undo: () => saveBoard(updateNote(boardRef.current, note.id, was)), redo: () => saveBoard(updateNote(boardRef.current, note.id, now)) });
+  };
+  const noteDrag = useRef<{ id: string; x: number; y: number; from: { x: number; y: number }; moved: boolean } | null>(null);
+  /** A note placed, and offered back. */
+  const putNote = (note: BoardNote, label: string) => {
+    saveBoard(addNote(boardRef.current, note));
+    history.push({ label, undo: () => saveBoard(removeNote(boardRef.current, note.id)), redo: () => saveBoard(addNote(boardRef.current, note)) });
+  };
+  /** Leaves a new note: on the selected card, to its right, or else in the middle of the window; and opens it to write. */
+  const leaveNote = () => {
+    if (!projectRef.current.writable) return notWritable('leave a note');
+    const card = selected ? layout.cards.find((c) => c.id === selected) : undefined;
+    const v = viewRef.current;
+    const at = card
+      ? { x: card.x + card.w + 24, y: card.y }
+      : { x: snap((size.w / 2 - v.x) / v.z - NOTE_WIDTH / 2), y: snap((size.h / 2 - v.y) / v.z - 40) };
+    const note: BoardNote = { id: newNoteId(), text: '', x: at.x, y: at.y, w: NOTE_WIDTH, color: 0, on: card?.id ?? null, part: null, at: 0 };
+    putNote(note, card ? `Leave a note on ${card.name}` : 'Leave a note');
+    setSelected(note.id);
+    setEditingNote(note.id);
+  };
+  const removeNoteWithUndo = (note: BoardNote) => {
+    saveBoard(removeNote(boardRef.current, note.id));
+    history.push({ label: 'Remove a note', undo: () => saveBoard(addNote(boardRef.current, note)), redo: () => saveBoard(removeNote(boardRef.current, note.id)) });
+    if (selected === note.id) setSelected(null);
+    if (editingNote === note.id) setEditingNote(null);
+  };
+  const endNoteEdit = (note: BoardNote, text: string | null) => {
+    setEditingNote(null);
+    // Nothing written, and nothing to go back to: the note goes, as if it had not been left. One never written
+    // goes without a step of its own, since the step that left it is the one to undo.
+    if (!note.text.trim() && (text === null || !text.trim())) {
+      if (note.at === 0) {
+        saveBoard(removeNote(boardRef.current, note.id));
+        if (selected === note.id) setSelected(null);
+        return;
+      }
+      return removeNoteWithUndo(note);
+    }
+    if (text === null || text === note.text) return;
+    const was = { text: note.text, at: note.at };
+    const now = { text, at: Date.now() };
+    saveBoard(updateNote(boardRef.current, note.id, now));
+    history.push({ label: 'Write a note', undo: () => saveBoard(updateNote(boardRef.current, note.id, was)), redo: () => saveBoard(updateNote(boardRef.current, note.id, now)) });
+  };
+  const colourNote = (note: BoardNote, color: number) => {
+    if (color === note.color) return;
+    const label = `Mark a note ${NOTE_KINDS[color]?.name ?? ''}`.trim();
+    saveBoard(updateNote(boardRef.current, note.id, { color }));
+    history.push({ label, undo: () => saveBoard(updateNote(boardRef.current, note.id, { color: note.color })), redo: () => saveBoard(updateNote(boardRef.current, note.id, { color })) });
+  };
+  /** A note's pin being dragged: the note, and where the pointer is on the board. */
+  const [pinDrag, setPinDrag] = useState<{ note: string; x: number; y: number } | null>(null);
+  const pinRef = useRef<{ note: string; el: HTMLElement } | null>(null);
+  /** The card under a point on the board, topmost first, and on an email the section there. */
+  const hitAt = (p: { x: number; y: number }): { card: PlacedCard; part: string | null } | null => {
+    for (let i = cards.length - 1; i >= 0; i -= 1) {
+      const c = cards[i]!;
+      if (p.x < c.x || p.x > c.x + c.w || p.y < c.y || p.y > c.y + c.h) continue;
+      const spans = emailSections[c.id];
+      const scale = c.w / EMAIL_PAGE;
+      const span = spans?.find((s) => p.y >= c.y + HEAD + s.top * scale && p.y <= c.y + HEAD + (s.top + s.height) * scale);
+      return { card: c, part: span?.id ?? null };
+    }
+    return null;
+  };
+  const onPinDown = (note: BoardNote, event: PointerEvent) => {
+    event.stopPropagation();
+    if (event.button !== 0 || !projectRef.current.writable) return;
+    const el = event.currentTarget as HTMLElement;
+    capture(el, event.pointerId);
+    pinRef.current = { note: note.id, el };
+    const p = worldAt(event.clientX, event.clientY);
+    setPinDrag({ note: note.id, x: p.x, y: p.y });
+    const onMove = (e: PointerEvent) => {
+      const q = worldAt(e.clientX, e.clientY);
+      setPinDrag({ note: note.id, x: q.x, y: q.y });
+      const hit = hitAt(q);
+      // The card under the pin lights up; a section under it is outlined too.
+      setPreviewPart(hit ? { note: note.id, part: hit.part, on: hit.card.id } : null);
+    };
+    const onUp = (e: PointerEvent) => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      release(el, e.pointerId);
+      pinRef.current = null;
+      setPinDrag(null);
+      setPreviewPart(null);
+      const hit = hitAt(worldAt(e.clientX, e.clientY));
+      const current = boardRef.current.notes.find((n) => n.id === note.id);
+      if (!current) return;
+      const was = { on: current.on, part: current.part };
+      const now = hit ? { on: hit.card.id, part: hit.part } : { on: null, part: null };
+      if (now.on === was.on && now.part === was.part) return;
+      saveBoard(updateNote(boardRef.current, note.id, now));
+      const label = hit ? (hit.part ? `Pin a note to a section of ${hit.card.name}` : `Pin a note to ${hit.card.name}`) : 'Unpin a note';
+      history.push({ label, undo: () => saveBoard(updateNote(boardRef.current, note.id, was)), redo: () => saveBoard(updateNote(boardRef.current, note.id, now)) });
+      setSelected(note.id);
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+  };
+  // A note's own drag, with capture, so the stage under it does not start a pan or a marquee.
+  const onNoteDown = (note: BoardNote, event: PointerEvent) => {
+    event.stopPropagation();
+    if (event.button !== 0 || (event.target as Element).closest('button, textarea, select, label')) return;
+    if (editingNote === note.id) return;
+    capture(event.currentTarget as HTMLElement, event.pointerId);
+    noteDrag.current = { id: note.id, x: event.clientX, y: event.clientY, from: { x: note.x, y: note.y }, moved: false };
+  };
+  const onNoteMove = (event: PointerEvent) => {
+    const d = noteDrag.current;
+    if (!d) return;
+    const dx = event.clientX - d.x;
+    const dy = event.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) < 3) return;
+    d.moved = true;
+    const z = viewRef.current.z;
+    setNoteMoving({ id: d.id, x: d.from.x + dx / z, y: d.from.y + dy / z });
+  };
+  const onNoteUp = (note: BoardNote, event: PointerEvent) => {
+    event.stopPropagation();
+    const d = noteDrag.current;
+    noteDrag.current = null;
+    release(event.currentTarget as HTMLElement, event.pointerId);
+    const carried = noteMoving;
+    setNoteMoving(null);
+    if (!d) return;
+    setSelected(note.id);
+    setSelectedLink(null);
+    if (!d.moved || !carried) return;
+    if (!projectRef.current.writable) return notWritable('move a note');
+    const to = { x: snap(carried.x), y: snap(carried.y) };
+    const from = d.from;
+    saveBoard(updateNote(boardRef.current, note.id, to));
+    history.push({ label: 'Move a note', undo: () => saveBoard(updateNote(boardRef.current, note.id, from)), redo: () => saveBoard(updateNote(boardRef.current, note.id, to)) });
+  };
   const [panning, setPanning] = useState(false);
   /** A group being moved or resized, as it is drawn until the pointer lets go, with the cards riding along. */
   const [groupDrag, setGroupDrag] = useState<{ id: string; dx: number; dy: number; dw: number; dh: number; riders: string[] } | null>(null);
@@ -841,6 +1001,13 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       event.preventDefault();
       const picked = links.find((l) => `${l.from}>${l.to}` === selectedLinkRef.current);
       if (picked) void breakLink(picked);
+    } else if ((event.key === 'Backspace' || event.key === 'Delete') && selected && isNoteId(selected)) {
+      event.preventDefault();
+      const note = board.notes.find((n) => n.id === selected);
+      if (note) removeNoteWithUndo(note);
+    } else if (!mod && event.key.toLowerCase() === 'n' && !event.altKey) {
+      event.preventDefault();
+      leaveNote();
     } else if ((event.key === 'Backspace' || event.key === 'Delete') && selected) {
       event.preventDefault();
       const card = layout.cards.find((c) => c.id === selected);
@@ -858,6 +1025,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     } else if (mod && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       void step(event.shiftKey ? 'redo' : 'undo');
+    } else if (event.key === 'Enter' && selected && isNoteId(selected)) {
+      event.preventDefault();
+      if (projectRef.current.writable) setEditingNote(selected);
     } else if (event.key === 'Enter' && selected) {
       const card = layout.cards.find((c) => c.id === selected);
       if (card) openCard(card);
@@ -1455,6 +1625,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     [files.docs.length, 'document'],
     [files.frames.length, 'frame'],
     [pictureCount, 'picture'],
+    [board.notes.length, 'note'],
   ]
     .filter(([n]) => (n as number) > 0)
     .map(([n, word]) => plural(n as number, word as string))
@@ -1527,8 +1698,55 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               </div>
             );
           })}
+          {(() => {
+            // The section the picked note is about, marked on its email; or the one under the pointer in a note's list.
+            const previewed = previewPart ? board.notes.find((n) => n.id === previewPart.note) : undefined;
+            const picked = previewed ? { ...previewed, part: previewPart!.part, on: previewPart!.on ?? previewed.on } : selected ? board.notes.find((n) => n.id === selected) : undefined;
+            const r = picked ? partRect(picked) : null;
+            return r ? <div class={`pb-part ${previewed ? 'preview' : ''}`} style={{ left: r.x, top: r.y, width: r.w, height: r.h }} aria-hidden="true" /> : null;
+          })()}
+          {board.notes.map((n) => {
+            // Carried by hand, or riding with the card it is on while that card is carried.
+            const carriedCard = n.on && moving && moving.id === n.on && !moving.copy ? layout.cards.find((c) => c.id === n.on) : undefined;
+            const at = noteMoving?.id === n.id ? noteMoving : carriedCard && moving ? { x: n.x + (moving.x - carriedCard.x), y: n.y + (moving.y - carriedCard.y) } : n;
+            return (
+              <NoteCard
+                key={n.id}
+                note={n}
+                x={at.x}
+                y={at.y}
+                selected={selected === n.id}
+                lifted={noteMoving?.id === n.id}
+                editing={editingNote === n.id}
+                writable={writable}
+                onPointerDown={(e) => onNoteDown(n, e)}
+                onPointerMove={onNoteMove}
+                onPointerUp={(e) => onNoteUp(n, e)}
+                onBeginEdit={() => setEditingNote(n.id)}
+                onEndEdit={(text) => endNoteEdit(n, text)}
+                onColor={(i) => colourNote(n, i)}
+                onRemove={() => removeNoteWithUndo(n)}
+                onPinDown={(e) => onPinDown(n, e)}
+                {...(n.on && emailsById.get(n.on)?.template
+                  ? { parts: sectionLabels(emailsById.get(n.on)!.template!), onPart: (id: string | null) => pointNote(n, id), onPreviewPart: (id: string | null) => setPreviewPart(id ? { note: n.id, part: id } : null) }
+                  : {})}
+              />
+            );
+          })}
           {marquee && <div class="pb-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} aria-hidden="true" />}
           <svg class="pb-links" width="1" height="1">
+            {pinDrag &&
+              (() => {
+                const n = board.notes.find((x) => x.id === pinDrag.note);
+                return n ? <path class="pb-tether pb-tether-drag" d={linkPath({ x: n.x, y: n.y, w: n.w, h: 40 }, { x: pinDrag.x, y: pinDrag.y, w: 0, h: 0 }).d} /> : null;
+              })()}
+            {board.notes.map((n) => {
+              // A hairline from a note to the card it is left on, dashed, quieter than a link between files.
+              const on = n.on ? (partRect(n) ?? rects.get(n.on)) : undefined;
+              if (!on) return null;
+              const at = noteMoving?.id === n.id ? noteMoving : n;
+              return <path key={`tether:${n.id}`} class="pb-tether" d={linkPath({ x: at.x, y: at.y, w: n.w, h: 40 }, on).d} />;
+            })}
             {links.map((link) => {
               const a = rects.get(link.from);
               const b = rects.get(link.to);
@@ -1614,7 +1832,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             return (
               <div
                 key={card.id}
-                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id && !moving.copy ? 'lifted' : ''} ${dropCard === card.id ? 'drop' : ''}`}
+                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id && !moving.copy ? 'lifted' : ''} ${dropCard === card.id || (pinDrag && previewPart?.on === card.id) ? 'drop' : ''}`}
                 data-card={card.id}
                 title={facts}
                 style={{ left: card.x, top: card.y, width: card.w, height: card.h }}
@@ -1633,7 +1851,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   )}
                 </header>
                 <div class="pb-card-body">
-                  {email && <EmailBody item={email} assets={assets} prints={emailPrints.get(email.id)} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} />}
+                  {email && <EmailBody item={email} assets={assets} prints={emailPrints.get(email.id)} live={live} width={card.w} height={card.h - HEAD} onHeight={(px) => measured(email.id, px)} onSections={(spans) => sectionsMeasured(email.id, spans)} />}
                   {frame && <FrameBody item={frame} assets={assets} print={printOf(frame)} width={card.w} height={card.h - HEAD} />}
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
                   {picture && <span class="pb-picture-name">{card.name}</span>}
@@ -1700,6 +1918,9 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           >
             <Plus /> Group
           </button>
+          <button class="pb-ghost" disabled={!writable} title={writable ? (selected && !isNoteId(selected) ? 'Leave a note on the selected card  ·  N' : 'Leave a note on the board  ·  N') : 'Allow editing to leave a note'} onClick={leaveNote}>
+            <Plus /> Note
+          </button>
           <div class="pb-menu">
             <button
               class={`pb-ghost ${linking ? 'on' : ''}`}
@@ -1754,8 +1975,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             ? 'Drag out the new group’s region · a click puts one down the usual size · Esc cancels'
             : selectedLink
               ? 'A line is picked · Break link, or Delete, takes it out of the file it is in · Esc lets go'
-              : selected
-                ? 'Enter opens · ⇧2 zooms to it · ⌥ drag copies · Delete removes the file, ⌘Z puts it back · Esc lets go'
+              : selected && isNoteId(selected)
+                ? 'Double-click or Enter writes · drag moves it · Delete removes the note, ⌘Z puts it back · Esc lets go'
+                : selected
+                  ? 'Enter opens · ⇧2 zooms to it · N leaves a note on it · ⌥ drag copies · Delete removes the file · Esc lets go'
                 : 'Drag to arrange · drop a picture on a frame or email to put it in · Space, or holding still, pans · ? for the keys'}
         </span>
         <span class="pb-sep" aria-hidden="true" />

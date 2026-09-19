@@ -30,19 +30,25 @@ import {
   type KeyValue,
 } from '../src/model/frame-store.ts';
 import {
+  addNote,
   boardJson,
+  emailCardSize,
   emptyBoard,
   forgetCard,
-  emailCardSize,
   layoutBoard,
   moveCard,
   newProjectInfo,
+  NOTE_WIDTH,
   projectJson,
   projectLinks,
   readBoard,
   readProjectInfo,
+  removeNote,
+  sectionLabels,
   tidyBoard,
+  updateNote,
   withPlaces,
+  type BoardNote,
   type CardLink,
   type CardSource,
 } from '../src/model/project.ts';
@@ -89,6 +95,70 @@ describe('board.json', () => {
     expect(readBoard('nope')).toEqual(emptyBoard());
     const raw = JSON.stringify({ version: 1, cards: { 'email:a': { x: 1, y: 2 }, 'poster:b': { x: 1, y: 2 }, 'frame:c': { x: 'left', y: 2 } } });
     expect(readBoard(raw).cards).toEqual({ 'email:a': { x: 1, y: 2 } });
+  });
+});
+
+describe('notes on the board', () => {
+  const note = (over: Partial<BoardNote> = {}): BoardNote => ({ id: 'note:a1', text: 'Tighten the headline', x: 300, y: 40, w: NOTE_WIDTH, color: 1, on: 'email:a', part: null, at: 1700000000000, ...over });
+
+  it('reads back as written, and skips what it cannot use', () => {
+    const board = addNote(moveCard(emptyBoard(), 'email:a', 10, 20), note());
+    expect(readBoard(boardJson(board))).toEqual(board);
+    const raw = JSON.stringify({
+      version: 1,
+      cards: {},
+      groups: [],
+      notes: [note({ part: 'sec-2' }), { ...note({ id: 'note:a1' }) }, note({ id: 'sticky:x' }), { ...note({ id: 'note:b' }), x: 'left' }, { ...note({ id: 'note:c', w: 9999, color: 42, on: 'poster:z' }), at: 'now', part: 7 }],
+    });
+    expect(readBoard(raw).notes).toEqual([note({ part: 'sec-2' }), { ...note({ id: 'note:c' }), w: 480, color: 0, on: null, part: null, at: 0 }]);
+    // Boards written before notes read as boards with none.
+    expect(readBoard(JSON.stringify({ version: 1, cards: {}, groups: [] })).notes).toEqual([]);
+  });
+
+  it('goes where the card it is left on goes, and stays put when the card is forgotten', () => {
+    const board = addNote(moveCard(emptyBoard(), 'email:a', 10, 20), note());
+    const moved = moveCard(board, 'email:a', 110, 70);
+    expect(moved.notes[0]).toMatchObject({ x: 400, y: 90, on: 'email:a' });
+    // A card placed for the first time moves no note.
+    expect(moveCard(board, 'frame:f', 500, 500).notes).toEqual(board.notes);
+    const gone = forgetCard(updateNote(moved, 'note:a1', { part: 'sec-1' }), 'email:a');
+    expect(gone.notes[0]).toMatchObject({ x: 400, y: 90, on: null, part: null });
+    expect(updateNote(gone, 'note:a1', { text: 'Done', color: 3 }).notes[0]).toMatchObject({ text: 'Done', color: 3, x: 400 });
+    expect(updateNote(gone, 'note:zz', { text: 'x' })).toBe(gone);
+    expect(removeNote(gone, 'note:a1').notes).toEqual([]);
+  });
+
+  it('names an email’s sections for a note to point at', () => {
+    const template = {
+      sections: [
+        { id: 's1', rows: [{ columns: [{ blocks: [{ type: 'topbar', text: 'A TAGLINE.' }] }] }] },
+        { id: 's2', rows: [{ columns: [{ blocks: [{ type: 'image', src: '' }, { type: 'heading', text: 'Big news: we’re opening 2 more clubs in Chicago.' }] }] }] },
+        { id: 's3', rows: [{ columns: [{ blocks: [{ type: 'richtext', html: '<p>The&nbsp;<b>club</b> opens in&amp;around May.</p>' }] }] }] },
+        { id: 's4', domId: 'section-legal', rows: [{ columns: [{ blocks: [{ type: 'legal' }] }] }] },
+        { id: 's5', rows: [] },
+      ],
+    } as unknown as Parameters<typeof sectionLabels>[0];
+    expect(sectionLabels(template)).toEqual([
+      { id: 's1', label: '1. Top bar: A TAGLINE.' },
+      { id: 's2', label: '2. Image: Big news: we’re opening 2 more…' },
+      { id: 's3', label: '3. Text: The club opens in around May.' },
+      { id: 's4', label: '4. Footer' },
+      { id: 's5', label: '5. Empty' },
+    ]);
+  });
+
+  it('survives a tidy, riding with its card', () => {
+    const sources: CardSource[] = [
+      { id: 'email:a', kind: 'email', name: 'A' },
+      { id: 'email:b', kind: 'email', name: 'B' },
+    ];
+    let board = layoutBoard(sources, emptyBoard()).cards.reduce((b, c) => moveCard(b, c.id, c.x + 1000, c.y + 1000), emptyBoard());
+    board = addNote(board, note({ on: 'email:a', x: board.cards['email:a']!.x + 300, y: board.cards['email:a']!.y }));
+    board = addNote(board, note({ id: 'note:free', on: null, x: 5, y: 5 }));
+    const tidy = tidyBoard(sources, board);
+    const a = tidy.cards['email:a']!;
+    expect(tidy.notes.find((n) => n.id === 'note:a1')).toMatchObject({ x: a.x + 300, y: a.y, on: 'email:a' });
+    expect(tidy.notes.find((n) => n.id === 'note:free')).toMatchObject({ x: 5, y: 5 });
   });
 });
 
