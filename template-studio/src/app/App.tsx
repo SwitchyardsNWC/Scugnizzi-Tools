@@ -1051,7 +1051,8 @@ export function App() {
   const imageBlockIds = useMemo(() => allBlocks(editor.template).flatMap((b) => (b.type === 'image' ? [b.id] : [])), [editor.template]);
 
   // --- the board's notes for this email (useBoardNotes.ts, NotesRail.tsx) ------------------------------------
-  const boardNotes = useBoardNotes(workspace, editor.file?.fileName ?? null);
+  const { notes: boardNotes, setResolved: resolveBoardNote } = useBoardNotes(workspace, editor.file?.fileName ?? null);
+  const openNotes = boardNotes.filter((n) => !n.resolvedAt).length;
   const [notesShown, setNotesShown] = useState(true);
   const noteLabels = useMemo(() => sectionLabels(editor.template), [editor.template]);
   /** Outlines a section on the canvas while a note that points at it is under the pointer. */
@@ -1956,7 +1957,7 @@ export function App() {
                 title={notesShown ? 'Hide the notes left on this email on the project board' : 'Show the notes left on this email on the project board'}
                 onClick={() => setNotesShown((v) => !v)}
               >
-                Notes <span class="notes-count">{boardNotes.length}</span>
+                Notes <span class="notes-count">{openNotes || '✓'}</span>
               </button>
             )}
             <button
@@ -1970,7 +1971,18 @@ export function App() {
           </div>
 
           {notesShown && boardNotes.length > 0 && !surfaceOf && (
-            <NotesRail notes={boardNotes} labels={noteLabels} onHover={outlinePart} onPick={goToPart} onOpenBoard={() => void (window.location.href = new URL('project.html', window.location.href).href)} onClose={() => setNotesShown(false)} />
+            <NotesRail
+              notes={boardNotes}
+              labels={noteLabels}
+              writable={Boolean(workspace?.canWrite)}
+              onHover={outlinePart}
+              onPick={goToPart}
+              onResolve={(id, resolved) => {
+                void resolveBoardNote(id, resolved).catch((cause: unknown) => notify(cause instanceof Error ? cause.message : 'The note could not be changed.'));
+              }}
+              onOpenBoard={() => void (window.location.href = new URL('project.html', window.location.href).href)}
+              onClose={() => setNotesShown(false)}
+            />
           )}
           {surfaceOf && (
             <Surface

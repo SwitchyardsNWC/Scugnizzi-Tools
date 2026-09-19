@@ -2563,3 +2563,45 @@ after the note has been created. drag a node from the note directly to a section
   the canvas: each note as it looks on the board, with the section it is about. The pointer over a note outlines
   its section on the canvas (an inline outline on the section's cells, taken off again); a click selects the
   section and brings it into view. Writing stays on the board, one line away.
+
+### 3.86 Resolved, a note you can move at once, and Tidy as families
+
+*2026-09-19.* Jared: "Maybe a final state of 'resolved' for the notes. and that can be changed in the template
+studio and canvas. one usability note, when you create a new note allow the user to move it. currently that is
+my instinct to adjust where it gets placed (place close to the pointer by default). trying to drag it before
+typing makes it go away. refine the tidy feature. it should bring all linked items close to each other in an
+organized way with clear hierarchy."
+
+- **Resolved.** `resolvedAt` on the note, 0 while open. A tick in the note's tools on the board, and on each card
+  in Studio's rail; resolved notes grey and step back, say "Resolved · 2 h", and sort last in the rail. The footer
+  and the rail's badge count open notes. Studio writes it by reading board.json again and writing it back with that
+  one note changed, so nothing else on the board is touched; the board reads the change on its next look.
+- **A new note moves at once.** It lands by the pointer when the pointer is over the board (beside the selected
+  card when there is one, the middle of the window otherwise), and its strip can be dragged while the field is
+  open: the press on the strip prevents its default, so focus stays in the field and the edit does not end, which
+  is what had made a dragged new note vanish.
+- **Tidy lays out families.** Each email is a cluster: the email at the left, the frames it follows in a column
+  beside it, the pictures the email and those frames show in a column beyond, with what those pictures were made
+  from after them. Clusters run in rows, emails by name. Below them, what no email holds: documents, frames and
+  pictures on their own, and pictures filed in folders, which stay in their groups, since a group is drawn around
+  its members and a filed picture placed beside an email would stretch its group across the board. Notes ride
+  with their cards as before. Tested on a nine-card folder.
+
+### 3.87 Tidy on the grid, and where a note's controls sit
+
+*2026-09-19.* Jared: "for tidy, use the grid system to lock everything into a nicely spaced grid. make the grid
+option on by default. The check to resolve on the note is in a strange spot. change the x to 'delete' that hovers
+outside of the note in the bottom right. and the resolved to the top right of the note."
+
+- **Tidy takes the grid step.** Every edge it places lands on a multiple of the step (24px by default), and every
+  gap is the usual one rounded up to it: the next column starts on the grid line after the card and a gap, the next
+  row on the grid line after the tallest card and a lane. The lanes below the families follow the same rule, one
+  per kind. Folders come from `layoutBoard` as before and are then moved as one onto the grid, their pictures
+  re-seated on it inside (a group's padding is 28px, so a picture at the group's padding was 4px off; the test
+  caught it), and the group grown to hold them. `step` defaults to 1, so the older tests, and a board with no
+  settings, tidy as before.
+- **Snap to grid is on by default.** For a browser that has already saved its canvas settings, the saved value
+  stands; the default reaches new ones.
+- **The note's tick is at the top right**, after the kind swatches, where a done mark is looked for. Delete is a
+  small word just outside the note's bottom right corner, shown on hover, so it is never taken for one of the
+  note's own controls and never sits beside the tick.

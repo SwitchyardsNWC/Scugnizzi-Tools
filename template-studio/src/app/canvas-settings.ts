@@ -48,7 +48,7 @@ export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
   ground: 'lines',
   groundOpacity: { lines: 0.5, dots: 0.6, mat: 0.85 },
   gridStep: 24,
-  snap: false,
+  snap: true,
   quickShapes: true,
   holdMs: 160,
   pencilOnly: 'auto',

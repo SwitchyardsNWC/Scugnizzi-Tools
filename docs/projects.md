@@ -764,6 +764,21 @@ as the board zooms out. The Canvas menu's segmented buttons and the project menu
 - **Template Studio shows them.** Open an email that has notes and a "Notes" toggle appears in the tools row; the
   rail lists each note, outlines its section on hover, and selects it on click. Writing happens on the board.
 
+### Resolved notes, and Tidy as families
+
+*Added 2026-09-19.*
+
+- **Resolve a note** with the tick on the note, on the board or in Template Studio's rail. It greys, says when, and
+  the tick opens it again. Counts show open notes.
+- **A new note lands by the pointer** and can be dragged by its strip straight away, before a word is written.
+- **Tidy** now lays the board out as families: each email with the frames it follows beside it and the pictures they
+  show beyond, in rows; everything no email holds below, folders kept as groups.
+
+### Tidy on the grid
+
+*Added 2026-09-19.* Tidy places every card and group on the grid, gaps rounded up to the step; Snap to grid is on by
+default. On a note, the tick to resolve sits at the top right and Delete floats just outside the bottom right corner.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

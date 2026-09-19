@@ -29,6 +29,8 @@ export interface NoteCardProps {
   onEndEdit(text: string | null): void;
   onColor(index: number): void;
   onRemove(): void;
+  /** Resolved, or opened again: the note's last state (Jared: "a final state of 'resolved'"). */
+  onResolve(resolved: boolean): void;
   /** On an email: its sections, for the note to point at one. Absent otherwise. */
   parts?: Array<{ id: string; label: string }>;
   onPart?(id: string | null): void;
@@ -41,7 +43,7 @@ export interface NoteCardProps {
   onPinDown?(event: PointerEvent): void;
 }
 
-export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPointerDown, onPointerMove, onPointerUp, onBeginEdit, onEndEdit, onColor, onRemove, parts, onPart, onPreviewPart, onPinDown }: NoteCardProps) {
+export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPointerDown, onPointerMove, onPointerUp, onBeginEdit, onEndEdit, onColor, onRemove, onResolve, parts, onPart, onPreviewPart, onPinDown }: NoteCardProps) {
   const root = useRef<HTMLDivElement | null>(null);
   const field = useRef<HTMLTextAreaElement | null>(null);
   /** Escape closes the field without keeping what was typed; the focus leaving must know. */
@@ -65,13 +67,14 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
   const when = note.at ? agoShort(note.at) : 'new';
   const kind = noteKind(note);
   const part = parts?.find((p) => p.id === note.part);
+  const resolved = note.resolvedAt > 0;
   return (
     <div
       ref={root}
-      class={`pb-note pb-note-${kind.id} ${selected ? 'on' : ''} ${lifted ? 'lifted' : ''} ${editing ? 'editing' : ''}`}
+      class={`pb-note pb-note-${kind.id} ${selected ? 'on' : ''} ${lifted ? 'lifted' : ''} ${editing ? 'editing' : ''} ${resolved ? 'resolved' : ''}`}
       data-note={note.id}
       style={{ left: x, top: y, width: note.w, background: kind.color }}
-      title={editing ? undefined : `${kind.id === 'note' ? 'A note' : `${kind.name}: ${kind.meaning}`}${part ? `, on section ${part.label}` : note.on ? ', left on a card' : ''} · ${when}. Double-click to write.`}
+      title={editing ? undefined : `${resolved ? 'Resolved. ' : ''}${kind.id === 'note' ? 'A note' : `${kind.name}: ${kind.meaning}`}${part ? `, on section ${part.label}` : note.on ? ', left on a card' : ''} · ${when}. Double-click to write.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -99,8 +102,8 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
       )}
       <div class="pb-note-head">
         <span class="pb-note-when">
-          {kind.id !== 'note' && <b class="pb-note-kind">{kind.name}</b>}
-          {when}
+          {resolved ? <b class="pb-note-kind">Resolved</b> : kind.id !== 'note' && <b class="pb-note-kind">{kind.name}</b>}
+          {resolved ? agoShort(note.resolvedAt) : when}
         </span>
         {writable && (
           <span class="pb-note-tools">
@@ -117,12 +120,18 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
                 }}
               />
             ))}
-            <button class="pb-note-x" aria-label="Remove this note" title="Remove this note. ⌘Z puts it back." onClick={onRemove}>
-              ×
+            <button class={`pb-note-check ${resolved ? 'on' : ''}`} aria-pressed={resolved} aria-label={resolved ? 'Open this note again' : 'Resolve this note'} title={resolved ? 'Resolved. Click to open it again.' : 'Resolve: this is dealt with.'} onClick={() => onResolve(!resolved)}>
+              ✓
             </button>
           </span>
         )}
       </div>
+      {writable && (
+        // Delete sits just outside the note's bottom right corner, so it is never mistaken for one of the note's own controls.
+        <button class="pb-note-delete" title="Remove this note. ⌘Z puts it back." onClick={onRemove}>
+          Delete
+        </button>
+      )}
       {parts && parts.length > 0 && (writable || part) && (
         <PartPicker
           parts={parts}
