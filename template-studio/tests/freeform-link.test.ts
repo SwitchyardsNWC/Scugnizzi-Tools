@@ -79,7 +79,7 @@ describe('following a frame in the Freeform app', () => {
   it('brings every linked block up to the project’s frames, and leaves the rest alone', () => {
     // The board reads an email saved before its frame was edited: the email’s copy is behind the frame file.
     const before = readAppFrame(JSON.stringify(doc(appFrame(), 'Freeform')), 'frame-a')!;
-    const edited = page({ ...appFrame(), layers: [{ ...appFrame().layers[0]!, text: 'Edited after the email was saved' }] });
+    const edited = page({ ...appFrame(), layers: [{ kind: 'text', id: 'l1', text: 'Edited after the email was saved', role: 'h2', color: null, x: 0, y: 0, width: 400, align: 'left' }] });
     const after = readAppFrame(JSON.stringify(doc(edited, 'Freeform')), 'frame-a')!;
     const saved = followFrame(doc(page()), 'f', before);
     expect(isCurrent(blockOf(saved), after)).toBe(false);
