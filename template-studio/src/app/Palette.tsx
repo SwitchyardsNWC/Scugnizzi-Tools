@@ -1,4 +1,5 @@
 import { CATALOG, SINGLETON } from '../model/catalog.ts';
+import { SY_BLOCKS } from '../model/switchyards.ts';
 import { allBlocks } from '../model/edit.ts';
 import { glyphFor } from './icons.tsx';
 import type { BlockType } from '../model/types.ts';
@@ -23,7 +24,7 @@ import type { Editor } from './useEditor.ts';
  * you already had, which asked a designer to know that a block they can see sits inside a row they
  * cannot. Now it is something you drop and then fill.
  */
-export type PaletteKind = BlockType | 'columns' | `pattern:${string}`;
+export type PaletteKind = BlockType | 'columns' | `pattern:${string}` | `sy:${string}`;
 
 /** What the palette shows for a folder pattern: its name, and what it holds. */
 export interface PatternCard {
@@ -34,6 +35,9 @@ export interface PatternCard {
 
 export const isPatternKind = (kind: PaletteKind): kind is `pattern:${string}` => kind.startsWith('pattern:');
 export const patternIdOf = (kind: `pattern:${string}`): string => kind.slice('pattern:'.length);
+/** One of the Switchyards email system's blocks (model/switchyards.ts), placed like a pattern: as sections at the end. */
+export const isSyKind = (kind: PaletteKind): kind is `sy:${string}` => kind.startsWith('sy:');
+export const syIdOf = (kind: `sy:${string}`): string => kind.slice('sy:'.length);
 
 const COLUMNS_CARD = {
   name: 'Columns',
@@ -46,10 +50,19 @@ const describe = (kind: PaletteKind, patterns: PatternCard[]) => {
     const found = patterns.find((p) => p.id === patternIdOf(kind));
     return found ? { name: found.name, summary: found.summary } : { name: 'Pattern', summary: 'A section saved to the folder.' };
   }
+  if (isSyKind(kind)) {
+    const found = SY_BLOCKS.find((b) => b.id === syIdOf(kind));
+    return found ? { name: found.name, summary: found.summary } : { name: 'Block', summary: 'A Switchyards block.' };
+  }
   return CATALOG[kind];
 };
 
 const GROUPS: Array<{ name: string; types: PaletteKind[]; help?: string }> = [
+  {
+    name: 'Switchyards',
+    types: SY_BLOCKS.map((b) => `sy:${b.id}` as const),
+    help: 'The Switchyards email system’s blocks, made from the plain blocks below on this template’s design system. Headings, paragraphs, buttons and the divider are the plain blocks: the system’s type and colours are in Design.',
+  },
   { name: 'Content', types: ['heading', 'richtext', 'image', 'brand', 'button', 'freeform'] },
   { name: 'Layout', types: ['columns', 'divider', 'stripes', 'spacer', 'dndarea'] },
   {
@@ -69,11 +82,13 @@ export interface PaletteProps {
   patterns: PatternCard[];
   /** A click on a pattern card: place it at the end. */
   onPlacePattern(id: string): void;
+  /** A click on one of the Switchyards blocks: place its sections at the end. */
+  onPlaceSyBlock(id: string): void;
   /** A block was added by clicking a card, for the recent-blocks list. */
   onUsed?(kind: PaletteKind): void;
 }
 
-export function Palette({ editor, dragging, onDrag, onDrop, patterns, onPlacePattern, onUsed }: PaletteProps) {
+export function Palette({ editor, dragging, onDrag, onDrop, patterns, onPlacePattern, onPlaceSyBlock, onUsed }: PaletteProps) {
   // Patterns are a fourth group, after the fixed furniture: they are the folder's, not the app's,
   // and a folder without any simply has three groups.
   const groups = patterns.length
@@ -103,6 +118,7 @@ export function Palette({ editor, dragging, onDrag, onDrop, patterns, onPlacePat
                 onDrop={onDrop}
                 patterns={patterns}
                 onPlacePattern={onPlacePattern}
+                onPlaceSyBlock={onPlaceSyBlock}
                 {...(onUsed ? { onUsed } : {})}
               />
             ))}
@@ -119,6 +135,7 @@ function Card({
   active,
   patterns,
   onPlacePattern,
+  onPlaceSyBlock,
   onUsed,
 }: {
   type: PaletteKind;
@@ -128,6 +145,7 @@ function Card({
   onDrop(): void;
   patterns: PatternCard[];
   onPlacePattern(id: string): void;
+  onPlaceSyBlock(id: string): void;
   onUsed?(kind: PaletteKind): void;
 }) {
   const spec = describe(type, patterns);
@@ -139,6 +157,7 @@ function Card({
   // and caught by lint for a second that arrives through a paste or an imported file.
   const spent =
     !isPatternKind(type) &&
+    !isSyKind(type) &&
     type !== 'columns' &&
     SINGLETON.includes(type) &&
     allBlocks(editor.template).some((b) => b.type === type);
@@ -150,6 +169,7 @@ function Card({
   const add = () => {
     if (spent) return;
     if (isPatternKind(type)) onPlacePattern(patternIdOf(type));
+    else if (isSyKind(type)) onPlaceSyBlock(syIdOf(type));
     else if (type === 'columns') editor.addColumns(editor.template.sections.length);
     else {
       editor.add(type, null);

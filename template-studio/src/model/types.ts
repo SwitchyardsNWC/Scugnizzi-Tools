@@ -114,6 +114,13 @@ export interface Section {
   /** A stable DOM id, when a section needs to be targeted from the stylesheet (e.g. section-legal). */
   domId?: string;
   /**
+   * Let this section's band run to the edge of the window instead of stopping at the email's width. The column
+   * stays where it was; only the colour behind it widens. Offered on the blocks that draw their own band: the top
+   * bar, the stripes, the footer. Jared, 2026-09-18: "give footers and top bars the option to be fullwidth of the
+   * window."
+   */
+  bleed?: boolean;
+  /**
    * Set when this section was placed from a folder pattern, and which version of it. The content
    * is a *copy* — the template compiles alone, with no dependency at export — and the marker is
    * what lets the editor say "the pattern has moved on" and offer the new version, or a detach.
@@ -168,6 +175,11 @@ export interface Column {
   borderRadius?: number;
   /** The gap between the box and what is inside it. */
   borderPad?: number;
+  /**
+   * A colour behind everything in this column, painted with the box and taking its corners: a card. Named from
+   * the palette like the border. The Switchyards Callout is a heading and a line on a navy fill with 8px corners.
+   */
+  fill?: ColorRef;
   /**
    * Space between the blocks when this column holds more than one.
    *
@@ -467,13 +479,30 @@ export interface BrandBlock extends BlockBase {
   renderedHash?: string;
 }
 
+/**
+ * How the legal footer is arranged. `classic` is the footer as it always was. The other four are the Switchyards
+ * email system's (model/switchyards.ts): a centred masthead, a two-column ledger, a one-row stub for short sends,
+ * and a cream letterhead for a note signed by a person. Same four parts in every one: seals, identity, notice,
+ * colophon; only the arrangement changes.
+ */
+export type LegalLayout = 'classic' | 'masthead' | 'ledger' | 'stub' | 'letterhead';
+
 /** Company, address, unsubscribe. Locked by default — a re-upload must fix every future send (1.7). */
 export interface LegalBlock extends BlockBase {
   type: 'legal';
+  /** The picture at the top of the footer: the badge row, or the lockup on a letterhead. */
   logoSrc: string;
   logoWidth: number;
   note: string;
   noteLock: Lock;
+  /** Absent is `classic`, so every footer from before layouts existed compiles as it did. */
+  layout?: LegalLayout;
+  /** The colophon mark, "© Switchyards U.S.A.", set in small letterspaced caps; blank shows none. Not in `classic`. */
+  mark?: string;
+  /** Social links, each a URL; blank leaves it out. The ledger lists them beside the legal links, the other layouts put them on a line of their own. */
+  instagram?: string;
+  youtube?: string;
+  linkedin?: string;
 }
 
 // ---------------------------------------------------------------------------------------------

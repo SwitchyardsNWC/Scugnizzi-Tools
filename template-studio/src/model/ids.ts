@@ -50,3 +50,19 @@ export function fieldName(label: string, taken: Set<string>): string {
   taken.add(name);
   return name;
 }
+
+/**
+ * HubSpot's name for the main body: a template with no module called `email_body` gets a warning at upload and
+ * cannot be used for blog and RSS emails, which pour the post into the module of that name. So the first rich
+ * text field a template gets is `email_body`, and only when that name is already taken does the label decide.
+ * Jared, 2026-09-18: "If an email has body text make sure you give it email_body."
+ */
+export const EMAIL_BODY = 'email_body';
+
+export function bodyFieldName(label: string, taken: Set<string>): string {
+  if (!taken.has(EMAIL_BODY)) {
+    taken.add(EMAIL_BODY);
+    return EMAIL_BODY;
+  }
+  return fieldName(label, taken);
+}

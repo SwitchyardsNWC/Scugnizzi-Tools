@@ -130,12 +130,15 @@ export function gapOf(column: Pick<Column, 'gap'>, ds: DesignSystem): number {
  */
 export function boxOf(column: Column, ds: DesignSystem): BoxTokens | null {
   const width = column.borderWidth ?? 0;
-  if (width <= 0) return null;
+  // A fill is a box too: a card with no line around it still needs the wrapper that paints it.
+  const fill = colorOf(ds, column.fill ?? null);
+  if (width <= 0 && !fill) return null;
   return {
     width,
     color: colorOf(ds, column.borderColor ?? null) ?? theme(ds, 'cream').text,
     radius: column.borderRadius ?? 0,
     pad: column.borderPad ?? 0,
+    fill,
   };
 }
 

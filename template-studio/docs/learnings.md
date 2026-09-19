@@ -2230,3 +2230,78 @@ been seen resolving in a live account.
 **The check reads the export as it would go.** `local-image` used to fire for any local name. Now the app
 checks the packed HTML, so the rule speaks only of a picture the folder cannot supply, with the fix that follows:
 put it under `assets/`, or paste a hosted URL. A safety net should name the thing that is actually wrong.
+
+### 3.71 The system's blocks are the plain blocks, arranged
+
+*2026-09-18.* Jared: "only use the templates when you create a new email like the blank and card emails. When you
+first open the template studio you can either open a folder or create new. Keep v1 standard. But let's create a new
+one based off of the switchyards email design system. add any of the design systems components that could be used
+as blocks. like the multiple footer or masthead options."
+
+**Opening on a choice, not on an email.** The app opened on the standard email, so every first visit began with
+somebody else's send and a decision about whether to delete it. It opens now on a Welcome screen (`app/Welcome.tsx`)
+over an untouched blank: open a folder, reopen the remembered one, or start from a starter. With a folder open and
+no file chosen, the same screen lists the folder's emails. The blank underneath is not kept as a draft until a
+choice is made, or the screen would never show twice. A file opened, a starter picked, or Skip, and it goes.
+
+**The Switchyards email system, as tokens and blocks** (`model/switchyards.ts`, after the design system of
+2026-09-18). Three colours, Helvetica, 18 on 26, a 620 breakpoint; the outline and solid buttons as the two button
+roles, full width as the block's alignment. Every component of the system is built from the blocks the app already
+has, on the template's own design system: a header is the top bar on the navy preset over a 6px red stripe; the
+Callout is a heading and a line in a column with a navy fill and 8px corners; the sign-off is the copy and the
+drawing; the hero and the stamp are image modules the team fills in HubSpot. The palette shows
+them as a Switchyards group and places each as sections at the end, cloned in with fresh ids and field names, the
+way a pattern is. No block type was added for any of it, so every piece keeps the inspector it already had.
+
+**Two things the plain blocks could not say.** A column can now be filled (`Column.fill`), painted with its box
+and taking its corners, which is what a card is. And the legal footer has four layouts beside the classic one
+(`LegalBlock.layout`; `compile/blocks/legal.ts`): masthead, ledger, stub and letterhead, one anatomy in four
+arrangements, drawn with hairlines in the section's ink, carrying the same HubSpot tokens in every one. Classic
+compiles byte for byte as before; the contract test is the proof.
+
+**Two starters from it**: the standard send and the short send, in the system's order. The v1 standard email
+stays as a starter, named for what it is. What is not hosted anywhere yet, the cream lockup for the lockup bar, is
+an image the team picks in HubSpot, and the block's summary names the file, rather than a guess at a URL.
+
+*Same day.* The letterhead is two blocks, a header and a footer, with the letter between them; it had been built
+as one footer. And the palette lost what it did not need: the two headers, which open the starters and are not
+for placing mid-email, and Details, Schedule, the inset and the pair, which are a paragraph or an image with a
+particular content.
+
+### 3.72 HubSpot asks for the body by name
+
+*2026-09-18.* Jared: "If an email has body text make sure you give it email_body - I get an error in hubspot 'The
+template does not contain the module email_body, it will not work for blog/rss emails'."
+
+HubSpot looks for a module named `email_body` in every email template. Without one it warns at upload, and blog
+and RSS emails, which pour the post into that module, cannot use the template. Ours named every rich text field
+for its label, so a template's main body was `body` or `first_paragraph` and never the name HubSpot wanted.
+
+**The first body a template gets is `email_body`** (`ids.ts`, `bodyFieldName`). The palette's Text block, the
+Switchyards starters' first paragraph and the card email's intro all take it; the next body in the same template
+is named for its label as before, since the name can only be held once. A drag and drop area is already named
+`email_body`, and counts.
+
+**A check says when it is missing** (`email-body`, a warning): a template with bodies and no field of that name,
+which is every template made before this rule. A field's name is fixed once created (learnings 1.10), so the
+inspector offers the one rename it ever will, *Name it email_body*, beside the name of a Text block's field while
+no field has the name yet; its hover text says why it belongs before the first upload. The v1 standard email keeps
+its names, which existing emails are bound to, and carries the warning instead; the contract test is unchanged.
+
+### 3.73 The footer's note, its socials, and a band that reaches the window
+
+*2026-09-18.* Jared: "allow html in the note section of the legal footers. Where the site input is. make that social
+sites: instagram, youtube, linkedin. give footers and top bars the option to be fullwidth of the window."
+
+- **The note takes HTML.** It took friendly text (`**bold**`, `[a link](url)`, a line break per line) and escaped
+  everything else, so a footer could not carry a written-out link. Now text that is already markup is used as it
+  is, and plain text keeps the friendly forms (`noteHtml`). The inspector's box is the HTML kind, six rows.
+- **Three social links in place of the site.** Instagram, YouTube, LinkedIn, each a URL, named by the network in
+  the footer's small type: a line of their own under the notice in the masthead and letterhead, rows in the
+  ledger's index, after the legal links in the stub. Only the ones set are drawn. The Switchyards presets carry
+  Instagram; the other two are blank until someone knows the addresses, rather than guessed.
+- **Full width.** The section already knew how to let its band run to the window's edge (`bleed`), from the days
+  the parity test needed v1's shape. It is a switch now, on the blocks that draw their own band: the top bar, the
+  stripes and the footer, in their Spacing (or Width) panel. The column stays at the email's width; only the colour
+  behind it widens, in Outlook too, whose band table goes to 100%. Gmail's apps keep their own inset around every
+  message, which the switch's hover text admits.

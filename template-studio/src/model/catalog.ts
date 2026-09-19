@@ -15,7 +15,7 @@
 // prefix lets one panel edit all three nodes without flattening the model to match the UI.
 
 import { bandedPreset, DEFAULT_DESIGN_SYSTEM, firstPreset, theme as themeTokens, type DesignSystem } from './design-system.ts';
-import { fieldName } from './ids.ts';
+import { fieldName, bodyFieldName } from './ids.ts';
 import { newDndArea } from './dnd.ts';
 import { MARKS } from './marks.ts';
 import type { Align, Block, BlockType, Column, Row, Section } from './types.ts';
@@ -139,6 +139,15 @@ const border = (): Control => ({
   help: 'A box around this block, inside the page gutter. Outlook honours the line and squares off the corners, which is the usual split.',
 });
 
+/** A colour behind the column's contents, with the box's corners: a card. */
+const fill = (): Control => ({
+  kind: 'palette',
+  path: 'column.fill',
+  label: 'Fill',
+  zero: 'None',
+  help: 'A colour behind everything in this column, with the box’s corners: a card. The Switchyards Callout is a heading and a line on a navy fill with 8px corners.',
+});
+
 const asImage = (): Control => ({
   kind: 'rasterise',
   path: 'block.src',
@@ -192,6 +201,14 @@ const spacing = (top = 'Space above', bottom = 'Space below'): Group => ({
       help: 'Following Design › Page padding. Drag to give this block its own right gutter, or use the button to hand it back.',
     },
   ],
+});
+
+/** For the blocks that draw their own band: let it run to the window's edge. */
+const fullWidth = (): Control => ({
+  kind: 'toggle',
+  path: 'section.bleed',
+  label: 'Full width',
+  help: 'Let the band run to the edge of the window instead of stopping at the email’s width. The content stays in its column. Gmail’s apps keep their own inset around every message, which no email can remove.',
 });
 
 /** Padding on the section, for blocks that draw their own band and ignore the column. */
@@ -264,7 +281,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             help: 'Which type role renders it — size, weight, line height and phone size all come with it. Set them in Design › Type.',
           },
           { kind: 'select', path: 'block.align', label: 'Align', options: ALIGN },
-          border(),
+          border(), fill(),
           asImage(),
         ],
       },
@@ -289,7 +306,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
       {
         name: 'Appearance',
         help: FROM_SYSTEM,
-        controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border(), asImage()],
+        controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border(), fill(), asImage()],
       },
       spacing('Space above', 'Space below'),
       background(),
@@ -333,7 +350,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             help: 'The size it renders at. Upload at twice this for retina. Never taken from the file.',
           },
           { kind: 'select', path: 'block.align', label: 'Align', options: ALIGN },
-          border(),
+          border(), fill(),
           // Renders as nothing at all on an image nobody converted, which is almost all of them.
           asImage(),
         ],
@@ -401,7 +418,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             help: 'Which button role renders it. Their fill, ink, border and shape are in Design › Buttons.',
           },
           { kind: 'select', path: 'block.align', label: 'Align', options: [...ALIGN, ['full', 'Full width']] },
-          border(),
+          border(), fill(),
         ],
       },
       spacing(),
@@ -435,7 +452,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
         help: 'Size, tracking and case come from the Top bar role in Design › Type. Put two of these in a row of columns for a tagline on the left and a link on the right.',
         controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }],
       },
-      sectionSpacing(),
+      { ...sectionSpacing(), controls: [...sectionSpacing().controls, fullWidth()] },
       // The band it draws is a preset like any other section's. It was pinned to one called `navy`
       // — which is this brand's name for its dark band and not a thing every design system has —
       // so a template built on any other palette got a navy bar it could not change.
@@ -456,6 +473,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
         help: 'Set a thickness to zero to drop that stripe, which turns this into a single rule.',
         controls: [{ kind: 'stripes', path: 'block.stripes', label: 'Stripes' }],
       },
+      { name: 'Width', controls: [fullWidth()] },
     ],
   },
 
@@ -541,7 +559,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
           { kind: 'render-picture', path: 'block.src', label: 'Render' },
         ],
       },
-      { name: 'Appearance', when: 'email', controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border()] },
+      { name: 'Appearance', when: 'email', controls: [{ kind: 'select', path: 'block.align', label: 'Align', options: ALIGN }, border(), fill()] },
       { ...spacing(), when: 'email' },
       { ...background(), when: 'email' },
     ],
@@ -573,7 +591,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
           { kind: 'number', path: 'block.width', label: 'Width', min: 20, max: 600, suffix: 'px', help: 'Rendered at twice this for retina.' },
           { kind: 'select', path: 'block.align', label: 'Align', options: ALIGN },
           { kind: 'palette', path: 'block.color', label: 'Colour', zero: 'Section text', help: 'Named from the palette. Left alone it follows the section’s text colour, so the mark reads on any band.' },
-          border(),
+          border(), fill(),
         ],
       },
       {
@@ -597,9 +615,31 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
         open: true,
         help: 'Company name, address and both unsubscribe links come from HubSpot’s own settings.',
         controls: [
-          { kind: 'url', path: 'block.logoSrc', label: 'Logo URL', placeholder: 'https://…' },
+          {
+            kind: 'select',
+            path: 'block.layout',
+            label: 'Layout',
+            options: [
+              ['classic', 'Classic'],
+              ['masthead', 'Masthead'],
+              ['ledger', 'Ledger'],
+              ['stub', 'Stub'],
+              ['letterhead', 'Letterhead'],
+            ],
+            help: 'Classic is the footer as it always was. The other four are the Switchyards email system’s: a centred masthead, a two-column ledger, a one-row stub for short sends, a cream letterhead for a note from a person. Same parts in every one; only the arrangement changes.',
+          },
+          { kind: 'url', path: 'block.logoSrc', label: 'Logo URL', placeholder: 'https://…', help: 'The picture at the top of the footer: the badge row on navy, the lockup on a letterhead.' },
           { kind: 'number', path: 'block.logoWidth', label: 'Logo width', min: 40, max: 400, suffix: 'px' },
-          { kind: 'textarea', path: 'block.note', label: 'Note' },
+          {
+            kind: 'html',
+            path: 'block.note',
+            label: 'Note',
+            help: 'The notice line. Plain text, with **bold** and [a link](https://…) if you like, or HTML written out: a <a>, a <br>, an <em>. In the Switchyards footer: “Please consider the environment and do not print this email. Nobody prints emails.”',
+          },
+          { kind: 'text', path: 'block.mark', label: 'Mark', placeholder: '© Switchyards U.S.A.', help: 'The colophon mark, set in small letterspaced caps. Blank shows none. Not drawn by the classic layout.' },
+          { kind: 'url', path: 'block.instagram', label: 'Instagram', placeholder: 'https://instagram.com/…', help: 'Named in the footer’s small type: on its own line in the masthead and letterhead, a row in the ledger, after the legal links in the stub. Blank leaves it out.' },
+          { kind: 'url', path: 'block.youtube', label: 'YouTube', placeholder: 'https://youtube.com/…', help: 'The same, for YouTube.' },
+          { kind: 'url', path: 'block.linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/…', help: 'The same, for LinkedIn.' },
         ],
       },
       {
@@ -614,7 +654,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
           },
         ],
       },
-      sectionSpacing(),
+      { ...sectionSpacing(), controls: [...sectionSpacing().controls, fullWidth()] },
       background(),
       hubspot('block.noteLock', 'Note'),
     ],
@@ -656,7 +696,7 @@ export const GROUP_GROUPS: Group[] = [
     name: 'Appearance',
     open: true,
     help: 'A box around the whole group, inside the page gutter.',
-    controls: [border()],
+    controls: [border(), fill()],
   },
   { ...spacing('Space above', 'Space below'), open: true },
   { ...background(), open: true },
@@ -718,7 +758,8 @@ export function createBlock(type: BlockType, ctx: NewBlockContext): Block {
       case 'heading':
         return { id: ctx.id(), type, lock: lock('Headline'), text: 'Heading', level: 'h1', align: 'left' };
       case 'richtext':
-        return { id: ctx.id(), type, lock: lock('Body'), html: '<p>Copy goes here.</p>', align: 'left' };
+        // The first body a template gets is HubSpot's `email_body` (ids.ts); the ones after it are named for their label.
+        return { id: ctx.id(), type, lock: { editable: true, label: 'Body', field: bodyFieldName('Body', ctx.taken) }, html: '<p>Copy goes here.</p>', align: 'left' };
       case 'image':
         return { id: ctx.id(), type, lock: lock('Image'), mode: 'module', src: '', alt: '', href: '', width: 560, align: 'center', optional: true };
       case 'button':
