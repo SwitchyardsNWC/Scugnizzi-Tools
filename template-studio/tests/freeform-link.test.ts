@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { risoStep } from '../src/model/effects.ts';
 import { recipeHash } from '../src/model/freeform.ts';
-import { FREEFORM_APP_FRAME, followFrame, isCurrent, linkedBlocks, readAppFrame, unlinkFrame } from '../src/model/freeform-link.ts';
+import { FREEFORM_APP_FRAME, followFrame, followFrames, isCurrent, linkedBlocks, readAppFrame, unlinkFrame } from '../src/model/freeform-link.ts';
 import { SCHEMA_VERSION } from '../src/model/schema.ts';
 import type { FreeformBlock, Template } from '../src/model/types.ts';
 
@@ -74,6 +74,26 @@ describe('following a frame in the Freeform app', () => {
     const linked = blockOf(followFrame(doc(page()), 'f', withFx));
     expect(isCurrent(linked, plain)).toBe(false);
     expect('effects' in blockOf(followFrame(doc(linked), 'f', plain))).toBe(false);
+  });
+
+  it('brings every linked block up to the project’s frames, and leaves the rest alone', () => {
+    // The board reads an email saved before its frame was edited: the email’s copy is behind the frame file.
+    const before = readAppFrame(JSON.stringify(doc(appFrame(), 'Freeform')), 'frame-a')!;
+    const edited = page({ ...appFrame(), layers: [{ ...appFrame().layers[0]!, text: 'Edited after the email was saved' }] });
+    const after = readAppFrame(JSON.stringify(doc(edited, 'Freeform')), 'frame-a')!;
+    const saved = followFrame(doc(page()), 'f', before);
+    expect(isCurrent(blockOf(saved), after)).toBe(false);
+
+    const shown = followFrames(saved, [after]);
+    expect(blockOf(shown).layers[0]).toMatchObject({ text: 'Edited after the email was saved' });
+    expect(isCurrent(blockOf(shown), after)).toBe(true);
+    // Nothing to do: the same template comes back, so the board’s cache and Studio’s draft stay untouched.
+    expect(followFrames(shown, [after])).toBe(shown);
+    // A frame the email does not follow, or a block that follows no frame, changes nothing.
+    const other = readAppFrame(JSON.stringify(doc(edited, 'Freeform')), 'frame-b')!;
+    expect(followFrames(saved, [other])).toBe(saved);
+    const free = doc(page());
+    expect(followFrames(free, [after])).toBe(free);
   });
 
   it('unlinks without losing the drawing', () => {

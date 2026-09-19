@@ -53,8 +53,7 @@ const fmt = {
 export function CanvasSettingsPanel() {
   const s = useCanvasSettings();
   const set = (patch: Partial<CanvasSettings>) => writeCanvasSettings(patch);
-  // The presence name is a person's, not a dial: Reset leaves it alone.
-  const changed = JSON.stringify({ ...s, presenceName: '' }) !== JSON.stringify({ ...DEFAULT_CANVAS_SETTINGS, presenceName: '' });
+  const changed = JSON.stringify(s) !== JSON.stringify(DEFAULT_CANVAS_SETTINGS);
   /** The ground that is drawn, whose opacity the dial shows; plain paper shows the lines' dial, greyed. */
   const drawn = s.ground === 'none' ? null : s.ground;
   return (
@@ -119,20 +118,9 @@ export function CanvasSettingsPanel() {
           </div>
         </div>
       </div>
-      <div class="cv-section">
-        <div class="cv-head">Together</div>
-        <label class="cv-row" title="Others see this name beside your cursor when you have the same project open.">
-          <span class="cv-label">Your name</span>
-          <input type="text" class="cv-text" value={s.presenceName} maxLength={40} placeholder="How others see you" onInput={(e) => set({ presenceName: (e.target as HTMLInputElement).value })} />
-        </label>
-        <label class="cv-row" title="The presence server (party/board.ts), for this browser. Leave it empty to use the site's own. Local: localhost:1999 after npm run party.">
-          <span class="cv-label">Server</span>
-          <input type="text" class="cv-text" value={s.presenceHost} maxLength={200} placeholder="the site's own" spellcheck={false} onInput={(e) => set({ presenceHost: (e.target as HTMLInputElement).value })} />
-        </label>
-      </div>
       <div class="cv-foot">
         <span>Kept in this browser, for every canvas.</span>
-        <button class="cv-reset" disabled={!changed} onClick={() => resetCanvasSettings({ presenceName: s.presenceName })}>
+        <button class="cv-reset" disabled={!changed} onClick={() => resetCanvasSettings()}>
           Reset
         </button>
       </div>

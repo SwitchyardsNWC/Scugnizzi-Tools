@@ -122,6 +122,22 @@ export function followFrame(template: Template, blockId: string, frame: AppFrame
   });
 }
 
+/**
+ * Every linked block brought up to the frame it follows, when one of these frames is that frame and the block is
+ * behind it. What the project board does before it draws an email, so a frame edited after the email was last
+ * saved still shows as it is now (Jared, 2026-09-19: "the email does not show the correct frame preview"); what
+ * Template Studio does on every change it hears from the Freeform tab. A block whose frame is not among these
+ * keeps the drawing it has.
+ */
+export function followFrames(template: Template, frames: AppFrame[]): Template {
+  let next = template;
+  for (const block of linkedBlocks(next)) {
+    const frame = frames.find((f) => f.key === block.source?.key);
+    if (frame && !isCurrent(block, frame)) next = followFrame(next, block.id, frame);
+  }
+  return next;
+}
+
 /** Stops following the frame. The drawing stays as it is, to be edited in this block's own canvas again. */
 export function unlinkFrame(template: Template, blockId: string): Template {
   return withFreeform(template, blockId, (block) => {

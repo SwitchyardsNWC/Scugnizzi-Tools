@@ -1874,9 +1874,6 @@ button.fig-pill:active { transform: scale(0.96); }
 .cv-menu.pill .cv-check, .cv-menu.pill .cv-seg, .cv-menu.pill .cv-seg button + button { border-color: #cfc8ba; }
 .cv-menu.pill .cv-seg button.on { background: #7b61ff; }
 .cv-menu.pill .cv-check:checked::after { background: #7b61ff; }
-.cv-text { flex: 1; min-width: 0; height: 24px; padding: 5px 0 1px; border: 0; border-bottom: 1px solid #dededc; border-radius: 0; background: none; color: #0d0d0d; font: inherit; font-size: 12px; letter-spacing: 0.011em; outline: none; }
-.cv-text:focus { border-bottom-color: #0d0d0d; }
-.cv-text::placeholder { color: #a8aaa7; }
 
 /* --- the Welcome screen (Welcome.tsx): a folder to open, or an email to start ---------------------------------- */
 .wl { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding: 40px 24px; overflow: auto; background: var(--paper); }

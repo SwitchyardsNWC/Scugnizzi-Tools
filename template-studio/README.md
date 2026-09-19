@@ -16,8 +16,8 @@ npm install && npm run dev     # the app
 npm test                       # 773 tests
 ```
 
-The built app is checked in at `dist/` so the tools directory can link to it; `npm run build`
-refreshes it.
+The built app is not checked in: the Pages workflow builds `dist/` before it uploads, and locally `npm run build`
+makes it (the tools directory links to `template-studio/dist/`).
 
 | Command | What it does |
 | --- | --- |

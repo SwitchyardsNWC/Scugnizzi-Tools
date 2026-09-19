@@ -232,14 +232,6 @@ const tbl = (rows: IRNode[], attrs: Attrs = {}): IRNode =>
   el('table', { role: 'presentation', width: '100%', cellpadding: '0', cellspacing: '0', ...attrs }, [el('tbody', null, rows)]);
 const tr = (cells: IRNode[]): IRNode => el('tr', null, cells);
 
-/** `https://www.switchyards.com/` → `switchyards.com`, for a link that shows where it goes. */
-export function hostOf(url: string): string {
-  return url
-    .trim()
-    .replace(/^[a-z]+:\/\//i, '')
-    .replace(/^www\./i, '')
-    .replace(/\/.*$/, '');
-}
 
 function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'classic'>, block: LegalBlock, sec: Section, col: Column, ctx: BuildContext): IRNode {
   const p = ctx.preview;

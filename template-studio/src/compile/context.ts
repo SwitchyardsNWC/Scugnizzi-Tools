@@ -142,7 +142,3 @@ export function boxOf(column: Column, ds: DesignSystem): BoxTokens | null {
   };
 }
 
-/** The section's resolved colours, for blocks that need to match their surroundings. */
-export function sectionColors(section: Section): { text: string; link: string } {
-  return { text: section.textColor, link: section.linkColor };
-}

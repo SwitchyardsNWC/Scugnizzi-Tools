@@ -1513,33 +1513,35 @@ export function Preview({
   // The chip in the sidebar captures the pointer, so its `pointermove` keeps firing in this
   // document even while the pointer is over the frame — which is why no invisible overlay is needed
   // to catch events the iframe would otherwise swallow.
+  //
+  // The measuring helpers above read refs and the live document, and the callbacks the app hands in are rebuilt
+  // every render. The effects below read them all through `live`, the latest render's copies, so each effect's
+  // dependency list holds only what it responds to, and a keystroke elsewhere in the app does not re-resolve a drop.
+  const live = useRef({ probeAt, measureRows, measureDividers, measureSpacing, idOfBand, onProbe, onAutoEdited });
+  live.current = { probeAt, measureRows, measureDividers, measureSpacing, idOfBand, onProbe, onAutoEdited };
+  const probeX = probe?.x ?? null;
+  const probeY = probe?.y ?? null;
   useEffect(() => {
-    if (!probe) {
+    if (probeX === null || probeY === null) {
       setHint(null);
       return;
     }
     hovered.current = null;
     setSpaces([]);
     const box = frame.current?.getBoundingClientRect();
-    const found = box ? probeAt(probe.x - box.left, probe.y - box.top, null) : null;
+    const found = box ? live.current.probeAt(probeX - box.left, probeY - box.top, null) : null;
     setHint(found?.hint ?? null);
-    onProbe?.(found?.spot ?? null);
-    // `onProbe` is deliberately not a dependency: it is rebuilt every render by the caller, and
-    // depending on it would re-resolve on every keystroke elsewhere in the app.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [probe?.x, probe?.y, ready]);
+    live.current.onProbe?.(found?.spot ?? null);
+  }, [probeX, probeY, ready]);
 
   // --- the rows, measured whenever the document or its height moves ------------------------------
   useEffect(() => {
-    setRows(measureRows());
-    // `measureRows` reads refs and the live document; it is not state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setRows(live.current.measureRows());
   }, [ready, doc, height, sections]);
 
   // The dividers follow the selected row of columns, re-measured with the rows.
   useEffect(() => {
-    setDividers(measureDividers(selectedSection ?? null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDividers(live.current.measureDividers(selectedSection ?? null));
   }, [ready, doc, height, selectedSection]);
 
   // A menu is about a row as it was; a changed document closes it. Escape and a click anywhere
@@ -1590,9 +1592,7 @@ export function Preview({
   // measurement that keeps the frame the size of its content.
   useEffect(() => {
     const id = spacing ?? hovered.current;
-    setSpaces(id ? measureSpacing(id) : []);
-    // `measureSpacing` reads refs and the live document; it is not state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSpaces(id ? live.current.measureSpacing(id) : []);
   }, [ready, spacing, height, doc]);
 
   // --- dimming, for the editability view --------------------------------------------------------
@@ -1615,9 +1615,7 @@ export function Preview({
     if (!inner?.querySelector(`[data-sy-block="${CSS.escape(autoEdit)}"]`)) return;
     autoEdited.current = autoEdit;
     actions.current?.beginEditing(autoEdit);
-    onAutoEdited?.();
-    // `onAutoEdited` is rebuilt every render by the caller and deliberately not a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    live.current.onAutoEdited?.();
   }, [ready, autoEdit, doc]);
 
   // --- selection outline, applied to the live document ------------------------------------------
@@ -1629,7 +1627,7 @@ export function Preview({
     for (const el of inner.querySelectorAll('[data-sy-selected-section]')) el.removeAttribute('data-sy-selected-section');
     if (selectedSection) {
       for (const band of inner.querySelectorAll('.hse-section')) {
-        if (idOfBand(band) === selectedSection) band.setAttribute('data-sy-selected-section', '');
+        if (live.current.idOfBand(band) === selectedSection) band.setAttribute('data-sy-selected-section', '');
       }
     }
     // The run first, then the primary: the primary carries the bar, the rest carry the outline.
@@ -1655,8 +1653,6 @@ export function Preview({
     // it is already in the coordinates the overlay is positioned in.
     const box = found.getBoundingClientRect();
     setBar({ top: Math.max(1, box.top - 25), left: Math.max(1, box.left), ...(found.dataset['sySection'] ? { sectionId: found.dataset['sySection'] } : {}) });
-    // `selectedSection` is in the deps below; `idOfBand` reads nothing that changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, selected, alsoSelected, selectedSection, layer, drawing, doc]);
 
   return (

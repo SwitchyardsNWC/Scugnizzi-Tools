@@ -114,8 +114,6 @@ describe('canvas settings', () => {
     expect(s.ground).toBe('lines');
     expect(s.groundOpacity).toEqual(DEFAULT_CANVAS_SETTINGS.groundOpacity);
     expect(s.wheelGain).toBe(DEFAULT_CANVAS_SETTINGS.wheelGain);
-    expect(parseCanvasSettings(JSON.stringify({ presenceHost: '  localhost:1999 ', presenceName: 'x'.repeat(60) }))).toMatchObject({ presenceHost: 'localhost:1999', presenceName: 'x'.repeat(40) });
-    expect(parseCanvasSettings(JSON.stringify({ presenceHost: 4 })).presenceHost).toBe('');
   });
 
   it('know the grounds, each with an opacity of its own, and read the old grid flag', () => {

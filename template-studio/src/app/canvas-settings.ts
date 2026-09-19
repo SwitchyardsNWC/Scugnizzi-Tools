@@ -37,10 +37,6 @@ export interface CanvasSettings {
   holdMs: number;
   /** Whether a finger draws on the Freeform surface: never once a pencil has been seen, always, or never at all. */
   pencilOnly: 'auto' | 'on' | 'off';
-  /** The presence server for the board (project/presence.ts), when this browser names one over the site's own. */
-  presenceHost: string;
-  /** The name others see beside this browser's cursor. */
-  presenceName: string;
 }
 
 export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
@@ -56,8 +52,6 @@ export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
   quickShapes: true,
   holdMs: 160,
   pencilOnly: 'auto',
-  presenceHost: '',
-  presenceName: '',
 };
 
 /** Each dial's floor, ceiling and step. */
@@ -76,7 +70,6 @@ export const CANVAS_SETTINGS_KEY = 'scuggnizzi.canvas.settings';
 const clamp = (value: unknown, range: { min: number; max: number }, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(range.max, Math.max(range.min, value)) : fallback;
 const flag = (value: unknown, fallback: boolean): boolean => (typeof value === 'boolean' ? value : fallback);
-const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
 /** The settings as stored, with every value checked and clamped; anything unreadable is the default. */
 export function parseCanvasSettings(raw: string | null): CanvasSettings {
@@ -110,8 +103,6 @@ export function parseCanvasSettings(raw: string | null): CanvasSettings {
     quickShapes: flag(value.quickShapes, d.quickShapes),
     holdMs: clamp(value.holdMs, CANVAS_RANGES.holdMs, d.holdMs),
     pencilOnly: pencil === 'on' || pencil === 'off' || pencil === 'auto' ? pencil : d.pencilOnly,
-    presenceHost: text(value.presenceHost, 200),
-    presenceName: text(value.presenceName, 40),
   };
 }
 

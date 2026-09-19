@@ -9,7 +9,7 @@
 // `data-sy-layer`, which is how the canvas finds one under the pointer; the export never sees this
 // markup at all, only the picture.
 
-import { canvasTypeOf, colorOf, firstPreset, fontOf, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
+import { canvasTypeOf, colorOf, firstPreset, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { textStyleOf } from '../model/canvas-text.ts';
 import { marksPerChar, runsOf } from '../model/rich-text.ts';
 import { BRUSHES, layerBox } from '../model/freeform.ts';

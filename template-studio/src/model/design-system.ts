@@ -400,8 +400,6 @@ export function bandedPreset(ds: DesignSystem): string {
   return names.find((name) => ds.themes[name]?.band) ?? names[0] ?? 'cream';
 }
 
-/** The palette, in the order a brand thinks about it. Used by the panel and by the preset picker. */
-export const PALETTE_ORDER = ['navy', 'red', 'cream', 'offwhite', 'white'] as const;
 
 // --- what the compiler asks the design system for -------------------------------------------------
 //

@@ -21,7 +21,7 @@ import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import { DOC_KIND_NAMES, DOC_OPENS_IN, docDisplayName, docKindOfUrl, isLinkFile, type DocKind } from '../model/docs.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
-import { readAppFrame, type AppFrame } from '../model/freeform-link.ts';
+import { followFrames, readAppFrame, type AppFrame } from '../model/freeform-link.ts';
 import { projectType } from '../model/project-types.ts';
 import { recipesByOutput, RECIPE_TOOLS, toolAddress, type ToolRecipe } from '../model/tool-recipes.ts';
 import {
@@ -68,7 +68,7 @@ import { META } from '../model/layout.ts';
 import { serializeTemplate, templateFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { folderWorkspace, isImageFile, type AssetFile } from '../workspace/workspace.ts';
-import { useCanvasSettings, writeCanvasSettings } from '../app/canvas-settings.ts';
+import { useCanvasSettings } from '../app/canvas-settings.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
 import { TouchGestures } from '../app/gestures.ts';
 import { glide, PanTracker } from '../app/inertia.ts';
@@ -96,8 +96,6 @@ import { useInstall } from './launch.ts';
 import { siteStore } from './site-store.ts';
 import { underStyle } from './ground.ts';
 import { History, useHistory } from './history.ts';
-import { colorForName, defaultPresenceName, usePresence } from './presence.ts';
-import { DEFAULT_PRESENCE_HOST } from './presence-config.ts';
 import type { Project } from './useProject.ts';
 
 type View = { x: number; y: number; z: number };
@@ -105,9 +103,6 @@ type Rect = { x: number; y: number; w: number; h: number };
 
 /** The card's title bar. */
 const HEAD = 28;
-/** The bars at the top and bottom of the board, which the canvas sits between. */
-const BAR_TOP = 44;
-const BAR_BOTTOM = 28;
 /** The width an email is laid out at inside its card, a little wider than the email so its edges show. */
 const EMAIL_PAGE = 640;
 const clampZoom = (z: number) => Math.min(3, Math.max(0.05, z));
@@ -152,9 +147,12 @@ interface EmailItem {
   fileName: string;
   name: string;
   modified: number;
+  /** The email as saved, with every block that follows one of the project's frames brought up to that frame. */
   template: Template | null;
   /** The compiled preview, before local pictures are swapped in. */
   html: string;
+  /** The frames as they were when this was read, so a frame's edit reads the email again. */
+  framesKey: string;
   error?: string;
 }
 
@@ -274,20 +272,25 @@ function useProjectFiles(project: MutableRef<Project>, notify: (message: string)
         c.emails.clear();
         c.systems = systemsKey;
       }
+      // An email that follows a frame shows the frame as it is now, not as it was when the email was last saved in
+      // Template Studio; so an email is read again when any frame moves, not only when its own file does.
+      const appFrames = frames.flatMap((f) => (f.frame ? [f.frame] : []));
+      const framesKey = appFrames.map((f) => `${f.key}:${f.hash}`).join('|');
       const emails: EmailItem[] = [];
       for (const file of list) {
         const old = c.emails.get(file.fileName);
-        if (old && old.modified === file.modified) {
+        if (old && old.modified === file.modified && old.framesKey === framesKey) {
           emails.push(old);
           continue;
         }
         let item: EmailItem;
         try {
           const loaded = await file.load();
-          const { template } = materialiseFolderSystem(loaded.template, systems);
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, html: compile(template, { mode: 'preview' }).html };
+          const { template: saved } = materialiseFolderSystem(loaded.template, systems);
+          const template = followFrames(saved, appFrames);
+          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: template.name || file.name, modified: file.modified, template, framesKey, html: compile(template, { mode: 'preview' }).html };
         } catch (cause) {
-          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
+          item = { id: emailCardId(file.fileName), fileName: file.fileName, name: file.name, modified: file.modified, template: null, html: '', framesKey, error: cause instanceof Error ? cause.message : `${file.fileName} could not be read.` };
         }
         c.emails.set(file.fileName, item);
         emails.push(item);
@@ -394,7 +397,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       saveTimer.current = window.setTimeout(async () => {
         try {
           boardModified.current = await writeFile(dir, BOARD_FILE, boardJson(boardRef.current));
-          savedRef.current?.();
         } catch (cause) {
           notify(cause instanceof Error ? `The board could not be saved: ${cause.message}` : 'The board could not be saved.');
         } finally {
@@ -409,19 +411,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     void loadBoard();
     void refresh();
   }, [loadBoard, refresh]);
-
-  // --- who else is here (presence.ts, party/board.ts) ---
-  const presenceHost = (settings.presenceHost || DEFAULT_PRESENCE_HOST).trim();
-  // A name the first time, kept in the settings so it is the same in every tab and can be changed in the Canvas menu.
-  useEffect(() => {
-    if (!settings.presenceName) writeCanvasSettings({ presenceName: defaultPresenceName() });
-  }, [settings.presenceName]);
-  const myName = settings.presenceName || 'Someone';
-  const presence = usePresence({ host: presenceHost, room: presenceHost ? info.id : null, name: myName, color: colorForName(myName), onSaved: refreshAll });
-  /** Tells the others a file changed, from the save timer, which is bound once. */
-  const savedRef = useRef<() => void>(() => {});
-  savedRef.current = presence.sendSaved;
-  const peersBySelected = useMemo(() => new Map(presence.peers.filter((p) => p.selected).map((p) => [p.selected!, p])), [presence.peers]);
 
   useEffect(() => {
     refreshAll();
@@ -510,6 +499,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const printsRef = useRef(prints);
   printsRef.current = prints;
   const assetSignature = assets.map((a) => a.url).join('|');
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -519,7 +510,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         const id = `${f.key}:${fr.hash}:${assetSignature.length}`;
         if (printsRef.current[id]) continue;
         try {
-          const canvas = await freeformCanvas(fr.page, f.template.ds ?? DEFAULT_DESIGN_SYSTEM, { assets, scale: 1, ground: fr.ground });
+          const canvas = await freeformCanvas(fr.page, f.template.ds ?? DEFAULT_DESIGN_SYSTEM, { assets: assetsRef.current, scale: 1, ground: fr.ground });
           if (cancelled) return;
           const url = canvas.toDataURL('image/png');
           setPrints((p) => ({ ...p, [id]: url }));
@@ -531,7 +522,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files.frames, assetSignature]);
   const printOf = (f: FrameItem) => (f.frame?.page.effects?.length ? prints[`${f.key}:${f.frame.hash}:${assetSignature.length}`] : undefined);
 
@@ -667,7 +657,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
 
   // --- selecting, moving, opening ---
   const [selected, setSelected] = useState<string | null>(null);
-  useEffect(() => presence.sendSelect(selected), [selected, presence.sendSelect]);
   /** `copy`: Option is held, so the original stays and a copy is being carried. */
   const [moving, setMoving] = useState<{ id: string; x: number; y: number; copy: boolean } | null>(null);
   /** A frame or an email a dragged picture, or a dragged frame, would be put into on letting go. */
@@ -848,10 +837,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   };
   const onPointerMove = (event: PointerEvent) => {
     if (gestures.current!.move(event)) return;
-    if (event.pointerType !== 'touch' || drag.current) {
-      const w = worldAt(event.clientX, event.clientY);
-      presence.sendCursor(Math.round(w.x), Math.round(w.y));
-    }
     const d = drag.current;
     if (!d) return;
     if (d.kind === 'marquee') {
@@ -989,68 +974,89 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     setMoving(null);
   };
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
-      const mod = event.metaKey || event.ctrlKey;
-      if (event.key === ' ') {
-        // Space is the hand while it is down, wherever the pointer lands.
-        event.preventDefault();
-        if (!spaceRef.current) {
-          spaceRef.current = true;
-          setHand(true);
-        }
-      } else if (event.key === 'Escape') {
-        if (groupingRef.current) setGrouping(false);
-        else if (selectedLinkRef.current) setSelectedLink(null);
-        else setSelected(null);
-      } else if ((event.key === 'Backspace' || event.key === 'Delete') && selectedLinkRef.current) {
-        event.preventDefault();
-        const picked = links.find((l) => `${l.from}>${l.to}` === selectedLinkRef.current);
-        if (picked) void breakLink(picked);
-      } else if ((event.key === 'Backspace' || event.key === 'Delete') && selected) {
-        event.preventDefault();
-        const card = layout.cards.find((c) => c.id === selected);
-        if (card) void deleteCard(card);
-      } else if (mod && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        void step(event.shiftKey ? 'redo' : 'undo');
-      } else if (event.key === 'Enter' && selected) {
-        const card = layout.cards.find((c) => c.id === selected);
-        if (card) openCard(card);
-      } else if (event.shiftKey && event.code === 'Digit1') {
-        event.preventDefault();
-        fit();
-      } else if (mod && (event.key === '=' || event.key === '+')) {
-        event.preventDefault();
-        zoomTo(viewRef.current.z * 1.25, undefined, true);
-      } else if (mod && event.key === '-') {
-        event.preventDefault();
-        zoomTo(viewRef.current.z / 1.25, undefined, true);
-      } else if (mod && event.key === '0') {
-        event.preventDefault();
-        zoomTo(1, undefined, true);
+  // The handlers are made every render, so they see the latest selection, layout and lines; one subscription reads
+  // them through a ref, so it is bound once and its dependency list is empty and true.
+  /** The card a first Backspace named; the second press deletes it. Escape, another card, or five seconds let it go. */
+  const armedDelete = useRef<{ id: string; until: number } | null>(null);
+  const onKey = (event: KeyboardEvent) => {
+    if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
+    const mod = event.metaKey || event.ctrlKey;
+    if (event.key === ' ') {
+      // Space is the hand while it is down, wherever the pointer lands.
+      event.preventDefault();
+      if (!spaceRef.current) {
+        spaceRef.current = true;
+        setHand(true);
       }
-    };
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== ' ') return;
-      spaceRef.current = false;
-      setHand(false);
-    };
-    const onBlur = () => {
-      spaceRef.current = false;
-      setHand(false);
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
+    } else if (event.key === 'Escape') {
+      if (armedDelete.current) {
+        armedDelete.current = null;
+        notify(`${layout.cards.find((c) => c.id === selected)?.name ?? 'The card'} stays.`);
+      } else if (groupingRef.current) setGrouping(false);
+      else if (selectedLinkRef.current) setSelectedLink(null);
+      else setSelected(null);
+    } else if ((event.key === 'Backspace' || event.key === 'Delete') && selectedLinkRef.current) {
+      event.preventDefault();
+      const picked = links.find((l) => `${l.from}>${l.to}` === selectedLinkRef.current);
+      if (picked) void breakLink(picked);
+    } else if ((event.key === 'Backspace' || event.key === 'Delete') && selected) {
+      event.preventDefault();
+      const card = layout.cards.find((c) => c.id === selected);
+      if (!card) return;
+      // Jared: "add a confirmation to delete from a board when using backspace." The first press names the file
+      // and asks; the second, on the same card within a few seconds, removes it. Undo still puts it back.
+      const armed = armedDelete.current;
+      if (armed && armed.id === card.id && armed.until > Date.now()) {
+        armedDelete.current = null;
+        void deleteCard(card);
+      } else {
+        armedDelete.current = { id: card.id, until: Date.now() + 5000 };
+        notify(`Delete ${card.name} from the project? Press ${event.key} again to remove its file (⌘Z puts it back), or Esc to keep it.`);
+      }
+    } else if (mod && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      void step(event.shiftKey ? 'redo' : 'undo');
+    } else if (event.key === 'Enter' && selected) {
+      const card = layout.cards.find((c) => c.id === selected);
+      if (card) openCard(card);
+    } else if (event.shiftKey && event.code === 'Digit1') {
+      event.preventDefault();
+      fit();
+    } else if (mod && (event.key === '=' || event.key === '+')) {
+      event.preventDefault();
+      zoomTo(viewRef.current.z * 1.25, undefined, true);
+    } else if (mod && event.key === '-') {
+      event.preventDefault();
+      zoomTo(viewRef.current.z / 1.25, undefined, true);
+    } else if (mod && event.key === '0') {
+      event.preventDefault();
+      zoomTo(1, undefined, true);
+    }
+  };
+  const onKeyUp = (event: KeyboardEvent) => {
+    if (event.key !== ' ') return;
+    spaceRef.current = false;
+    setHand(false);
+  };
+  const onBlur = () => {
+    spaceRef.current = false;
+    setHand(false);
+  };
+  const keyHandlers = useRef({ onKey, onKeyUp, onBlur });
+  keyHandlers.current = { onKey, onKeyUp, onBlur };
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => keyHandlers.current.onKey(event);
+    const up = (event: KeyboardEvent) => keyHandlers.current.onKeyUp(event);
+    const blur = () => keyHandlers.current.onBlur();
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, layout, openCard, fit, zoomTo, links]);
+  }, []);
   const selectedLinkRef = useRef<string | null>(null);
   selectedLinkRef.current = selectedLink;
 
@@ -1077,7 +1083,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       await writeFile(dir, path, text);
       stale();
       await refresh();
-      presence.sendSaved();
     };
     await write(after);
     history.push({ label, undo: () => write(before), redo: () => write(after) });
@@ -1095,7 +1100,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       await writeFrame(dir, { key: frame.key, name: frame.name, savedAt: Date.now(), template }, await readFolderFrames(dir));
       stale();
       await refresh();
-      presence.sendSaved();
     };
     await write(next);
     history.push({ label, undo: () => write(frame.template), redo: () => write(next) });
@@ -1183,7 +1187,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         stale();
         saveBoard(moveCard(boardRef.current, made!.id, at.x, at.y));
         await refresh();
-        presence.sendSaved();
       };
       await place();
       notify(`Copied ${card.name}.`);
@@ -1194,8 +1197,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
           stale();
           saveBoard(forgetCard(boardRef.current, made!.id));
           await refresh();
-          presence.sendSaved();
-        },
+          },
         redo: place,
       });
     } catch (cause) {
@@ -1291,14 +1293,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         stale();
         saveBoard(forgetCard(boardRef.current, card.id));
         await refresh();
-        presence.sendSaved();
       };
       const restore = async () => {
         await writeFile(dir, path, data);
         stale();
         saveBoard(moveCard(boardRef.current, card.id, at.x, at.y));
         await refresh();
-        presence.sendSaved();
       };
       const pointing = links.filter((l) => l.from === card.id && l.kind !== 'made').length;
       await remove();
@@ -1336,7 +1336,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       if (place) next = moveCard(next, pictureCardId(m.to), place.x, place.y);
       saveBoard(next);
     }
-    presence.sendSaved();
     return rewritten;
   };
 
@@ -1617,7 +1616,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => presence.sendCursor(null, null)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           if (!e.dataTransfer?.files.length) return;
@@ -1740,7 +1738,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             const picture = picturesById.get(card.id);
             const doc = docsById.get(card.id);
             const madeBy = picture ? recipeOf.get(picture.path) : undefined;
-            const peer = peersBySelected.get(card.id);
             const live = isLive(card);
             const facts = email
               ? `${email.fileName} · saved ${ago(email.modified)}`
@@ -1763,10 +1760,10 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             return (
               <div
                 key={card.id}
-                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id && !moving.copy ? 'lifted' : ''} ${dropCard === card.id ? 'drop' : ''} ${peer ? 'peer' : ''}`}
+                class={`pb-card pb-${card.kind} ${selected === card.id ? 'on' : ''} ${moving?.id === card.id && !moving.copy ? 'lifted' : ''} ${dropCard === card.id ? 'drop' : ''}`}
                 data-card={card.id}
                 title={facts}
-                style={{ left: card.x, top: card.y, width: card.w, height: card.h, ...(peer ? { '--peer': peer.color } : {}) }}
+                style={{ left: card.x, top: card.y, width: card.w, height: card.h }}
                 onDblClick={() => openCard(card)}
               >
                 <header class="pb-card-head">
@@ -1787,7 +1784,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
                   {picture && (live ? <img class="pb-picture-img" src={picture.url} alt="" draggable={false} /> : null)}
                   {doc && <DocBody item={doc} />}
                 </div>
-                {peer && <span class="pb-peer-tag">{peer.name}</span>}
               </div>
             );
           })}
@@ -1809,17 +1805,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
               ) : null;
             })()}
 
-          {/* The others' pointers, at their places on the board, the same size at every zoom. */}
-          {presence.peers
-            .filter((p) => p.x !== null && p.y !== null)
-            .map((p) => (
-              <div key={p.id} class="pb-peer" style={{ left: p.x!, top: p.y!, transform: `scale(${1 / view.z})`, '--peer': p.color }} aria-hidden="true">
-                <svg viewBox="0 0 16 16" width="16" height="16">
-                  <path d="M1.5 1.5l12 5-5 2-2 5z" fill="var(--peer)" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" />
-                </svg>
-                <span class="pb-peer-name">{p.name}</span>
-              </div>
-            ))}
         </div>
       </div>
 
@@ -1905,23 +1890,6 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             <>Saving into {dir.name}</>
           )}
         </span>
-        {presenceHost && (
-          <>
-            <span class="pb-sep" aria-hidden="true" />
-            <span class="pb-presence" title={presence.state === 'online' ? `Everyone with ${info.name} open on ${presenceHost}` : `Presence server: ${presenceHost}`}>
-              {presence.peers.map((p) => (
-                <i key={p.id} class="pb-dot" style={{ background: p.color }} title={p.name} />
-              ))}
-              {presence.state === 'online'
-                ? presence.peers.length
-                  ? `${presence.peers.length === 1 ? presence.peers[0]!.name : plural(presence.peers.length, 'other')} here`
-                  : `Only you here, as ${myName}`
-                : presence.state === 'connecting'
-                  ? 'Connecting…'
-                  : 'Presence offline'}
-            </span>
-          </>
-        )}
         <span class="pb-grow" />
         <span class="pb-hint">
           {grouping

@@ -14,14 +14,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "baseline": "node --experimental-strip-types --no-warnings tools/make-baseline.ts",
-    "workspace": "node --experimental-strip-types --no-warnings tools/make-workspace.ts",
-    "party": "partykit dev party/board.ts --port 1999",
-    "party:deploy": "partykit deploy"
+    "workspace": "node --experimental-strip-types --no-warnings tools/make-workspace.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
     "jsdom": "^29.1.1",
-    "partykit": "^0.0.115",
     "typescript": "^5.7.2",
     "vite": "^5.4.21",
     "vitest": "^2.1.8"

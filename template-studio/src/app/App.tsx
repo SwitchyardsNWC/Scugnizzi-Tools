@@ -113,6 +113,9 @@ const WIDTHS: Record<Device, number> = { desktop: 680, phone: 375 };
  */
 const CANVAS_LAG = 180;
 
+/** One string for a set of frames, so two reads that saw the same frames compare equal. */
+const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:${f.name}`).join('|');
+
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'template';
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)}KB`;
 
@@ -1308,7 +1311,6 @@ export function App() {
   }, [shownTemplate, allAssets]);
 
   // The Freeform app's frames, followed live: its tab writes on every change, and this tab hears it.
-  const framesKey = (frames: AppFrame[]) => frames.map((f) => `${f.key}:${f.hash}:${f.name}`).join('|');
   const framesSignature = framesKey(appFrames);
   // Frames this email already follows stay listed whatever project they belong to, so a link is never hidden.
   const followedKeys = useRef<string[]>([]);
@@ -1316,7 +1318,6 @@ export function App() {
   useEffect(() => {
     const next = readFreeformFrames(frameScope, followedKeys.current);
     setAppFrames((old) => (framesKey(old) === framesKey(next) ? old : next));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frameScope]);
   useEffect(() => {
     const read = () => {
@@ -1332,7 +1333,6 @@ export function App() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', read);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The pictures the Freeform app keeps, read again whenever a frame changes, since that is when one may have been dropped.
@@ -1412,7 +1412,7 @@ export function App() {
   const [draftFailed, setDraftFailed] = useState(false);
   const templateRef = useRef(editor.template);
   templateRef.current = editor.template;
-  const keepDraft = () => {
+  const keepDraft = useCallback(() => {
     // Nothing chosen yet: the blank under the Welcome screen is nobody's work, and kept it would skip the screen next time.
     if (workspaceRef.current?.canWrite || choosingRef.current) return;
     try {
@@ -1421,7 +1421,7 @@ export function App() {
     } catch {
       setDraftFailed(true);
     }
-  };
+  }, []);
   // Written as it changes. With a writable folder open the email lives in its file and the draft goes, so a
   // later visit never brings back something older than the file.
   useEffect(() => {
@@ -1435,17 +1435,15 @@ export function App() {
     }
     const timer = window.setTimeout(keepDraft, 400);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor.template, workspace]);
+  }, [editor.template, workspace, keepDraft]);
+  // Once, on the way in: everything this reads is stable for the life of the page.
   useEffect(() => {
     // Once more on the way out, for the last few keystrokes.
     const flush = () => keepDraft();
     window.addEventListener('pagehide', flush);
     if (restored) notify(`Welcome back: ${restored.name}, as you left it. It is kept in this browser until you open a folder.`);
     return () => window.removeEventListener('pagehide', flush);
-    // Once, on the way in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [keepDraft, restored, notify]);
 
   // Only when the browser would not keep the email: then leaving the page would lose it, so the browser asks first.
   useEffect(() => {
@@ -1483,12 +1481,13 @@ export function App() {
 
   // Says this tab is open, which email it holds, and which frames that email follows. Every 20 seconds is
   // enough: a background tab's timers run about once a minute anyway, and presence lasts two.
-  const linkedKeys = [...new Set(linkedBlocks(editor.template).map((b) => b.source!.key))];
-  const linkedSignature = linkedKeys.join('|');
+  const linkedSignature = [...new Set(linkedBlocks(editor.template).map((b) => b.source!.key))].join('|');
+  const emailName = editor.template.name;
   useEffect(() => {
+    const linkedKeys = linkedSignature ? linkedSignature.split('|') : [];
     const write = () => {
       try {
-        localStorage.setItem(STUDIO_PRESENCE, JSON.stringify({ tab: studioTab.current, email: editor.template.name, linked: linkedKeys.length, keys: linkedKeys, at: Date.now() }));
+        localStorage.setItem(STUDIO_PRESENCE, JSON.stringify({ tab: studioTab.current, email: emailName, linked: linkedKeys.length, keys: linkedKeys, at: Date.now() }));
       } catch {
         // Storage full or blocked: the Freeform app offers to open Template Studio instead.
       }
@@ -1496,8 +1495,7 @@ export function App() {
     write();
     const timer = window.setInterval(write, 20_000);
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor.template.name, linkedSignature]);
+  }, [emailName, linkedSignature]);
 
   useEffect(() => {
     const leave = () => {
