@@ -2837,3 +2837,47 @@ weight." Then: "make a fun trashcan icon in the lower right of the canvas to see
   each built correctly are open at once.
 - **Reachable when empty means it has to say so.** The old panel only ever opened with rows in it. A can you can
   always click needed an empty line and a disabled Empty it.
+
+### 3.94 Padding you can see, and a phone that can differ
+
+*2026-09-20. Jared: "for the desgin panel in the template studio. show the page and text padding visualy as you
+adjust. allow mobile and desktop values."*
+
+- **The canvas already lags on purpose, and that turned out to be the answer rather than the problem.** Two of
+  three proposed designs assumed the compiled document had to keep up with the drag, which meant shortening
+  `CANVAS_LAG` or patching the frame's head. But the 180ms timer is *trailing* and its cleanup clears the pending
+  one on every template change, so during a continuous drag it never fires at all: a drag costs zero reloads while
+  the pointer moves and exactly one when it stops. Shortening it is what would have created a strobe.
+- **So the live value is a stylesheet, not a document.** `paintPadding` writes one `<style>` the app owns into the
+  frame's head with the undebounced number as an `!important` override. A stylesheet write is a style recalc
+  rather than a document load, so the email reflows at pointer speed. Then `measurePadding` reads the result back
+  with `getComputedStyle`, so the bands are measured from the live document exactly as the spacing overlay is
+  (learnings 3.60) and are live at the same time. Measuring and being smooth looked like a trade and was not.
+- **`:not([class*="sy-pad-"])` is the whole of "follows the page gutter".** A column that departed from the gutter
+  wears `sy-pad-<left>-<right>`, so the override and the overlay both skip it and it does not get dragged along by
+  a dial it does not obey.
+- **Forty stripes, not two bands.** Every block's cell carries the gutter, so measuring them raw draws one strip
+  per block down each side with their labels stacked on each other. `coalesce` merges strips that share a left
+  edge and a width and are vertically contiguous within a pixel.
+- **Dragging up from zero draws a band that is not there yet.** At 0 the compiler emits no inset cell at all, so
+  there is nothing to measure until the drag ends. For that first beat the band is predicted from the host cell's
+  content box, which is its rectangle less the page gutter — exactly where the cell will be. The measured version
+  takes over silently when the canvas catches up.
+- **`null`, not zero, for "follow the desktop value".** `ButtonTokens.mobileSize` uses 0 to mean inherit and
+  copying that here would have been a bug: a phone gutter of 0 is full bleed and a phone text padding of 0 is what
+  every template already has, so a zero sentinel makes the two most likely phone values unsayable. The compiler
+  had the right shape in two places already — `sidesOf` and `gapOf` both read `typeof x === 'number' ? x : the
+  system's` — and `onPhone` is now the one place that question is asked.
+- **No migration, no schema bump.** `undefined` and `null` both fall out of `typeof x === 'number'`, so a design
+  system written before today resolves to the desktop value, which is what it renders now. At the defaults the
+  compiler emits the same bytes it always did, which is the promise every page token ships under.
+- **One class, because the phone rule needed a selector anyway.** `sy-tp` on the text-inset cell is what the media
+  query overrides *and* what the overlay measures. Inventing a second marker for the overlay is how a codebase
+  ends up with two names for one cell.
+- **The footer was the thing that would have made it read as broken.** It builds its own cells rather than going
+  through `padClass`, so a phone gutter moved the whole email except its address block. One of its two cells
+  already wore `hs_padded`; the other now does, and `gutterPhoneRule` is shared so a footer-only email still gets
+  the rule that class selects. Three snapshots changed, by exactly one class name.
+- **`InheritDial` was lifted, not copied.** The Inspector's `inherit-number` control — a dial plus a chain — is
+  exactly what a phone override needs, because a plain `Dial` cannot say "inherit": its commit turns an empty
+  field into 0, which is a real value here. The Inspector now calls the same component.

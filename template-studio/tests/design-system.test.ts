@@ -1045,3 +1045,90 @@ describe('text padding', () => {
     expect(padded).toMatch(/padding:6px 12px[^>]*class="sy-rich|class="sy-rich[^>]*padding:6px 12px/);
   });
 });
+
+/**
+ * Padding that differs between a phone and a desktop (Jared: "allow mobile and desktop values").
+ *
+ * The thing to defend is the sentinel. `null` means follow the desktop number and `0` means zero, which is a real
+ * design — a phone gutter of 0 is an email that runs to the edge of the screen. `ButtonTokens.mobileSize` uses 0
+ * for "inherit" and copying that here would have made the most likely phone value unsayable.
+ */
+describe('padding on phones', () => {
+  const load = async () => {
+    const { compile } = await import('../src/compile/compile.ts');
+    const { createSection } = await import('../src/model/catalog.ts');
+    const { blankTemplate } = await import('../src/model/starters.ts');
+    const { DEFAULT_DESIGN_SYSTEM } = await import('../src/model/design-system.ts');
+    const { sequentialIds } = await import('../src/model/ids.ts');
+    const ids = () => ({ id: sequentialIds(), taken: new Set<string>() });
+    const base = { ...blankTemplate(), sections: [createSection('heading', ids(), DEFAULT_DESIGN_SYSTEM), createSection('richtext', ids(), DEFAULT_DESIGN_SYSTEM)] };
+    const html = (over: Record<string, unknown>) => compile({ ...base, ds: { ...DEFAULT_DESIGN_SYSTEM, ...over } }, { mode: 'hubl', date: '2026-09-19' }).html;
+    return { html, ds: DEFAULT_DESIGN_SYSTEM };
+  };
+
+  it('changes nothing at all while every phone value is null', async () => {
+    const { html, ds } = await load();
+    expect(html({})).toBe(html({ mobilePagePadding: null, mobileTextPadX: null, mobileTextPadY: null }));
+    // The phone gutter rule is the desktop number, which is what it has always been.
+    expect(html({})).toContain(`.hs_padded { padding-left:${ds.pagePadding}px !important`);
+    expect(html({})).not.toContain('.sy-tp {');
+  });
+
+  it('takes a phone gutter of its own, leaving the desktop one alone', async () => {
+    const { html } = await load();
+    const out = html({ pagePadding: 24, mobilePagePadding: 8 });
+    expect(out).toContain('.hs_padded { padding-left:8px !important; padding-right:8px !important }');
+    // The cell itself still carries the desktop number inline, sides second in the shorthand; the phone rule
+    // overrides it, which is the only way an email can say "this width, but not that one".
+    expect(out).toMatch(/padding:\d+px 24px/);
+  });
+
+  it('treats a phone gutter of zero as zero, not as "follow the desktop one"', async () => {
+    const { html } = await load();
+    const out = html({ pagePadding: 24, mobilePagePadding: 0 });
+    expect(out).toContain('.hs_padded { padding-left:0px !important; padding-right:0px !important }');
+    expect(out).not.toContain('.hs_padded { padding-left:24px');
+  });
+
+  it('takes phone text padding, and gives the rule a cell to select', async () => {
+    const { html } = await load();
+    const out = html({ textPadX: 12, textPadY: 6, mobileTextPadX: 4, mobileTextPadY: 2 });
+    expect(out).toContain('.sy-tp { padding:2px 4px !important }');
+    expect((out.match(/sy-tp/g) ?? []).length).toBeGreaterThan(2);
+    // One rule for the whole email, however many text blocks wear the class.
+    expect((out.match(/\.sy-tp \{/g) ?? []).length).toBe(1);
+  });
+
+  it('emits the inset cell for a system with phone text padding and none on desktop', async () => {
+    const { html } = await load();
+    const out = html({ textPadX: 0, textPadY: 0, mobileTextPadX: 8 });
+    // Nothing to see on a desktop, but the media query needs something to select.
+    expect(out).toContain('padding:0px 0px');
+    expect(out).toContain('.sy-tp { padding:0px 8px !important }');
+  });
+
+  it('moves the legal footer with the rest of the email', async () => {
+    const { compile } = await import('../src/compile/compile.ts');
+    const { createSection } = await import('../src/model/catalog.ts');
+    const { blankTemplate } = await import('../src/model/starters.ts');
+    const { DEFAULT_DESIGN_SYSTEM } = await import('../src/model/design-system.ts');
+    const { sequentialIds } = await import('../src/model/ids.ts');
+    const ids = () => ({ id: sequentialIds(), taken: new Set<string>() });
+    // A footer on its own: the gutter's phone rule has to be asked for by the footer itself, because no padded
+    // column ran to ask for it. Setting a phone gutter and watching the footer stay put would read as a bug.
+    const only = { ...blankTemplate(), sections: [createSection('legal', ids(), DEFAULT_DESIGN_SYSTEM)] };
+    const out = compile({ ...only, ds: { ...DEFAULT_DESIGN_SYSTEM, pagePadding: 24, mobilePagePadding: 6 } }, { mode: 'hubl', date: '2026-09-19' }).html;
+    expect(out).toContain('.hs_padded { padding-left:6px !important; padding-right:6px !important }');
+    // And the footer's own address cell wears the class the rule selects.
+    expect(out).toMatch(/padding:10px 24px"[^>]*class="hs_padded/);
+  });
+
+  it('leaves a column that set its own sides on its own number, phone or not', async () => {
+    const { html } = await load();
+    const out = html({ pagePadding: 24, mobilePagePadding: 8 });
+    expect(out).toContain('.hs_padded { padding-left:8px !important');
+    // And a system whose phone gutter matches its desktop one says it once, as before.
+    const same = html({ pagePadding: 24, mobilePagePadding: 24 });
+    expect(same).toBe(html({ pagePadding: 24 }));
+  });
+});

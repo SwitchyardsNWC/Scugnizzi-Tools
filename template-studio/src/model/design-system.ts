@@ -245,6 +245,19 @@ export interface DesignSystem {
    */
   textPadX: number;
   textPadY: number;
+  /**
+   * The same three, on phones, or `null` to follow the desktop number (Jared: "allow mobile and desktop values").
+   *
+   * `null` rather than `mobileSize`'s zero, and the difference is correctness rather than taste. A phone gutter of
+   * 0 is full bleed, which is a design somebody wants; a phone text padding of 0 is what every template has today.
+   * A zero sentinel would make both of those unsayable. The shape already exists twice over in the compiler, where
+   * `sidesOf` and `gapOf` both read `typeof x === 'number' ? x : the system's`.
+   *
+   * At `null` the compiler emits exactly the bytes it emits now, which is the promise every page token ships under.
+   */
+  mobilePagePadding: number | null;
+  mobileTextPadX: number | null;
+  mobileTextPadY: number | null;
   pageBackground: string;
   /**
    * A frame around the whole email, drawn outside every band — the navy top bar and the footer
@@ -279,6 +292,16 @@ export interface DesignSystem {
    */
   mobileBreakpoint: number;
 }
+
+/**
+ * A phone value, or the desktop one it follows.
+ *
+ * The one place `null` is read, so the compiler's media query, the Design panel's dials and the canvas overlay
+ * cannot drift apart about what "follow the desktop value" means. Clamped, because a negative padding is not a
+ * thing either half should have to think about.
+ */
+export const onPhone = (mobile: number | null | undefined, desktop: number): number =>
+  typeof mobile === 'number' && Number.isFinite(mobile) ? Math.max(0, mobile) : Math.max(0, desktop);
 
 export const DEFAULT_DESIGN_SYSTEM: DesignSystem = {
   version: 1,
@@ -330,6 +353,9 @@ export const DEFAULT_DESIGN_SYSTEM: DesignSystem = {
   blockGap: 16,
   textPadX: 0,
   textPadY: 0,
+  mobilePagePadding: null,
+  mobileTextPadX: null,
+  mobileTextPadY: null,
   pageBackground: '#f7f6f3',
   pageBorderWidth: 0,
   pageBorderColor: 'navy',

@@ -17,7 +17,7 @@
 import { el, frag, print, raw, text, voidEl, when, type IRNode, type Test } from '../ir.ts';
 import { imgStyle, section } from '../layout.ts';
 import { fontDecl, typeOf } from '../../model/design-system.ts';
-import type { BuildContext } from '../context.ts';
+import { gutterPhoneRule, type BuildContext } from '../context.ts';
 import type { Column, LegalBlock, Section } from '../../model/types.ts';
 import { richContent } from './fields.ts';
 import { inline } from '../friendly.ts';
@@ -46,6 +46,9 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
   // is set *away* from — a right-aligned footer gets extra room on the left — which is what keeps a
   // long address from running the full width. A centred footer gets neither.
   const gut = ctx.ds.pagePadding;
+  // The footer's cells wear `hs_padded` but never pass through `padClass`, so the rule that class selects has to
+  // be asked for here as well. Same key, so a template with a padded column above pays for it once.
+  gutterPhoneRule(ctx);
   const outerLeft = align === 'right' ? gut : 0;
   const outerRight = align === 'left' ? gut : 0;
   const company = print('site_settings.company_name', p.company);
@@ -151,6 +154,11 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
                     align,
                     valign: 'top',
                     style: `${fontDecl(ctx.ds)} font-size:${typeOf(ctx.ds, 'body').size}px; color:${ink}; word-break:break-word; text-align:${align}; margin-bottom:0; line-height:135%; padding:10px ${gut}px`,
+                    // `hs_padded` for the same reason its sibling above wears it: the phone gutter's rule selects
+                    // that class, and without it this is the one cell in the email that keeps the desktop gutter
+                    // on a phone — which reads as a bug, not as a decision. Last, so the attributes before it keep
+                    // the order they have had since the footer was written.
+                    class: 'hs_padded',
                   },
                   [
                     el('p', { style: `${pm}line-height:115%; color:${ink}; font-weight:bold; font-size:12px` }, [

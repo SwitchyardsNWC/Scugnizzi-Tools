@@ -36,7 +36,7 @@ export function richTextParts(block: RichTextBlock, sec: Section, col: Column, c
   // for editing and the inlined `.sy-rich p` rules still match from above them.
   const rich = `sy-rich ${cls}`;
   const inset = hasTextInset(ctx.ds);
-  const words = inset ? textInset(content.value, ctx.ds, rich) : content.value;
+  const words = inset ? textInset(content.value, ctx, rich) : content.value;
   const outerClass = (side: string | null) => (inset ? side : [rich, side].filter(Boolean).join(' ') || null);
 
   // Bottom padding defaults to 0 because the last paragraph's own margin already provides it;

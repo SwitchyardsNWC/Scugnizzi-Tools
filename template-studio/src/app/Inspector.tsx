@@ -16,7 +16,7 @@ import { EMAIL_BODY } from '../model/ids.ts';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
-import { LinkedIcon } from './icons.tsx';
+import { InheritDial } from './InheritDial.tsx';
 
 // The inspector, generated from the catalog.
 //
@@ -299,32 +299,19 @@ function ControlField({
     const token = control.path === 'column.gap' ? { value: ds.blockGap, name: 'Design › Between blocks' } : { value: ds.pagePadding, name: 'Design › Page padding' };
     const inherited = token.value;
     return (
-      <div class={`field wide inherit ${following ? 'following' : ''}`}>
-        <Dial
-          label={control.label}
-          value={following ? inherited : own}
-          onChange={set}
-          min={control.min ?? 0}
-          max={control.max ?? 100}
-          step={control.step ?? 1}
-          {...(control.suffix ? { suffix: control.suffix } : {})}
-          {...(control.zero ? { zero: control.zero } : {})}
-          {...(control.help ? { title: control.help } : {})}
-        />
-        <button
-          class={`chain ${following ? 'on' : ''}`}
-          aria-pressed={following}
-          aria-label={`${control.label}: follow ${token.name}`}
-          title={
-            following
-              ? `Following ${token.name}. Click to give this block its own.`
-              : `This block has its own. Click to hand it back to ${token.name}.`
-          }
-          onClick={() => set(following ? inherited : null)}
-        >
-          <LinkedIcon />
-        </button>
-      </div>
+      <InheritDial
+        label={control.label}
+        value={own}
+        inherited={inherited}
+        inheritedName={token.name}
+        onChange={set}
+        {...(control.min !== undefined ? { min: control.min } : {})}
+        {...(control.max !== undefined ? { max: control.max } : {})}
+        {...(control.step !== undefined ? { step: control.step } : {})}
+        {...(control.suffix ? { suffix: control.suffix } : {})}
+        {...(control.zero ? { zero: control.zero } : {})}
+        {...(control.help ? { title: control.help } : {})}
+      />
     );
   }
 
