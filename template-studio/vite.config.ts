@@ -13,7 +13,7 @@ export default defineConfig({
     emptyOutDir: true,
     // Three pages over one source tree: Template Studio, the Freeform canvas as a tool of its own, and the
     // project board. They share every module, so a change to the canvas or the compiler lands in all three.
-    rollupOptions: { input: { main: page('index.html'), freeform: page('freeform.html'), project: page('project.html') } },
+    rollupOptions: { input: { main: page('index.html'), freeform: page('freeform.html'), project: page('project.html'), admin: page('admin.html') } },
   },
   test: {
     // The compiler is pure and DOM-free (acceptance.md §1), so the tests run in plain Node.

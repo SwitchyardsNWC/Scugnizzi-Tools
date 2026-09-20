@@ -805,6 +805,24 @@ than counted; a type role's colour is the same swatch control as every other col
 reads as unset; Top bar no longer offers two controls that moved nothing; and the button specimen is drawn on the
 background its variant is actually used on, so the outlined Secondary shows on navy.
 
+### The studio library
+
+*Added 2026-09-19.* A fourth page, **Studio library**, on the tools dashboard.
+
+- **Starter emails.** What Template Studio offers on New. Edit one and it opens in Template Studio; Update from
+  the email brings your changes back. Copy here takes one of the app's own into this folder so the team gets your
+  version. New ones start blank.
+- **Project types.** What Create a project puts in a new folder: the folders, the picture groups that become
+  boards, the frames and their sizes, and the emails. A form, since a type is data.
+- **Design systems.** What the folder holds, and a paste box. Paste a Claude design system — the page, its CSS, a
+  token file, or a `.system.json` — and it reads the colours, the type scale and the shape, shows the palette it
+  found and everything it refused, and saves it for any template to follow.
+
+All three live in the project folder, beside the patterns and design systems it already carries, so they travel
+with the folder your team shares. What the app ships is always listed underneath and never goes away, so New and
+Create a project still work before any folder is open. A team that wants one library for everything keeps one
+folder for it and opens that.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

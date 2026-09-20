@@ -9,8 +9,9 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 /** Set in this tab once the board has opened a file here. */
-const FROM_BOARD_KEY = 'scuggnizzi.studio.from-board';
+const FROM_BOARD_KEY = 'scuggnizzi.studio.back';
 
+import { readBack, type Back } from './back-to.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
 import { PROJECT_CHANNEL } from '../model/project.ts';
 import type { Template } from '../model/types.ts';
@@ -65,30 +66,17 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
     setReopenable(await recallFolderHandle());
   }, [adopt, openWanted]);
 
-  /**
-   * Whether the board sent this tab here (`?open=<file>` is the board's, and nobody else's), so the back arrow
-   * goes back to the board rather than to the tools. Kept for the tab, so a reload does not forget.
-   */
-  const [fromBoard, setFromBoard] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(FROM_BOARD_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  /** Where this tab was sent from, so the back arrow leads there rather than to the tools (app/back-to.ts). */
+  const [back, setBack] = useState<Back | null>(() => readBack(FROM_BOARD_KEY, null));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const name = params.get('open');
-    // The board sends `?from=board`, with `?open=<file>` for a file or alone for a new email, and the arrow goes back
-    // to it. `?open=` on its own is also how the Freeform canvas returns here, so it does not decide by itself.
-    if (params.get('from') === 'board') {
-      setFromBoard(true);
-      try {
-        sessionStorage.setItem(FROM_BOARD_KEY, '1');
-      } catch {
-        // Storage blocked: the arrow knows for this page load only.
-      }
+    // `?from=board` from the board, `?from=admin` from the studio library. `?open=` on its own is also how the
+    // Freeform canvas returns here, so it never decides by itself.
+    const from = params.get('from');
+    if (from) {
+      setBack(readBack(FROM_BOARD_KEY, from));
       params.delete('from');
     }
     if (name) {
@@ -131,5 +119,5 @@ export function useProjectFolder({ adopt, workspace, load, notify }: Options) {
     await openWanted(ws);
   }, [reopenable, adopt, openWanted]);
 
-  return { reopenable: workspace ? null : reopenable, reopen, dismiss: () => setReopenable(null), fromBoard };
+  return { reopenable: workspace ? null : reopenable, reopen, dismiss: () => setReopenable(null), back };
 }

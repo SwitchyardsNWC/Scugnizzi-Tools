@@ -47,6 +47,22 @@ export const systemFileName = (name: string): string => `${fileSlug(name)}.syste
 /** `patterns/<slug>.pattern.json`, without the folder. */
 export const patternFileName = (name: string): string => `${fileSlug(name)}.pattern.json`;
 
+/** `starters/<slug>.starter.json`, without the folder. */
+export const starterFileName = (name: string): string => `${fileSlug(name)}.starter.json`;
+
+/** `project-types/<slug>.type.json`, without the folder. */
+export const projectTypeFileName = (name: string): string => `${fileSlug(name)}.type.json`;
+
+/** A starter file. Sorted keys, for the same reason as the template. */
+export function serializeStarter(starter: unknown): string {
+  return `${JSON.stringify(starter, sortedKeys, 2)}\n`;
+}
+
+/** A project type file. Sorted keys, for the same reason as the template. */
+export function serializeProjectType(type: unknown): string {
+  return `${JSON.stringify(type, sortedKeys, 2)}\n`;
+}
+
 /** A replacer that rebuilds every plain object with its keys in order. Arrays keep theirs. */
 function sortedKeys(_key: string, value: unknown): unknown {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
