@@ -784,6 +784,13 @@ default. On a note, the tick to resolve sits at the top right and Delete floats 
 *Added 2026-09-19.* Every note takes a thread: Reply under the note on the board, or under it in Template Studio's
 rail; each reply shows its time, and a bin on the reply removes it. Reply sits at the note's foot; "Delete note" joins it once the note is picked.
 
+### Writing in Template Studio, first pass
+
+*Added 2026-09-19.* Opening a block puts the caret where you clicked, not on everything. Bold, italic and the other
+marks go on the selection or the word at the caret. The slash menu is Turn into, Style and Add below, with what the
+paragraph already is ticked. Selecting words shows a small bar with B, I, U, S, Link and Clear. And Markdown works as
+you type: `**bold**`, `*italic*`, `` `code` ``, `~~struck~~`, `[words](address)`.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

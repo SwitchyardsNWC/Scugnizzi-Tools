@@ -1165,6 +1165,22 @@ button.fig-pill:active { transform: scale(0.96); }
 .sy-slash-item.on .sy-slash-tag { color: rgb(255 255 255 / 0.8); }
 .sy-slash-empty { padding: 8px 8px 6px; font-size: 12px; color: rgb(255 255 255 / 0.6); }
 
+/* The bar over a selection: the same near-black as the menu, the marks the words wear lit. */
+.sy-selbar {
+  position: absolute; z-index: 30; display: flex; align-items: center; gap: 2px; height: 28px; padding: 0 4px; border-radius: 7px;
+  background: #1b2030; color: #fff; box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.sy-selbar-btn { min-width: 26px; height: 22px; padding: 0 7px; border: 0; border-radius: 4px; background: none; color: rgb(255 255 255 / 0.85); font: inherit; font-size: 12px; line-height: 22px; cursor: pointer; }
+.sy-selbar-btn:hover { background: rgb(255 255 255 / 0.12); color: #fff; }
+.sy-selbar-btn.on { background: var(--accent); color: #fff; }
+.sy-selbar-bold { font-weight: 700; }
+.sy-selbar-italic { font-style: italic; }
+.sy-selbar-underline { text-decoration: underline; text-underline-offset: 2px; }
+.sy-selbar-strike { text-decoration: line-through; }
+.sy-selbar-link, .sy-selbar-clear { font-size: 11px; }
+.sy-slash-check { font-size: 11px; color: rgb(255 255 255 / 0.7); }
+.sy-slash-item.on .sy-slash-check { color: #fff; }
+
 /* A reminder, not a bar: two keys, over the block, gone the moment the menu opens. */
 .sy-edit-hint {
   position: absolute; z-index: 21; height: 20px; display: flex; align-items: center; gap: 4px;

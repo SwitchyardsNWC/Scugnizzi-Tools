@@ -284,5 +284,6 @@ function tidy(html: string): string {
  * should not record which browser the designer happened to use.
  */
 export function fromContentEditable(html: string): string {
-  return sanitise(html.replace(/<div\b[^>]*>/gi, '<p>').replace(/<\/div>/gi, '</p>'));
+  // The zero-width spaces the editor stands the caret on after a converted run (Preview.tsx) never ship.
+  return sanitise(html.replace(/\u200b/g, '').replace(/<div\b[^>]*>/gi, '<p>').replace(/<\/div>/gi, '</p>'));
 }

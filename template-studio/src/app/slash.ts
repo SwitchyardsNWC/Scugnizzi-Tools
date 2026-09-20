@@ -37,7 +37,10 @@ export interface SlashItem {
   label: string;
   /** Which part of the menu. Format commands need an editable; blocks need a selection; recent
    *  is the last few blocks added, shown first while nothing has been typed. */
-  group: 'recent' | 'format' | 'block';
+  /** `turn`: what the paragraph becomes. `style`: what the words wear. `block`: added below. */
+  group: 'recent' | 'turn' | 'style' | 'block';
+  /** A `turn` item that is what the caret's paragraph already is: ticked in the menu. */
+  current?: boolean;
   /** Other words somebody might type for it. Matched as prefixes, so short is fine. */
   keywords: string[];
   /** One line, shown as the item's hover — Jared's rule about explanations. */
@@ -47,39 +50,90 @@ export interface SlashItem {
   kind?: string;
 }
 
-const f = (id: string, label: string, keywords: string[], hint: string, exec: Exec): SlashItem => ({
+const f = (group: 'turn' | 'style') => (id: string, label: string, keywords: string[], hint: string, exec: Exec): SlashItem => ({
   id,
   label,
-  group: 'format',
+  group,
   keywords,
   hint,
   exec,
 });
+const t = f('turn');
+const s = f('style');
 
-export const FORMAT_COMMANDS: SlashItem[] = [
-  f('p', 'Paragraph', ['text', 'normal', 'body', 'p'], 'Body copy, at the body role.', { command: 'formatBlock', value: 'p' }),
-  f('h1', 'Heading 1', ['h1', 'title', 'headline'], 'The largest heading. Sized by Design › Type.', { command: 'formatBlock', value: 'h1' }),
-  f('h2', 'Heading 2', ['h2', 'subhead'], 'A section heading.', { command: 'formatBlock', value: 'h2' }),
-  f('h3', 'Heading 3', ['h3'], 'A smaller heading.', { command: 'formatBlock', value: 'h3' }),
-  f('h4', 'Heading 4', ['h4'], 'A small heading.', { command: 'formatBlock', value: 'h4' }),
-  f('h5', 'Heading 5', ['h5', 'eyebrow', 'caps'], 'Uppercase and tracked, in the shipped scale.', { command: 'formatBlock', value: 'h5' }),
-  f('h6', 'Heading 6', ['h6', 'label'], 'The smallest heading.', { command: 'formatBlock', value: 'h6' }),
-  f('ul', 'Bulleted list', ['bullets', 'list', 'ul', '-'], 'Or type "- " at the start of a line.', { command: 'insertUnorderedList' }),
-  f('ol', 'Numbered list', ['numbers', 'steps', 'ol', '1'], 'Or type "1. " at the start of a line.', { command: 'insertOrderedList' }),
-  f('quote', 'Quote', ['blockquote', 'pull', '>'], 'A block quote, with the bar and inset from Design › Lists & quotes.', { command: 'formatBlock', value: 'blockquote' }),
-  f('hr', 'Horizontal rule', ['rule', 'line', 'divider', 'hr', '---'], 'A rule between paragraphs, on the system’s rule colour.', { command: 'insertHorizontalRule' }),
-  f('bold', 'Bold', ['strong', 'b'], '⌘B does the same.', { command: 'bold' }),
-  f('italic', 'Italic', ['em', 'i'], '⌘I does the same.', { command: 'italic' }),
-  f('underline', 'Underline', ['u'], '⌘U does the same. Readers expect underlined text to be a link, so use it sparingly.', { command: 'underline' }),
-  f('strike', 'Strikethrough', ['strikethrough', 'del', 's'], 'A line through the selection.', { command: 'strikeThrough' }),
-  f('sup', 'Superscript', ['superscript', 'sup', 'power'], 'Raised small text — a footnote mark, a ™.', { command: 'superscript' }),
-  f('sub', 'Subscript', ['subscript', 'sub'], 'Lowered small text.', { command: 'subscript' }),
-  f('small', 'Small print', ['small', 'fine', 'footnote', 'caption'], 'The selection at the small size — or the whole paragraph, when nothing is selected.', { command: 'wrap', tag: 'small' }),
-  f('code', 'Code', ['mono', 'monospace', 'pre'], 'Monospace, for a code or a reference number.', { command: 'wrap', tag: 'code' }),
-  f('link', 'Link', ['url', 'href', 'anchor', 'a'], 'Link the selection. ⌘K does the same.', { command: 'link' }),
-  f('unlink', 'Remove link', ['unlink'], 'Keep the words, drop the link.', { command: 'unlink' }),
-  f('clear', 'Clear formatting', ['plain', 'remove', 'reset'], 'Back to plain body copy.', { command: 'removeFormat' }),
+/**
+ * What the caret's paragraph can become. Jared: "sometimes text box takes on whatever style I'm trying to add" —
+ * the menu had block types, marks and blocks to add in one list; now what changes the paragraph and what changes
+ * the words are two groups, and the one the paragraph already is comes ticked.
+ */
+export const TURN_COMMANDS: SlashItem[] = [
+  t('p', 'Paragraph', ['text', 'normal', 'body', 'p'], 'Body copy, at the body role.', { command: 'formatBlock', value: 'p' }),
+  t('h1', 'Heading 1', ['h1', 'title', 'headline'], 'The largest heading. Sized by Design › Type.', { command: 'formatBlock', value: 'h1' }),
+  t('h2', 'Heading 2', ['h2', 'subhead'], 'A section heading.', { command: 'formatBlock', value: 'h2' }),
+  t('h3', 'Heading 3', ['h3'], 'A smaller heading.', { command: 'formatBlock', value: 'h3' }),
+  t('h4', 'Heading 4', ['h4'], 'A small heading.', { command: 'formatBlock', value: 'h4' }),
+  t('h5', 'Heading 5', ['h5', 'eyebrow', 'caps'], 'Uppercase and tracked, in the shipped scale.', { command: 'formatBlock', value: 'h5' }),
+  t('h6', 'Heading 6', ['h6', 'label'], 'The smallest heading.', { command: 'formatBlock', value: 'h6' }),
+  t('ul', 'Bulleted list', ['bullets', 'list', 'ul', '-'], 'Or type "- " at the start of a line.', { command: 'insertUnorderedList' }),
+  t('ol', 'Numbered list', ['numbers', 'steps', 'ol', '1'], 'Or type "1. " at the start of a line.', { command: 'insertOrderedList' }),
+  t('quote', 'Quote', ['blockquote', 'pull', '>'], 'A block quote, with the bar and inset from Design › Lists & quotes.', { command: 'formatBlock', value: 'blockquote' }),
+  t('hr', 'Horizontal rule', ['rule', 'line', 'divider', 'hr', '---'], 'A rule between paragraphs, on the system’s rule colour.', { command: 'insertHorizontalRule' }),
 ];
+
+/** What the selected words wear. With nothing selected, the word at the caret. */
+export const STYLE_COMMANDS: SlashItem[] = [
+  s('bold', 'Bold', ['strong', 'b'], '⌘B does the same, or **stars** around the words.', { command: 'bold' }),
+  s('italic', 'Italic', ['em', 'i'], '⌘I does the same, or *a star* around the words.', { command: 'italic' }),
+  s('underline', 'Underline', ['u'], '⌘U does the same. Readers expect underlined text to be a link, so use it sparingly.', { command: 'underline' }),
+  s('strike', 'Strikethrough', ['strikethrough', 'del', 's'], 'A line through the words, or ~~tildes~~ around them.', { command: 'strikeThrough' }),
+  s('sup', 'Superscript', ['superscript', 'sup', 'power'], 'Raised small text — a footnote mark, a ™.', { command: 'superscript' }),
+  s('sub', 'Subscript', ['subscript', 'sub'], 'Lowered small text.', { command: 'subscript' }),
+  s('small', 'Small print', ['small', 'fine', 'footnote', 'caption'], 'The words at the small size.', { command: 'wrap', tag: 'small' }),
+  s('code', 'Code', ['mono', 'monospace', 'pre'], 'Monospace, for a code or a reference number; or `backticks` around the words.', { command: 'wrap', tag: 'code' }),
+  s('link', 'Link', ['url', 'href', 'anchor', 'a'], 'Link the words. ⌘K does the same, or [words](address).', { command: 'link' }),
+  s('unlink', 'Remove link', ['unlink'], 'Keep the words, drop the link.', { command: 'unlink' }),
+  s('clear', 'Clear formatting', ['plain', 'remove', 'reset'], 'Back to plain body copy.', { command: 'removeFormat' }),
+];
+
+/** Both halves, for anything that wants the whole list. */
+export const FORMAT_COMMANDS: SlashItem[] = [...TURN_COMMANDS, ...STYLE_COMMANDS];
+
+/** The `turn` item id for what a paragraph is, from its tag; null for anything the menu does not name. */
+export function turnIdOf(tag: string, listTag?: string | null): string | null {
+  const t = tag.toLowerCase();
+  if (t === 'p' || t === 'div') return 'p';
+  if (/^h[1-6]$/.test(t)) return t;
+  if (t === 'blockquote') return 'quote';
+  if (t === 'li') return listTag?.toLowerCase() === 'ol' ? 'ol' : 'ul';
+  return null;
+}
+
+/**
+ * A Markdown habit finished inline, read from the text before the caret the moment its closing mark is typed:
+ * `**bold**`, `*italic*` or `_italic_`, `` `code` ``, `~~struck~~`, `[words](address)`. What matched, where it
+ * starts in that text, the words to keep, and what to do to them. Nothing across a space-only run, and a lone
+ * `*` inside a word is not italic.
+ */
+export function inlineMarkdown(before: string): { start: number; text: string; exec: Exec; href?: string } | null {
+  const rules: Array<{ re: RegExp; exec: Exec; href?: boolean }> = [
+    { re: /\*\*([^*\n]+?)\*\*$/, exec: { command: 'bold' } },
+    { re: /(?<![*\w])\*([^*\n]+?)\*$/, exec: { command: 'italic' } },
+    { re: /(?<![_\w])_([^_\n]+?)_$/, exec: { command: 'italic' } },
+    { re: /~~([^~\n]+?)~~$/, exec: { command: 'strikeThrough' } },
+    { re: /`([^`\n]+?)`$/, exec: { command: 'wrap', tag: 'code' } },
+    { re: /\[([^\]\n]+?)\]\(([^)\s]+)\)$/, exec: { command: 'link' }, href: true },
+  ];
+  for (const rule of rules) {
+    const m = rule.re.exec(before);
+    if (!m) continue;
+    const text = m[1]!;
+    // Words, not a space with stars round it: `2 * 3 *` is arithmetic.
+    if (!text.trim() || text !== text.trim()) continue;
+    const start = before.length - m[0].length;
+    return rule.href ? { start, text, exec: rule.exec, href: m[2]! } : { start, text, exec: rule.exec };
+  }
+  return null;
+}
 
 /**
  * A block the menu can add below the current one. The app supplies the list from the palette, so
@@ -156,7 +210,8 @@ export const SHORTCUTS: Array<{ keys: string; does: string; when?: string }> = [
   { keys: '/', does: 'Open the menu — format the text, or add a block below' },
   { keys: '⌘K', does: 'Link the selection', when: 'editing' },
   { keys: '⌘K', does: 'Add a block below the selected one', when: 'selected' },
-  { keys: '⌘B  ⌘I  ⌘U', does: 'Bold, italic, underline', when: 'editing' },
+  { keys: '⌘B  ⌘I  ⌘U', does: 'Bold, italic, underline — the selection, or the word at the caret', when: 'editing' },
+  { keys: '**a**  *a*  `a`  ~~a~~  [a](url)', does: 'Bold, italic, code, strike, link — as you type the closing mark', when: 'editing' },
   { keys: '- ␣   1. ␣   # ␣   > ␣', does: 'Bullet, number, heading, quote — at the start of a line', when: 'editing' },
   { keys: 'Tab  ⇧Tab', does: 'Indent or outdent a list item', when: 'editing' },
   { keys: 'Enter', does: 'Edit the selected block’s text', when: 'selected' },

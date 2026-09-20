@@ -26,7 +26,7 @@ export interface SlashMenuProps {
   onHover(index: number): void;
 }
 
-const GROUP_NAMES: Record<SlashItem['group'], string> = { recent: 'Recent', format: 'Format', block: 'Add below' };
+const GROUP_NAMES: Record<SlashItem['group'], string> = { recent: 'Recent', turn: 'Turn into', style: 'Style', block: 'Add below' };
 
 export function SlashMenu({ items, index, top, left, query, title, onPick, onHover }: SlashMenuProps) {
   const list = useRef<HTMLDivElement | null>(null);
@@ -68,7 +68,8 @@ export function SlashMenu({ items, index, top, left, query, title, onPick, onHov
               onClick={() => onPick(item)}
             >
               <span class="sy-slash-label">{item.label}</span>
-              {item.group !== 'format' && !title && <span class="sy-slash-tag">block</span>}
+              {item.current && <span class="sy-slash-check" aria-label="What it is now">✓</span>}
+              {(item.group === 'block' || item.group === 'recent') && !title && <span class="sy-slash-tag">block</span>}
             </button>
           </div>
         );
