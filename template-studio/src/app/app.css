@@ -469,6 +469,9 @@ select { appearance: none; padding-right: 22px;
 .dial input { appearance: textfield; }
 
 .dials { display: grid; gap: 5px; margin-bottom: 10px; }
+/* A box around dials that belong together, so the pointer has something to be over. `display: contents`
+   would be tidier markup and no use at all: there would be no box for pointerenter to fire against. */
+.dials .dial-group { display: grid; gap: 5px; }
 .stripe-height { width: 118px; flex: none; }
 
 /* --- design system panel ---------------------------------------------------------------------- */
@@ -1591,6 +1594,9 @@ button.fig-pill:active { transform: scale(0.96); }
 .sy-space-gap { background: rgb(60 130 240 / 0.28); }
 .sy-space-box { background: rgb(150 120 220 / 0.26); }
 .sy-space-section { background: rgb(240 150 60 / 0.28); }
+/* Text padding, while a Design dial is being worked. Page padding reuses the green above on purpose, so the
+   colour means the same thing here as it does in the Inspector's Spacing panel: that space is padding. */
+.sy-space-text { background: rgb(210 90 150 / 0.26); }
 /* Positioned rather than flexed so the number is centred on the strip's own axis even when the
    strip is thinner than it is — a 16px gutter's label sits on the gutter, not beside it. */
 .sy-space-label {
@@ -1604,6 +1610,7 @@ button.fig-pill:active { transform: scale(0.96); }
 .sy-space-gap .sy-space-label { color: #1b4f9a; }
 .sy-space-box .sy-space-label { color: #4d3390; }
 .sy-space-section .sy-space-label { color: #8a4a00; }
+.sy-space-text .sy-space-label { color: #8a2f5c; }
 
 /* The cell a drop would join, behind the inset line: what makes "into this column" legible. */
 .sy-hint.sy-hint-frame {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { TEXT_INSET_CLASS } from '../compile/layout.ts';
 import { fromContentEditable, sanitise } from '../model/sanitise.ts';
 import type { BlockType } from '../model/types.ts';
 import { BLOCK_ICONS, ColumnsIcon, GroupIcon } from './icons.tsx';
@@ -119,6 +120,15 @@ export interface PreviewProps {
    * dial in the side panel shows the number moving on the canvas.
    */
   spacing?: string | null;
+
+  /**
+   * The page and text padding to draw, while a Design dial is being worked. Null the rest of the time.
+   *
+   * Separate from `spacing` because it answers a different question — that one draws the box model of one block
+   * you are pointing at, this one draws one decision across the whole email — and because the two are written by
+   * different panels and would otherwise clear each other.
+   */
+  padHot?: PadSpec | null;
 
   /**
    * The selected block's name, which turns on the on-canvas action bar.
@@ -256,9 +266,24 @@ interface SpaceBox {
   left: number;
   width: number;
   height: number;
-  kind: 'pad' | 'gap' | 'section' | 'box';
+  kind: 'pad' | 'gap' | 'section' | 'box' | 'text';
   /** The number the strip is, as rendered. */
   value: number;
+}
+
+/**
+ * The padding a Design dial is showing right now, at the value the pointer is on.
+ *
+ * Sent while the Page / layout panel is being worked, and null the rest of the time. `textBlocks` is the ids of
+ * the headings and text blocks, which the canvas cannot tell apart from anything else once it is HTML — it is
+ * only needed for the moment when text padding is being dragged up from zero and the inset cell does not exist
+ * in the document yet.
+ */
+export interface PadSpec {
+  pageX: number;
+  textX: number;
+  textY: number;
+  textBlocks: string[];
 }
 
 /** A row as the canvas draws it: what it is, and its band in frame coordinates. */
@@ -351,6 +376,7 @@ export function Preview({
   alsoSelected,
   onClipboard,
   spacing,
+  padHot,
   selectedSection,
   onSelectSection,
   sections,
@@ -387,6 +413,13 @@ export function Preview({
   const [hint, setHint] = useState<Hint | null>(null);
   /** The spacing overlay's strips, in frame coordinates. Empty when nothing is being shown. */
   const [spaces, setSpaces] = useState<SpaceBox[]>([]);
+  /**
+   * The padding bands, kept apart from `spaces` on purpose.
+   *
+   * `setSpaces` is written from six places that all belong to the hover-and-Inspector story, and every one of
+   * them clears it. A second writer sharing the array would be cleared by whichever fired last.
+   */
+  const [padSpaces, setPadSpaces] = useState<SpaceBox[]>([]);
   const spacingRef = useRef<string | null>(spacing ?? null);
   spacingRef.current = spacing ?? null;
   /** The block under the pointer, for the hover form of the overlay. */
@@ -723,6 +756,120 @@ export function Preview({
     const container = ((host ?? root).closest('.hse-column-container') ?? root.querySelector('.hse-column-container')) as HTMLElement | null;
     if (container) strips(container, 'section', false);
     return out;
+  };
+
+  // --- the padding overlay, for the Design panel's dials -----------------------------------------
+  //
+  // Jared: "show the page and text padding visualy as you adjust."
+  //
+  // The canvas lags the document by CANVAS_LAG, and during a continuous drag that trailing timer never fires at
+  // all — which is the right behaviour, because reloading the document under a moving pointer would strobe. So
+  // the value the pointer is on is written into the frame as one stylesheet the app owns, and the email reflows
+  // with the drag because a stylesheet write is a style recalc rather than a document load. Then the bands are
+  // measured back out of the live document, the same way `measureSpacing` does, so what is drawn is what the
+  // client gets rather than what the dial says. When the drag ends the canvas catches up and the sheet and the
+  // document say the same thing.
+
+  /** The id of the app's own override sheet inside the frame. */
+  const PAD_SHEET = 'sy-pad-live';
+
+  const paintPadding = (spec: PadSpec | null) => {
+    const inner = frame.current?.contentDocument;
+    if (!inner?.head) return;
+    const found = inner.getElementById(PAD_SHEET) as HTMLStyleElement | null;
+    if (!spec) {
+      found?.remove();
+      return;
+    }
+    const sheet = found ?? inner.createElement('style');
+    sheet.id = PAD_SHEET;
+    // Last in the head, so it outranks the compiled phone rule at equal specificity.
+    if (sheet.parentNode !== inner.head || inner.head.lastChild !== sheet) inner.head.appendChild(sheet);
+    sheet.textContent = [
+      // `:not([class*="sy-pad-"])` is exactly "follows the page gutter": a column that set its own sides wears
+      // `sy-pad-<left>-<right>` from compile/context.ts, and must not be dragged along by the system's dial.
+      `td.hs_padded:not([class*="sy-pad-"]) { padding-left:${spec.pageX}px !important; padding-right:${spec.pageX}px !important }`,
+      `td.${TEXT_INSET_CLASS} { padding:${spec.textY}px ${spec.textX}px !important }`,
+    ].join('\n');
+  };
+
+  /**
+   * Vertically contiguous strips in the same column, as one band.
+   *
+   * Every block's cell carries the gutter, so measuring them raw gives a stack of forty stripes down each side,
+   * each with its own number sitting on top of the last. A normal email should read as two clean bands.
+   */
+  const coalesce = (boxes: SpaceBox[]): SpaceBox[] => {
+    const out: SpaceBox[] = [];
+    for (const box of [...boxes].sort((a, b) => a.left - b.left || a.top - b.top)) {
+      const last = out[out.length - 1];
+      const joins =
+        last &&
+        last.kind === box.kind &&
+        Math.abs(last.left - box.left) < 0.5 &&
+        Math.abs(last.width - box.width) < 0.5 &&
+        box.top <= last.top + last.height + 1;
+      if (!joins || !last) {
+        out.push({ ...box });
+        continue;
+      }
+      last.height = Math.max(last.top + last.height, box.top + box.height) - last.top;
+    }
+    return out;
+  };
+
+  const measurePadding = (spec: PadSpec): SpaceBox[] => {
+    const inner = frame.current?.contentDocument;
+    const view = inner?.defaultView;
+    // The same guard the spacing overlay uses: a block with the caret in it is being written, not looked at.
+    if (!inner || !view || editing.current || slashRef.current) return [];
+
+    const sides = (el: HTMLElement, kind: SpaceBox['kind'], key: string, both: boolean): SpaceBox[] => {
+      const cs = view.getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      const [pt, pr, pb, pl] = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map((v) => parseFloat(v) || 0) as [number, number, number, number];
+      const tall = Math.max(0, r.height - pt - pb);
+      const out: SpaceBox[] = [];
+      if (pl > 0) out.push({ key: `${key}-l`, kind, top: r.top + pt, left: r.left, width: pl, height: tall, value: pl });
+      if (pr > 0) out.push({ key: `${key}-r`, kind, top: r.top + pt, left: r.right - pr, width: pr, height: tall, value: pr });
+      if (!both) return out;
+      if (pt > 0) out.push({ key: `${key}-t`, kind, top: r.top, left: r.left, width: r.width, height: pt, value: pt });
+      if (pb > 0) out.push({ key: `${key}-b`, kind, top: r.bottom - pb, left: r.left, width: r.width, height: pb, value: pb });
+      return out;
+    };
+
+    const gutter: SpaceBox[] = [];
+    for (const el of inner.querySelectorAll('td.hs_padded:not([class*="sy-pad-"])')) {
+      gutter.push(...sides(el as HTMLElement, 'pad', 'pg', false));
+    }
+
+    const insets = [...inner.querySelectorAll(`td.${TEXT_INSET_CLASS}`)] as HTMLElement[];
+    const text: SpaceBox[] = [];
+    if (insets.length) {
+      for (const [i, el] of insets.entries()) text.push(...sides(el, 'text', `tp${i}`, true));
+    } else if (spec.textX > 0 || spec.textY > 0) {
+      // Dragged up from nothing: the inset cell is not in the document yet, because at zero the compiler emits no
+      // markup at all and the canvas will not catch up until the drag ends. The band is drawn where the cell will
+      // be — the host's content box, which is its rectangle less the page gutter — so the space appears under the
+      // pointer instead of after it.
+      for (const [i, id] of spec.textBlocks.entries()) {
+        const block = inner.querySelector(`[data-sy-block="${CSS.escape(id)}"]`) as HTMLElement | null;
+        const host = block && cellOf(block);
+        if (!host) continue;
+        const r = contentBox(host);
+        const x = Math.min(spec.textX, r.width / 2);
+        const y = Math.min(spec.textY, r.height / 2);
+        if (x > 0) {
+          text.push({ key: `tw${i}-l`, kind: 'text', top: r.top + y, left: r.left, width: x, height: Math.max(0, r.height - y * 2), value: spec.textX });
+          text.push({ key: `tw${i}-r`, kind: 'text', top: r.top + y, left: r.right - x, width: x, height: Math.max(0, r.height - y * 2), value: spec.textX });
+        }
+        if (y > 0) {
+          text.push({ key: `tw${i}-t`, kind: 'text', top: r.top, left: r.left, width: r.width, height: y, value: spec.textY });
+          text.push({ key: `tw${i}-b`, kind: 'text', top: r.bottom - y, left: r.left, width: r.width, height: y, value: spec.textY });
+        }
+      }
+    }
+    return [...coalesce(gutter), ...text];
   };
 
   /** Where the action bar sits, in frame coordinates. Null when nothing is selected. */
@@ -1738,8 +1885,8 @@ export function Preview({
   // The measuring helpers above read refs and the live document, and the callbacks the app hands in are rebuilt
   // every render. The effects below read them all through `live`, the latest render's copies, so each effect's
   // dependency list holds only what it responds to, and a keystroke elsewhere in the app does not re-resolve a drop.
-  const live = useRef({ probeAt, measureRows, measureDividers, measureSpacing, idOfBand, onProbe, onAutoEdited });
-  live.current = { probeAt, measureRows, measureDividers, measureSpacing, idOfBand, onProbe, onAutoEdited };
+  const live = useRef({ probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited });
+  live.current = { probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited };
   const probeX = probe?.x ?? null;
   const probeY = probe?.y ?? null;
   useEffect(() => {
@@ -1816,6 +1963,16 @@ export function Preview({
     setSpaces(id ? live.current.measureSpacing(id) : []);
   }, [ready, spacing, height, doc]);
 
+  // --- the padding overlay ----------------------------------------------------------------------
+  //
+  // Paint, then measure, in that order: writing the sheet forces the style recalc that the measurement then
+  // reads. `doc` and `ready` are here because a reload replaces the document and takes the injected sheet with
+  // it; `width` because switching to the phone canvas changes which rule wins and so what the band is.
+  useEffect(() => {
+    live.current.paintPadding(padHot ?? null);
+    setPadSpaces(padHot ? live.current.measurePadding(padHot) : []);
+  }, [ready, padHot, height, width, doc]);
+
   // --- dimming, for the editability view --------------------------------------------------------
   useEffect(() => {
     const inner = frame.current?.contentDocument;
@@ -1879,7 +2036,7 @@ export function Preview({
   return (
     <div class="preview-frame" style={{ width: `${width}px` }}>
       {!plain && (<>
-      {spaces.map((s) => (
+      {[...spaces, ...padSpaces].map((s) => (
         <div
           key={s.key}
           class={`sy-space sy-space-${s.kind}`}

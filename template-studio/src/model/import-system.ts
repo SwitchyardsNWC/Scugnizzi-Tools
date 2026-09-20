@@ -715,6 +715,12 @@ function applySystemJson(raw: Record<string, unknown>, ds: DesignSystem, warning
   for (const key of ['containerWidth', 'pagePadding', 'blockGap', 'pageMargin', 'pageBorderWidth', 'mobileBreakpoint', 'textPadX', 'textPadY'] as const) {
     keep(key, (v) => typeof v === 'number' && Number.isFinite(v), 'a number');
   }
+  // The phone overrides take null as well as a number, because null is how a system says "follow the desktop
+  // value" — the loop above would have thrown it away as not-a-number and quietly pinned the phone to whatever
+  // the desktop happened to be at import time.
+  for (const key of ['mobilePagePadding', 'mobileTextPadX', 'mobileTextPadY'] as const) {
+    keep(key, (v) => v === null || (typeof v === 'number' && Number.isFinite(v)), 'a number, or nothing to follow the desktop value');
+  }
   if (typeof ds.containerWidth === 'number' && (ds.containerWidth < WIDTH_RANGE.min || ds.containerWidth > WIDTH_RANGE.max)) {
     warnings.push(`${ds.containerWidth}px is a page, not an email, so the width stayed at ${DEFAULT_DESIGN_SYSTEM.containerWidth}px.`);
     ds.containerWidth = DEFAULT_DESIGN_SYSTEM.containerWidth;

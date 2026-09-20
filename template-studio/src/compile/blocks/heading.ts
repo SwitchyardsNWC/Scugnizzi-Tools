@@ -51,7 +51,7 @@ export function headingParts(block: HeadingBlock, sec: Section, col: Column, ctx
 
   const heading = textInset(
     el(block.level, { class: cls, style: `${style}; text-align:${block.align}; color:${color}`, align: block.align }, content.value),
-    ctx.ds,
+    ctx,
   );
 
   return {

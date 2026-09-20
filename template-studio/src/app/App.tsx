@@ -65,7 +65,7 @@ import { clipText, parseClip } from '../model/clipboard.ts';
 import { applyPattern, detachPattern, instanceOf, patternFromSection, placePattern, pushPattern, type Pattern } from '../model/patterns.ts';
 import { fileSlug, serializeDesignSystem, serializePattern } from '../model/serialize.ts';
 import { tidyTemplate } from '../model/tidy.ts';
-import type { DesignSystem } from '../model/design-system.ts';
+import { onPhone, type DesignSystem } from '../model/design-system.ts';
 import { blankTemplate } from '../model/starters.ts';
 import { SY_BLOCKS } from '../model/switchyards.ts';
 import { cloneSection as copySection, designSystemOf as systemOf, freshIds as idsFor, takenFieldNames as fieldsTaken } from '../model/edit.ts';
@@ -714,6 +714,39 @@ export function App() {
     }
     return null;
   }, [spacingHot, editor.selection, editor.template]);
+
+  /**
+   * The padding to draw on the canvas while the Design panel's padding dials are being worked.
+   *
+   * Read off `editor.template` rather than `shownTemplate`, on purpose: the canvas lags by CANVAS_LAG and during
+   * a continuous drag that trailing timer never fires at all, so the shown template is not where the pointer is.
+   * Preview writes these numbers into the frame as a live override and measures the result, which is how the
+   * bands follow the drag without the document reloading under it.
+   */
+  const [padHot, setPadHot] = useState(false);
+  const padSpec = useMemo(() => {
+    if (!padHot) return null;
+    const ds = designSystemOf(editor.template);
+    const phone = device === 'phone';
+    // The ids of the headings and text blocks, needed only while text padding is being dragged up from zero,
+    // when the inset cell those bands belong to is not in the document yet.
+    const textBlocks: string[] = [];
+    for (const section of editor.template.sections) {
+      for (const row of section.rows) {
+        for (const column of row.columns) {
+          for (const block of column.blocks) {
+            if (block.type === 'heading' || block.type === 'richtext') textBlocks.push(block.id);
+          }
+        }
+      }
+    }
+    return {
+      pageX: phone ? onPhone(ds.mobilePagePadding, ds.pagePadding) : Math.max(0, ds.pagePadding),
+      textX: phone ? onPhone(ds.mobileTextPadX, ds.textPadX) : Math.max(0, ds.textPadX),
+      textY: phone ? onPhone(ds.mobileTextPadY, ds.textPadY) : Math.max(0, ds.textPadY),
+      textBlocks,
+    };
+  }, [padHot, device, editor.template]);
 
   /** Every selected block, primary first, in the order the document holds them. */
   const selectedIds = useMemo(() => {
@@ -1861,6 +1894,7 @@ export function App() {
           onChooseFiles={(picked) => void adopt(workspaceFromFiles(picked))}
           device={device === 'phone' ? 'phone' : 'desktop'}
           onDevice={setDevice}
+          onPadHot={setPadHot}
           {...(workspace?.label ? { workspaceLabel: workspace.label } : {})}
           onOpenFile={(file) => void open(file)}
           onOpenFolder={pickFolder}
@@ -2101,6 +2135,7 @@ export function App() {
               autoEdit={autoEdit}
               onAutoEdited={() => setAutoEdit(null)}
               spacing={spacingFor}
+              padHot={padSpec}
               {...(picked
                 ? {
                     selectedLabel: picked.label,

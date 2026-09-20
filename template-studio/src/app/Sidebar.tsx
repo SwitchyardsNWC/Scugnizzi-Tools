@@ -69,6 +69,8 @@ export interface SidebarProps {
   onChooseFiles(files: File[]): void;
   device: 'desktop' | 'phone';
   onDevice(device: 'desktop' | 'phone'): void;
+  /** True while the Design panel's padding dials are being worked; the canvas draws the space they set. */
+  onPadHot?(hot: boolean): void;
   onOpenFile(file: TemplateFile): void;
   /**
    * Removes a file from the folder; absent when the folder cannot be written. Passed through to the Files panel,
@@ -189,6 +191,7 @@ export function Sidebar(props: SidebarProps) {
             onFollow={props.onFollowSystem}
             onSaveAs={props.onSaveSystemAs}
             onDetach={props.onDetachSystem}
+            {...(props.onPadHot ? { onPadHot: props.onPadHot } : {})}
           />
         )}
       </div>

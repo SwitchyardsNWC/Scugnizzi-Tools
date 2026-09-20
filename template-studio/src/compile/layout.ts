@@ -9,7 +9,10 @@
 // (plan.md, Risks) true by construction rather than by review.
 
 import { el, frag, raw, type AttrValue, type ElementColors, type IRNode } from './ir.ts';
-import { buttonOf, colorOf, fontDecl, halfWidth, typeOf, type ButtonStyle, type DesignSystem } from '../model/design-system.ts';
+import { buttonOf, colorOf, fontDecl, halfWidth, onPhone, typeOf, type ButtonStyle, type DesignSystem } from '../model/design-system.ts';
+// Type-only, so the pair stays a compile-time cycle and never a runtime one — context.ts already imports
+// `type BoxTokens` back from here on the same terms.
+import type { BuildContext } from './context.ts';
 
 // Every primitive takes the design system rather than reading a constant, and takes it as a
 // *required* option so a new call site cannot quietly fall back to Helvetica. That is the whole
@@ -253,8 +256,22 @@ function classOf(padded: boolean, className: string | null | undefined): string 
  * `className` is the side-padding override, when the column has one — see `padClass`. `padded`
  * is off for a row inside a stacked column, for the reason `CellOptions` gives.
  */
-/** Whether the system asks for space inside text blocks at all. Zero emits no markup, so nothing changes. */
-export const hasTextInset = (ds: DesignSystem): boolean => Math.max(0, ds.textPadX ?? 0) > 0 || Math.max(0, ds.textPadY ?? 0) > 0;
+/** The class every text-inset cell wears: what the phone rule selects, and what the Design panel's overlay measures. */
+export const TEXT_INSET_CLASS = 'sy-tp';
+
+/**
+ * Whether the system asks for space inside text blocks at all, on either width. All four at zero emits no markup,
+ * so nothing changes for a template that has never touched it.
+ *
+ * The phone values count: a system with nothing on desktop and 8px on phones still needs the cell, because the
+ * media query has to have something to select. That cell is emitted with `padding:0px 0px`, which is what it
+ * already renders as.
+ */
+export const hasTextInset = (ds: DesignSystem): boolean =>
+  Math.max(0, ds.textPadX ?? 0) > 0 ||
+  Math.max(0, ds.textPadY ?? 0) > 0 ||
+  onPhone(ds.mobileTextPadX, 0) > 0 ||
+  onPhone(ds.mobileTextPadY, 0) > 0;
 
 /**
  * A heading's or a text block's content inside the extra space the design system asks for (`textPadX`, `textPadY`),
@@ -264,11 +281,26 @@ export const hasTextInset = (ds: DesignSystem): boolean => Math.max(0, ds.textPa
  * opens for editing (inline-text.ts, TEXT_TARGETS) and the editable has to be the cell that holds the paragraphs —
  * not one that holds a table that holds them.
  */
-export function textInset(inner: IRNode, ds: DesignSystem, className?: string): IRNode {
+export function textInset(inner: IRNode, ctx: BuildContext, className?: string): IRNode {
+  const ds = ctx.ds;
   const x = Math.max(0, ds.textPadX ?? 0);
   const y = Math.max(0, ds.textPadY ?? 0);
-  if (!x && !y) return inner;
-  return cell(inner, { ds, padding: `${y}px ${x}px`, padded: false, ...(className ? { className } : {}) });
+  const phoneX = onPhone(ds.mobileTextPadX, x);
+  const phoneY = onPhone(ds.mobileTextPadY, y);
+  if (!x && !y && !phoneX && !phoneY) return inner;
+  // One rule for the whole email, pushed from the first cell that wears the class: text padding is a single
+  // system-wide decision, unlike a column's sides, so there is nothing to key the class on and nothing to collide.
+  if (phoneX !== x || phoneY !== y) {
+    ctx.once(TEXT_INSET_CLASS, () =>
+      ctx.mobile.push(`.${TEXT_INSET_CLASS} { padding:${phoneY}px ${phoneX}px !important }`),
+    );
+  }
+  // `sy-tp` joined last, so rich text stays `sy-rich …` and TEXT_TARGETS still finds the editable cell by its
+  // first class. One marker serves two callers: the phone rule needs a selector to override the inline padding,
+  // and the Design panel's overlay needs something to measure — inventing a second class for the second job is
+  // how a codebase ends up with two names for one cell.
+  const named = [className, TEXT_INSET_CLASS].filter(Boolean).join(' ');
+  return cell(inner, { ds, padding: `${y}px ${x}px`, padded: false, className: named });
 }
 
 export function imageCell(

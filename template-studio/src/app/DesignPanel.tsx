@@ -21,6 +21,7 @@ import { colorOf, DEFAULT_DESIGN_SYSTEM, type DesignSystem, type TypeStyle } fro
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
+import { InheritDial } from './InheritDial.tsx';
 
 // The design system editor.
 //
@@ -91,9 +92,16 @@ export interface DesignPanelProps {
   onFollow(name: string): void;
   onSaveAs(name: string): void;
   onDetach(): void;
+  /**
+   * True while the padding dials are being worked, so the canvas draws the space they set.
+   *
+   * The panel says only that they are hot; App reads the numbers off the undebounced template itself, because
+   * those are the numbers the pointer is on and the canvas is a beat behind them by design.
+   */
+  onPadHot?(hot: boolean): void;
 }
 
-export function DesignPanel({ editor, onClose, device, onDevice, systems, folderOpen, onFollow, onSaveAs, onDetach }: DesignPanelProps) {
+export function DesignPanel({ editor, onClose, device, onDevice, systems, folderOpen, onFollow, onSaveAs, onDetach, onPadHot }: DesignPanelProps) {
   const ds = designSystemOf(editor.template);
   const tuned = editor.template.ds !== undefined;
   const following = editor.template.designSystem ?? null;
@@ -150,7 +158,7 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
       {/* The page first: how wide the email is, what frames it and what sits outside it are the
           decisions every other value is set *against*. Choosing a 38px H1 before you have decided
           whether the email is 600px or 320px wide is choosing it twice. */}
-      <PagePanel editor={editor} ds={ds} />
+      <PagePanel editor={editor} ds={ds} phone={phone} onPadHot={onPadHot} />
 
       {/* Then typography, together: a list and a quote are set in the same scale as the paragraph
           above them, and reaching past Colour and Buttons to adjust one was a walk between two
@@ -1148,11 +1156,25 @@ function Preset({ editor, ds, name, only }: { editor: Editor; ds: DesignSystem; 
  * twice. It is also the one panel whose four values only make sense read together, which is why
  * they are four dials in one place rather than spread between here and the inspector.
  */
-function PagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
+function PagePanel({ editor, ds, phone, onPadHot }: { editor: Editor; ds: DesignSystem; phone: boolean; onPadHot?: (hot: boolean) => void }) {
+  // While the pointer is over the padding dials, or one of them has focus, the canvas draws the space they set.
+  // The group rather than the dial, copied from the Inspector's Spacing panel: one box to hover, and focus moving
+  // between the three dials inside it does not flicker the overlay off and on.
+  const hot = onPadHot
+    ? {
+        onPointerEnter: () => onPadHot(true),
+        onPointerLeave: () => onPadHot(false),
+        onFocusIn: () => onPadHot(true),
+        onFocusOut: (e: FocusEvent) => {
+          const next = e.relatedTarget as Node | null;
+          if (!next || !(e.currentTarget as HTMLElement).contains(next)) onPadHot(false);
+        },
+      }
+    : {};
   return (
     <Panel
       name="Page / layout"
-      summary={`${ds.containerWidth}px · ${ds.pagePadding}px gutter`}
+      summary={`${ds.containerWidth}px · ${ds.pagePadding}px gutter${typeof ds.mobilePagePadding === 'number' ? ` · ${ds.mobilePagePadding}px on phones` : ''}`}
       help="The sheet the email sits on: its width, the gutter inside it, the frame around it, the space outside it, and where the phone rules take over. Columns inside a row are set on the row."
     >
       <div class="dials">
@@ -1166,35 +1188,84 @@ function PagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
           suffix="px"
           title="The whole email body. 600px is the number every client agrees about, but narrow is a real design — a 300px receipt is a template, not a mistake."
         />
-        <Dial
-          label="Page padding"
-          value={ds.pagePadding}
-          onChange={(v) => editor.set('ds.pagePadding', v)}
-          min={0}
-          max={80}
-          suffix="px"
-          title="The gutter between the email's edge and its content, both sides. With the width above it is what sets the measure — the line length the copy actually gets."
-        />
-        <Dial
-          label="Text padding ↔"
-          value={ds.textPadX}
-          onChange={(v) => editor.set('ds.textPadX', v)}
-          min={0}
-          max={60}
-          suffix="px"
-          zero="None"
-          title="Extra space inside every heading and text block, each side, on top of the page padding. Buttons and images keep their own."
-        />
-        <Dial
-          label="Text padding ↕"
-          value={ds.textPadY}
-          onChange={(v) => editor.set('ds.textPadY', v)}
-          min={0}
-          max={60}
-          suffix="px"
-          zero="None"
-          title="Extra space above and below the words in every heading and text block. A paragraph's own space after stays as set in Type."
-        />
+        {/* The three paddings together, in one box the pointer can be over: while it is, the canvas draws the
+            space they set, on the email rather than in a number. Same idea as the Inspector's Spacing panel, so
+            hovering a padding dial means the same thing wherever you are. */}
+        <div class="dial-group" {...hot}>
+          {phone ? (
+            <>
+              <InheritDial
+                label="Page padding"
+                value={ds.mobilePagePadding}
+                inherited={ds.pagePadding}
+                inheritedName="the desktop gutter"
+                onChange={(v) => editor.set('ds.mobilePagePadding', v)}
+                min={0}
+                max={80}
+                suffix="px"
+                zero="None"
+                title="The gutter on phones. Following the desktop number unless you give it one of its own — and 0 is a real choice here, an email that runs to the edge of the screen."
+              />
+              <InheritDial
+                label="Text padding ↔"
+                value={ds.mobileTextPadX}
+                inherited={ds.textPadX}
+                inheritedName="the desktop text padding"
+                onChange={(v) => editor.set('ds.mobileTextPadX', v)}
+                min={0}
+                max={60}
+                suffix="px"
+                zero="None"
+                title="Space inside every heading and text block on phones, each side. A phone has less width to give away, so this is usually the one to take back."
+              />
+              <InheritDial
+                label="Text padding ↕"
+                value={ds.mobileTextPadY}
+                inherited={ds.textPadY}
+                inheritedName="the desktop text padding"
+                onChange={(v) => editor.set('ds.mobileTextPadY', v)}
+                min={0}
+                max={60}
+                suffix="px"
+                zero="None"
+                title="Space above and below the words in every heading and text block on phones."
+              />
+              <p class="note">Outlook on Windows keeps the desktop numbers: it ignores the phone rules entirely.</p>
+            </>
+          ) : (
+            <>
+              <Dial
+                label="Page padding"
+                value={ds.pagePadding}
+                onChange={(v) => editor.set('ds.pagePadding', v)}
+                min={0}
+                max={80}
+                suffix="px"
+                title="The gutter between the email's edge and its content, both sides. With the width above it is what sets the measure — the line length the copy actually gets."
+              />
+              <Dial
+                label="Text padding ↔"
+                value={ds.textPadX}
+                onChange={(v) => editor.set('ds.textPadX', v)}
+                min={0}
+                max={60}
+                suffix="px"
+                zero="None"
+                title="Extra space inside every heading and text block, each side, on top of the page padding. Buttons and images keep their own."
+              />
+              <Dial
+                label="Text padding ↕"
+                value={ds.textPadY}
+                onChange={(v) => editor.set('ds.textPadY', v)}
+                min={0}
+                max={60}
+                suffix="px"
+                zero="None"
+                title="Extra space above and below the words in every heading and text block. A paragraph's own space after stays as set in Type."
+              />
+            </>
+          )}
+        </div>
         <Dial
           label="Between blocks"
           value={ds.blockGap}

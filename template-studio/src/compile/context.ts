@@ -4,7 +4,7 @@
 // previewed or exported (architecture.md §2). If a block ever needs to branch on mode, the fix is a
 // `print` node with a fallback or an `if` node, not a flag.
 
-import { colorOf, theme, type DesignSystem } from '../model/design-system.ts';
+import { colorOf, onPhone, theme, type DesignSystem } from '../model/design-system.ts';
 import type { BoxTokens } from './layout.ts';
 import type { Column, Preview } from '../model/types.ts';
 
@@ -96,15 +96,26 @@ export function paddingOf(column: Padded, ds: DesignSystem): string {
  * Named for the numbers rather than for the block, so two blocks that made the same choice share
  * one rule instead of paying for it twice.
  */
+/**
+ * The gutter's own phone rule, once per document.
+ *
+ * Pushed by whatever needs it first — a padded column, or the legal footer, which builds its own cells rather
+ * than going through `padClass` and would otherwise be the one part of the email that did not move when the phone
+ * gutter changed. Emitted from the cells that wear the class rather than into the head of every template, where a
+ * footer-only email carried it for nothing.
+ */
+export function gutterPhoneRule(ctx: BuildContext): void {
+  const phone = onPhone(ctx.ds.mobilePagePadding, ctx.ds.pagePadding);
+  ctx.once('hs_padded', () =>
+    ctx.mobile.push(`.hs_padded { padding-left:${phone}px !important; padding-right:${phone}px !important }`),
+  );
+}
+
 export function padClass(column: Padded, ctx: BuildContext): string | null {
   const { left, right } = sidesOf(column, ctx.ds);
   const gut = ctx.ds.pagePadding;
-  // The gutter's own phone rule, once, from the first cell that wears the class — rather than in
-  // the head for every template, where a footer-only email carried it for nothing. It goes in
-  // first, so a departing cell's rule below still comes later in the sheet and wins.
-  ctx.once('hs_padded', () =>
-    ctx.mobile.push(`.hs_padded { padding-left:${gut}px !important; padding-right:${gut}px !important }`),
-  );
+  // It goes in first, so a departing cell's rule below still comes later in the sheet and wins.
+  gutterPhoneRule(ctx);
   if (left === gut && right === gut) return null;
   const cls = `sy-pad-${left}-${right}`;
   ctx.once(cls, () =>
