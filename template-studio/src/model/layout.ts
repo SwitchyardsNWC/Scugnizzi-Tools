@@ -27,6 +27,8 @@ export const META = {
   /** The studio library: starters and project types a folder carries of its own (model/library.ts). */
   starters: metaPath('starters'),
   projectTypes: metaPath('project-types'),
+  /** What a delete goes through, so it can be put back (model/trash.ts). Swept to its caps. */
+  trash: metaPath('trash'),
 } as const;
 
 /** How a rendered picture is named in documents and in the assets list: under this prefix, wherever its file is. */
@@ -61,4 +63,5 @@ export const VISIBLE_FOLDER_NOTES: Record<string, string> = {
   [META.rendered]: 'pictures drawn from an email’s text',
   [META.starters]: 'emails to start from, in this folder’s New menu',
   [META.projectTypes]: 'what Create a project makes, as this folder sets it',
+  [META.trash]: 'what was deleted, until the project board sweeps it',
 };

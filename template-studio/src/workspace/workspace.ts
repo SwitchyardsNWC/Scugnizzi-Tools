@@ -16,6 +16,8 @@ import { importV1 } from '../model/import-v1.ts';
 import { completeDesignSystem, type DesignSystem } from '../model/design-system.ts';
 import { parsePattern, type Pattern } from '../model/patterns.ts';
 import { parseProjectType, parseStarter, type ProjectTypeFile, type StarterFile } from '../model/library.ts';
+
+import { keepBytesInTrash } from './trash.ts';
 import { patternFileName, systemFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { zip } from '../model/zip.ts';
@@ -162,7 +164,8 @@ export interface Workspace {
   projectTypes(): Promise<Array<{ fileName: string; item: ProjectTypeFile }>>;
   writeProjectType(fileName: string, json: string): Promise<void>;
   /** Removes one library file. Absent on a read-only workspace, which is how the tool knows not to offer it. */
-  deleteLibraryFile?(folder: 'starters' | 'project-types', fileName: string): Promise<void>;
+  /** `name` is what the library called it, so the trash lists "Monthly note" rather than its file name. */
+  deleteLibraryFile?(folder: 'starters' | 'project-types', fileName: string, name?: string): Promise<void>;
 }
 
 const SYSTEM = '.system.json';
@@ -299,13 +302,15 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     return (m ?? dir).getDirectoryHandle(name, { create: true });
   };
   /** Every folder a tool's files may be in: the new place, and the old one until the project is opened for editing. */
-  const toolFolders = async (name: string): Promise<Handle[]> => {
-    const out: Handle[] = [];
+  const toolFolders = async (name: string): Promise<Handle[]> => (await toolPlaces(name)).map((p) => p.folder);
+  /** The same walk, with the path each place is at — what the trash needs to put a file back where it was. */
+  const toolPlaces = async (name: string): Promise<Array<{ folder: Handle; at: string }>> => {
+    const out: Array<{ folder: Handle; at: string }> = [];
     const m = await meta();
     const modern = m ? await subdirectory(m, name) : null;
-    if (modern) out.push(modern);
+    if (modern) out.push({ folder: modern, at: `${META_DIR}/${name}` });
     const legacy = await subdirectory(dir, name);
-    if (legacy) out.push(legacy);
+    if (legacy) out.push({ folder: legacy, at: name });
     return out;
   };
   return {
@@ -449,16 +454,18 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
     async writeProjectType(fileName, json) {
       await writeLibrary(writable, dir.name, toolFolder, 'project-types', fileName, json);
     },
-    async deleteLibraryFile(folder, fileName) {
+    async deleteLibraryFile(folder, fileName, name) {
       if (!writable) throw refused(dir.name);
       return writing(dir.name, async () => {
-        for (const source of await toolFolders(folder)) {
+        for (const place of await toolPlaces(folder)) {
+          let handle: FileSystemFileHandle;
           try {
-            await source.getFileHandle(fileName);
+            handle = await place.folder.getFileHandle(fileName);
           } catch {
             continue;
           }
-          await source.removeEntry(fileName);
+          await keepBytesInTrash(dir, `${place.at}/${fileName}`, await handle.getFile(), name ? { name } : {});
+          await place.folder.removeEntry(fileName);
           return;
         }
         throw new Error(`${fileName} is not in ${dir.name} any more.`);
@@ -574,13 +581,21 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         // be removed. Sharing the helper is what makes "everything the panel offered can be deleted" true by
         // construction rather than by coincidence.
         let removed = 0;
-        for (const source of [...(await toolFolders('templates')), dir]) {
+        for (const place of [...(await toolPlaces('templates')), { folder: dir, at: '' }]) {
+          let handle: FileSystemFileHandle;
           try {
-            await source.getFileHandle(fileName);
+            handle = await place.folder.getFileHandle(fileName);
           } catch {
             continue;
           }
-          await source.removeEntry(fileName);
+          // The first copy — the one the panel showed — goes to the trash so it can be put back (model/trash.ts).
+          // The hidden duplicates behind it are shadows that should not exist and are simply removed.
+          if (removed === 0) {
+            const path = place.at ? `${place.at}/${fileName}` : fileName;
+            const file = await handle.getFile();
+            await keepBytesInTrash(dir, path, file, { name: nameInside(await file.text(), fileName) });
+          }
+          await place.folder.removeEntry(fileName);
           removed += 1;
         }
         if (removed === 0) throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);

@@ -2771,3 +2771,41 @@ Then: "Creating and editing the project start templates too."
 - **Confirmed, not applied.** The panel reads the paste, shows the palette it found, the paths that changed and
   every warning, and only then offers Save — which is what §3a asked for when it said mapping presets onto an
   unfamiliar palette "should be a step the designer confirms".
+
+### 3.93 The trash, and the can in the corner
+
+*2026-09-19. Jared, on the board's missing-card note: "should deleted items go in an 'archive' so they can be
+restored?" Then: "build it, put a cap on how much trash stays in a project, so it doesn't accidentally become
+weight." Then: "make a fun trashcan icon in the lower right of the canvas to see everything in the trash."*
+
+- **The gap Undo could not close.** Undo holds the deleted file's bytes in a closure, so it dies with the tab.
+  Delete an email, close the browser, and it is gone from a folder a whole team shares. The project had already
+  admitted this in one place — it refuses to delete a Google Doc and points at Drive, "where the trash can give
+  it back" — and had no equivalent of its own.
+- **One door in, one door out.** A delete writes two files into `.scug/trash/`, the bytes and a record of where
+  they came from, and nothing else in the app reads that folder. That is what keeps it from becoming the
+  two-copies bug this codebase keeps catching: it is a holding pen, never a second place to look for a template.
+  `keepInTrash` moves; `keepBytesInTrash` is for a caller that already holds the handle, so the workspace's own
+  delete, which walks the three places a template can sit, does not read the file a second time.
+- **Three caps, not one**, because each catches a different way of becoming weight: thirty days for a folder
+  nobody has deleted from in months, forty megabytes for one picture too many, a hundred files for a thousand
+  tiny frames. Age first, then newest-first while the bytes and the count allow.
+- **The rule that needed thinking about.** A single item larger than the whole cap is *kept* while it is the
+  newest, and swept as soon as anything newer arrives (`tooBig` requires `keep.length > 0`). A cap that silently
+  ate the only copy of what you just deleted would be worse than no cap at all.
+- **A restore never writes over what took the name.** `restorePath` numbers around it and keeps the whole tail of
+  suffixes, so `a.template.json` comes back as `a 2.template.json`, not `a.template 2.json` — and the board says
+  which it was. Verified in the browser with a decoy file sitting at the old path.
+- **`sizeOf(0)` said "1 KB".** The `Math.max(1, …)` floor was there so a 300-byte file does not read as nothing;
+  an empty trash, which really is nothing, was reading as 1 KB in the panel's footer. Floors that protect small
+  values lie about zero.
+- **The list's subject is recency, so it may not fall back to a date.** `ago` switches to `toLocaleDateString`
+  past 24 h, which put "9/17/2026" in a list about what is about to be swept. `agoDays` keeps counting in days,
+  and a row under a week from the cap says how many days it has left.
+- **The can.** The bar button became a drawn can in the lower right of the canvas: faded when empty, a count when
+  full, the lid swinging up from its left end as the pointer comes near, and one shake when something lands in
+  it. The only motion on this board that is there to be enjoyed rather than to inform, and all of it behind
+  `prefers-reduced-motion`. An always-present can is also the answer to "where did my delete go" *before* the
+  first delete, which the bar button, hidden until the trash had something in it, could never be.
+- **Reachable when empty means it has to say so.** The old panel only ever opened with rows in it. A can you can
+  always click needed an empty line and a disabled Empty it.
