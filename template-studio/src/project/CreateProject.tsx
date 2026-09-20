@@ -7,7 +7,7 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { newFrameId } from '../model/frame-store.ts';
-import { folderNote, planProject, PROJECT_TYPES } from '../model/project-types.ts';
+import { folderNote, planProject, PROJECT_TYPES, type ProjectType } from '../model/project-types.ts';
 import { createProjectFolder, pickDestination } from './folder.ts';
 import { launcherUrl } from './launch.ts';
 
@@ -16,6 +16,8 @@ type Dir = FileSystemDirectoryHandle;
 export interface CreateProjectProps {
   /** The type chosen when the sheet opens, by id. The first type when absent or unknown. */
   initialType?: string;
+  /** The types to offer: the app's, with the open folder's over them (model/library.ts). The app's alone by default. */
+  types?: ProjectType[];
   onClose(): void;
   /** `where` is the folder it went into, or empty when the chosen folder became the project. */
   onCreated(dir: Dir, name: string, where: string): Promise<void>;
@@ -61,14 +63,14 @@ function explain(cause: unknown, where: string): string {
   return cause instanceof Error ? cause.message : 'The project could not be created.';
 }
 
-export function CreateProject({ initialType, onClose, onCreated }: CreateProjectProps) {
-  const [typeId, setTypeId] = useState((PROJECT_TYPES.find((t) => t.id === initialType) ?? PROJECT_TYPES[0]!).id);
+export function CreateProject({ initialType, types = PROJECT_TYPES, onClose, onCreated }: CreateProjectProps) {
+  const [typeId, setTypeId] = useState((types.find((t) => t.id === initialType) ?? types[0]!).id);
   const [name, setName] = useState('');
   const [parent, setParent] = useState<Dir | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
-  const type = PROJECT_TYPES.find((t) => t.id === typeId) ?? PROJECT_TYPES[0]!;
+  const type = types.find((t) => t.id === typeId) ?? types[0]!;
   const title = name.trim() || 'New project';
 
   const plan = useMemo(() => {
@@ -130,7 +132,7 @@ export function CreateProject({ initialType, onClose, onCreated }: CreateProject
         </header>
 
         <div class="cp-types" role="radiogroup" aria-label="Project type">
-          {PROJECT_TYPES.map((t) => (
+          {types.map((t) => (
             <button key={t.id} class={`cp-type ${t.id === type.id ? 'on' : ''}`} role="radio" aria-checked={t.id === type.id} onClick={() => setTypeId(t.id)}>
               <span class={`cp-type-icon ${t.id}`} aria-hidden="true">
                 {ICONS[t.id] ?? ICONS['blank']}

@@ -9,6 +9,9 @@
 import { render } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
+import { mergeById } from '../model/library.ts';
+import { PROJECT_TYPES, type ProjectType } from '../model/project-types.ts';
+import { folderWorkspace } from '../workspace/workspace.ts';
 import { Board } from './Board.tsx';
 import { CreateProject } from './CreateProject.tsx';
 import { useInstall, watchLaunches, type InstallState, type LaunchedFile } from './launch.ts';
@@ -40,6 +43,29 @@ function ProjectTool() {
     window.setTimeout(() => setToast((t) => (t === message ? null : t)), 4200);
   }, []);
   const open = (project.status === 'ready' || project.status === 'view-only') && project.dir && project.info;
+  /**
+   * The types Create a project offers: the app's, with the open folder's over them by id (model/library.ts).
+   * Read from whatever folder is open, so a team's own types travel with the folder they work in.
+   */
+  const [types, setTypes] = useState<ProjectType[]>(PROJECT_TYPES);
+  useEffect(() => {
+    let cancelled = false;
+    if (!project.dir) {
+      setTypes(PROJECT_TYPES);
+      return;
+    }
+    void folderWorkspace(project.dir, project.writable)
+      .projectTypes()
+      .then((found) => {
+        if (!cancelled) setTypes(mergeById(PROJECT_TYPES, found.map(({ item }) => item.type)));
+      })
+      .catch(() => {
+        // A folder with none: the app's own are what shows.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.dir, project.writable, project.generation]);
   const install = useInstall();
   /** A `.scug` this page was opened with, whose folder this browser has yet to be shown. */
   const [launch, setLaunch] = useState<LaunchedFile | null>(null);
@@ -85,7 +111,7 @@ function ProjectTool() {
       ) : (
         <Welcome project={project} launch={launch} onDropLaunch={() => setLaunch(null)} install={install} onCreate={() => setCreating('')} />
       )}
-      {creating !== null && <CreateProject initialType={creating} onClose={() => setCreating(null)} onCreated={created} />}
+      {creating !== null && <CreateProject initialType={creating} types={types} onClose={() => setCreating(null)} onCreated={created} />}
       {toast && (
         <div class="pb-toast" role="status">
           {toast}

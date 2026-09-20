@@ -2731,3 +2731,43 @@ Implemented, all of them panel-level:
 
 Left for Jared to pick from, verified but bigger than a panel: a preheader, dark-mode counterparts for palette
 colours, 2x image widths, a contrast ratio beside each preset, and the compiler's last five literal preset names.
+
+### 3.92 The studio library, and a design system pasted in
+
+*2026-09-19.* Jared: "Can you make a admin tool for me that allows me to edit the default templates and create
+new ones. If it can import a claude design system for colors, type and general direction that would be ideal."
+Then: "Creating and editing the project start templates too."
+
+- **A fourth page**, `admin.html`, over the same source tree. Three lists: the starter emails New offers, the
+  project types Create a project makes, and the design systems the folder holds.
+- **Where they live was the design question**, and the answer is the folder, with the code's own set as the
+  floor. `.scug/starters/*.starter.json` and `.scug/project-types/*.type.json` sit beside the design systems and
+  the patterns a folder already carries, read by the same `toolFolders` walk and synced by the same Drive. The
+  alternatives were this browser (shares nothing; learnings 3.7 is about exactly that failure) and a second
+  "library" folder remembered in IndexedDB (a second picker, a second view-only state, a second permission
+  re-grant, and two places a design system could live). The folder's items sit over the app's **by id**, and the
+  app's are never removed — which is why New still works with nothing open, and why nothing needed to become
+  async at module load.
+- **Editing a starter is not a second editor.** A starter is an email, and Studio is the email editor, so Edit
+  writes the template into the folder as an ordinary email and opens `index.html?open=<file>&from=admin`. Update
+  from the email reads it back. The back arrow learned `admin` the same day the two private copies of "where does
+  back go" became one (`app/back-to.ts`): Studio kept a boolean, Freeform kept a record, and a third copy was the
+  thing to prevent.
+- **Editing a project type is a form**, because a type is data and there is nothing to draw. `planProject` did
+  not change: it already took a `ProjectType`, and the only edit was `CreateProject` taking its list as a prop
+  instead of importing the constant.
+- **The import.** `model/import-system.ts`, pure and DOM-free, reads five shapes — a `.system.json`, a token
+  file, CSS, a whole page, or loose text with colours in it — and says on the result which it took, so a wrong
+  guess is visible. The load-bearing half is not the parsing but `repointRefs`: replacing `colors` leaves
+  nineteen `ColorRef`s in the defaults naming entries that no longer exist, `colorOf` returns null for them, and
+  `theme()` falls text and link back to black. An import without it produces a system whose every heading is
+  black on a band that vanished. A reference whose name is gone keeps the colour it resolved to, and takes the
+  new name when the new palette holds that colour under one.
+- **What it refuses is the product.** A width outside 320–700 is a page, not an email. A phone size is never
+  raised. A body size never comes from a ladder that names no roles. A font stack is never repaired. The phone
+  breakpoint is never read from a `@media` query. Each refusal is a warning a person can read, and
+  docs/architecture.md §3a had already written down why: "the one thing the importer must not do is replace the
+  system wholesale and silently."
+- **Confirmed, not applied.** The panel reads the paste, shows the palette it found, the paths that changed and
+  every warning, and only then offers Save — which is what §3a asked for when it said mapping presets onto an
+  unfamiliar palette "should be a step the designer confirms".

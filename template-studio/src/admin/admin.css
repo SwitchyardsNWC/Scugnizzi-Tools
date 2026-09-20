@@ -1,0 +1,78 @@
+/* The studio library.
+ *
+ * The board's chrome, because it is the same kind of page: one folder, a bar at the top, a status line at the
+ * bottom. Everything between is a list of rows and a form, in the tools' own plain shapes — no cards, no shadows,
+ * nothing that bounces. */
+
+.ad-app { position: absolute; inset: 0; overflow: hidden; background: var(--pb-ground); }
+.ad-title { font-size: 13px; font-weight: 500; color: var(--pb-ink); }
+.ad-body { position: absolute; left: 0; right: 0; top: 44px; bottom: 28px; overflow-y: auto; }
+
+.ad { max-width: 860px; margin: 0 auto; padding: 22px 24px 60px; }
+
+.ad-tabs { display: flex; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--pb-soft); }
+.ad-tab {
+  padding: 8px 12px 9px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--pb-muted); font: inherit; font-size: 13px; cursor: pointer;
+}
+.ad-tab:hover { color: var(--pb-ink); }
+.ad-tab.on { color: var(--pb-ink); border-bottom-color: var(--pb-ink); }
+
+.ad-pane { display: block; }
+.ad-lead { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--pb-muted); max-width: 62ch; }
+.ad-h { margin: 28px 0 8px; font-size: 13px; font-weight: 500; color: var(--pb-ink); }
+
+.ad-list { list-style: none; margin: 0 0 12px; padding: 0; border-top: 1px solid var(--pb-soft); }
+.ad-row {
+  display: flex; align-items: center; gap: 12px; padding: 11px 2px 12px;
+  border-bottom: 1px solid var(--pb-soft); background: none;
+}
+.ad-row-none { color: var(--pb-muted); font-size: 12.5px; }
+.ad-row-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ad-row-main b { font-size: 13px; font-weight: 500; color: var(--pb-ink); }
+.ad-row-sum { font-size: 12px; line-height: 1.45; color: var(--pb-muted); }
+.ad-row-facts { font-family: var(--pb-mono); font-size: 10.5px; letter-spacing: 0; color: var(--pb-faint); }
+.ad-row-acts { flex: none; display: flex; gap: 6px; }
+
+/* Where a row comes from: this folder, or the app. A fact, quietly. */
+.ad-tag {
+  flex: none; padding: 2px 7px 3px; border: 1px solid var(--pb-soft); border-radius: 999px;
+  font-size: 10px; color: var(--pb-muted); white-space: nowrap;
+}
+.ad-tag.folder { border-color: var(--pb-ink); color: var(--pb-ink); }
+
+.ad-form { display: grid; gap: 10px; padding: 14px 0 4px; }
+.ad-field { display: grid; gap: 4px; font-size: 12px; color: var(--pb-muted); }
+.ad-field.inline { display: flex; align-items: center; gap: 8px; }
+.ad-field input, .ad-field textarea, .ad-field select {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--pb-soft); border-radius: 3px; background: var(--pb-paper);
+  color: var(--pb-ink); font: inherit; font-size: 13px; line-height: 1.45;
+}
+.ad-field textarea { resize: vertical; font-family: var(--pb-mono); font-size: 12px; }
+.ad-field input:focus, .ad-field textarea:focus, .ad-field select:focus { outline: none; border-color: var(--pb-ink); }
+.ad-form-acts { display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+.ad-note { margin: 2px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--pb-faint); }
+.ad-note code, .ad-lead code { font-family: var(--pb-mono); font-size: 11px; }
+
+.ad-paste {
+  display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--pb-soft); border-radius: 3px;
+  background: var(--pb-paper); color: var(--pb-ink); font-family: var(--pb-mono); font-size: 12px; line-height: 1.5;
+  resize: vertical;
+}
+.ad-paste:focus { outline: none; border-color: var(--pb-ink); }
+
+.ad-swatches { flex: none; display: inline-flex; gap: 3px; }
+.ad-swatches i { width: 12px; height: 12px; border: 1px solid var(--pb-soft); }
+.ad-swatches.big { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
+.ad-swatches.big i { width: 22px; height: 22px; }
+
+.ad-result { margin-top: 14px; padding: 12px 14px 14px; border: 1px solid var(--pb-hairline); background: var(--pb-paper); }
+.ad-result-head { margin: 0; font-size: 12.5px; color: var(--pb-text); }
+.ad-changes { margin: 6px 0 0; padding: 0 0 0 16px; font-family: var(--pb-mono); font-size: 11px; color: var(--pb-muted); }
+.ad-warnings { margin: 10px 0 0; padding: 10px 0 0 16px; border-top: 1px solid var(--pb-soft); font-size: 12px; line-height: 1.5; color: var(--pb-brick); }
+
+.ad-empty {
+  max-width: 460px; margin: 120px auto 0; padding: 0 24px; display: grid; gap: 10px; justify-items: start;
+}
+.ad-empty b { font-size: 15px; font-weight: 500; color: var(--pb-ink); }
+.ad-empty p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--pb-muted); }

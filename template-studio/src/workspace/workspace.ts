@@ -15,6 +15,7 @@ import { migrate } from '../model/schema.ts';
 import { importV1 } from '../model/import-v1.ts';
 import { completeDesignSystem, type DesignSystem } from '../model/design-system.ts';
 import { parsePattern, type Pattern } from '../model/patterns.ts';
+import { parseProjectType, parseStarter, type ProjectTypeFile, type StarterFile } from '../model/library.ts';
 import { patternFileName, systemFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { zip } from '../model/zip.ts';
@@ -151,10 +152,23 @@ export interface Workspace {
   /** Every `patterns/<name>.pattern.json`. A file that is not a pattern is skipped, not fatal. */
   patterns(): Promise<Pattern[]>;
   writePattern(pattern: Pattern, json: string): Promise<void>;
+  /**
+   * The studio library this folder carries: emails to start from, and what Create a project makes
+   * (model/library.ts). Both are empty in a folder that has never had the admin tool pointed at it,
+   * and the app's own built-in set is what shows then.
+   */
+  starters(): Promise<Array<{ fileName: string; item: StarterFile }>>;
+  writeStarter(fileName: string, json: string): Promise<void>;
+  projectTypes(): Promise<Array<{ fileName: string; item: ProjectTypeFile }>>;
+  writeProjectType(fileName: string, json: string): Promise<void>;
+  /** Removes one library file. Absent on a read-only workspace, which is how the tool knows not to offer it. */
+  deleteLibraryFile?(folder: 'starters' | 'project-types', fileName: string): Promise<void>;
 }
 
 const SYSTEM = '.system.json';
 const PATTERN = '.pattern.json';
+const STARTER = '.starter.json';
+const PROJECT_TYPE = '.type.json';
 /** `switchyards.system.json` → `switchyards`. The name a template writes in `designSystem`. */
 const systemName = (fileName: string) => fileName.slice(0, -SYSTEM.length);
 
@@ -421,6 +435,33 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         const out = await handle.createWritable();
         await out.write(json);
         await out.close();
+      });
+    },
+    async starters() {
+      return readLibrary(toolFolders, 'starters', STARTER, parseStarter);
+    },
+    async writeStarter(fileName, json) {
+      await writeLibrary(writable, dir.name, toolFolder, 'starters', fileName, json);
+    },
+    async projectTypes() {
+      return readLibrary(toolFolders, 'project-types', PROJECT_TYPE, parseProjectType);
+    },
+    async writeProjectType(fileName, json) {
+      await writeLibrary(writable, dir.name, toolFolder, 'project-types', fileName, json);
+    },
+    async deleteLibraryFile(folder, fileName) {
+      if (!writable) throw refused(dir.name);
+      return writing(dir.name, async () => {
+        for (const source of await toolFolders(folder)) {
+          try {
+            await source.getFileHandle(fileName);
+          } catch {
+            continue;
+          }
+          await source.removeEntry(fileName);
+          return;
+        }
+        throw new Error(`${fileName} is not in ${dir.name} any more.`);
       });
     },
     async writeExport(fileName, html) {
@@ -719,6 +760,18 @@ export function workspaceFromFiles(files: File[]): Workspace {
     async writePattern(pattern, json) {
       download(patternFileName(pattern.name), json);
     },
+    async starters() {
+      return readLibraryFiles(files, STARTER, parseStarter);
+    },
+    async writeStarter(fileName, json) {
+      download(fileName, json);
+    },
+    async projectTypes() {
+      return readLibraryFiles(files, PROJECT_TYPE, parseProjectType);
+    },
+    async writeProjectType(fileName, json) {
+      download(fileName, json);
+    },
     async writeExport(fileName, html) {
       download(fileName, html);
       return fileName;
@@ -730,6 +783,67 @@ export function workspaceFromFiles(files: File[]): Workspace {
       return { ok: true, modified: Date.now() };
     },
   };
+}
+
+/**
+ * Every library file of one kind, in the places `list` walks. A file that does not parse is skipped rather than
+ * fatal, for the same reason a design system file is: one half-saved file on a synced folder must not take the
+ * whole New menu down.
+ */
+async function readLibrary<T>(
+  toolFolders: (name: string) => Promise<Handle[]>,
+  folder: string,
+  ext: string,
+  parse: (raw: unknown) => T,
+): Promise<Array<{ fileName: string; item: T }>> {
+  const out: Array<{ fileName: string; item: T }> = [];
+  const seen = new Set<string>();
+  for (const source of await toolFolders(folder)) {
+    for await (const [fileName, entry] of source.entries()) {
+      if (entry.kind !== 'file' || !fileName.endsWith(ext) || seen.has(fileName)) continue;
+      seen.add(fileName);
+      try {
+        out.push({ fileName, item: parse(JSON.parse(await (await (entry as FileSystemFileHandle).getFile()).text())) });
+      } catch {
+        // Skipped, not fatal.
+      }
+    }
+  }
+  return out;
+}
+
+async function writeLibrary(
+  writable: boolean,
+  label: string,
+  toolFolder: (name: string) => Promise<Handle>,
+  folder: string,
+  fileName: string,
+  json: string,
+): Promise<void> {
+  if (!writable) {
+    download(fileName, json);
+    return;
+  }
+  return writing(label, async () => {
+    const dir = await toolFolder(folder);
+    const handle = await dir.getFileHandle(fileName, { create: true });
+    const out = await handle.createWritable();
+    await out.write(json);
+    await out.close();
+  });
+}
+
+/** The same, for a workspace made of files somebody picked by hand. */
+async function readLibraryFiles<T>(files: File[], ext: string, parse: (raw: unknown) => T): Promise<Array<{ fileName: string; item: T }>> {
+  const out: Array<{ fileName: string; item: T }> = [];
+  for (const file of files.filter((f) => f.name.endsWith(ext))) {
+    try {
+      out.push({ fileName: file.name, item: parse(JSON.parse(await file.text())) });
+    } catch {
+      // Skipped.
+    }
+  }
+  return out;
 }
 
 export function download(fileName: string, html: string): void {

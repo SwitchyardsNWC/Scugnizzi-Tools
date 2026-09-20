@@ -77,6 +77,7 @@ import { BranchIcon, CopyIcon, DesktopIcon, EyeIcon, glyphFor, InboxIcon, MoonIc
 import { TEXT_TARGETS } from './inline-text.ts';
 import { useEditor } from './useEditor.ts';
 import { STARTERS } from './starters-list.ts';
+import { mergeById } from '../model/library.ts';
 import { readRecent, writeRecent } from './recent-blocks.ts';
 import { type Device, Framed, SaveBadge } from './app-chrome.tsx';
 import { usePrints } from './usePrints.ts';
@@ -1050,6 +1051,32 @@ export function App() {
   /** The Image blocks, which a carried picture may land on rather than beside (Preview.tsx, `onto`). */
   const imageBlockIds = useMemo(() => allBlocks(editor.template).flatMap((b) => (b.type === 'image' ? [b.id] : [])), [editor.template]);
 
+  /**
+   * What New offers: the app's own starters, with the open folder's over them by id (model/library.ts).
+   * The app's are the floor — they are what shows with no folder open, and the folder's are read after.
+   */
+  const [folderStarters, setFolderStarters] = useState<Starter[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!workspace) {
+      setFolderStarters([]);
+      return;
+    }
+    void workspace
+      .starters()
+      .then((found) => {
+        if (cancelled) return;
+        setFolderStarters(found.map(({ item }) => ({ id: item.id, name: item.name, summary: item.summary, make: () => structuredClone(item.template) })));
+      })
+      .catch(() => {
+        // A folder with none, or one that cannot be read: the app's own are what shows.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
+  const starters = useMemo(() => mergeById(STARTERS, folderStarters), [folderStarters]);
+
   // --- the board's notes for this email (useBoardNotes.ts, NotesRail.tsx) ------------------------------------
   const { notes: boardNotes, setResolved: resolveBoardNote, reply: replyToBoardNote } = useBoardNotes(workspace, editor.file?.fileName ?? null);
   const openNotes = boardNotes.filter((n) => !n.resolvedAt).length;
@@ -1666,9 +1693,9 @@ export function App() {
             from the board ... I want it to go back to the project board by default"), else the tools. */}
         <a
           class="brand-back"
-          href={projectFolder.fromBoard ? 'project.html' : '../../index.html'}
-          title={projectFolder.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}
-          aria-label={projectFolder.fromBoard ? 'Back to the project board' : 'Back to Scugnizzi tools'}
+          href={projectFolder.back?.href ?? '../../index.html'}
+          title={projectFolder.back?.title ?? 'Back to Scugnizzi tools'}
+          aria-label={projectFolder.back?.title ?? 'Back to Scugnizzi tools'}
         >
           ←
         </a>
@@ -1810,7 +1837,7 @@ export function App() {
           files={files}
           assets={assets}
           {...(surfaceOf ? { onDropAsset: (asset: AssetFile, at: { x: number; y: number } | null) => surfaceApi.current?.dropAsset(asset, at) } : {})}
-          starters={STARTERS}
+          starters={starters}
           onNew={startNew}
           onDuplicate={duplicateCurrent}
           {...(workspace?.deleteTemplate ? { onDelete: (file: TemplateFile) => void deleteTemplateFile(file) } : {})}
@@ -1841,7 +1868,7 @@ export function App() {
         <main class="canvas">
           {choosing && (
             <Welcome
-              starters={STARTERS}
+              starters={starters}
               files={files}
               folder={workspace?.label ?? null}
               folders={supportsFolders()}
