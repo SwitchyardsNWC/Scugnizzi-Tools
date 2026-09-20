@@ -46,6 +46,7 @@ my-campaign/
     social-media/           a frame's files: one folder per frame
   design-systems/           as Template Studio has them now
   templates/                Template Studio's emails
+  .scug/trash/              what was deleted, waiting: read only by the trash view
   social/  print/           future tools' files
   exports/                  what each tool hands off
 ```
@@ -822,6 +823,39 @@ All three live in the project folder, beside the patterns and design systems it 
 with the folder your team shares. What the app ships is always listed underneath and never goes away, so New and
 Create a project still work before any folder is open. A team that wants one library for everything keeps one
 folder for it and opens that.
+
+### The trash
+
+*Added 2026-09-19.*
+
+> "I love how it shows items that recently where deleted. should deleted items go in an 'archive' so they can be
+> restored?" — then: "build it, put a cap on how much trash stays in a project, so it doesn't accidentally become
+> weight."
+
+Until now the only net under a delete was Undo, and Undo lives in memory: it holds the file's bytes in a closure
+and dies with the tab. Deleting an email and closing the browser lost it, from a folder a whole team shares.
+
+A delete now moves the file into `.scug/trash/` as two files, the bytes and a record saying where they came from,
+instead of removing it. **Nothing reads that folder except the trash view.** That is the whole reason it is safe:
+the trash is never a second place to look for a template or a picture, so it cannot become the two-copies bug this
+codebase keeps catching. One door in, one door out.
+
+- **The can.** Lower right of the canvas. Faded when empty, solid with a count when it is holding something, and
+  it gives one shake when something lands in it. Clicking it opens Recently deleted: what is in there, how long
+  each thing has left, Put back beside each, and Empty it.
+- **Put back** returns a file to the path it came from. If something has taken that name since, it comes back
+  numbered (`a 2.template.json`) and the board says so, rather than writing over whatever took its place.
+- **The caps.** Thirty days, forty megabytes, a hundred files. Three rather than one, because each catches a
+  different way of becoming weight: a folder nobody has deleted from in months, one picture too many, and a
+  thousand tiny frames. The sweep runs when something is trashed and when a project is opened, so a project shut
+  for a month is not still carrying last month's deletes. Age goes first, then newest-first while the bytes and
+  the count allow. A single item larger than the whole cap is kept while it is the newest, and swept as soon as
+  anything newer arrives: a cap that silently ate the only copy of what you just deleted would be worse than no
+  cap at all.
+
+The rules are pure, in `src/model/trash.ts`, and tested. The reading and writing is `src/workspace/trash.ts`, in
+the workspace layer rather than beside the board's own folder helpers because both the board and Template Studio
+delete things and neither page should reach across into the other's module.
 
 ## To decide first
 

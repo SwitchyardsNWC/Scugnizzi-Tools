@@ -405,6 +405,62 @@ body { background: #f5f5f4; }
 .pb-keys kbd { font-family: var(--pb-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--pb-soft); background: var(--pb-row); }
 .pb-keys-or { color: var(--pb-faint); }
 
+/* The can, lower right of the canvas, above the status line.
+ *
+ * The one piece of this board that moves for pleasure rather than for information: the lid lifts as the pointer
+ * comes near, and the whole can gives a single shake when something lands in it. Faded while empty, because an
+ * empty can is a fact you can see without reading, and solid with a count once it is holding something. */
+.pb-can {
+  position: absolute; right: 14px; bottom: 40px; z-index: 6;
+  width: 42px; height: 46px; padding: 0; border: 1px solid transparent; border-radius: 9px;
+  display: grid; place-items: center; background: none; color: var(--pb-text); cursor: pointer;
+  transition: opacity var(--pb-fast), background-color var(--pb-fast), color var(--pb-fast), border-color var(--pb-fast);
+}
+.pb-can.empty { opacity: 0.4; }
+.pb-can:hover, .pb-can.on { opacity: 1; background: var(--pb-paper); border-color: var(--pb-card-border); color: var(--pb-ink); }
+.pb-can-art { display: block; width: 28px; height: 30px; }
+.pb-can-art svg {
+  display: block; width: 100%; height: 100%; overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
+}
+/* The hinge is the left end of the lid bar, so it swings up rather than sliding. */
+.pb-can-lid { transform-origin: 5px 8.6px; transition: transform 180ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+.pb-can:hover .pb-can-lid, .pb-can.on .pb-can-lid { transform: translateY(-2.5px) rotate(-12deg); }
+.pb-can-count {
+  position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 999px; background: var(--pb-ink); color: var(--pb-paper);
+  font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.pb-can.jolt .pb-can-art { animation: pb-can-shake 600ms ease-out; }
+.pb-can.jolt .pb-can-lid { animation: pb-can-drop 600ms ease-out; }
+@keyframes pb-can-shake {
+  0%, 100% { transform: none; }
+  16% { transform: rotate(-7deg); }
+  42% { transform: rotate(5deg); }
+  70% { transform: rotate(-2deg); }
+}
+@keyframes pb-can-drop {
+  0% { transform: translateY(-7px) rotate(-18deg); }
+  55% { transform: translateY(0) rotate(3deg); }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb-can-lid { transition: none; }
+  .pb-can.jolt .pb-can-art, .pb-can.jolt .pb-can-lid { animation: none; }
+  .pb-can:hover .pb-can-lid, .pb-can.on .pb-can-lid { transform: none; }
+}
+
+/* Recently deleted: the keys sheet's paper, a list, and what it is taking. */
+.pb-trash { width: 520px; }
+.pb-trash-lead { margin: 0; padding: 10px 14px 12px; border-bottom: 1px solid var(--pb-soft); font-size: 12px; line-height: 1.5; color: var(--pb-muted); }
+.pb-trash-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow-y: auto; }
+.pb-trash-list li { display: flex; align-items: center; gap: 12px; padding: 9px 14px 10px; border-bottom: 1px solid var(--pb-row); }
+.pb-trash-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.pb-trash-main b { font-size: 13px; font-weight: 500; color: var(--pb-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-trash-facts { font-family: var(--pb-mono); font-size: 10.5px; letter-spacing: 0; color: var(--pb-faint); }
+.pb-trash-none { padding: 14px 14px 15px; font-size: 12.5px; color: var(--pb-muted); }
+.pb-trash-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 11px; font-size: 11.5px; color: var(--pb-muted); }
+
 /* --- notices --------------------------------------------------------------------------------------------- */
 .pb-notice, .pb-toast {
   position: fixed; left: 50%; top: 56px; z-index: 80; max-width: min(620px, calc(100% - 32px)); padding: 9px 14px 7px; transform: translateX(-50%);

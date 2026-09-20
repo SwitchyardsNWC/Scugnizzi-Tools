@@ -46,8 +46,15 @@ export const agoShort = (t: number) => {
   if (d < 7) return `${d} d`;
   return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
-export const sizeOf = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+// The 1 KB floor is so a 300-byte file does not read as nothing; an empty trash, which really is nothing, is exempt.
+export const sizeOf = (n: number) =>
+  n <= 0 ? '0 KB' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** `ago`, but in days rather than a date, for a list where how long ago is the point. */
+export const agoDays = (t: number) => {
+  const h = Math.round((Date.now() - t) / 3_600_000);
+  return h < 24 ? ago(t) : `${plural(Math.round(h / 24), 'day')} ago`;
+};
 
 /**
  * Opens what a card is. Our own tools open here, in this tab (Jared, 2026-09-19: "when I open an item from the

@@ -194,7 +194,7 @@ export function Admin({ project, notify }: AdminProps) {
     if (!workspace?.deleteLibraryFile || !writable) return cannot(`remove ${what}`);
     setBusy(true);
     try {
-      await workspace.deleteLibraryFile(folder, fileName);
+      await workspace.deleteLibraryFile(folder, fileName, what);
       await read();
       notify(`${what} is back to the one the app ships.`);
     } catch (cause) {
