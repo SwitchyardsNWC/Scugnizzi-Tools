@@ -63,7 +63,7 @@ import {
 import { canStack, STACKABLE } from '../model/catalog.ts';
 import { clipText, parseClip } from '../model/clipboard.ts';
 import { applyPattern, detachPattern, instanceOf, patternFromSection, placePattern, pushPattern, type Pattern } from '../model/patterns.ts';
-import { fileSlug, serializeDesignSystem, serializePattern, serializeTemplate } from '../model/serialize.ts';
+import { fileSlug, serializeDesignSystem, serializePattern } from '../model/serialize.ts';
 import { tidyTemplate } from '../model/tidy.ts';
 import type { DesignSystem } from '../model/design-system.ts';
 import { blankTemplate } from '../model/starters.ts';
@@ -391,18 +391,14 @@ export function App() {
   const deleteTemplateFile = useCallback(
     async (file: TemplateFile) => {
       if (!workspace?.deleteTemplate) return;
-      let json: string | null = null;
-      try {
-        const { template } = await file.load();
-        json = serializeTemplate(template);
-      } catch {
-        // Unreadable — a v1 file with a shape we cannot parse, say. It can still be deleted; the
-        // offer to undo is what goes away, and the toast says so instead of promising one.
-        json = null;
-      }
 
+      // The delete hands back the way to undo it, the way Tidy does just above. Reading the template first and
+      // saving it again was the old undo, and it had two faults the trash removes: a file Studio could not parse
+      // had no undo at all, and putting one back left its record in the trash, so the folder held the file and the
+      // can still offered it — a second copy one click away.
+      let undo: { restore(): Promise<string> } | null;
       try {
-        await workspace.deleteTemplate(file.fileName);
+        undo = await workspace.deleteTemplate(file.fileName);
       } catch (cause) {
         notify(cause instanceof Error ? cause.message : `Could not delete ${file.fileName}.`);
         return;
@@ -412,20 +408,25 @@ export function App() {
       if (wasOpen) editor.releaseFile();
       await refreshFiles();
 
+      const back = undo;
       const message = wasOpen
         ? `Deleted ${file.name}. It is still open here, but no longer saved to a file.`
         : `Deleted ${file.name}.`;
       notify(
-        json ? message : `${message} It could not be read, so there is nothing to undo into.`,
-        json
+        message,
+        back
           ? () => {
               void (async () => {
                 try {
-                  await workspace.writeTemplate(file.fileName, json, 0);
+                  const at = await back.restore();
                   await refreshFiles();
-                  notify(`${file.name} is back.`);
+                  notify(
+                    at === file.fileName
+                      ? `${file.name} is back.`
+                      : `${file.name} is back, as ${at} — something had taken its old name.`,
+                  );
                 } catch (cause) {
-                  notify(cause instanceof Error ? cause.message : `Could not restore ${file.fileName}.`);
+                  notify(cause instanceof Error ? cause.message : `Could not put ${file.fileName} back.`);
                 }
               })();
             }

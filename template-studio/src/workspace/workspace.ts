@@ -17,7 +17,8 @@ import { completeDesignSystem, type DesignSystem } from '../model/design-system.
 import { parsePattern, type Pattern } from '../model/patterns.ts';
 import { parseProjectType, parseStarter, type ProjectTypeFile, type StarterFile } from '../model/library.ts';
 
-import { keepBytesInTrash } from './trash.ts';
+import { keepBytesInTrash, restoreFromTrash } from './trash.ts';
+import type { TrashRecord } from '../model/trash.ts';
 import { patternFileName, systemFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { zip } from '../model/zip.ts';
@@ -116,12 +117,19 @@ export interface Workspace {
    *
    * There is no confirmation anywhere above this, by the project's own rule: destructive things
    * happen and offer Undo rather than asking first (learnings 3.2). That is only honest because
-   * undo here is a real restore — the caller reads the template before deleting and writes the same
-   * bytes back under the same name, so the file that returns is the file that left. The one thing
-   * it cannot put back is the moment: on a synced folder somebody else's client may have already
-   * seen the deletion, which is why the toast says so rather than implying the folder never moved.
+   * undo here is a real restore, and the way back comes with the delete: `restore` puts the trashed
+   * bytes back and takes the record out of the trash, so the file that returns is the file that
+   * left and the trash is not left holding a second copy of something already on disk. It resolves
+   * to the name it landed under, which is the old one unless something has taken it meanwhile.
+   *
+   * Reading the file first is what this used to do, and it meant a template Studio could not parse
+   * had no undo at all. The trash keeps bytes, not templates, so now it does.
+   *
+   * The one thing it cannot put back is the moment: on a synced folder somebody else's client may
+   * have already seen the deletion, which is why the toast says so rather than implying the folder
+   * never moved.
    */
-  deleteTemplate?(fileName: string): Promise<void>;
+  deleteTemplate?(fileName: string): Promise<{ restore(): Promise<string> } | null>;
   /**
    * Removes every copy of a template's name except the one `list` shows, and says where each was, with a way to
    * put it back. Absent on a read-only workspace.
@@ -581,6 +589,7 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
         // be removed. Sharing the helper is what makes "everything the panel offered can be deleted" true by
         // construction rather than by coincidence.
         let removed = 0;
+        let trashed: TrashRecord | null = null;
         for (const place of [...(await toolPlaces('templates')), { folder: dir, at: '' }]) {
           let handle: FileSystemFileHandle;
           try {
@@ -593,12 +602,22 @@ function folderWorkspace(dir: Handle, writable: boolean): Workspace {
           if (removed === 0) {
             const path = place.at ? `${place.at}/${fileName}` : fileName;
             const file = await handle.getFile();
-            await keepBytesInTrash(dir, path, file, { name: nameInside(await file.text(), fileName) });
+            trashed = await keepBytesInTrash(dir, path, file, { name: nameInside(await file.text(), fileName) });
           }
           await place.folder.removeEntry(fileName);
           removed += 1;
         }
         if (removed === 0) throw new Error(`${fileName} is not in ${dir.name} any more. Somebody else may have removed it.`);
+        if (!trashed) return null;
+        const record = trashed;
+        return {
+          restore: async () =>
+            writing(dir.name, async () => {
+              const at = await restoreFromTrash(dir, record);
+              if (!at) throw new Error(`${fileName} is no longer in the trash, so there is nothing to put back.`);
+              return at.split('/').pop() ?? at;
+            }),
+        };
       });
     },
 

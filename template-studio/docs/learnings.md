@@ -2795,7 +2795,28 @@ weight." Then: "make a fun trashcan icon in the lower right of the canvas to see
   ate the only copy of what you just deleted would be worse than no cap at all.
 - **A restore never writes over what took the name.** `restorePath` numbers around it and keeps the whole tail of
   suffixes, so `a.template.json` comes back as `a 2.template.json`, not `a.template 2.json` — and the board says
-  which it was. Verified in the browser with a decoy file sitting at the old path.
+  which it was.
+- **And the first bug in the trash was in that sentence's one blind spot.** `restoreFromTrash` told `restorePath`
+  that a single name was taken: the original. So the *first* restore onto an occupied name took `a 2`, and the
+  second, asking the same question and getting the same answer, took `a 2` as well and wrote over it. Two things
+  deleted under one name, one file out. Found by a review pass hours after shipping, not by the test suite and not
+  by me at the keyboard: I had verified exactly one collision in the browser, it passed, and one collision is the
+  case that works. The fix is `takenIn`, which asks the folder what it holds.
+- **The second bug was the same shape: a delete that knew something the caller did not.** Studio's undo read the
+  template before deleting and saved it again afterwards, which predates the trash by a year and was never revised
+  when the trash landed. So the file came back and its record stayed, the can went on offering a template already
+  sitting in the folder, and Put back then made a second copy of it. `deleteTemplate` now hands back the way to
+  undo it, which is what `tidyTemplate` four lines above it had always done — the idiom was in the same file, in
+  the same component, unread.
+- **Handing back the undo fixed a thing nobody had asked about.** The old undo was only offered when the template
+  parsed, because it worked by re-serializing one; a v1 file with a shape Studio cannot read was deleted with a
+  toast that said there was nothing to undo into. The trash keeps bytes, not templates, so the restore that comes
+  with the delete works on any file at all. The false sentence did not need rewording, it needed deleting.
+- **A right rule with a caller asking the wrong question is invisible to a test of either half.** `restorePath`
+  had a passing test for numbering past two taken names; the caller simply never passed two. That seam is why
+  `tests/trash-folder.test.ts` exists — the workspace half, against a `Map`-backed fake of the six directory-handle
+  methods this module actually calls, which is enough to run the real code in plain Node. Writing the failing test
+  first was what made the second-collision case appear at all.
 - **`sizeOf(0)` said "1 KB".** The `Math.max(1, …)` floor was there so a 300-byte file does not read as nothing;
   an empty trash, which really is nothing, was reading as 1 KB in the panel's footer. Floors that protect small
   values lie about zero.
@@ -2807,5 +2828,12 @@ weight." Then: "make a fun trashcan icon in the lower right of the canvas to see
   it. The only motion on this board that is there to be enjoyed rather than to inform, and all of it behind
   `prefers-reduced-motion`. An always-present can is also the answer to "where did my delete go" *before* the
   first delete, which the bar button, hidden until the trash had something in it, could never be.
+- **A sheet in front of the board was not taking the keyboard.** Only Escape knew the shortcuts sheet existed,
+  and nothing knew about the can's panel, so every other board key went on working behind both. With a card
+  selected, Backspace twice deleted it behind the very panel listing what had been deleted — the arming toast
+  appearing under a dialog, where nobody would read it. One guard at the head of `onKey` now covers both sheets,
+  and Escape closes the one in front. Tab and the arrows are deliberately let through, so a sheet stays navigable.
+  The fix was three lines; finding it took a review pass, because the bug only shows when two features that were
+  each built correctly are open at once.
 - **Reachable when empty means it has to say so.** The old panel only ever opened with rows in it. A can you can
   always click needed an empty line and a disabled Empty it.
