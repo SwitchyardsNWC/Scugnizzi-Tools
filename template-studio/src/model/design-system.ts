@@ -206,6 +206,11 @@ export function canvasTypeOf(ds: DesignSystem): Record<string, CanvasTextStyle> 
 }
 
 export interface DesignSystem {
+  /**
+   * The format marker written into every `design-systems/*.system.json`. Nothing reads it today; it is kept
+   * deliberately, because a shared file that other people's folders already hold is the one place a future
+   * migration has to be able to recognise. (`SCHEMA_VERSION` marks a template, which is a different file.)
+   */
   version: number;
   colors: Record<string, string>;
   richText: RichTextTokens;
@@ -214,7 +219,6 @@ export interface DesignSystem {
   buttons: Record<string, ButtonTokens>;
   themes: Record<string, ThemeTokens>;
   type: Record<string, TypeStyle>;
-  space: Record<string, number>;
   /**
    * The email's outer width — the band, the stripes and the footer included, not just the text
    * column. 600px is the number every client agrees about; 320 is a receipt.
@@ -234,6 +238,13 @@ export interface DesignSystem {
    * given a number of its own.
    */
   blockGap: number;
+  /**
+   * Extra space inside every heading and text block, on top of the page padding: `textPadX` each side, `textPadY`
+   * above and below (Jared: "add padding to all text blocks"). Buttons and images keep their own. Zero, the
+   * default, adds no markup, so every existing template compiles as it did.
+   */
+  textPadX: number;
+  textPadY: number;
   pageBackground: string;
   /**
    * A frame around the whole email, drawn outside every band — the navy top bar and the footer
@@ -314,10 +325,11 @@ export const DEFAULT_DESIGN_SYSTEM: DesignSystem = {
     // bar per email and "how big is the tagline" is a decision about the template.
     topbar: { size: 12, lineHeight: 110, weight: 'bold', mobileSize: 10, marginBottom: 0, uppercase: true },
   },
-  space: { s: 10, m: 20, l: 40 },
   containerWidth: 600,
   pagePadding: 20,
   blockGap: 16,
+  textPadX: 0,
+  textPadY: 0,
   pageBackground: '#f7f6f3',
   pageBorderWidth: 0,
   pageBorderColor: 'navy',
@@ -461,12 +473,24 @@ function richRule(selector: string, t: TypeStyle, statesWeight: boolean, ds: Des
   return `${selector} { margin:0 0 ${t.marginBottom}px 0; line-height:${t.lineHeight}%; font-size:${t.size}px${weight}${font}${color}${extra} }`;
 }
 
+/**
+ * The heading roles the stylesheet writes a rule for. One list, because it was three: `richTextCss` built it
+ * inline, `roleSelectors` matched it with a regex, and the Type panel assumed every role had both (learnings 3.48 —
+ * a list that lives in more than one file drifts).
+ */
+export const RICH_LEVELS: HeadingLevel[] = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+
+/**
+ * Whether the compiler writes a style rule for this role at all. `topbar` has none: the tagline takes its
+ * section's colour and its own `margin:0`, so a Colour or a Space after set on it reaches nothing.
+ */
+export const stylesRichText = (name: string): boolean => name === 'body' || (RICH_LEVELS as string[]).includes(name);
+
 /** The type scale, as the stylesheet HubSpot inlines. */
 export function richTextCss(ds: DesignSystem): string[] {
   const body = typeOf(ds, 'body');
-  const levels: HeadingLevel[] = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
   return [
-    ...levels.map((level) => richRule(`.sy-rich ${level}`, typeOf(ds, level), true, ds)),
+    ...RICH_LEVELS.map((level) => richRule(`.sy-rich ${level}`, typeOf(ds, level), true, ds)),
     richRule('.sy-rich p', body, false, ds),
     // Lists keep a tighter line height than reading text on purpose; only the size and the bottom
     // margin follow the body token.

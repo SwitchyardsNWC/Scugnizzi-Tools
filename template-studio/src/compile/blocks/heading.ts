@@ -4,7 +4,7 @@
 // (learnings 2.11). That is why `collapse` wraps the section rather than the h1.
 
 import { el, frag, type IRNode } from '../ir.ts';
-import { cell, section } from '../layout.ts';
+import { cell, section, textInset } from '../layout.ts';
 import { boxOf, padClass, paddingOf, type BuildContext } from '../context.ts';
 import { colorOf, fontOf, typeOf } from '../../model/design-system.ts';
 import type { DesignSystem } from '../../model/design-system.ts';
@@ -49,10 +49,9 @@ export function headingParts(block: HeadingBlock, sec: Section, col: Column, ctx
   // there is nothing block-specific left to name. head.ts already emits the rule.
   const cls = `sy-${block.level}`;
 
-  const heading = el(
-    block.level,
-    { class: cls, style: `${style}; text-align:${block.align}; color:${color}`, align: block.align },
-    content.value,
+  const heading = textInset(
+    el(block.level, { class: cls, style: `${style}; text-align:${block.align}; color:${color}`, align: block.align }, content.value),
+    ctx.ds,
   );
 
   return {

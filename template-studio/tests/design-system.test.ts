@@ -1010,3 +1010,38 @@ describe('a Heading block and a heading the team typed are the same role', () =>
     expect(out).toContain('<h4 class="sy-h4" style="margin:0; line-height:135%; font-size:15px; font-weight:bold; text-transform:uppercase; letter-spacing:1.2px');
   });
 });
+
+describe('text padding', () => {
+  it('adds an inner cell around headings and text blocks, and nothing at zero', async () => {
+    const { compile } = await import('../src/compile/compile.ts');
+    const { createSection } = await import('../src/model/catalog.ts');
+    const { blankTemplate } = await import('../src/model/starters.ts');
+    const { DEFAULT_DESIGN_SYSTEM } = await import('../src/model/design-system.ts');
+    const { sequentialIds } = await import('../src/model/ids.ts');
+    const ids = () => ({ id: sequentialIds(), taken: new Set<string>() });
+    const base = { ...blankTemplate(), sections: [createSection('heading', ids(), DEFAULT_DESIGN_SYSTEM), createSection('richtext', ids(), DEFAULT_DESIGN_SYSTEM)] };
+    const plain = compile(base, { mode: 'hubl', date: '2026-09-19' }).html;
+    const padded = compile({ ...base, ds: { ...DEFAULT_DESIGN_SYSTEM, textPadX: 12, textPadY: 6 } }, { mode: 'hubl', date: '2026-09-19' }).html;
+    expect(plain).not.toContain('padding:6px 12px');
+    expect((padded.match(/padding:6px 12px/g) ?? []).length).toBe(2);
+    // The same words, once more table deep, and nothing else moved.
+    expect(padded.replace(/<table[^>]*>\s*<tbody>\s*<tr>\s*<td[^>]*padding:6px 12px[^>]*>|<\/td>\s*<\/tr>\s*<\/tbody>\s*<\/table>/g, '').length).toBeLessThan(padded.length);
+  });
+
+  it('keeps sy-rich on the cell that holds the paragraphs, which is what the canvas opens for editing', async () => {
+    const { compile } = await import('../src/compile/compile.ts');
+    const { createSection } = await import('../src/model/catalog.ts');
+    const { blankTemplate } = await import('../src/model/starters.ts');
+    const { DEFAULT_DESIGN_SYSTEM } = await import('../src/model/design-system.ts');
+    const { sequentialIds } = await import('../src/model/ids.ts');
+    const ids = () => ({ id: sequentialIds(), taken: new Set<string>() });
+    const base = { ...blankTemplate(), sections: [createSection('richtext', ids(), DEFAULT_DESIGN_SYSTEM)] };
+    /** What sits immediately after the `sy-rich` cell's opening tag: the words, never a table. */
+    const afterRich = (html: string) => html.slice(html.indexOf('sy-rich')).replace(/^[^>]*>/, '').trimStart().slice(0, 7);
+    expect(afterRich(compile(base, { mode: 'preview' }).html)).not.toContain('<table');
+    const padded = compile({ ...base, ds: { ...DEFAULT_DESIGN_SYSTEM, textPadX: 12, textPadY: 6 } }, { mode: 'preview' }).html;
+    expect(afterRich(padded)).not.toContain('<table');
+    // And it is the inset cell that wears it, so the padding is on the editable itself.
+    expect(padded).toMatch(/padding:6px 12px[^>]*class="sy-rich|class="sy-rich[^>]*padding:6px 12px/);
+  });
+});

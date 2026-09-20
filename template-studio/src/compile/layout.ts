@@ -253,6 +253,24 @@ function classOf(padded: boolean, className: string | null | undefined): string 
  * `className` is the side-padding override, when the column has one — see `padClass`. `padded`
  * is off for a row inside a stacked column, for the reason `CellOptions` gives.
  */
+/** Whether the system asks for space inside text blocks at all. Zero emits no markup, so nothing changes. */
+export const hasTextInset = (ds: DesignSystem): boolean => Math.max(0, ds.textPadX ?? 0) > 0 || Math.max(0, ds.textPadY ?? 0) > 0;
+
+/**
+ * A heading's or a text block's content inside the extra space the design system asks for (`textPadX`, `textPadY`),
+ * as an inner cell, since padding on a `td` is the one padding every mail client honours. Nothing at zero.
+ *
+ * `className` goes on that inner cell rather than the outer one, because rich text's `sy-rich` is what the canvas
+ * opens for editing (inline-text.ts, TEXT_TARGETS) and the editable has to be the cell that holds the paragraphs —
+ * not one that holds a table that holds them.
+ */
+export function textInset(inner: IRNode, ds: DesignSystem, className?: string): IRNode {
+  const x = Math.max(0, ds.textPadX ?? 0);
+  const y = Math.max(0, ds.textPadY ?? 0);
+  if (!x && !y) return inner;
+  return cell(inner, { ds, padding: `${y}px ${x}px`, padded: false, ...(className ? { className } : {}) });
+}
+
 export function imageCell(
   inner: IRNode,
   padding: string,

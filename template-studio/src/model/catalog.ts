@@ -165,7 +165,7 @@ const asImage = (): Control => ({
  */
 const spacing = (top = 'Space above', bottom = 'Space below'): Group => ({
   name: 'Spacing',
-  help: 'Above and below belong to this block — or to the group, when several blocks share a column. The sides follow the page gutter until you set one; the band behind it always runs edge to edge either way. Hover the canvas to see them drawn.',
+  help: 'Above and below belong to this block — or to the group, when several blocks share a column. The sides follow the page gutter until you set one; the band behind it always runs edge to edge either way. A heading or a text block also carries Design › Text padding inside whatever is set here. Hover the canvas to see them drawn.',
   controls: [
     { kind: 'number', path: 'column.padTop', label: top, min: 0, max: 200, suffix: 'px' },
     { kind: 'number', path: 'column.padBottom', label: bottom, min: 0, max: 200, suffix: 'px' },
@@ -188,7 +188,7 @@ const spacing = (top = 'Space above', bottom = 'Space below'): Group => ({
       max: 120,
       suffix: 'px',
       zero: 'None',
-      help: 'Following Design › Page padding. Drag to give this block its own left gutter, or use the button to hand it back.',
+      help: 'Following Design › Page padding, with Design › Text padding inside it on a heading or a text block. Drag to give this block its own left gutter, or use the button to hand it back.',
     },
     {
       kind: 'inherit-number',
@@ -198,7 +198,7 @@ const spacing = (top = 'Space above', bottom = 'Space below'): Group => ({
       max: 120,
       suffix: 'px',
       zero: 'None',
-      help: 'Following Design › Page padding. Drag to give this block its own right gutter, or use the button to hand it back.',
+      help: 'Following Design › Page padding, with Design › Text padding inside it on a heading or a text block. Drag to give this block its own right gutter, or use the button to hand it back.',
     },
   ],
 });

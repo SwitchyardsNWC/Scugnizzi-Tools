@@ -1,16 +1,14 @@
 import { CANVAS_EFFECTS, canvasTypeOf, type CanvasEffect, type CanvasTextStyle } from '../model/design-system.ts';
+import { roleIsStyled } from '../compile/colors.ts';
 import { canvasTypeSampleSvg } from '../compile/freeform.ts';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import {
   addColor,
-  addFont,
   addPreset,
   colorUsage,
-  fontUsage,
   presetUsage,
-  removeFont,
   removePreset,
   renamePreset,
   designSystemOf,
@@ -99,7 +97,16 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
   const ds = designSystemOf(editor.template);
   const tuned = editor.template.ds !== undefined;
   const following = editor.template.designSystem ?? null;
+  const missing = following !== null && !systems[following];
   const phone = device === 'phone';
+  /** One line for the four states: the folder's, the folder's but gone, this template's own, or the shipped values. */
+  const whose = missing
+    ? { text: `The folder has no ${nameOf(following)} system. These are this template's own values until one is saved under that name.`, help: 'The template names a design system the folder does not hold. Save one under that name, or follow another.' }
+    : following
+      ? { text: `Following ${nameOf(following)} — the folder's system. Every template that follows it moves with these values.`, help: `Editing design-systems/${following}.system.json. The template holds no copy of it.` }
+      : tuned
+        ? { text: "This template's own values. Nothing else moves with them.", help: 'A private copy, saved inside this template. Save it to the folder to share it.' }
+        : { text: 'The shipped values. Nothing else moves with them.', help: 'Untouched defaults. The first change makes a private copy inside this template.' };
 
   return (
     <div class="inspector design">
@@ -110,6 +117,14 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
           Close
         </button>
       </nav>
+
+      {/* Whose system this is, where it is always visible. It is the most consequential fact in the panel — whether
+          these dials edit this template's own copy or a folder file every other template follows — and it used to
+          be rendered last, below eight panels that remember being open. The moves stay at the foot; this only says
+          where you are. */}
+      <p class={`system-where ${missing ? 'warn' : ''}`} title={whose.help}>
+        {whose.text}
+      </p>
 
       {/* One switch for two things: which value a dial edits, and what the canvas is showing. They
           were separate — a phone size dial beside a desktop preview — which is a way to tune a
@@ -142,14 +157,14 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
           halves of the same decision. */}
       <TypePanel editor={editor} ds={ds} phone={phone} />
       <RichTextPanel editor={editor} ds={ds} />
-      {/* Playful type for the freeform canvas, its own category: it follows none of the email's rules. */}
-      <CanvasTypePanel editor={editor} ds={ds} />
       <ColourPanel editor={editor} ds={ds} />
       {/* Directly under Colour, because a preset is a handful of colours with a name — reading one
           without the other is reading half of it. */}
       <PresetPanel editor={editor} ds={ds} />
       <ButtonPanel editor={editor} ds={ds} phone={phone} />
       <ImagePanel editor={editor} ds={ds} />
+      {/* Playful type for the freeform canvas, last and on its own: it follows none of the email's rules above. */}
+      <CanvasTypePanel editor={editor} ds={ds} />
 
       <SystemFooter
         editor={editor}
@@ -322,15 +337,38 @@ function SystemFooter({
   );
 }
 
-function Panel({ name, help, open: initial, children }: { name: string; help?: string; open?: boolean; children: ComponentChildren }) {
-  const [open, setOpen] = useState(Boolean(initial));
+/** Which panels are open, kept in this browser: the panel you were tuning is the one you come back to. */
+const OPEN_KEY = 'scuggnizzi.design.open';
+const readOpen = (): Record<string, boolean> => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as unknown;
+    return raw && typeof raw === 'object' ? (raw as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+};
+
+function Panel({ name, help, summary, open: initial, children }: { name: string; help?: string; summary?: ComponentChildren; open?: boolean; children: ComponentChildren }) {
+  const [open, setOpen] = useState(() => readOpen()[name] ?? Boolean(initial));
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(OPEN_KEY, JSON.stringify({ ...readOpen(), [name]: next }));
+      } catch {
+        // Not kept; the panel opens as it did.
+      }
+      return next;
+    });
+  };
   return (
     <section class={`panel ${open ? 'open' : ''}`}>
-      <button class="panel-head" aria-expanded={open} title={help} onClick={() => setOpen((v) => !v)}>
+      <button class="panel-head" aria-expanded={open} title={help} onClick={toggle}>
         <span class="caret" aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
         {name}
+        {summary !== undefined && !open && <span class="panel-sum">{summary}</span>}
       </button>
       {open && (
         <div class="panel-body">
@@ -349,13 +387,33 @@ function TypePanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; ph
   const level = ds.type[picked] ? picked : (order[0] ?? 'body');
   const t: TypeStyle = ds.type[level] ?? DEFAULT_DESIGN_SYSTEM.type['body']!;
   const set = (key: keyof TypeStyle, value: unknown) => editor.set(`ds.type.${level}.${key}`, value);
+  /** Whether the compiler writes any rule for this role. `topbar` gets none, so two controls below would reach nothing. */
+  const styled = roleIsStyled(level);
 
   return (
     <Panel
       name="Type"
       open
+      summary={`${ds.type['h1']?.size ?? ds.type[order[0] ?? 'body']?.size ?? ''}/${ds.type['body']?.size ?? ''} · ${nameOf(fontKeyOf(ds, ds.fontStack) ?? 'custom')}`}
       help="The scale a heading renders at, and the rules HubSpot inlines onto whatever the team types in the rich text editor."
     >
+      {/* The email's font first, because every role below falls back to it and the Font select down there names it
+          in its own first option — setting a value before the value it is measured against is the ordering fault
+          this panel argues against one level up. The stacks shipped are the whole list: the add-a-font form that
+          used to sit at the bottom read as a second font control (Jared: "the emails font with the ability to add
+          a font is confusing"). */}
+      <div class="field wide type-font" title="What every role falls back to, and what everything that is not a type role renders in. Email has no webfonts worth relying on, so these are the stacks already installed.">
+        <label>The email’s font</label>
+        <select value={ds.fontStack} onChange={(e) => editor.set('ds.fontStack', (e.target as HTMLSelectElement).value)}>
+          {Object.entries(ds.fonts).map(([key, value]) => (
+            <option key={key} value={value}>
+              {nameOf(key)}
+            </option>
+          ))}
+          {!Object.values(ds.fonts).includes(ds.fontStack) && <option value={ds.fontStack}>{ds.fontStack}</option>}
+        </select>
+      </div>
+
       {/* The specimen doubles as the selector: pick the size you can see is wrong. */}
       <div class="specimen" role="radiogroup" aria-label="Type level">
         {order.map((name) => {
@@ -417,6 +475,7 @@ function TypePanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; ph
           suffix="%"
           title="Reading text wants about 150%; headings want less. One value for both widths — a line height that changed on a phone would be a second number nobody is looking at."
         />
+        {styled && (
         <Dial
           label="Space after"
           value={t.marginBottom}
@@ -426,6 +485,7 @@ function TypePanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; ph
           suffix="px"
           title="The margin below. HubSpot injects 1em onto every paragraph at send, so stating one is the only way to control it (learnings 1.9)."
         />
+        )}
         <Dial
           label="Tracking"
           value={t.letterSpacing ?? 0}
@@ -459,7 +519,7 @@ function TypePanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; ph
       {/* Per role. This is the difference between "the email is Helvetica" and a design: a Georgia
           H1 over Helvetica body copy is a decision a designer should be able to make here. */}
       <div class="controls">
-        <div class="field" title="The stack this role renders in. Left on Default it follows the email's font below.">
+        <div class="field wide" title="The stack this role renders in. Left on Default it follows the email's font at the top of this panel.">
           <label>Font</label>
           <select
             value={t.font ?? ''}
@@ -473,152 +533,24 @@ function TypePanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; ph
             ))}
           </select>
         </div>
-        <div
-          class="field"
-          title="Pins this role to a palette colour. Left on Follow the background it takes the section's text colour, which is what keeps a heading readable when it lands on the navy band."
-        >
-          <label>Colour</label>
-          <select
-            value={typeof t.color === 'string' ? t.color : ''}
-            onChange={(e) => set('color', (e.target as HTMLSelectElement).value || undefined)}
-          >
-            <option value="">Follow the background</option>
-            {Object.keys(ds.colors).map((key) => (
-              <option key={key} value={key}>
-                {nameOf(key)}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      <div class="field wide" title="What every role falls back to, and what everything that is not a type role renders in. Email has no webfonts worth relying on, so these are the stacks already installed.">
-        <label>The email’s font</label>
-        <select value={ds.fontStack} onChange={(e) => editor.set('ds.fontStack', (e.target as HTMLSelectElement).value)}>
-          {Object.entries(ds.fonts).map(([key, value]) => (
-            <option key={key} value={value}>
-              {nameOf(key)}
-            </option>
-          ))}
-          {!Object.values(ds.fonts).includes(ds.fontStack) && <option value={ds.fontStack}>{ds.fontStack}</option>}
-        </select>
-      </div>
-
-      <FontList editor={editor} ds={ds} />
+      {/* Only for the roles the compiler writes a colour rule for. The Top bar's tagline takes its section's
+          colour, so a Colour set on it reached nothing and said otherwise. */}
+      {styled && (
+        <PresetSlot
+          ds={ds}
+          label="Colour"
+          value={t.color ?? null}
+          onChange={(v) => set('color', v ?? undefined)}
+          allowNone
+          noneLabel="Follow the background"
+          help="Pins this role to a palette colour. Left on Follow the background it takes the section's text colour, which is what keeps a heading readable when it lands on the navy band."
+        />
+      )}
     </Panel>
   );
 }
-
-/**
- * The stacks, and a way to add one.
- *
- * Seven shipped and that was the whole list: a template in a monospace face needed a stack the
- * system did not have, and nothing in the panel could give it one. A role names a stack rather
- * than holding it (learnings 3.12), so adding one is safe — `mono` can be tuned once and every role
- * that says it follows.
- *
- * Removing is refused while a role names it, and the tooltip says which. A role whose stack
- * resolves to nothing would fall back to the default silently, which is a change in a place nobody
- * is looking.
- */
-function FontList({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [stack, setStack] = useState('');
-  // Focused from an effect rather than with `autofocus`: the attribute only fires when the
-  // element is created with the document, and this one is created on a click. Keystrokes then
-  // landed wherever focus already was, which was the button that had just been pressed.
-  const first = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    if (adding) first.current?.focus();
-  }, [adding]);
-
-  const commit = () => {
-    if (!name.trim() || !stack.trim()) return;
-    editor.commit('Add font', addFont(editor.template, name, stack));
-    setAdding(false);
-    setName('');
-    setStack('');
-  };
-
-  return (
-    <div class="font-list">
-      {Object.entries(ds.fonts).map(([key, value]) => {
-        const uses = fontUsage(ds, key);
-        return (
-          <div class="font-row" key={key} title={uses.length ? `Named by ${uses.join(', ')}.` : 'Named by no role yet.'}>
-            <span class="font-name">{nameOf(key)}</span>
-            <span class="font-stack">{value}</span>
-            <button
-              class="swatch-drop"
-              disabled={uses.length > 0}
-              aria-label={`Remove ${nameOf(key)}`}
-              title={uses.length ? `${uses.join(', ')} use it. Point them at another font first.` : 'Remove. Nothing names it.'}
-              onClick={() => editor.commit('Remove font', removeFont(editor.template, key))}
-            >
-              ✕
-            </button>
-          </div>
-        );
-      })}
-
-      {adding ? (
-        // A form, so Enter submits the way a browser already knows how to — and handled on keydown
-        // as well, because implicit submission rides on the keypress a synthetic key event does not
-        // always produce, and a form that submits from one keyboard and not another is a form
-        // that looks broken.
-        <form
-          class="font-add"
-          onSubmit={(e) => {
-            e.preventDefault();
-            commit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setAdding(false);
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              commit();
-            }
-          }}
-        >
-          <input
-            ref={first}
-            type="text"
-            placeholder="Name — e.g. Mono"
-            value={name}
-            aria-label="Font name"
-            onInput={(e) => setName((e.target as HTMLInputElement).value)}
-          />
-          <input
-            type="text"
-            placeholder="Stack — e.g. Menlo, Consolas, monospace"
-            value={stack}
-            spellcheck={false}
-            aria-label="Font stack"
-            title="Comma-separated, first choice first, ending in a generic family. Email has no webfonts worth relying on, so name faces that are installed."
-            onInput={(e) => setStack((e.target as HTMLInputElement).value)}
-          />
-          <div class="row-actions-inline">
-            <button type="submit" class="btn" disabled={!name.trim() || !stack.trim()}>
-              Add
-            </button>
-            <button type="button" class="link" onClick={() => setAdding(false)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div class="palette-actions">
-          <button class="btn wide" title="A new stack any role can name — a monospace face, a serif, whatever the template is set in." onClick={() => setAdding(true)}>
-            + Add a font
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- colour ----------------------------------------------------------------------------------------
 
 /**
  * One palette entry: a well, a name you can rewrite, a hex you can type, and a way to remove it.
@@ -768,6 +700,15 @@ function ColourPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   return (
     <Panel
       name="Colour"
+      summary={
+        <span class="sum-dots">
+          {Object.entries(ds.colors)
+            .slice(0, 8)
+            .map(([key, hex]) => (
+              <i key={key} class="sum-dot" style={{ background: hex }} title={nameOf(key)} />
+            ))}
+        </span>
+      }
       help={`The ${keys.length} colours the whole system is built from. Presets, type roles and buttons name them rather than repeating them.`}
     >
       {keys.map((key) => (
@@ -806,15 +747,24 @@ function ColourPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
  */
 function ButtonPanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; phone: boolean }) {
   const names = Object.keys(ds.buttons);
-  const [picked, setPicked] = useState<string>(names[0] ?? 'red');
-  const style = ds.buttons[picked] ? picked : (names[0] ?? 'red');
-  const t = ds.buttons[style] ?? DEFAULT_DESIGN_SYSTEM.buttons['red']!;
+  // `primary`/`secondary` since schema 3; the fallbacks said `red`, which has not been a variant name for as long
+  // and left `DEFAULT_DESIGN_SYSTEM.buttons['red']!` asserting over an `undefined` (learnings 3.48 again).
+  const [picked, setPicked] = useState<string>(names[0] ?? 'primary');
+  const style = ds.buttons[picked] ? picked : (names[0] ?? 'primary');
+  const t = ds.buttons[style] ?? DEFAULT_DESIGN_SYSTEM.buttons['primary']!;
   const at = (key: string) => `ds.buttons.${style}.${key}`;
+  // The background a variant is actually drawn on, read from the presets rather than from a colour name, so a
+  // renamed palette or an imported system still shows the truth. Among the presets naming this variant, a banded
+  // one wins: a coloured band is the case a second variant exists for, and taking whichever preset sorted first
+  // put the outlined Secondary on cream, where its white outline is invisible.
+  const users = Object.values(ds.themes).filter((th) => th.button === style);
+  const on = users.find((th) => th.band) ?? users[0];
 
   return (
     <Panel
       name="Buttons"
-      help="The two variants a block can pick. Red sits on light backgrounds, white on the navy band."
+      summary={Object.keys(ds.buttons).join(', ')}
+      help="The two variants a block can pick. A preset names one as its default; a block can override it."
     >
       <div class="seg" role="group" aria-label="Button variant">
         {names.map((name) => (
@@ -832,7 +782,8 @@ function ButtonPanel({ editor, ds, phone }: { editor: Editor; ds: DesignSystem; 
       {/* The real thing, at the real numbers, on the background it is drawn for. */}
       <div
         class="btn-specimen"
-        style={{ background: colorOf(ds, style === 'white' ? 'navy' : 'cream') ?? '#fff' }}
+        style={{ background: colorOf(ds, on?.band ?? on?.container ?? null) ?? colorOf(ds, ds.pageBackground) ?? '#fff' }}
+        title={on ? `On the background a section using this variant draws.` : 'No preset names this variant, so it sits on the page background.'}
       >
         <span
           style={{
@@ -891,6 +842,7 @@ function RichTextPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   return (
     <Panel
       name="Lists & quotes"
+      summary={`indent ${ds.richText.listIndent}px · quote bar ${ds.richText.quoteBar}px`}
       help="What the team's own formatting looks like: bulleted and numbered lists, block quotes, and the horizontal rule."
     >
       <div class="dials">
@@ -978,7 +930,11 @@ function ImagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   const at = (key: string) => `ds.image.${key}`;
 
   return (
-    <Panel name="Images" help="The frame around every image, and the width a newly dropped one starts at.">
+    <Panel
+      name="Images"
+      summary={`${ds.image.defaultWidth}px · ${ds.image.radius ? `${ds.image.radius}px corner` : 'square'}${ds.image.borderWidth ? ` · ${ds.image.borderWidth}px border` : ''}`}
+      help="The frame around every image, and the width a newly dropped one starts at."
+    >
       <div class="dials">
         <Dial
           label="Corner"
@@ -1023,6 +979,7 @@ function PresetPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   return (
     <Panel
       name="Background presets"
+      summary={Object.keys(ds.themes).join(', ')}
       help="A handful of colours with a name. A preset moves a section's band, container, text and link together, and names colours from the palette above rather than repeating them."
     >
       {names.map((name) => (
@@ -1195,6 +1152,7 @@ function PagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   return (
     <Panel
       name="Page / layout"
+      summary={`${ds.containerWidth}px · ${ds.pagePadding}px gutter`}
       help="The sheet the email sits on: its width, the gutter inside it, the frame around it, the space outside it, and where the phone rules take over. Columns inside a row are set on the row."
     >
       <div class="dials">
@@ -1216,6 +1174,26 @@ function PagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
           max={80}
           suffix="px"
           title="The gutter between the email's edge and its content, both sides. With the width above it is what sets the measure — the line length the copy actually gets."
+        />
+        <Dial
+          label="Text padding ↔"
+          value={ds.textPadX}
+          onChange={(v) => editor.set('ds.textPadX', v)}
+          min={0}
+          max={60}
+          suffix="px"
+          zero="None"
+          title="Extra space inside every heading and text block, each side, on top of the page padding. Buttons and images keep their own."
+        />
+        <Dial
+          label="Text padding ↕"
+          value={ds.textPadY}
+          onChange={(v) => editor.set('ds.textPadY', v)}
+          min={0}
+          max={60}
+          suffix="px"
+          zero="None"
+          title="Extra space above and below the words in every heading and text block. A paragraph's own space after stays as set in Type."
         />
         <Dial
           label="Between blocks"
@@ -1338,6 +1316,7 @@ function CanvasTypePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
   return (
     <Panel
       name="Canvas type"
+      summary={`${Object.keys(canvasTypeOf(ds)).length} styles`}
       help="Playful type for the freeform canvas. It ships inside a picture, so it can outline, shadow, highlight, sticker, wobble and bend. Pick a style on the canvas with the Text tool."
     >
       <div class="canvas-type-chips">
