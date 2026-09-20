@@ -1900,6 +1900,16 @@ button.fig-pill:active { transform: scale(0.96); }
 .cv-menu.pill .cv-seg button.on { background: #7b61ff; }
 .cv-menu.pill .cv-check:checked::after { background: #7b61ff; }
 
+/* What a closed design panel holds, in a few words beside its name. */
+.panel-sum { display: flex; align-items: center; gap: 5px; margin-left: auto; padding-left: 10px; overflow: hidden; font-size: 11px; font-weight: 400; color: var(--faint); white-space: nowrap; text-overflow: ellipsis; }
+/* Whose design system this is, under the panel's own crumbs: a fact, not a control. */
+.system-where { margin: 0 0 4px; padding: 7px 12px 8px; border-bottom: 1px solid var(--line-soft); background: var(--sunk); font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.system-where.warn { color: var(--warn); }
+
+/* A palette summarised by showing it, rather than by counting it. */
+.sum-dots { display: inline-flex; align-items: center; gap: 3px; }
+.sum-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--line); }
+
 /* --- the board's notes for this email (NotesRail.tsx) ------------------------------------------------------------ */
 .notes-toggle { display: inline-flex; align-items: center; gap: 6px; }
 .notes-count { font-family: var(--mono); font-size: 10.5px; padding: 0 5px; border-radius: 999px; background: var(--sunk); color: var(--ink); }

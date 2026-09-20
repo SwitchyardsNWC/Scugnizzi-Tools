@@ -11,7 +11,7 @@
 // no idea the registry exists, so a block author cannot forget to register — and the registry
 // cannot double-count, because it runs once over a tree that is already complete.
 
-import { colorOf, type DesignSystem } from '../model/design-system.ts';
+import { colorOf, RICH_LEVELS, type DesignSystem } from '../model/design-system.ts';
 import { walk, type IRNode } from './ir.ts';
 
 export type ColorKind = 'bg' | 'text' | 'link';
@@ -129,9 +129,12 @@ export function darkModeLayers(registry: Registry, pageBackground: string, ds: D
  */
 function roleSelectors(name: string): string[] {
   if (name === 'body') return ['.sy-rich p', '.sy-rich li', '.sy-rich blockquote'];
-  if (/^h[1-6]$/.test(name)) return [`.sy-rich ${name}`, `${name}.sy-${name}`];
+  if ((RICH_LEVELS as string[]).includes(name)) return [`.sy-rich ${name}`, `${name}.sy-${name}`];
   return [];
 }
+
+/** Whether a type role reaches the output's colour layer at all — what the Type panel asks before offering Colour. */
+export const roleIsStyled = (name: string): boolean => roleSelectors(name).length > 0;
 
 /** Every colour the output uses, as `kind:hex`. The validator compares this against the emitted CSS. */
 export function allColors(registry: Registry): string[] {

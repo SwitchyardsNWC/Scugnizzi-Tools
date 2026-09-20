@@ -78,7 +78,6 @@ export function switchyardsDesignSystem(): DesignSystem {
       body: { size: 18, lineHeight: 144, weight: 'normal', mobileSize: 18, marginBottom: 10 },
       topbar: { size: 12, lineHeight: 133, weight: 'bold', mobileSize: 12, marginBottom: 0, uppercase: true, letterSpacing: 0.24 },
     },
-    space: { s: 10, m: 20, l: 40 },
     containerWidth: 600,
     pagePadding: 20,
     blockGap: 10,

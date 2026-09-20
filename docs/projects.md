@@ -791,6 +791,20 @@ marks go on the selection or the word at the caret. The slash menu is Turn into,
 paragraph already is ticked. Selecting words shows a small bar with B, I, U, S, Link and Clear. And Markdown works as
 you type: `**bold**`, `*italic*`, `` `code` ``, `~~struck~~`, `[words](address)`.
 
+### Padding for text blocks, and a Design panel pass
+
+*Added 2026-09-19.* Design › Page / layout has two new dials, Text padding ↔ and ↕, which add space inside every
+heading and text block on top of the page gutter.
+
+The font controls stopped arguing with each other: the email's font is a plain dropdown of the shipped stacks, it
+is now the first thing in Type (every role falls back to it), and the add-a-font list under it is gone.
+
+The rest of the panel, from a review of it: whose design system you are editing is stated in the header instead of
+below eight panels; each panel remembers being open and says what it holds when shut, with the palette shown rather
+than counted; a type role's colour is the same swatch control as every other colour, so a hand-set hex no longer
+reads as unset; Top bar no longer offers two controls that moved nothing; and the button specimen is drawn on the
+background its variant is actually used on, so the outlined Secondary shows on navy.
+
 ## To decide first
 
 1. **Is the deck its own tool or a panel in every tool?** The plan says its own tool, because

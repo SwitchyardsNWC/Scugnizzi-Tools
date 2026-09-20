@@ -2665,3 +2665,69 @@ writing with a sudo markdown feel." Then: "start with the first list."
 - **⌘B, ⌘I and ⌘U** go through the editor's own hands now, not the browser's, so at a caret they take the word.
 - **Still `execCommand` underneath.** Every one of these rides the browser's editor, so this is the pass that stops
   the hurt, not the one that makes the model ours. That one (3.88's note on a shared text model) is next.
+
+### 3.90 Padding for every text block, and a font control that stopped arguing with itself
+
+*2026-09-19.* Jared: "add a new design panel feature to add padding to all text blocks. The emails font with the
+ability to add a font is confusing. keep the default drop down options for now. make any other updates to the
+design panel structure or features that would be useful."
+
+- **`textPadX` and `textPadY`.** Two tokens, two dials in Page / layout, and an inner cell around the words in
+  every heading and rich text block (`textInset`, compile/layout.ts). A `<td>`'s padding is the one padding every
+  mail client honours, so it is a cell and not a style on the element. Zero emits nothing at all, so every
+  template that does not ask for it compiles byte-for-byte as before — the same discipline `pageBorderWidth`
+  follows. Buttons and images keep their own padding; this is about text.
+- **The font is a dropdown again.** "The email's font" sat above a list of stacks with an "+ Add a font" form
+  under it, and the two read as two different font controls on one screen. The list is gone; the dropdown of
+  shipped stacks is the whole control, and a role that departs from it picks from the same stacks in Type. The
+  model keeps `addFont`/`removeFont` — nothing about the file format changed, only what the panel offers.
+- **Panels remember, and say what they hold.** Which panels are open is kept in this browser
+  (`scuggnizzi.design.open`), so the one being tuned is the one you come back to. A closed panel shows a few
+  words of what is inside it: "600px · 20px gutter", "3 colours", "primary, secondary". Canvas type moved to the
+  end, on its own, since it follows none of the email's rules above it.
+- **Three more `documentElement` throws.** Learnings 3.61 records this exact failure — the frame's first
+  document, before its `srcdoc` has parsed, has no root element, and an effect that throws on it takes every
+  effect queued behind it down with it. It was fixed once, for `mouseleave`, and left in three other places,
+  where it threw on every single load of Template Studio. One `rootOf` helper, null-checked, and the console is
+  clean. A lesson recorded in one place is not a lesson applied everywhere: the grep is the fix.
+
+### 3.91 What a five-lens review of the Design panel found
+
+*2026-09-19.* The second half of Jared's ask — "make any other updates to the design panel structure or features
+that would be useful" — run as five parallel reviews (coverage, email rendering, information architecture,
+usability, consistency) with every proposal then handed to an adversarial verifier whose default was to refute.
+51 findings, 24 verified, 19 survived, 5 refuted. What the refutations killed is the useful half of that number:
+one proposal rested on `mobileBreakpoint` deciding what the Phone switch shows, and it does not — the phone canvas
+is a hard-coded 375px.
+
+Implemented, all of them panel-level:
+
+- **The email's font is the first control in Type.** Every role below falls back to it, and the per-role Font
+  select names it in its own first option — so it was a value set after the value it is measured against. The hover
+  that said "below" says "at the top of this panel".
+- **The type role's Colour is a `PresetSlot`.** It was a bare select listing palette keys. A role holding a literal
+  `#d10000` — legal, and what `colorOf` passes straight through — matched no option, so the select fell back to
+  rendering "Follow the background" while the compiler pinned that role to a red. The panel reported the opposite
+  of what shipped. `PresetSlot` labels the literal and shows a swatch, and every other colour row already used it.
+- **Top bar loses two controls that reached nothing.** Its tagline takes its section's colour and carries a
+  hard-coded `margin:0`, so Colour and Space after moved nothing. Both are now gated on the compiler's own answer
+  (`roleIsStyled`), and the list of styled roles moved to one place (`RICH_LEVELS`) that `richTextCss` and
+  `roleSelectors` now share instead of each keeping its own copy.
+- **The button specimen sits on the background the variant is drawn on.** It painted itself with
+  `style === 'white' ? 'navy' : 'cream'`, and the variants have been `primary`/`secondary` since schema 3 — so the
+  test was never true and the outlined Secondary was always shown on cream, where its white outline is invisible.
+  It now reads the preset that names the variant. The first attempt took whichever preset sorted first and put
+  Secondary back on cream, because `callout` names it too and sorts before `navy`: a banded preset wins, since a
+  coloured band is the case a second variant exists for. The browser caught that; the verifier had not.
+  The same commit kills two `?? 'red'` fallbacks and a `DEFAULT_DESIGN_SYSTEM.buttons['red']!` asserting over
+  `undefined`.
+- **Every panel says what it holds when closed**, and Colour shows its swatches instead of counting them.
+- **Whose system this is sits in the header.** It is the most consequential fact in the panel — whether these dials
+  edit this template's private copy or a folder file every other template follows — and it was rendered last, under
+  eight panels that now remember being open. Four states, one line, always visible. The moves stay at the foot.
+- **`ds.space` is gone.** Declared, defaulted, copied into the Switchyards system, shipped in every saved file, and
+  read by nothing. `ds.version` stays, with a comment saying why: it is the format marker on a shared file other
+  people's folders already hold, which is the one place a future migration has to be able to recognise.
+
+Left for Jared to pick from, verified but bigger than a panel: a preheader, dark-mode counterparts for palette
+colours, 2x image widths, a contrast ratio beside each preset, and the compiler's last five literal preset names.

@@ -202,6 +202,16 @@ const BAR_COMMANDS: Array<{ id: string; label: string; title: string; exec: Exec
 ];
 
 /**
+ * The frame document's root element, or null.
+ *
+ * `documentElement` is typed as always present and is not: the frame's first document, before its `srcdoc` has
+ * parsed, has no root element at all. That was learned once for `mouseleave` (learnings 3.61) and left in three
+ * other places, where it threw on every load — and an effect that throws takes every effect queued behind it
+ * down with it.
+ */
+const rootOf = (doc: Document): HTMLElement | null => doc.documentElement as HTMLElement | null;
+
+/**
  * Where a dragged block would land, named in terms of the document rather than of pixels.
  *
  * The canvas resolves a pointer position to one of these and stops there. Turning it into "column
@@ -1552,7 +1562,7 @@ export function Preview({
     const carry = () => inner.querySelector('[data-sy-carry]') as HTMLElement | null;
 
     const clearDrag = () => {
-      inner.documentElement.removeAttribute('data-sy-dragging');
+      rootOf(inner)?.removeAttribute('data-sy-dragging');
       carry()?.remove();
       for (const el of inner.querySelectorAll('[data-sy-lifted]')) el.removeAttribute('data-sy-lifted');
       drag.current = null;
@@ -1637,7 +1647,7 @@ export function Preview({
       if (!state.active) {
         if (Math.abs(event.clientY - state.y) < 5) return;
         state.active = true;
-        inner.documentElement.setAttribute('data-sy-dragging', '');
+        rootOf(inner)?.setAttribute('data-sy-dragging', '');
         // The overlay would sit under the copy in your hand and over the target; neither helps.
         hovered.current = null;
         setSpaces([]);
@@ -1854,8 +1864,8 @@ export function Preview({
     // The picked layer on a freeform surface, and the pen's cursor while it is down.
     for (const el of inner.querySelectorAll('[data-sy-layer-on]')) el.removeAttribute('data-sy-layer-on');
     if (layer) found?.querySelector(`[data-sy-layer="${CSS.escape(layer)}"]`)?.setAttribute('data-sy-layer-on', '');
-    if (drawing) inner.documentElement.setAttribute('data-sy-drawing', '');
-    else inner.documentElement.removeAttribute('data-sy-drawing');
+    if (drawing) rootOf(inner)?.setAttribute('data-sy-drawing', '');
+    else rootOf(inner)?.removeAttribute('data-sy-drawing');
     if (!found) {
       setBar(null);
       return;
