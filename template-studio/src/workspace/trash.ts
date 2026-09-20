@@ -82,6 +82,25 @@ async function remove(dir: Dir, path: string): Promise<void> {
   }
 }
 
+/**
+ * Every path already spoken for in the folder a file came from.
+ *
+ * `restorePath` numbers past every name it is given, and for a while it was given exactly one: the original path.
+ * That is right until two things have been deleted under the same name — the first came back as `a 2`, and the
+ * second, told only that `a` was taken, came back as `a 2` as well and wrote over it. Asking the folder is the
+ * only answer that stays true however many copies are waiting.
+ */
+async function takenIn(dir: Dir, path: string): Promise<string[]> {
+  const { parts } = split(path);
+  const folder = await childDir(dir, parts);
+  if (!folder) return [];
+  const prefix = parts.length ? `${parts.join('/')}/` : '';
+  const taken: string[] = [];
+  // Directories count: a file cannot be written where a folder of that name already sits.
+  for await (const [name] of folder.entries()) taken.push(`${prefix}${name}`);
+  return taken;
+}
+
 /** Every record in the trash, newest first. A file that is not one is skipped rather than fatal. */
 export async function readTrash(dir: Dir): Promise<TrashRecord[]> {
   const folder = await trashDir(dir);
@@ -161,9 +180,9 @@ export async function forgetTrashed(dir: Dir, record: TrashRecord): Promise<void
 /**
  * A trashed thing back where it came from, and out of the trash.
  *
- * `taken` is whatever is at that path now: a restore never writes over what took the old name, so it comes back
- * numbered instead and the caller says where it landed. Returns the path it went to, or null when the bytes are
- * gone — which can happen if somebody emptied the folder by hand between the list and the click.
+ * A restore never writes over anything: it numbers past every name the folder already holds, including one an
+ * earlier restore has just taken, and the caller says where it landed. Returns the path it went to, or null when
+ * the bytes are gone — which can happen if somebody emptied the folder by hand between the list and the click.
  */
 export async function restoreFromTrash(dir: Dir, record: TrashRecord): Promise<string | null> {
   const data = await readFile(dir, `${TRASH_DIR}/${trashDataName(record.id)}`);
@@ -171,8 +190,7 @@ export async function restoreFromTrash(dir: Dir, record: TrashRecord): Promise<s
     await forgetTrashed(dir, record);
     return null;
   }
-  const at = await readFile(dir, record.path);
-  const path = restorePath(record.path, at ? [record.path] : []);
+  const path = restorePath(record.path, await takenIn(dir, record.path));
   await write(dir, path, data);
   await forgetTrashed(dir, record);
   return path;

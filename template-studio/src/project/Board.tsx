@@ -107,8 +107,8 @@ const BOARD_KEYS: Array<[string[], string]> = [
   [['⌘Z', '⇧⌘Z'], 'Undo, redo'],
   [['Enter'], 'Open the selected card in its tool; write in the selected note'],
   [['N'], 'Leave a note, on the selected card when one is picked'],
-  [['⌫', '⌦'], 'Remove the selected file; press twice, ⌘Z puts it back'],
-  [['Esc'], 'Let go of the selection, a picked line or a new group'],
+  [['⌫', '⌦'], 'Remove the selected file; press twice, ⌘Z puts it back and the can holds it either way'],
+  [['Esc'], 'Close the sheet in front, or let go of the selection, a picked line or a new group'],
   [['⇧1'], 'Fit everything'],
   [['⇧2'], 'Zoom to the selected card'],
   [['⌘+', '⌘−'], 'Zoom in and out'],
@@ -1017,6 +1017,21 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   const armedDelete = useRef<{ id: string; until: number } | null>(null);
   const onKey = (event: KeyboardEvent) => {
     if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
+    // A sheet in front of the board takes the keyboard. Only Escape knew about the shortcuts sheet before, and
+    // nothing knew about the can's panel, so the board's own keys went on working behind both: with a card
+    // selected, Backspace twice deleted it behind the very panel listing what had been deleted. Tab and the
+    // arrows are deliberately left alone, so the sheet stays navigable by keyboard.
+    if (trashOpen || showKeys) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (trashOpen) setTrashOpen(false);
+        else setShowKeys(false);
+      } else if (event.key === '?' && showKeys && !trashOpen) {
+        event.preventDefault();
+        setShowKeys(false);
+      }
+      return;
+    }
     const mod = event.metaKey || event.ctrlKey;
     if (event.key === ' ') {
       // Space is the hand while it is down, wherever the pointer lands.
@@ -1029,8 +1044,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       event.preventDefault();
       setShowKeys((v) => !v);
     } else if (event.key === 'Escape') {
-      if (showKeys) setShowKeys(false);
-      else if (armedDelete.current) {
+      if (armedDelete.current) {
         armedDelete.current = null;
         notify(`${layout.cards.find((c) => c.id === selected)?.name ?? 'The card'} stays.`);
       } else if (groupingRef.current) setGrouping(false);
