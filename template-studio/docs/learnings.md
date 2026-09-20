@@ -2633,3 +2633,35 @@ how the input has the outline when editing the note." So: "Delete note", shown o
 always there; and the note's field and the reply field have no focus ring. The board's ring (`.pb-app :focus-visible`)
 had been drawing a rounded box around the words, since a textarea's own `outline: none` loses to `:focus-visible`;
 the field is the note, and a ring around the words said "form" where the paper said "note".
+
+### 3.89 Writing, the first pass
+
+*2026-09-19.* Jared: "in the template studio its not very dialed in when using the '/' command to make something
+bold or a paragraph. sometimes text box takes on whatever style i'm trying to add. I like the way notion handles
+writing with a sudo markdown feel." Then: "start with the first list."
+
+- **Why the whole block took the style.** Opening a block for editing selected all of its text, so the first thing
+  reached for, ⌘B or a menu row, landed on everything. Now the caret goes where the double-click was
+  (`caretRangeFromPoint`, with Firefox's `caretPositionFromPoint` as the fallback), and to the end when the edit
+  opens another way.
+- **A mark goes on words.** With nothing selected, bold, italic, underline, strike, sub, sup, code, small, link and
+  clear take the word at the caret (`selectWordAtCaret`), never the block, and do nothing when the caret is between
+  words. `wrapInline` used to take the whole block when nothing was selected; that is gone.
+- **The menu in halves.** Turn into (paragraph, headings, lists, quote, rule) and Style (the marks) are two groups
+  with names, and the row for what the paragraph already is comes ticked (`turnIdOf` on the caret's block, read when
+  the menu opens and carried in its state). Single-line fields still get neither, as before.
+- **A bar over a selection.** While rich text is edited and words are selected, a small bar sits above them: B, I,
+  U, S, Link, Clear, each lit when the words already wear it (`queryCommandState`, and the nearest `<a>` for links).
+  It follows `selectionchange` inside the frame and holds its own mousedown so the selection stays. The hint under
+  the block now says "select for styles".
+- **Markdown finished inline.** `**bold**`, `*italic*`, `_italic_`, `` `code` ``, `~~struck~~` and `[words](address)`
+  convert the moment the closing mark is typed (`inlineMarkdown`, pure and tested, then `inlineMarkdownAfterInput`):
+  the marks come out, the words take the style, and the caret goes on after them plain, the typing state turned
+  off, so the next word is not bold too. A lone `*` in arithmetic and an `_` in a name are left alone.
+- **Two things the browser taught.** A command run inside the `input` event of the browser's own editing command is
+  refused, so the inline conversion runs a tick later. And a caret left at the end of an inline run is taken back
+  into the run by the next key, so after code or a link the caret stands on a zero-width space after the run, which
+  `fromContentEditable` strips on the way out; bold, italic and strike also get their typing state turned off.
+- **⌘B, ⌘I and ⌘U** go through the editor's own hands now, not the browser's, so at a caret they take the word.
+- **Still `execCommand` underneath.** Every one of these rides the browser's editor, so this is the pass that stops
+  the hurt, not the one that makes the model ours. That one (3.88's note on a shared text model) is next.

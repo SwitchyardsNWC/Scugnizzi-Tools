@@ -5,7 +5,7 @@ import type { BlockType } from '../model/types.ts';
 import { BLOCK_ICONS, ColumnsIcon, GroupIcon } from './icons.tsx';
 import { capture, release } from './pointer.ts';
 import { SlashMenu } from './SlashMenu.tsx';
-import { blockItem, filterItems, FORMAT_COMMANDS, markdownShortcut, slashQuery, type Exec, type SlashItem } from './slash.ts';
+import { blockItem, filterItems, inlineMarkdown, markdownShortcut, slashQuery, STYLE_COMMANDS, TURN_COMMANDS, turnIdOf, type Exec, type SlashItem } from './slash.ts';
 
 // The canvas.
 //
@@ -180,7 +180,26 @@ interface SlashState {
   index: number;
   top: number;
   left: number;
+  /** What the caret's paragraph is when the menu opens, so that row comes ticked. */
+  current?: string | null;
 }
+
+/** The bar over a selection while rich text is edited: where, and what the words already wear. */
+interface SelectionBar {
+  top: number;
+  left: number;
+  on: Record<string, boolean>;
+}
+
+/** What the selection bar offers, in order. The same commands the menu's Style group runs. */
+const BAR_COMMANDS: Array<{ id: string; label: string; title: string; exec: Exec; state?: string }> = [
+  { id: 'bold', label: 'B', title: 'Bold  ·  ⌘B', exec: { command: 'bold' }, state: 'bold' },
+  { id: 'italic', label: 'I', title: 'Italic  ·  ⌘I', exec: { command: 'italic' }, state: 'italic' },
+  { id: 'underline', label: 'U', title: 'Underline  ·  ⌘U', exec: { command: 'underline' }, state: 'underline' },
+  { id: 'strike', label: 'S', title: 'Strikethrough', exec: { command: 'strikeThrough' }, state: 'strikeThrough' },
+  { id: 'link', label: 'Link', title: 'Link the words  ·  ⌘K', exec: { command: 'link' }, state: 'link' },
+  { id: 'clear', label: 'Clear', title: 'Back to plain text', exec: { command: 'removeFormat' } },
+];
 
 /**
  * Where a dragged block would land, named in terms of the document rather than of pixels.
@@ -540,9 +559,11 @@ export function Preview({
     pick(item: SlashItem): void;
     applyLink(url: string): void;
     cancelLink(): void;
-    beginEditing(blockId: string): boolean;
+    beginEditing(blockId: string, at?: { x: number; y: number }): boolean;
     openQuickAdd(): void;
+    runExec(command: Exec): void;
   } | null>(null);
+  const [selBar, setSelBar] = useState<SelectionBar | null>(null);
 
   /**
    * The cell a block's content sits in: its own row's cell inside a group, or the padded cell of a
@@ -742,7 +763,7 @@ export function Preview({
                 .map((kind) => (quickAdd?.kinds ?? []).find((k) => k.kind === kind))
                 .filter((k): k is NonNullable<typeof k> => Boolean(k))
                 .map((k) => blockItem(k.kind, k.name, k.summary, 'recent'))),
-          ...(slash.mode === 'format' && editing.current?.rich ? FORMAT_COMMANDS : []),
+          ...(slash.mode === 'format' && editing.current?.rich ? [...TURN_COMMANDS.map((i) => ({ ...i, current: i.id === slash.current })), ...STYLE_COMMANDS] : []),
           ...(quickAdd?.kinds ?? []).map((k) => blockItem(k.kind, k.name, k.summary)),
         ],
         slash.query,
@@ -871,6 +892,7 @@ export function Preview({
       if (!session) return;
       editing.current = null;
       setEditHint(null);
+      setSelBar(null);
       setSlash(null);
       linking.current = false;
       session.el.removeAttribute('contenteditable');
@@ -888,8 +910,12 @@ export function Preview({
       }
     };
 
-    /** Opens a block's text for editing. The double-click, Enter and the slash menu all land here. */
-    const beginEditing = (blockId: string): boolean => {
+    /**
+     * Opens a block's text for editing. The double-click, Enter and the slash menu all land here. `at` is where the
+     * pointer was: the caret goes there; otherwise to the end. Never the whole text selected, which was how the first
+     * style reached for landed on everything (Jared: "sometimes text box takes on whatever style i'm trying to add").
+     */
+    const beginEditing = (blockId: string, at?: { x: number; y: number }): boolean => {
       const target = textTargets?.[blockId];
       if (!target) return false; // images and the rest: the inspector is the way in
       const found = inner.querySelector(`[data-sy-block="${CSS.escape(blockId)}"]`) as HTMLElement | null;
@@ -925,7 +951,24 @@ export function Preview({
       const box = el.getBoundingClientRect();
       setEditHint({ top: Math.max(1, box.top - 24), left: Math.max(1, box.left), rich });
       const range = inner.createRange();
-      range.selectNodeContents(el);
+      let placed = false;
+      if (at) {
+        type PointDoc = Document & { caretRangeFromPoint?(x: number, y: number): Range | null; caretPositionFromPoint?(x: number, y: number): { offsetNode: Node; offset: number } | null };
+        const doc = inner as PointDoc;
+        const hit = doc.caretRangeFromPoint?.(at.x, at.y) ?? null;
+        const pos = hit ? null : (doc.caretPositionFromPoint?.(at.x, at.y) ?? null);
+        const node = hit?.startContainer ?? pos?.offsetNode ?? null;
+        const offset = hit?.startOffset ?? pos?.offset ?? 0;
+        if (node && el.contains(node)) {
+          range.setStart(node, offset);
+          range.collapse(true);
+          placed = true;
+        }
+      }
+      if (!placed) {
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
       inner.getSelection()?.removeAllRanges();
       inner.getSelection()?.addRange(range);
       return true;
@@ -940,7 +983,7 @@ export function Preview({
         surfaceRef.current.onEnterSurface?.(blockId);
         return;
       }
-      beginEditing(blockId);
+      beginEditing(blockId, { x: event.clientX, y: event.clientY });
     };
 
     // --- the slash menu ---
@@ -1039,31 +1082,60 @@ export function Preview({
             .map((k) => blockItem(k.kind, k.name, k.summary, 'recent'));
       // Formatting only where there is markup to format: a heading or a button label is one line
       // of plain text, so the menu on those offers the add-a-block half alone.
-      const formats = state.mode === 'format' && editing.current?.rich ? FORMAT_COMMANDS : [];
+      const formats = state.mode === 'format' && editing.current?.rich ? [...TURN_COMMANDS.map((i) => ({ ...i, current: i.id === state.current })), ...STYLE_COMMANDS] : [];
       return filterItems([...recent, ...formats, ...blocks], state.query);
     };
 
-    /** The selection, or the whole block when nothing is selected, wrapped in an inline tag. */
+    /**
+     * With nothing selected, the word the caret is in becomes the selection, so a mark lands on that word and not
+     * on the whole block, and not on nothing. False when the caret is not in a word.
+     */
+    const selectWordAtCaret = (): boolean => {
+      const sel = inner.getSelection();
+      if (!sel || sel.rangeCount === 0) return false;
+      const range = sel.getRangeAt(0);
+      if (!range.collapsed) return true;
+      const node = range.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return false;
+      const text = node.textContent ?? '';
+      const at = range.startOffset;
+      const wordish = (ch: string | undefined) => Boolean(ch && !/[\s\u00a0.,;:!?()[\]{}"'“”‘’]/.test(ch));
+      if (!wordish(text[at - 1]) && !wordish(text[at])) return false;
+      let from = at;
+      let to = at;
+      while (from > 0 && wordish(text[from - 1])) from -= 1;
+      while (to < text.length && wordish(text[to])) to += 1;
+      const word = inner.createRange();
+      word.setStart(node, from);
+      word.setEnd(node, to);
+      sel.removeAllRanges();
+      sel.addRange(word);
+      return true;
+    };
+
+    /** The selection, or the word at the caret, wrapped in an inline tag. Nothing selected and no word: nothing. */
     const wrapInline = (tag: string) => {
+      if (!selectWordAtCaret()) return;
       const sel = inner.getSelection();
       if (!sel || sel.rangeCount === 0) return;
-      let range = sel.getRangeAt(0);
-      if (range.collapsed) {
-        const block = blockOfCaret();
-        if (!block) return;
-        range = inner.createRange();
-        range.selectNodeContents(block);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+      const range = sel.getRangeAt(0);
       const holder = inner.createElement('div');
       holder.appendChild(range.cloneContents());
       exec('insertHTML', `<${tag}>${holder.innerHTML}</${tag}>`);
     };
 
+    /** Where the caret is: the paragraph's kind, for the menu to tick. */
+    const currentTurn = (): string | null => {
+      const block = blockOfCaret();
+      if (!block) return null;
+      return turnIdOf(block.tagName, block.closest('ol, ul')?.tagName ?? null);
+    };
+
     const openLink = () => {
       const session = editing.current;
       if (!session || !session.rich) return;
+      // A link with nothing selected links the word at the caret, as the other marks do.
+      selectWordAtCaret();
       const sel = inner.getSelection();
       linkRange.current = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
       linking.current = true;
@@ -1107,6 +1179,8 @@ export function Preview({
       }
     };
 
+    /** Marks that go on words: with nothing selected they take the word at the caret, never the whole block. */
+    const WORD_MARKS = new Set(['bold', 'italic', 'underline', 'strikeThrough', 'superscript', 'subscript', 'removeFormat', 'unlink']);
     const runExec = (command: Exec) => {
       const session = editing.current;
       if (!session) return;
@@ -1122,6 +1196,7 @@ export function Preview({
           wrapInline(command.tag);
           break;
         default:
+          if (WORD_MARKS.has(command.command) && !selectWordAtCaret()) return;
           exec(command.command);
       }
     };
@@ -1132,7 +1207,7 @@ export function Preview({
       // The query comes out of the text *before* anything commits, or "/head" ships in the copy.
       if (state?.mode === 'format' && session) removeSlashText();
       setSlash(null);
-      if (item.group === 'format' && item.exec) {
+      if ((item.group === 'turn' || item.group === 'style') && item.exec) {
         runExec(item.exec);
         return;
       }
@@ -1160,7 +1235,7 @@ export function Preview({
       setSlash({ mode: 'insert', query: '', index: 0, top: at ? at.top + 28 : 12, left: at ? at.left : 12 });
     };
 
-    actions.current = { pick, applyLink, cancelLink, beginEditing, openQuickAdd };
+    actions.current = { pick, applyLink, cancelLink, beginEditing, openQuickAdd, runExec };
 
     /**
      * The Markdown habits — "- ", "1. ", "# ", "> " — read once the space is in, and only when the
@@ -1184,19 +1259,95 @@ export function Preview({
       return true;
     };
 
+    /**
+     * The inline habits, `**bold**` and the rest (slash.ts, inlineMarkdown), read the moment the closing mark is in:
+     * the marks come out, the words stay and take the style, and the caret goes on after them, plain.
+     */
+    const inlineMarkdownAfterInput = (): boolean => {
+      const session = editing.current;
+      if (!session?.rich) return false;
+      const before = textBeforeCaret();
+      if (before === null || !inlineMarkdown(before)) return false;
+      // A tick later: the words may have arrived through the browser's own editing command (dictation, some input
+      // methods, a paste of one word), and a command run inside that command's own `input` event is refused.
+      window.setTimeout(applyInlineMarkdown, 0);
+      return true;
+    };
+    const applyInlineMarkdown = () => {
+      const session = editing.current;
+      if (!session?.rich) return;
+      const before = textBeforeCaret();
+      const found = before === null ? null : inlineMarkdown(before);
+      if (!found) return;
+      const sel = inner.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const caret = sel.getRangeAt(0);
+      const node = caret.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      // The whole habit, marks and all, becomes the bare words.
+      const whole = inner.createRange();
+      whole.setStart(node, found.start);
+      whole.setEnd(node, caret.startOffset);
+      sel.removeAllRanges();
+      sel.addRange(whole);
+      exec('insertText', found.text);
+      // Then the words are selected and styled.
+      const after = inner.getSelection();
+      if (!after || after.rangeCount === 0) return;
+      const end = after.getRangeAt(0);
+      const target = end.startContainer;
+      if (target.nodeType !== Node.TEXT_NODE || end.startOffset < found.text.length) return;
+      const words = inner.createRange();
+      words.setStart(target, end.startOffset - found.text.length);
+      words.setEnd(target, end.startOffset);
+      after.removeAllRanges();
+      after.addRange(words);
+      if (found.exec.command === 'link' && found.href) {
+        const typed = found.href;
+        exec('createLink', /^(https?:|mailto:|tel:|#)/i.test(typed) ? typed : `https://${typed}`);
+      } else if (found.exec.command === 'wrap') wrapInline(found.exec.tag);
+      else exec(found.exec.command);
+      // And the caret goes on after them, out of the style, so the next word is plain.
+      const done = inner.getSelection();
+      if (done && done.rangeCount) {
+        const r = done.getRangeAt(0);
+        const styled = (r.endContainer.nodeType === Node.ELEMENT_NODE ? (r.endContainer as Element) : r.endContainer.parentElement)?.closest('b, strong, i, em, s, strike, code, a, small');
+        const out = inner.createRange();
+        if (styled && session.el.contains(styled) && styled !== session.el) {
+          // A caret at the end of an inline run is taken back into it by the browser as soon as a key is typed, so
+          // the next word would be code, or part of the link. A zero-width space after the run gives the caret a
+          // plain place to stand; it is stripped on the way out (sanitise.ts).
+          const plain = inner.createTextNode('\u200b');
+          styled.after(plain);
+          out.setStart(plain, 1);
+        } else out.setStart(r.endContainer, r.endOffset);
+        out.collapse(true);
+        done.removeAllRanges();
+        done.addRange(out);
+        for (const cmd of ['bold', 'italic', 'strikeThrough'] as const) {
+          try {
+            if (inner.queryCommandState(cmd)) exec(cmd);
+          } catch {
+            // Not a state the browser reports; the caret is out of the styled run anyway.
+          }
+        }
+      }
+    };
+
     /** After every keystroke in an editable: a marker just finished, or a `/query` before the caret? */
     const onInput = () => {
       if (!editing.current) return;
       const state = slashRef.current;
       if (state?.mode === 'link') return;
       if (markdownAfterInput()) return;
+      if (inlineMarkdownAfterInput()) return;
       const before = textBeforeCaret();
       const found = before === null ? null : slashQuery(before);
       if (found && dismissed.current !== found.at) {
         if (state?.mode === 'format') setSlash({ ...state, query: found.query, index: 0 });
         else {
           const rect = caretBox();
-          if (rect) setSlash({ mode: 'format', query: found.query, index: 0, ...place(rect) });
+          if (rect) setSlash({ mode: 'format', query: found.query, index: 0, current: currentTurn(), ...place(rect) });
         }
         return;
       }
@@ -1290,6 +1441,14 @@ export function Preview({
         openLink();
         return;
       }
+      // ⌘B, ⌘I, ⌘U through our own hands rather than the browser's: on a selection as the browser would, but at a
+      // caret on the word there, where the browser would only set a typing state.
+      const markKey = meta && !event.shiftKey && !event.altKey && session.rich ? ({ b: 'bold', i: 'italic', u: 'underline' } as const)[event.key.toLowerCase() as 'b' | 'i' | 'u'] : undefined;
+      if (markKey) {
+        event.preventDefault();
+        runExec({ command: markKey });
+        return;
+      }
       if (event.key === 'Tab') {
         // In a list, Tab indents. Anywhere else it does nothing — deliberately, because the
         // browser's default moves focus out of the editable, and that commits the edit mid-word.
@@ -1308,6 +1467,45 @@ export function Preview({
         event.preventDefault();
         stopEditing(false);
       }
+    };
+
+    /**
+     * The bar over a selection: shown while rich text is edited and some of it is selected, saying what the words
+     * wear. Selecting then pressing is what a hand reaches for; the slash is for when the words are still coming.
+     */
+    const onSelectionChange = () => {
+      const session = editing.current;
+      const sel = inner.getSelection();
+      if (!session?.rich || !sel || sel.rangeCount === 0 || sel.isCollapsed || slashRef.current) {
+        setSelBar(null);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!session.el.contains(range.commonAncestorContainer)) {
+        setSelBar(null);
+        return;
+      }
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        setSelBar(null);
+        return;
+      }
+      const on: Record<string, boolean> = {};
+      for (const b of BAR_COMMANDS) {
+        if (!b.state) continue;
+        if (b.state === 'link') {
+          const el = range.startContainer.nodeType === Node.ELEMENT_NODE ? (range.startContainer as Element) : range.startContainer.parentElement;
+          on[b.id] = Boolean(el?.closest('a'));
+          continue;
+        }
+        try {
+          on[b.id] = inner.queryCommandState(b.state);
+        } catch {
+          on[b.id] = false;
+        }
+      }
+      const width = frame.current?.getBoundingClientRect().width ?? 600;
+      setSelBar({ top: Math.max(2, rect.top - 34), left: Math.max(4, Math.min(rect.left + rect.width / 2 - 96, width - 196)), on });
     };
 
     // Clicking a menu row must not take focus — the menu suppresses its own mousedown — and the
@@ -1492,6 +1690,7 @@ export function Preview({
     inner.addEventListener('dblclick', onDoubleClick);
     inner.addEventListener('keydown', onKeyDown);
     inner.addEventListener('input', onInput);
+    inner.addEventListener('selectionchange', onSelectionChange);
     inner.addEventListener('focusout', onFocusOut);
     inner.addEventListener('paste', onPaste);
     inner.addEventListener('paste', onPasteBlocks);
@@ -1508,6 +1707,7 @@ export function Preview({
       inner.removeEventListener('dblclick', onDoubleClick);
       inner.removeEventListener('keydown', onKeyDown);
       inner.removeEventListener('input', onInput);
+      inner.removeEventListener('selectionchange', onSelectionChange);
       inner.removeEventListener('focusout', onFocusOut);
       inner.removeEventListener('paste', onPaste);
       inner.removeEventListener('paste', onPasteBlocks);
@@ -1695,12 +1895,22 @@ export function Preview({
           style={{ top: `${hint.top}px`, left: `${hint.left}px`, width: `${hint.width}px`, height: `${hint.height}px` }}
         />
       )}
-      {editHint && !slash && (
+      {selBar && !slash && (
+        // Over the selection, while rich text is edited: what the words wear, and the few marks a hand reaches for.
+        <div class="sy-selbar" style={{ top: `${selBar.top}px`, left: `${selBar.left}px` }} role="toolbar" aria-label="Style the selection" onMouseDown={(e) => e.preventDefault()}>
+          {BAR_COMMANDS.map((b) => (
+            <button key={b.id} type="button" class={`sy-selbar-btn sy-selbar-${b.id} ${selBar.on[b.id] ? 'on' : ''}`} title={b.title} aria-pressed={selBar.on[b.id] ?? false} onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current?.runExec(b.exec)}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {editHint && !slash && !selBar && (
         // Not a toolbar: a reminder of the two keys that matter, gone the moment the menu opens.
         <div class="sy-edit-hint" style={{ top: `${editHint.top}px`, left: `${editHint.left}px` }} aria-hidden="true">
           {editHint.rich ? (
             <>
-              <kbd>/</kbd> format · <kbd>⌘K</kbd> link · <kbd>esc</kbd> done
+              <kbd>/</kbd> menu · select for styles · <kbd>esc</kbd> done
             </>
           ) : (
             <>

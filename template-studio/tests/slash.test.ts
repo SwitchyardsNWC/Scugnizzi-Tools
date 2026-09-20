@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { blockItem, filterItems, FORMAT_COMMANDS, markdownShortcut, SHORTCUTS, slashQuery } from '../src/app/slash.ts';
+import { blockItem, filterItems, FORMAT_COMMANDS, inlineMarkdown, markdownShortcut, SHORTCUTS, slashQuery, STYLE_COMMANDS, TURN_COMMANDS, turnIdOf } from '../src/app/slash.ts';
 import { sanitise } from '../src/model/sanitise.ts';
 
 describe('what the menu offers', () => {
@@ -127,5 +127,51 @@ describe('the shortcut sheet', () => {
   it('lists the slash menu first and says what each key does', () => {
     expect(SHORTCUTS[0]?.keys).toBe('/');
     for (const s of SHORTCUTS) expect(s.does.length).toBeGreaterThan(4);
+  });
+});
+
+describe('the menu in two halves', () => {
+  it('keeps what changes the paragraph apart from what changes the words', () => {
+    expect(TURN_COMMANDS.every((i) => i.group === 'turn')).toBe(true);
+    expect(STYLE_COMMANDS.every((i) => i.group === 'style')).toBe(true);
+    expect(TURN_COMMANDS.map((i) => i.id)).toEqual(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'quote', 'hr']);
+    expect(STYLE_COMMANDS.map((i) => i.id)).toContain('bold');
+  });
+
+  it('names what a paragraph is now, so that row comes ticked', () => {
+    expect(turnIdOf('P')).toBe('p');
+    expect(turnIdOf('div')).toBe('p');
+    expect(turnIdOf('H2')).toBe('h2');
+    expect(turnIdOf('blockquote')).toBe('quote');
+    expect(turnIdOf('LI', 'UL')).toBe('ul');
+    expect(turnIdOf('li', 'ol')).toBe('ol');
+    expect(turnIdOf('td')).toBeNull();
+  });
+});
+
+describe('Markdown finished inline', () => {
+  it('reads the habit at the caret, and says where it started and what to keep', () => {
+    expect(inlineMarkdown('Say **hello**')).toEqual({ start: 4, text: 'hello', exec: { command: 'bold' } });
+    expect(inlineMarkdown('a *quiet word*')).toEqual({ start: 2, text: 'quiet word', exec: { command: 'italic' } });
+    expect(inlineMarkdown('an _aside_')).toEqual({ start: 3, text: 'aside', exec: { command: 'italic' } });
+    expect(inlineMarkdown('was ~~this~~')).toEqual({ start: 4, text: 'this', exec: { command: 'strikeThrough' } });
+    expect(inlineMarkdown('ref `SY-204`')).toEqual({ start: 4, text: 'SY-204', exec: { command: 'wrap', tag: 'code' } });
+    expect(inlineMarkdown('see [the club](switchyards.com/chicago)')).toEqual({ start: 4, text: 'the club', exec: { command: 'link' }, href: 'switchyards.com/chicago' });
+  });
+
+  it('leaves alone what is not a habit', () => {
+    expect(inlineMarkdown('2 * 3 *')).toBeNull();
+    expect(inlineMarkdown('snake_case_')).toBeNull();
+    expect(inlineMarkdown('** **')).toBeNull();
+    expect(inlineMarkdown('**still typing')).toBeNull();
+    expect(inlineMarkdown('a *bold** mess')).toBeNull();
+    expect(inlineMarkdown('[no address]()')).toBeNull();
+  });
+});
+
+describe('what the editor leaves behind', () => {
+  it('strips the zero-width spaces the caret stood on', async () => {
+    const { fromContentEditable } = await import('../src/model/sanitise.ts');
+    expect(fromContentEditable('<p>see <code>SY-204</code>\u200b then</p>')).toBe('<p>see <code>SY-204</code> then</p>');
   });
 });
