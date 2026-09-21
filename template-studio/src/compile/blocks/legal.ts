@@ -176,12 +176,18 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
                           text('Unsubscribe'),
                         ),
                       ]),
-                      voidEl('br', {}),
-                      el(
-                        'a',
-                        { href: { k: 'attrPrint' as const, path: 'unsubscribe_link', fallback: '#preferences' }, style: `color:${link}`, 'data-unsubscribe': 'true', target: '_blank' },
-                        el('span', { style: 'font-size:12px' }, text('Manage Preferences')),
-                      ),
+                      // The break belongs to the link below it, so leaving the link out does not leave a blank line
+                      // where it was.
+                      ...(block.hidePreferences
+                        ? []
+                        : [
+                            voidEl('br', {}),
+                            el(
+                              'a',
+                              { href: { k: 'attrPrint' as const, path: 'unsubscribe_link', fallback: '#preferences' }, style: `color:${link}`, 'data-unsubscribe': 'true', target: '_blank' },
+                              el('span', { style: 'font-size:12px' }, text('Manage Preferences')),
+                            ),
+                          ]),
                     ]),
                   ],
                   { text: ink, link },
@@ -297,8 +303,14 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
   const legalLink = (path: string, fallback: string, label: string) =>
     el('a', { href: { k: 'attrPrint' as const, path, fallback }, class: 'sy-tap', style: `color:${link}; text-decoration:none`, 'data-unsubscribe': 'true', target: '_blank' }, text(label));
   const unsubscribe = legalLink('unsubscribe_link_all', '#unsubscribe', 'Unsubscribe');
+  // Manage Preferences is a courtesy and can be left out; Unsubscribe is the law's and HubSpot's, and stays.
+  const showPreferences = !block.hidePreferences;
   const preferences = legalLink('unsubscribe_link', '#preferences', 'Manage Preferences');
-  const links = el('span', { style: small('normal') }, [unsubscribe, el('span', { class: 'sy-sep' }, raw(' &nbsp;&middot;&nbsp; ')), preferences]);
+  const links = el(
+    'span',
+    { style: small('normal') },
+    showPreferences ? [unsubscribe, el('span', { class: 'sy-sep' }, raw(' &nbsp;&middot;&nbsp; ')), preferences] : [unsubscribe],
+  );
   const markText = block.mark?.trim() ?? '';
   const mark = markText ? el('span', { style: small('bold', '; letter-spacing:1px; text-transform:uppercase') }, text(markText)) : null;
   const socials = socialLinks(block);
@@ -365,7 +377,9 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
             { class: 'sy-stack sy-ledger', width: '42%', valign: 'top', style: `padding:0 0 0 20px; border-left:${hair}` },
             tbl([
               tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, unsubscribe))]),
-              tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, preferences))]),
+              ...(showPreferences
+                ? [tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, preferences))])]
+                : []),
               ...socialRows,
               ...(mark ? [tr([el('td', { style: 'padding:12px 0 0' }, mark)])] : []),
             ]),

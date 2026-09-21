@@ -151,3 +151,95 @@ describe('declaration order follows document order', () => {
     expect(declared.length).toBeGreaterThanOrEqual(8);
   });
 });
+
+/**
+ * The footer's two legal links.
+ *
+ * Unsubscribe is the law's and HubSpot's; Manage Preferences is a courtesy, and Jared asked for it to be optional
+ * (2026-09-21). The thing to defend is that the optional one can go without taking the required one with it, in
+ * every layout that draws them — three different pieces of markup, which is exactly how one of them gets missed.
+ */
+describe('the Manage Preferences link', () => {
+  const LAYOUTS = ['classic', 'masthead', 'ledger', 'stub', 'letterhead'] as const;
+  const footer = (over: Partial<Extract<Block, { type: 'legal' }>>): Block => ({
+    id: 'b',
+    type: 'legal',
+    logoSrc: '',
+    logoWidth: 180,
+    note: 'A note.',
+    noteLock: lock('Legal note', 'legal_note', false),
+    ...over,
+  });
+
+  it.each(LAYOUTS)('is there by default on the %s layout', (layout) => {
+    const html = compile(only(footer({ layout }), 'cream'), { mode: 'hubl', date: '2026-09-11' }).html;
+    expect(html).toContain('Manage Preferences');
+    expect(html).toContain('Unsubscribe');
+  });
+
+  it.each(LAYOUTS)('goes when it is left out, and takes nothing else with it on the %s layout', (layout) => {
+    const html = compile(only(footer({ layout, hidePreferences: true }), 'cream'), { mode: 'hubl', date: '2026-09-11' }).html;
+    expect(html).not.toContain('Manage Preferences');
+    // The one that is not a choice.
+    expect(html).toContain('Unsubscribe');
+    expect(html).toContain('{{ unsubscribe_link_all }}');
+    // And the separator between them goes too, rather than leaving a dot with nothing after it.
+    expect(html).not.toContain('&middot;&nbsp; </span></span>');
+  });
+
+  it('still passes the linter with it gone, because the required link is untouched', () => {
+    const out = compile(only(footer({ layout: 'ledger', hidePreferences: true }), 'cream'), { mode: 'hubl', date: '2026-09-11' });
+    const findings = lint({ tree: out.tree, registry: out.registry, html: out.html, bytes: out.bytes });
+    expect(errorsIn(findings).filter((f) => f.rule === 'can-spam')).toEqual([]);
+  });
+
+  it('is absent from an older footer, so nothing written before this loses its link', () => {
+    const html = compile(only(footer({ layout: 'ledger' }), 'cream'), { mode: 'hubl', date: '2026-09-11' }).html;
+    expect(html).toContain('Manage Preferences');
+  });
+});
+
+/**
+ * What a new ledger footer says before anybody types in it (Jared, 2026-09-21).
+ *
+ * The ledger sets its note beside an index of links rather than under a centred badge row, which makes its small
+ * type read as a statement about the company rather than as housekeeping — so it carries different words from the
+ * other four, and this is the test that keeps the two sets from drifting into each other.
+ */
+describe('the ledger footer, as the system builds it', () => {
+  it('opens on the ledger words, not the printing notice', async () => {
+    const { SY_BLOCKS, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
+    const item = SY_BLOCKS.find((b) => b.id === 'footer-b');
+    expect(item).toBeTruthy();
+    const sections = item!.make(DEFAULT_DESIGN_SYSTEM);
+    const block = sections.flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((b) => b.type === 'legal');
+    expect(block).toBeTruthy();
+    const legal = block as Extract<Block, { type: 'legal' }>;
+    expect(legal.note).toBe('40+ clubs. 17 cities. 1 membership.');
+    expect(legal.mark).toBe('Dettagli E Pulizia');
+    expect(legal.instagram).toBe(SY_SOCIAL.instagram);
+    expect(legal.youtube).toBe(SY_SOCIAL.youtube);
+    expect(legal.youtube).toBe('https://www.youtube.com/@switchyards');
+  });
+
+  it('leaves the other four footers on the printing notice and the copyright mark', async () => {
+    const { SY_BLOCKS, SY_COPY } = await import('../src/model/switchyards.ts');
+    const ids = ['footer-a', 'footer-c', 'footer-letterhead'];
+    let checked = 0;
+    for (const id of ids) {
+      const item = SY_BLOCKS.find((b) => b.id === id);
+      expect(item, id).toBeTruthy();
+      const legal = item!
+        .make(DEFAULT_DESIGN_SYSTEM)
+        .flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks)))
+        .find((b) => b.type === 'legal') as Extract<Block, { type: 'legal' }> | undefined;
+      expect(legal, id).toBeTruthy();
+      expect(legal!.note, id).toBe(SY_COPY.notice);
+      expect(legal!.mark, id).toBe(SY_COPY.mark);
+      expect(legal!.youtube, id).toBeUndefined();
+      checked += 1;
+    }
+    // A loop that skipped everything would pass silently, which is the one way this test could lie.
+    expect(checked).toBe(ids.length);
+  });
+});
