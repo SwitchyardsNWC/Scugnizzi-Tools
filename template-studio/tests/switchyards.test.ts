@@ -111,9 +111,15 @@ describe('the footer layouts', () => {
 
   it('draws its structure in hairlines, and names the social links that are set', () => {
     expect(footerHtml('masthead')).toContain('border-top:1px solid #f7f6f3');
-    expect(footerHtml('masthead')).toContain('© Switchyards U.S.A.');
-    expect(footerHtml('masthead')).toContain('>Instagram<');
-    expect(footerHtml('masthead')).not.toContain('>YouTube<');
+    // Read from the system rather than spelled out, so changing the mark is one edit and not two. The quotes the
+    // mark is written with reach the page escaped, which is the compiler's business and not the footer's.
+    expect(footerHtml('masthead')).toContain(SY_COPY.mark.replace(/"/g, '&quot;'));
+    // Both addresses, on every layout: they are places the company is, not properties of one arrangement, and the
+    // two starters ship a masthead and a stub — so a social that only the ledger carried was one nobody saw.
+    for (const layout of ['masthead', 'ledger', 'stub', 'letterhead'] as const) {
+      expect(footerHtml(layout), layout).toContain('>Instagram<');
+      expect(footerHtml(layout), layout).toContain('>YouTube<');
+    }
     const ledger = footerHtml('ledger');
     expect(ledger).toContain('sy-ledger');
     expect(ledger).toContain('href="https://instagram.com/switchyards"');
@@ -139,17 +145,32 @@ describe('the footer layouts', () => {
     expect(hubl(t).html).toContain('<a href="https://www.switchyards.com/">Read why.</a>');
   });
 
-  it('runs the band to the window edge when a section asks, and keeps it at the email’s width otherwise', () => {
+  it('gives every footer the window’s width, rules included', () => {
+    // A footer is the floor of the page, so its band runs to the edge — and the rules above and below it are part
+    // of the footer, so they go with it. A 600px red line over a band that runs to the edge reads as a mistake.
+    for (const id of ['footer-a', 'footer-b', 'footer-c', 'footer-letterhead']) {
+      const item = SY_BLOCKS.find((b) => b.id === id);
+      expect(item, id).toBeTruthy();
+      const sections = item!.make(switchyardsDesignSystem());
+      expect(sections.length, id).toBeGreaterThan(1);
+      for (const section of sections) expect(section.bleed, `${id} / ${section.rows[0]!.columns[0]!.blocks[0]!.type}`).toBe(true);
+    }
+  });
+
+  it('runs the footer’s band to the window edge by default, and keeps it at the email’s width when turned off', () => {
     const t = switchyardsTemplate();
     const legalSection = t.sections.find((s) => s.rows[0]!.columns[0]!.blocks[0]!.type === 'legal')!;
-    const before = hubl(t).html;
-    legalSection.bleed = true;
+    // Jared, 2026-09-21: "make all the footers full width by default." The switch still exists; the default moved.
+    expect(legalSection.bleed).toBe(true);
     const after = hubl(t).html;
+    legalSection.bleed = false;
+    const before = hubl(t).html;
     // The outer band loses its width; the column inside keeps its 600.
     const tagOf = (html: string) => /<div[^>]*id="section-legal"[^>]*>/.exec(html)?.[0] ?? '';
     expect(tagOf(before)).toContain('max-width:600px');
     expect(tagOf(after)).not.toContain('max-width:600px');
     expect(after).toContain('max-width:600px');
+    legalSection.bleed = true;
     expect(after).toContain('width="100%" style="width:100%" bgcolor="#011272"');
     // The top bar and the stripes take the same switch and stay whole.
     t.sections[0]!.bleed = true;

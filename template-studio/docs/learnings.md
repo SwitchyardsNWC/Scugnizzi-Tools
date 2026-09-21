@@ -2890,12 +2890,26 @@ membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the 
 - **The ledger is the one footer whose small type is a statement.** The other four set the note under a centred
   badge row, where it reads as housekeeping, so the printing notice belongs there. The ledger sets it beside an
   index of links, in the left column under the name and address, where it reads as a line about the company. So
-  it carries its own two strings — `SY_COPY.ledgerNote` and `ledgerMark` — and the other four are untouched. A
-  test walks all five and asserts which set each one gets, because the obvious way for this to rot is for one
-  default to be quietly copied across the rest.
+  it carries its own note — `SY_COPY.ledgerNote` — and the other four are untouched. A test walks all five and
+  asserts which one each gets, because the obvious way for this to rot is for one default to be quietly copied
+  across the rest.
+
+  *Corrected the next day.* It briefly had a mark of its own as well, and that was wrong: the system has one mark
+  and the ledger is not a different company. Jared changed the shared `mark` to the house's own words the same
+  afternoon, which left two strings differing only by the quotes around them and the ledger signing off unquoted
+  while the other four were quoted. `ledgerMark` is gone and every footer reads `SY_COPY.mark` (Jared: "delete
+  ledgermarks and use the default one"). The note stays the ledger's, because that one really is about the
+  layout: its small type sits beside an index of links and reads as a statement, not as housekeeping.
 - **YouTube was the missing half of a comment.** `SY_SOCIAL` said "the one social address in hand. YouTube and
   LinkedIn are fields in the footer's inspector, blank until someone knows them." Now somebody does, so it is a
   constant rather than a field left empty, and the comment says LinkedIn alone.
+- **Scoping it to the ledger was wrong, and invisible.** The request named the ledger, so all four defaults went
+  there — but a social address is a place the company is, not a property of one arrangement, and Instagram was
+  already on every layout. Worse, both starters ship a masthead and a stub, so the one footer that had YouTube was
+  the one nobody opens. Jared, the next day: "the youtube link I asked to be a default isn't in there." The lesson
+  is not "read the scope more loosely": it is that a default nobody can see on the default path has not shipped,
+  and the test that would have caught it is the one that walks every layout rather than the one it was asked for.
+  The note stays the ledger's, because that one really is about the layout.
 - **Optional means the optional one.** Unsubscribe is CAN-SPAM's and HubSpot's — `lint.ts` fails the build without
   it — so it is not a choice to offer, and the toggle is named for the link that actually can go. Its help says so
   rather than leaving somebody to find out by shipping.
@@ -2907,3 +2921,22 @@ membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the 
   the shared `links` span puts a dot between them, and the ledger gives each a row on its own hairline. Leaving
   one out has to take its separator with it in all three, or the footer ends with a dangling dot or a blank line.
   The test runs all five layouts rather than the one the request was about.
+
+### 3.96 Footers run to the edge
+
+*2026-09-21. Jared: "make all the footers full width by default."*
+
+- **The switch already existed; the default moved.** `section.bleed` was added on 2026-09-18 for "the option to be
+  fullwidth of the window" and shipped off. A footer is the floor of the page rather than one more card on it, so
+  off was the wrong side to start on. Set in two places: `Maker.footer` for the four system layouts, and
+  `sectionFor` for the Legal footer the palette drops in.
+- **The rules go with it.** A footer is not just its band: the masthead and the ledger close with a 28px red band
+  and all of them open on a 6px rule. Bleeding the navy and leaving those at 600px would read as a mistake rather
+  than as a choice, so `footer()` widens its own rules — and only its own. The 6px rule under a *header* still
+  stops at the email's width, which is why this is a wrapper inside `footer()` and not a change to `rule()`.
+- **Existing footers keep what they have.** `bleed` is a stored field, so this moves what a *new* footer starts
+  with and migrates nothing. A template from last week still compiles byte for byte as it did.
+- **The suite was already red when this started.** The commit that landed the ledger defaults also changed
+  `SY_COPY.mark` from the copyright line to the house's own, and `tests/switchyards.test.ts` still spelled the old
+  mark out. Fixed by reading `SY_COPY.mark` instead of repeating it, so changing the mark is one edit and not two.
+  The quotes in it reach the page escaped, which is the compiler's business and is now said in the test.
