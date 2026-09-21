@@ -856,7 +856,10 @@ export function sectionFor(block: Block, ctx: NewBlockContext, ds: DesignSystem 
     linkColor: t.link,
     padTop: type === 'topbar' ? 16 : type === 'legal' ? 30 : 0,
     padBottom: type === 'topbar' ? 12 : type === 'legal' ? 10 : 0,
-    ...(type === 'legal' ? { domId: 'section-legal' } : {}),
+    // A footer runs to the edge of the window by default (Jared, 2026-09-21). The column stays where it is; only
+    // the band behind it widens, which is what makes a footer read as the floor of the page rather than as one
+    // more card on it. Every other block still stops at the email's width.
+    ...(type === 'legal' ? { domId: 'section-legal', bleed: true } : {}),
     rows: [row],
   };
 }

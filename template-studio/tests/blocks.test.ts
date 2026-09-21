@@ -159,6 +159,19 @@ describe('declaration order follows document order', () => {
  * (2026-09-21). The thing to defend is that the optional one can go without taking the required one with it, in
  * every layout that draws them — three different pieces of markup, which is exactly how one of them gets missed.
  */
+describe('a footer dropped in from the palette', () => {
+  it('runs to the window’s edge, where nothing else does', async () => {
+    const { createSection } = await import('../src/model/catalog.ts');
+    const { sequentialIds } = await import('../src/model/ids.ts');
+    const ids = () => ({ id: sequentialIds(), taken: new Set<string>() });
+    expect(createSection('legal', ids(), DEFAULT_DESIGN_SYSTEM).bleed).toBe(true);
+    // Only the footer. A heading that ran to the edge would be a band across the window with one word in it.
+    for (const type of ['heading', 'richtext', 'button', 'image', 'topbar'] as const) {
+      expect(createSection(type, ids(), DEFAULT_DESIGN_SYSTEM).bleed, type).toBeFalsy();
+    }
+  });
+});
+
 describe('the Manage Preferences link', () => {
   const LAYOUTS = ['classic', 'masthead', 'ledger', 'stub', 'letterhead'] as const;
   const footer = (over: Partial<Extract<Block, { type: 'legal' }>>): Block => ({

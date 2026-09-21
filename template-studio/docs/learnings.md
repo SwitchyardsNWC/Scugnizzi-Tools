@@ -2907,3 +2907,22 @@ membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the 
   the shared `links` span puts a dot between them, and the ledger gives each a row on its own hairline. Leaving
   one out has to take its separator with it in all three, or the footer ends with a dangling dot or a blank line.
   The test runs all five layouts rather than the one the request was about.
+
+### 3.96 Footers run to the edge
+
+*2026-09-21. Jared: "make all the footers full width by default."*
+
+- **The switch already existed; the default moved.** `section.bleed` was added on 2026-09-18 for "the option to be
+  fullwidth of the window" and shipped off. A footer is the floor of the page rather than one more card on it, so
+  off was the wrong side to start on. Set in two places: `Maker.footer` for the four system layouts, and
+  `sectionFor` for the Legal footer the palette drops in.
+- **The rules go with it.** A footer is not just its band: the masthead and the ledger close with a 28px red band
+  and all of them open on a 6px rule. Bleeding the navy and leaving those at 600px would read as a mistake rather
+  than as a choice, so `footer()` widens its own rules — and only its own. The 6px rule under a *header* still
+  stops at the email's width, which is why this is a wrapper inside `footer()` and not a change to `rule()`.
+- **Existing footers keep what they have.** `bleed` is a stored field, so this moves what a *new* footer starts
+  with and migrates nothing. A template from last week still compiles byte for byte as it did.
+- **The suite was already red when this started.** The commit that landed the ledger defaults also changed
+  `SY_COPY.mark` from the copyright line to the house's own, and `tests/switchyards.test.ts` still spelled the old
+  mark out. Fixed by reading `SY_COPY.mark` instead of repeating it, so changing the mark is one edit and not two.
+  The quotes in it reach the page escaped, which is the compiler's business and is now said in the test.

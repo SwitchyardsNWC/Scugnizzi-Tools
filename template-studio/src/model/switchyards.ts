@@ -261,9 +261,14 @@ class Maker {
       instagram: SY_SOCIAL.instagram,
       ...(ledger ? { youtube: SY_SOCIAL.youtube } : {}),
     };
-    const legal = this.one(letter ? 'cream' : 'navy', block, { padTop: 0, padBottom: 0, align: layout === 'ledger' ? 'left' : 'center' }, { padTop: pad, padBottom: pad, domId: 'section-legal' });
-    if (letter) return [legal, this.rule(6)];
-    return [this.rule(6), legal, ...(layout === 'masthead' || layout === 'ledger' ? [this.rule(28)] : [])];
+    const legal = this.one(letter ? 'cream' : 'navy', block, { padTop: 0, padBottom: 0, align: layout === 'ledger' ? 'left' : 'center' }, { padTop: pad, padBottom: pad, domId: 'section-legal', bleed: true });
+    // Jared, 2026-09-21: "make all the footers full width by default." The band runs to the window's edge and the
+    // column stays at the email's width, so only the colour behind it widens. The rules above and below go with
+    // it: they are part of the footer, and a 600px red line over a band that runs to the edge reads as a mistake
+    // rather than as a choice.
+    const wide = (section: Section): Section => ({ ...section, bleed: true });
+    if (letter) return [legal, wide(this.rule(6))];
+    return [wide(this.rule(6)), legal, ...(layout === 'masthead' || layout === 'ledger' ? [wide(this.rule(28))] : [])];
   }
 }
 
