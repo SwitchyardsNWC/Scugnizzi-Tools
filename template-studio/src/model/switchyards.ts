@@ -44,15 +44,17 @@ export const SY_COPY = {
   mark: '"Dettagli E Pulizia"',
   signOff: '<p>See you around the club,<br>-Switchyards</p>',
   /**
-   * The ledger's own two lines (Jared, 2026-09-21).
+   * The ledger's own note (Jared, 2026-09-21).
    *
    * That layout sets the note beside an index of links rather than under a centred badge row, which makes it the
-   * one footer where the small type is read as a statement about the company rather than as housekeeping. So it
-   * says what the company is instead of asking nobody to print the email, and signs off in the house's own words
-   * rather than with a copyright line.
+   * one footer where the small type reads as a statement about the company rather than as housekeeping. So it
+   * says what the company is instead of asking nobody to print the email.
+   *
+   * It had a mark of its own too, for one day, and that was a mistake: the system has one mark and the ledger is
+   * not a different company. Every footer signs off with `mark` above (Jared: "delete ledgermarks and use the
+   * default one").
    */
   ledgerNote: '40+ clubs. 17 cities. 1 membership.',
-  ledgerMark: 'Dettagli E Pulizia',
 } as const;
 
 const PREVIEW: Preview = { company: 'SWITCHYARDS U.S.A.', address: '151 Ted Turner Dr NW', city: 'Atlanta', state: 'GA', zip: '30303' };
@@ -257,9 +259,12 @@ class Maker {
       logoWidth: letter ? 120 : 180,
       note: ledger ? SY_COPY.ledgerNote : SY_COPY.notice,
       noteLock: this.fixed('Legal note'),
-      mark: ledger ? SY_COPY.ledgerMark : SY_COPY.mark,
+      mark: SY_COPY.mark,
+      // Both addresses on every layout. Scoping YouTube to the ledger was a misreading of where it was asked for:
+      // it is a place the company is, like Instagram beside it, not a property of one arrangement — and both
+      // starters ship a masthead and a stub, so the one footer that had it was the one nobody was looking at.
       instagram: SY_SOCIAL.instagram,
-      ...(ledger ? { youtube: SY_SOCIAL.youtube } : {}),
+      youtube: SY_SOCIAL.youtube,
     };
     const legal = this.one(letter ? 'cream' : 'navy', block, { padTop: 0, padBottom: 0, align: layout === 'ledger' ? 'left' : 'center' }, { padTop: pad, padBottom: pad, domId: 'section-legal', bleed: true });
     // Jared, 2026-09-21: "make all the footers full width by default." The band runs to the window's edge and the

@@ -229,14 +229,22 @@ describe('the ledger footer, as the system builds it', () => {
     expect(block).toBeTruthy();
     const legal = block as Extract<Block, { type: 'legal' }>;
     expect(legal.note).toBe('40+ clubs. 17 cities. 1 membership.');
-    expect(legal.mark).toBe('Dettagli E Pulizia');
+    // The note is the ledger's own; the mark is the system's, the same one every other footer signs off with.
+    expect(legal.mark).toBe(SY_COPY.mark);
     expect(legal.instagram).toBe(SY_SOCIAL.instagram);
     expect(legal.youtube).toBe(SY_SOCIAL.youtube);
     expect(legal.youtube).toBe('https://www.youtube.com/@switchyards');
   });
 
-  it('leaves the other four footers on the printing notice and the copyright mark', async () => {
-    const { SY_BLOCKS, SY_COPY } = await import('../src/model/switchyards.ts');
+  it('leaves the other footers on the printing notice, and gives them all the same mark', async () => {
+    const { SY_BLOCKS, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
+    // The ledger's mark is the system's too (Jared: "delete ledgermarks and use the default one"), so the only
+    // thing that sets the ledger apart from the rest is its note.
+    const ledgerItem = SY_BLOCKS.find((b) => b.id === 'footer-b')!;
+    const ledgerMark = (ledgerItem
+      .make(DEFAULT_DESIGN_SYSTEM)
+      .flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks)))
+      .find((b) => b.type === 'legal') as Extract<Block, { type: 'legal' }>).mark;
     const ids = ['footer-a', 'footer-c', 'footer-letterhead'];
     let checked = 0;
     for (const id of ids) {
@@ -249,7 +257,8 @@ describe('the ledger footer, as the system builds it', () => {
       expect(legal, id).toBeTruthy();
       expect(legal!.note, id).toBe(SY_COPY.notice);
       expect(legal!.mark, id).toBe(SY_COPY.mark);
-      expect(legal!.youtube, id).toBeUndefined();
+      expect(legal!.mark, id).toBe(ledgerMark);
+      expect(legal!.youtube, id).toBe(SY_SOCIAL.youtube);
       checked += 1;
     }
     // A loop that skipped everything would pass silently, which is the one way this test could lie.

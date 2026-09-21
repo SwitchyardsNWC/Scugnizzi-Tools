@@ -2890,12 +2890,26 @@ membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the 
 - **The ledger is the one footer whose small type is a statement.** The other four set the note under a centred
   badge row, where it reads as housekeeping, so the printing notice belongs there. The ledger sets it beside an
   index of links, in the left column under the name and address, where it reads as a line about the company. So
-  it carries its own two strings — `SY_COPY.ledgerNote` and `ledgerMark` — and the other four are untouched. A
-  test walks all five and asserts which set each one gets, because the obvious way for this to rot is for one
-  default to be quietly copied across the rest.
+  it carries its own note — `SY_COPY.ledgerNote` — and the other four are untouched. A test walks all five and
+  asserts which one each gets, because the obvious way for this to rot is for one default to be quietly copied
+  across the rest.
+
+  *Corrected the next day.* It briefly had a mark of its own as well, and that was wrong: the system has one mark
+  and the ledger is not a different company. Jared changed the shared `mark` to the house's own words the same
+  afternoon, which left two strings differing only by the quotes around them and the ledger signing off unquoted
+  while the other four were quoted. `ledgerMark` is gone and every footer reads `SY_COPY.mark` (Jared: "delete
+  ledgermarks and use the default one"). The note stays the ledger's, because that one really is about the
+  layout: its small type sits beside an index of links and reads as a statement, not as housekeeping.
 - **YouTube was the missing half of a comment.** `SY_SOCIAL` said "the one social address in hand. YouTube and
   LinkedIn are fields in the footer's inspector, blank until someone knows them." Now somebody does, so it is a
   constant rather than a field left empty, and the comment says LinkedIn alone.
+- **Scoping it to the ledger was wrong, and invisible.** The request named the ledger, so all four defaults went
+  there — but a social address is a place the company is, not a property of one arrangement, and Instagram was
+  already on every layout. Worse, both starters ship a masthead and a stub, so the one footer that had YouTube was
+  the one nobody opens. Jared, the next day: "the youtube link I asked to be a default isn't in there." The lesson
+  is not "read the scope more loosely": it is that a default nobody can see on the default path has not shipped,
+  and the test that would have caught it is the one that walks every layout rather than the one it was asked for.
+  The note stays the ledger's, because that one really is about the layout.
 - **Optional means the optional one.** Unsubscribe is CAN-SPAM's and HubSpot's — `lint.ts` fails the build without
   it — so it is not a choice to offer, and the toggle is named for the link that actually can go. Its help says so
   rather than leaving somebody to find out by shipping.

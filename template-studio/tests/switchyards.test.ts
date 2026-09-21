@@ -114,8 +114,12 @@ describe('the footer layouts', () => {
     // Read from the system rather than spelled out, so changing the mark is one edit and not two. The quotes the
     // mark is written with reach the page escaped, which is the compiler's business and not the footer's.
     expect(footerHtml('masthead')).toContain(SY_COPY.mark.replace(/"/g, '&quot;'));
-    expect(footerHtml('masthead')).toContain('>Instagram<');
-    expect(footerHtml('masthead')).not.toContain('>YouTube<');
+    // Both addresses, on every layout: they are places the company is, not properties of one arrangement, and the
+    // two starters ship a masthead and a stub — so a social that only the ledger carried was one nobody saw.
+    for (const layout of ['masthead', 'ledger', 'stub', 'letterhead'] as const) {
+      expect(footerHtml(layout), layout).toContain('>Instagram<');
+      expect(footerHtml(layout), layout).toContain('>YouTube<');
+    }
     const ledger = footerHtml('ledger');
     expect(ledger).toContain('sy-ledger');
     expect(ledger).toContain('href="https://instagram.com/switchyards"');
