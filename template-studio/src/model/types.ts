@@ -503,6 +503,13 @@ export interface LegalBlock extends BlockBase {
   instagram?: string;
   youtube?: string;
   linkedin?: string;
+  /**
+   * Leaves out the Manage Preferences link. Absent is false, so every footer written before this keeps it.
+   *
+   * Only that one. Unsubscribe stays in every layout whatever this says: CAN-SPAM requires it and HubSpot refuses
+   * to publish a template without it (lint.ts, learnings 1.8), so it is not a choice to offer.
+   */
+  hidePreferences?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------

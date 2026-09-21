@@ -2881,3 +2881,29 @@ adjust. allow mobile and desktop values."*
 - **`InheritDial` was lifted, not copied.** The Inspector's `inherit-number` control — a dial plus a chain — is
   exactly what a phone override needs, because a plain `Dial` cannot say "inherit": its commit turns an empty
   field into 0, which is a real value here. The Inspector now calls the same component.
+
+### 3.95 The ledger footer's own words, and a link that can go
+
+*2026-09-21. Jared: "For the ledger footer type / Make these the default values / note: 40+ clubs. 17 cities. 1
+membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the manage preferences link optional."*
+
+- **The ledger is the one footer whose small type is a statement.** The other four set the note under a centred
+  badge row, where it reads as housekeeping, so the printing notice belongs there. The ledger sets it beside an
+  index of links, in the left column under the name and address, where it reads as a line about the company. So
+  it carries its own two strings — `SY_COPY.ledgerNote` and `ledgerMark` — and the other four are untouched. A
+  test walks all five and asserts which set each one gets, because the obvious way for this to rot is for one
+  default to be quietly copied across the rest.
+- **YouTube was the missing half of a comment.** `SY_SOCIAL` said "the one social address in hand. YouTube and
+  LinkedIn are fields in the footer's inspector, blank until someone knows them." Now somebody does, so it is a
+  constant rather than a field left empty, and the comment says LinkedIn alone.
+- **Optional means the optional one.** Unsubscribe is CAN-SPAM's and HubSpot's — `lint.ts` fails the build without
+  it — so it is not a choice to offer, and the toggle is named for the link that actually can go. Its help says so
+  rather than leaving somebody to find out by shipping.
+- **`hidePreferences`, not `preferences`.** A positive flag would have to default true, and a boolean absent from
+  every footer written before today reads as false, so every existing template would have silently lost its link.
+  The negative reads worse in the type and is the only one that is safe, which is the same trade `optional` on the
+  image block already made.
+- **Three pieces of markup draw those two links.** The classic layout writes them inline with a `<br>` between,
+  the shared `links` span puts a dot between them, and the ledger gives each a row on its own hairline. Leaving
+  one out has to take its separator with it in all three, or the footer ends with a dangling dot or a blank line.
+  The test runs all five layouts rather than the one the request was about.

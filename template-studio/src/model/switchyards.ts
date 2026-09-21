@@ -21,8 +21,11 @@ import { SCHEMA_VERSION } from './schema.ts';
 import type { Block, Column, LegalLayout, Lock, Preview, Section, Template } from './types.ts';
 
 export const SY_SITE = 'https://www.switchyards.com/';
-/** The one social address in hand. YouTube and LinkedIn are fields in the footer's inspector, blank until someone knows them. */
-export const SY_SOCIAL = { instagram: 'https://instagram.com/switchyards' } as const;
+/** The social addresses in hand. LinkedIn is a field in the footer's inspector, blank until someone knows it. */
+export const SY_SOCIAL = {
+  instagram: 'https://instagram.com/switchyards',
+  youtube: 'https://www.youtube.com/@switchyards',
+} as const;
 
 /** The pictures the standard email already ships with, on HubSpot's files. */
 export const SY_ASSETS = {
@@ -38,8 +41,18 @@ export const SY_ASSETS = {
 export const SY_COPY = {
   tagline: '“The World’s First Neighborhood Work Club”',
   notice: 'Please consider the environment and do not print this email. Nobody prints emails.',
-  mark: '© Switchyards U.S.A.',
+  mark: '"Dettagli E Pulizia"',
   signOff: '<p>See you around the club,<br>-Switchyards</p>',
+  /**
+   * The ledger's own two lines (Jared, 2026-09-21).
+   *
+   * That layout sets the note beside an index of links rather than under a centred badge row, which makes it the
+   * one footer where the small type is read as a statement about the company rather than as housekeeping. So it
+   * says what the company is instead of asking nobody to print the email, and signs off in the house's own words
+   * rather than with a copyright line.
+   */
+  ledgerNote: '40+ clubs. 17 cities. 1 membership.',
+  ledgerMark: 'Dettagli E Pulizia',
 } as const;
 
 const PREVIEW: Preview = { company: 'SWITCHYARDS U.S.A.', address: '151 Ted Turner Dr NW', city: 'Atlanta', state: 'GA', zip: '30303' };
@@ -233,6 +246,7 @@ class Maker {
   }
   footer(layout: Exclude<LegalLayout, 'classic'>): Section[] {
     const letter = layout === 'letterhead';
+    const ledger = layout === 'ledger';
     const pad = layout === 'stub' ? 20 : 40;
     const block: Block = {
       id: this.id(),
@@ -241,10 +255,11 @@ class Maker {
       // The letterhead's lockup is its header's; the foot opens on a hairline instead.
       logoSrc: letter ? '' : SY_ASSETS.seals,
       logoWidth: letter ? 120 : 180,
-      note: SY_COPY.notice,
+      note: ledger ? SY_COPY.ledgerNote : SY_COPY.notice,
       noteLock: this.fixed('Legal note'),
-      mark: SY_COPY.mark,
+      mark: ledger ? SY_COPY.ledgerMark : SY_COPY.mark,
       instagram: SY_SOCIAL.instagram,
+      ...(ledger ? { youtube: SY_SOCIAL.youtube } : {}),
     };
     const legal = this.one(letter ? 'cream' : 'navy', block, { padTop: 0, padBottom: 0, align: layout === 'ledger' ? 'left' : 'center' }, { padTop: pad, padBottom: pad, domId: 'section-legal' });
     if (letter) return [legal, this.rule(6)];

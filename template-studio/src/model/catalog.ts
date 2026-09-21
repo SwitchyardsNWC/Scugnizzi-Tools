@@ -640,6 +640,12 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
           { kind: 'url', path: 'block.instagram', label: 'Instagram', placeholder: 'https://instagram.com/…', help: 'Named in the footer’s small type: on its own line in the masthead and letterhead, a row in the ledger, after the legal links in the stub. Blank leaves it out.' },
           { kind: 'url', path: 'block.youtube', label: 'YouTube', placeholder: 'https://youtube.com/…', help: 'The same, for YouTube.' },
           { kind: 'url', path: 'block.linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/…', help: 'The same, for LinkedIn.' },
+          {
+            kind: 'toggle',
+            path: 'block.hidePreferences',
+            label: 'Leave out Manage Preferences',
+            help: 'On, the footer offers Unsubscribe alone. Unsubscribe itself is never optional: the law asks for it and HubSpot refuses to publish a template without one.',
+          },
         ],
       },
       {
