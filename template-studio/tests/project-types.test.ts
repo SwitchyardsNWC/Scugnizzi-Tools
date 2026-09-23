@@ -134,6 +134,11 @@ describe('project types', () => {
     expect(projectFolderName('  ..hidden  ')).toBe('hidden');
     expect(projectFolderName('   ')).toBe('New project');
     expect(projectFolderName('x'.repeat(200))).toHaveLength(80);
+    // The control range was written into the regex as two raw bytes, which made the whole file read as binary:
+    // grep skipped it and git showed its diffs as unreviewable. Escaped now, and this is what says the escape
+    // means what the bytes did.
+    expect(projectFolderName('a\u0000b\u001fc')).toBe('a b c');
+    expect(projectFolderName('Tab\there')).toBe('Tab here');
   });
 
   it('keeps project.json’s type when it is read, and drops one that is not a name', () => {

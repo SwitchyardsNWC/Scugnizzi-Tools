@@ -2940,3 +2940,57 @@ membership. / mark: \"Dettagli E Pulizia\" / instagram / youtube" and "Make the 
   `SY_COPY.mark` from the copyright line to the house's own, and `tests/switchyards.test.ts` still spelled the old
   mark out. Fixed by reading `SY_COPY.mark` instead of repeating it, so changing the mark is one edit and not two.
   The quotes in it reach the page escaped, which is the compiler's business and is now said in the test.
+
+### 3.97 Freeform's delete, a file that read as binary, and a folder that explains itself
+
+*2026-09-21. Three jobs off one question from Jared: "should we consider not hiding the .scug folder?" The answer
+was no — the hiding is not the problem, the silence is — so the work became the middle option instead.*
+
+- **Freeform's frame delete never went through the trash.** The board's did, from the day the trash landed. So
+  which door you used decided whether a frame could come back, out of a folder the whole team shares, and nobody
+  chose that: it was just the half that got wired. `deleteFrameFile` now hands the record back and Freeform's Undo
+  forgets it, the same shape `deleteTemplate` took two days earlier. The ordering is free here because `run` is a
+  serial queue: the forget is enqueued behind both the delete and the re-write, so by the time it lands the record
+  exists and the file is already back.
+- **A file had been invisible to grep for weeks.** `project-types.ts` held two raw control bytes, 0x00 and 0x1f,
+  written straight into a regex where `\x00-\x1f` was meant. That made `file` report it as data, so git rendered
+  its diffs as binary and every `grep -r` skipped it silently. It is one of the heaviest users of the folder
+  constant, which is exactly the file a search about the folder layout must not miss — and my own searches came
+  back empty on it twice in one afternoon without saying so. The lesson is the silence: a tool that skips a file
+  and reports nothing is worse than one that fails.
+- **The README was only ever written for projects the tools created.** `planProject` wrote one; a folder the tools
+  *adopted* got a launcher file with an extension nobody recognises and no sentence anywhere explaining either it
+  or the dot folder beside it. Same README now, minus the parts about a project type an adopted folder never had,
+  and never over one that already exists — a README is a thing people edit.
+- **"Finder hides it; leave it be" was the wrong sentence in three places.** It told somebody the folder was
+  hidden without telling them it was there or how to look. It now says what the dot is for and that ⌘⇧. shows it.
+- **The migration always knew what it moved and never said.** `migrateLayout` returns the list and `readProject`
+  dropped it inside a bare catch, so somebody who had `templates/` bookmarked watched it vanish with no reason
+  given. The board says it once, on the open that does it.
+- **What was refused:** renaming `.scug`. Jared's own words are at the top of `layout.ts` — someone looking for a
+  file in Drive should not run into a wall of `.json`. A visible folder puts that wall one click down instead of
+  removing it, and the migration would strand every trash record written before it, because a record stores a
+  literal path and the restore writes straight back to it.
+
+### 3.98 The trash, from every page that fills it
+
+*2026-09-21. The last of the gaps the trash shipped with: four pages delete into the folder and exactly one could
+open it.*
+
+- **The header of `workspace/trash.ts` had already argued this and nobody finished the argument.** It says the IO
+  lives in the workspace layer "because both the board and Template Studio delete things, and a page should not
+  have to reach across into another page's module to get its deletes onto the same footing." True of the writing
+  from day one; the reading stayed in `Board.tsx`. So Studio had been putting files in the trash for a week with
+  no way to look at them, and the library had been removing starters into it with no undo at all.
+- **The split is state versus telling.** `useTrash` owns what is in the folder, whether the panel is up, the sweep
+  and the shake, because those are identical everywhere. Each page passes its own `onRestore` and `onEmpty`,
+  because what to say afterwards and what to refresh are not: the board redraws its cards, Studio its file list,
+  the library its starters. Trying to share those too is how a shared component grows a `kind` prop and a switch.
+- **The styles had to move as well, and that is what decided the class names.** The can and the panel were
+  `pb-*`, which is the board's sheet, and they leaned on `.pb-keys` for the sheet chrome — which only the board
+  loads and only the board has. They are `sy-*` now, written against the `:root` tokens in `app.css` that every
+  page imports, with a backdrop and a sheet of their own. The board keeps exactly one rule, `.pb-can-at`, which is
+  where *that page* pins the can. Placing is the page's; the drawing is not.
+- **The panel rereads when it opens.** The board could rely on its file-listing epoch; Studio and the library have
+  their own rhythms, and a shared panel cannot know any of them. Reading on open costs one folder listing at the
+  moment somebody is waiting to see a list anyway.

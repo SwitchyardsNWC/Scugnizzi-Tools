@@ -55,7 +55,7 @@ export const VISIBLE_FOLDER_NOTES: Record<string, string> = {
   assets: 'pictures every tool can use; each folder in it is a group on the board',
   docs: 'briefs, copy and sheets: Google Docs in a synced folder, or links to them',
   exports: 'what ships: the HubSpot template files',
-  [META_DIR]: 'the tools’ own files. Finder hides it; leave it be',
+  [META_DIR]: 'the tools’ own files. The dot keeps it out of the way in Finder; ⌘⇧. shows it',
   [META.templates]: 'emails, as Template Studio saves them',
   [META.frames]: 'Freeform frames, one file each',
   [META.systems]: 'the colours and type emails follow',

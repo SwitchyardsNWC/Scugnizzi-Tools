@@ -18,7 +18,7 @@ import {
 } from '../model/project.ts';
 import { LEGACY_META_DIRS, LEGACY_META_FILES, META, META_DIR, RENDERED_PREFIX } from '../model/layout.ts';
 import { isGroupFolder } from '../model/project.ts';
-import type { ProjectPlan } from '../model/project-types.ts';
+import { projectReadme, type ProjectPlan } from '../model/project-types.ts';
 import { docLinkFileName, docLinkJson, DOCS_DIR, isDocFile, readDocLink, type DocLink } from '../model/docs.ts';
 import { readRecipe, RECIPE_TOOLS, type RecipeTool, type ToolRecipe } from '../model/tool-recipes.ts';
 import { renameInRecipe, renameSrc } from '../model/asset-moves.ts';
@@ -87,13 +87,16 @@ export async function removeFile(dir: Dir, path: string): Promise<void> {
  * comes from the folder's name rather than chance, so two pages opening the same new folder at once agree on
  * it, and once written it stays whatever the folder is renamed to.
  */
-export async function readProject(dir: Dir, writable: boolean): Promise<ProjectInfo> {
+export async function readProject(dir: Dir, writable: boolean, onMoved?: (moved: string[]) => void): Promise<ProjectInfo> {
   const modern = readProjectInfo((await readText(dir, PROJECT_FILE))?.text ?? null);
   const legacy = modern ? null : readProjectInfo((await readText(dir, LEGACY_PROJECT_FILE))?.text ?? null);
   // Opened for editing: whatever the old layout left at the top of the folder goes into .scug/ (model/layout.ts).
   if (writable) {
     try {
-      await migrateLayout(dir);
+      // `migrateLayout` has always said what it moved and this has always thrown it away, so somebody who had
+      // `templates/` bookmarked watched it vanish and was told nothing. The caller decides whether to say so.
+      const moved = await migrateLayout(dir);
+      if (moved.length && onMoved) onMoved(moved);
     } catch {
       // Next time. Every reader looks in both places meanwhile.
     }
@@ -223,6 +226,40 @@ export async function ensureLauncher(dir: Dir, info: ProjectInfo, openUrl: strin
     return null;
   }
   return name;
+}
+
+/**
+ * Makes sure the project explains itself, for whoever opens the folder rather than the app.
+ *
+ * `planProject` writes a README into every project it creates, and for a year a folder the tools *adopted* got
+ * nothing: a teammate browsing it in Drive found a file with an extension they did not recognise, a folder whose
+ * name begins with a dot, and no sentence anywhere saying what either was. Same README, minus the parts about a
+ * project type an adopted folder never had.
+ *
+ * Written once, and never over one that is already there — a README is a thing people edit, and the tools have no
+ * business replacing somebody's own words.
+ */
+export async function ensureReadme(dir: Dir, info: ProjectInfo): Promise<string | null> {
+  try {
+    await dir.getFileHandle('README.md');
+    return null;
+  } catch {
+    // Not there, which is the case this is for.
+  }
+  const folders: string[] = [];
+  try {
+    for await (const [name, entry] of dir.entries()) {
+      if (entry.kind === 'directory' && !name.startsWith('.')) folders.push(name);
+    }
+  } catch {
+    return null;
+  }
+  try {
+    await writeFile(dir, 'README.md', projectReadme(null, info.name, folders.sort()));
+  } catch {
+    return null;
+  }
+  return 'README.md';
 }
 
 /**

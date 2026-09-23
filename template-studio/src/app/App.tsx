@@ -75,6 +75,7 @@ import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
 import { BranchIcon, CopyIcon, DesktopIcon, EyeIcon, glyphFor, InboxIcon, MoonIcon, PhoneIcon, TickIcon } from './icons.tsx';
 import { TEXT_TARGETS } from './inline-text.ts';
+import { TrashPanel, useTrash } from './Trash.tsx';
 import { useEditor } from './useEditor.ts';
 import { STARTERS } from './starters-list.ts';
 import { mergeById } from '../model/library.ts';
@@ -241,6 +242,15 @@ export function App() {
   const adoptRef = useRef<(file: TemplateFile) => void>(() => {});
   const workspaceRef = useRef<Workspace | null>(null);
   workspaceRef.current = workspace;
+  /**
+   * The project's trash, for the can in the Files panel.
+   *
+   * Studio has been deleting into it since it shipped and had no way to look: `workspace/trash.ts` says in its own
+   * header that the IO sits in the workspace layer because more than one page deletes, and this is the page that
+   * proves it. The board keeps its own handle; both read the same folder.
+   */
+  const trash = useTrash(workspace?.handle ?? null, { writable: Boolean(workspace?.canWrite), epoch: files });
+
   /** Re-reads the folder into the panel. Every write that adds or removes a file ends with this. */
   const refreshFiles = useCallback(async () => {
     const where = workspaceRef.current;
@@ -1852,6 +1862,30 @@ export function App() {
       )}
 
       <div class="body">
+        <TrashPanel
+          trash={trash}
+          writable={Boolean(workspace?.canWrite)}
+          onRestore={(record) => {
+            void (async () => {
+              try {
+                const at = await trash.restore(record);
+                await refreshFiles();
+                if (!at) notify(`${record.name} is no longer in the trash.`);
+                else if (at !== record.path) notify(`${record.name} is back, as ${at.split('/').pop()} — something had taken its old name.`);
+                else notify(`${record.name} is back.`);
+              } catch (cause) {
+                notify(cause instanceof Error ? cause.message : `${record.name} could not be put back.`);
+              }
+            })();
+          }}
+          onEmpty={() => {
+            void (async () => {
+              const gone = await trash.empty();
+              trash.setOpen(false);
+              notify(`${gone} ${gone === 1 ? 'file' : 'files'} gone for good.`);
+            })();
+          }}
+        />
         <Sidebar
           editor={editor}
           tab={tab}
@@ -1898,6 +1932,7 @@ export function App() {
           {...(workspace?.label ? { workspaceLabel: workspace.label } : {})}
           onOpenFile={(file) => void open(file)}
           onOpenFolder={pickFolder}
+          trash={trash}
         />
 
         <main class="canvas">

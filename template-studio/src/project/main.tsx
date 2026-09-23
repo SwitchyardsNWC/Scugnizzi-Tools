@@ -256,7 +256,7 @@ function Welcome({ project, launch, onDropLaunch, install, onCreate }: WelcomePr
             </li>
             <li>
               <code>.scug/</code>
-              <span>the tools’ own files: the board, the emails and frames as the tools save them, design systems. Finder hides it</span>
+              <span>the tools’ own files: the board, the emails and frames as the tools save them, design systems. The dot keeps it out of the way in Finder; ⌘⇧. shows it</span>
             </li>
             <li>
               <code>name.scug</code>

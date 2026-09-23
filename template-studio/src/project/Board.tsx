@@ -76,7 +76,7 @@ import {
 } from '../model/board-edits.ts';
 import { duplicateTemplate } from '../model/edit.ts';
 import { FRAME_PREFIX, newFrameId } from '../model/frame-store.ts';
-import { META } from '../model/layout.ts';
+import { META, META_DIR } from '../model/layout.ts';
 import { serializeTemplate, templateFileName } from '../model/serialize.ts';
 import type { Template } from '../model/types.ts';
 import { isImageFile, type AssetFile } from '../workspace/workspace.ts';
@@ -91,11 +91,12 @@ import { readFolderFrames, writeFrame } from './frame-sync.ts';
 import { underStyle } from './ground.ts';
 import { History, useHistory } from './history.ts';
 import type { Project } from './useProject.ts';
-import { ago, agoDays, cardUnder, clampZoom, EMAIL_PAGE, HEAD, KIND_LABEL, kindOfCardOr, linkPath, missingName, openTitle, openTool, placesOf, plural, readView, restorePlaces, sizeOf, type Rect, type View } from './board-helpers.ts';
+import { ago, cardUnder, clampZoom, EMAIL_PAGE, HEAD, KIND_LABEL, kindOfCardOr, linkPath, missingName, openTitle, openTool, placesOf, plural, readView, restorePlaces, sizeOf, type Rect, type View } from './board-helpers.ts';
 import { type EmailItem, type FrameItem, type PrintedPage, printId, printedIn, useProjectFiles } from './files.ts';
 import { DocBody, EmailBody, FrameBody, type SectionSpan } from './cards.tsx';
-import { emptyTrash, forgetTrashed, keepInTrash, readTrash, restoreFromTrash, sweepTrash } from '../workspace/trash.ts';
-import { daysLeft, TRASH_CAPS, trashBytes, type TrashRecord } from '../model/trash.ts';
+import { forgetTrashed, keepInTrash } from '../workspace/trash.ts';
+import type { TrashRecord } from '../model/trash.ts';
+import { TrashCan, TrashPanel, useTrash } from '../app/Trash.tsx';
 import { LinkForm, ProjectMenu } from './menus.tsx';
 import { NoteCard } from './notes.tsx';
 import { ArrowLeft, FitAll, FitOne, Minus, Plus } from './glyphs.tsx';
@@ -205,6 +206,18 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   useEffect(() => {
     refreshAll();
   }, [project.generation, refreshAll]);
+
+  /**
+   * The one time the folder was reorganised under somebody, said out loud.
+   *
+   * Opening an older project for editing moves the tools' files into `.scug/`. That has always happened silently,
+   * so a teammate with `templates/` bookmarked in Finder watched it disappear with no explanation. Once, on the
+   * open that does it, and never again — the list is empty every time after.
+   */
+  useEffect(() => {
+    if (!project.moved.length) return;
+    notify(`Tidied ${plural(project.moved.length, 'folder')} into ${META_DIR}: ${project.moved.join(', ')}. The tools read them from there now; the dot keeps it out of the way in Finder, and ⌘⇧. shows it.`);
+  }, [project.moved, notify]);
 
   useEffect(() => {
     const onFocus = () => refreshAll();
@@ -1021,12 +1034,12 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     // nothing knew about the can's panel, so the board's own keys went on working behind both: with a card
     // selected, Backspace twice deleted it behind the very panel listing what had been deleted. Tab and the
     // arrows are deliberately left alone, so the sheet stays navigable by keyboard.
-    if (trashOpen || showKeys) {
+    if (trash.open || showKeys) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (trashOpen) setTrashOpen(false);
+        if (trash.open) trash.setOpen(false);
         else setShowKeys(false);
-      } else if (event.key === '?' && showKeys && !trashOpen) {
+      } else if (event.key === '?' && showKeys && !trash.open) {
         event.preventDefault();
         setShowKeys(false);
       }
@@ -1597,42 +1610,17 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
   };
 
   /** The board laid out afresh, with the lines in mind: what is linked sits together. One step, undone as one. */
-  // --- the trash (model/trash.ts, workspace/trash.ts) ---
-  const [trash, setTrash] = useState<TrashRecord[]>([]);
-  const [trashOpen, setTrashOpen] = useState(false);
-  const readTrashNow = useCallback(async () => {
-    setTrash(await readTrash(dir).catch(() => []));
-  }, [dir]);
-  useEffect(() => {
-    void readTrashNow();
-  }, [readTrashNow, files.epoch]);
-  /** Swept on opening, so a project that has been shut for a month is not still carrying last month's deletes. */
-  useEffect(() => {
-    if (!project.writable) return;
-    void sweepTrash(dir, Date.now())
-      .then((gone) => {
-        if (gone) void readTrashNow();
-      })
-      .catch(() => undefined);
-  }, [dir, project.writable, readTrashNow]);
-
-  /** One shake when something lands in the can — the arrival is the only thing on this board worth animating. */
-  const [canJolt, setCanJolt] = useState(false);
-  const wasInTrash = useRef(trash.length);
-  useEffect(() => {
-    const was = wasInTrash.current;
-    wasInTrash.current = trash.length;
-    if (trash.length <= was) return undefined;
-    setCanJolt(true);
-    const timer = window.setTimeout(() => setCanJolt(false), 620);
-    return () => window.clearTimeout(timer);
-  }, [trash.length]);
+  // --- the trash (model/trash.ts, workspace/trash.ts, app/Trash.tsx) ---
+  //
+  // The can and the panel are shared with Template Studio and the library now; what stays here is what only the
+  // board knows: that putting a file back means redrawing the cards.
+  const trash = useTrash(dir, { writable: project.writable, epoch: files.epoch });
+  const readTrashNow = trash.reread;
 
   const restoreTrashed = async (record: TrashRecord) => {
     if (!projectRef.current.writable) return notWritable('put something back');
     try {
-      const at = await restoreFromTrash(dir, record);
-      await readTrashNow();
+      const at = await trash.restore(record);
       stale();
       await refresh();
       if (!at) notify(`${record.name} is no longer in the trash.`);
@@ -2073,31 +2061,8 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         </div>
       </header>
 
-      {/* The can, where the room's rubbish goes. Always in the corner, faded when empty, so a delete has a visible
-          somewhere to go before you have made one. */}
-      <button
-        class={`pb-can ${trashOpen ? 'on' : ''} ${trash.length ? 'full' : 'empty'} ${canJolt ? 'jolt' : ''}`}
-        aria-expanded={trashOpen}
-        aria-label={trash.length ? `Recently deleted — ${plural(trash.length, 'file')}` : 'Recently deleted — nothing here'}
-        title={
-          trash.length
-            ? `${plural(trash.length, 'deleted file')} in here, taking ${sizeOf(trashBytes(trash))}. Kept ${TRASH_CAPS.days} days, up to ${Math.round(TRASH_CAPS.bytes / 1024 / 1024)} MB.`
-            : `Nothing deleted lately. What you delete waits in here ${TRASH_CAPS.days} days, so it can come back.`
-        }
-        onClick={() => setTrashOpen((v) => !v)}
-      >
-        <span class="pb-can-art" aria-hidden="true">
-          <svg viewBox="0 0 28 30">
-            <g class="pb-can-lid">
-              <path d="M4.6 8.6h18.8" />
-              <path d="M11 8.6V5.6h6v3" />
-            </g>
-            <path class="pb-can-body" d="M7 10.6h14l-1.15 16.1a1.7 1.7 0 0 1-1.7 1.6h-8.3a1.7 1.7 0 0 1-1.7-1.6Z" />
-            <path class="pb-can-ribs" d="M11.7 14.6v9.2M16.3 14.6v9.2" />
-          </svg>
-        </span>
-        {trash.length > 0 && <span class="pb-can-count">{trash.length}</span>}
-      </button>
+      {/* The can, where the room's rubbish goes. In the corner of the canvas, which is this page's placing of it. */}
+      <TrashCan trash={trash} className="pb-can-at" />
 
       <footer class="pb-bar pb-bar-bottom">
         <span class="pb-status">
@@ -2129,60 +2094,18 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
         <span class="pb-count">{counts || 'empty'}</span>
       </footer>
 
-      {trashOpen && (
-        <div class="pb-keys-backdrop" onClick={() => setTrashOpen(false)}>
-          <div class="pb-keys pb-trash" role="dialog" aria-label="Recently deleted" onClick={(e) => e.stopPropagation()}>
-            <header>
-              <b>Recently deleted</b>
-              <button class="pb-ghost" onClick={() => setTrashOpen(false)}>
-                Done
-              </button>
-            </header>
-            <p class="pb-trash-lead">
-              Deleting puts a file here instead of throwing it away, so it can come back after the tab is closed and
-              Undo is gone. It keeps the last {TRASH_CAPS.days} days, up to {Math.round(TRASH_CAPS.bytes / 1024 / 1024)} MB
-              and {TRASH_CAPS.count} files — the oldest goes when the newest arrives, so it never becomes weight.
-            </p>
-            <ul class="pb-trash-list">
-              {trash.length === 0 && <li class="pb-trash-none">Nothing in here. What you delete lands in the can, and waits.</li>}
-              {trash.map((record) => (
-                <li key={record.id}>
-                  <span class="pb-trash-main">
-                    <b>{record.name}</b>
-                    <span class="pb-trash-facts">
-                      {record.kind} · {sizeOf(record.size)} · {record.deletedAt ? agoDays(record.deletedAt) : 'some time ago'}
-                      {record.deletedAt && daysLeft(record, Date.now()) <= 7 ? ` · ${plural(daysLeft(record, Date.now()), 'day')} left` : ''}
-                    </span>
-                  </span>
-                  <button class="pb-ghost" disabled={!writable} title={`Put it back in ${record.path.slice(0, record.path.lastIndexOf('/')) || 'the folder'}.`} onClick={() => void restoreTrashed(record)}>
-                    Put back
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <footer class="pb-trash-foot">
-              <span>
-                {plural(trash.length, 'file')} · {sizeOf(trashBytes(trash))} of {Math.round(TRASH_CAPS.bytes / 1024 / 1024)} MB
-              </span>
-              <button
-                class="pb-inline"
-                disabled={!writable || trash.length === 0}
-                title="Everything here, gone for good. There is no undo for this one."
-                onClick={() => {
-                  void (async () => {
-                    const gone = await emptyTrash(dir).catch(() => 0);
-                    await readTrashNow();
-                    setTrashOpen(false);
-                    notify(`${plural(gone, 'file')} gone for good.`);
-                  })();
-                }}
-              >
-                Empty it
-              </button>
-            </footer>
-          </div>
-        </div>
-      )}
+      <TrashPanel
+        trash={trash}
+        writable={writable}
+        onRestore={(record) => void restoreTrashed(record)}
+        onEmpty={() => {
+          void (async () => {
+            const gone = await trash.empty();
+            trash.setOpen(false);
+            notify(`${plural(gone, 'file')} gone for good.`);
+          })();
+        }}
+      />
       {showKeys && (
         <div class="pb-keys-backdrop" onClick={() => setShowKeys(false)}>
           <div class="pb-keys" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>

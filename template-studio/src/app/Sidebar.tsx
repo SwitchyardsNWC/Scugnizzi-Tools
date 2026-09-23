@@ -4,6 +4,7 @@ import { Outline } from './Outline.tsx';
 import { isAssetKind, Palette, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
 import type { DesignSystem } from '../model/design-system.ts';
 import { Templates, type Starter } from './Templates.tsx';
+import type { TrashHandle } from './Trash.tsx';
 import { RailAssets, RailBlocks, RailDesign, RailLayers, RailTemplates } from './icons.tsx';
 import type { AssetFile, TemplateFile } from '../workspace/workspace.ts';
 import type { Editor } from './useEditor.ts';
@@ -71,6 +72,8 @@ export interface SidebarProps {
   onDevice(device: 'desktop' | 'phone'): void;
   /** True while the Design panel's padding dials are being worked; the canvas draws the space they set. */
   onPadHot?(hot: boolean): void;
+  /** The project's trash, for the can beside the file count. Absent when there is no folder to have one. */
+  trash?: TrashHandle;
   onOpenFile(file: TemplateFile): void;
   /**
    * Removes a file from the folder; absent when the folder cannot be written. Passed through to the Files panel,
@@ -164,6 +167,7 @@ export function Sidebar(props: SidebarProps) {
             {...(props.onTidy ? { onTidy: props.onTidy } : {})}
             onOpenFolder={props.onOpenFolder}
             onChooseFiles={props.onChooseFiles}
+            {...(props.trash ? { trash: props.trash } : {})}
           />
         )}
         {shown === 'layers' && <Outline editor={props.editor} patternOf={props.patternOf} also={props.also} />}
