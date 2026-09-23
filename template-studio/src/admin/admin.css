@@ -10,7 +10,8 @@
 
 .ad { max-width: 860px; margin: 0 auto; padding: 22px 24px 60px; }
 
-.ad-tabs { display: flex; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--pb-soft); }
+.ad-tabs { display: flex; align-items: center; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--pb-soft); }
+.ad-tabs-grow { flex: 1; }
 .ad-tab {
   padding: 8px 12px 9px; border: 0; border-bottom: 2px solid transparent; background: none;
   color: var(--pb-muted); font: inherit; font-size: 13px; cursor: pointer;

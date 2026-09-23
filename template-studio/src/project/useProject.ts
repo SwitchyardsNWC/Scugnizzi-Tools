@@ -17,7 +17,7 @@ import {
   rememberProjectFolder,
   supportsFolders,
 } from '../workspace/workspace.ts';
-import { ensureLauncher, launcherMismatch, readProject } from './folder.ts';
+import { ensureLauncher, ensureReadme, launcherMismatch, readProject } from './folder.ts';
 import { launcherUrl } from './launch.ts';
 
 type Dir = FileSystemDirectoryHandle;
@@ -37,6 +37,13 @@ export interface Project {
   writable: boolean;
   /** Goes up every time the project is looked at again, for effects that should read the folder anew. */
   generation: number;
+  /**
+   * What the layout migration moved into `.scug/` on opening, if anything, so the board can say so once.
+   *
+   * It always knew and never said: somebody who had `templates/` bookmarked in Finder watched it disappear and
+   * was given no reason. Empty every other time, which is every time after the first.
+   */
+  moved: string[];
   /** Shows the folder picker. */
   open(): Promise<boolean>;
   /** Opens a folder already in hand, one Create a project just made, as the project. */
@@ -56,25 +63,28 @@ export interface Project {
   openFor(launcher: Launcher, fileName: string): Promise<string | null>;
 }
 
-type State = Pick<Project, 'status' | 'dir' | 'info' | 'generation'>;
+type State = Pick<Project, 'status' | 'dir' | 'info' | 'generation' | 'moved'>;
 
 export function useProject(): Project {
-  const [state, setState] = useState<State>({ status: 'loading', dir: null, info: null, generation: 0 });
+  const [state, setState] = useState<State>({ status: 'loading', dir: null, info: null, generation: 0, moved: [] });
   const channel = useRef<BroadcastChannel | null>(null);
   const dirRef = useRef<Dir | null>(null);
 
   const settle = useCallback(async (dir: Dir | null) => {
     dirRef.current = dir;
     if (!dir) {
-      setState((s) => ({ status: supportsFolders() ? 'none' : 'unsupported', dir: null, info: null, generation: s.generation + 1 }));
+      setState((s) => ({ status: supportsFolders() ? 'none' : 'unsupported', dir: null, info: null, generation: s.generation + 1, moved: [] }));
       return;
     }
     const status: ProjectStatus =
       (await permissionOf(dir, 'readwrite')) === 'granted' ? 'ready' : (await permissionOf(dir, 'read')) === 'granted' ? 'view-only' : 'asking';
     let info: ProjectInfo | null = null;
+    let moved: string[] = [];
     if (status !== 'asking') {
       try {
-        info = await readProject(dir, status === 'ready');
+        info = await readProject(dir, status === 'ready', (m) => {
+          moved = m;
+        });
       } catch {
         info = null;
       }
@@ -82,9 +92,12 @@ export function useProject(): Project {
     if (info) {
       // Known by id from now on, so its .scug finds it; and given a .scug, so Finder can open it.
       await rememberProjectFolder(info.id, dir);
-      if (status === 'ready') await ensureLauncher(dir, info, launcherUrl());
+      if (status === 'ready') {
+        await ensureLauncher(dir, info, launcherUrl());
+        await ensureReadme(dir, info);
+      }
     }
-    setState((s) => ({ status: info || status === 'asking' ? status : 'asking', dir, info, generation: s.generation + 1 }));
+    setState((s) => ({ status: info || status === 'asking' ? status : 'asking', dir, info, generation: s.generation + 1, moved }));
   }, []);
 
   useEffect(() => {

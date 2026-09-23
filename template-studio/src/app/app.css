@@ -1977,3 +1977,89 @@ button.fig-pill:active { transform: scale(0.96); }
 
 /* The one rename the inspector offers, beside the field name it would replace. */
 .fieldname .link { margin-left: 10px; }
+
+/* --- the trash: the can, and Recently deleted ------------------------------------------------------
+ * Shared by every page that deletes into the project folder (app/Trash.tsx). The board pins the can to a corner
+ * of its canvas, Template Studio and the library sit it in a bar; the panel is the same everywhere. Written
+ * against the `:root` tokens above rather than the board's, because the board is no longer the only page that
+ * shows it. */
+.sy-can {
+  position: relative; display: grid; place-items: center; flex: none;
+  width: 42px; height: 46px; padding: 0; border: 1px solid transparent; border-radius: 9px;
+  background: none; color: var(--muted); cursor: pointer;
+  transition: opacity 120ms linear, background-color 120ms linear, color 120ms linear, border-color 120ms linear;
+}
+.sy-can.empty { opacity: 0.4; }
+.sy-can:hover, .sy-can.on { opacity: 1; background: var(--panel); border-color: var(--line); color: var(--ink); }
+.sy-can-art { display: block; width: 28px; height: 30px; }
+.sy-can-art svg {
+  display: block; width: 100%; height: 100%; overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
+}
+/* The hinge is the left end of the lid bar, so it swings up rather than sliding. */
+.sy-can-lid { transform-origin: 5px 8.6px; transition: transform 180ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sy-can:hover .sy-can-lid, .sy-can.on .sy-can-lid { transform: translateY(-2.5px) rotate(-12deg); }
+.sy-can-count {
+  position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 999px; background: var(--ink); color: var(--panel);
+  font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.sy-can.jolt .sy-can-art { animation: sy-can-shake 600ms ease-out; }
+.sy-can.jolt .sy-can-lid { animation: sy-can-drop 600ms ease-out; }
+@keyframes sy-can-shake {
+  0%, 100% { transform: none; }
+  16% { transform: rotate(-7deg); }
+  42% { transform: rotate(5deg); }
+  70% { transform: rotate(-2deg); }
+}
+@keyframes sy-can-drop {
+  0% { transform: translateY(-7px) rotate(-18deg); }
+  55% { transform: translateY(0) rotate(3deg); }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sy-can-lid { transition: none; }
+  .sy-can.jolt .sy-can-art, .sy-can.jolt .sy-can-lid { animation: none; }
+  .sy-can:hover .sy-can-lid, .sy-can.on .sy-can-lid { transform: none; }
+}
+
+/* The sheet the panel sits on. Its own, rather than the board's `.pb-keys`, because three pages mount it and
+   only one of them has that chrome. */
+.sy-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgb(15 18 28 / 0.32); padding: 24px;
+}
+.sy-sheet {
+  max-width: 100%; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: 0 10px 40px rgb(15 18 28 / 0.22); overflow: hidden;
+}
+.sy-sheet header { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--line-soft); }
+.sy-sheet header b { font-size: 13px; font-weight: 500; }
+.sy-sheet-done {
+  height: 28px; padding: 6px 9px; border: 1px solid transparent; border-radius: 4px;
+  background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer;
+}
+.sy-sheet-done:hover:not(:disabled) { background: var(--sunk); color: var(--ink); }
+.sy-sheet-done:disabled { color: var(--faint); cursor: default; }
+
+.sy-trash { width: 520px; }
+.sy-trash-lead { margin: 0; padding: 10px 14px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.sy-trash-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow-y: auto; }
+.sy-trash-list li { display: flex; align-items: center; gap: 12px; padding: 9px 14px 10px; border-bottom: 1px solid var(--line-soft); }
+.sy-trash-none { padding: 14px; font-size: 12.5px; color: var(--muted); }
+.sy-trash-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.sy-trash-main b { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sy-trash-facts { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--faint); }
+.sy-trash-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 11px; font-size: 11.5px; color: var(--muted); }
+.sy-trash-empty {
+  padding: 0; border: 0; background: none; color: var(--accent); font: inherit;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.sy-trash-empty:hover:not(:disabled) { color: var(--ink); }
+.sy-trash-empty:disabled { color: var(--faint); text-decoration: none; cursor: default; }
+
+/* In the Files panel the can sits beside the count, smaller than the board's corner one and with no border of
+   its own: it is a row of chrome, not a thing pinned to a canvas. */
+.folder-can { width: 26px; height: 26px; margin: -4px -4px -4px 4px; }
+.folder-can .sy-can-art { width: 18px; height: 20px; }
+.folder-can .sy-can-count { top: -2px; right: -3px; min-width: 14px; height: 14px; font-size: 9px; }

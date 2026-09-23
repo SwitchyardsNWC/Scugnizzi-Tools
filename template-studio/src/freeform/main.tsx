@@ -45,6 +45,8 @@ import { Surface, type SurfaceApi } from '../app/Surface.tsx';
 import { useEditor } from '../app/useEditor.ts';
 import { listPictures, writePicture, type PictureEntry } from '../project/folder.ts';
 import { copyKeptPictures, deleteFrameFile, syncFrames, writeFrame, type FolderFrame } from '../project/frame-sync.ts';
+import { forgetTrashed } from '../workspace/trash.ts';
+import type { TrashRecord } from '../model/trash.ts';
 import { siteStore } from '../project/site-store.ts';
 import { useProject, type Project } from '../project/useProject.ts';
 import { FramesMenu } from './FramesMenu.tsx';
@@ -552,16 +554,30 @@ function FreeformTool() {
       framesRef.current = index;
       setFrames(index);
     }
+    // The file goes to the project's trash rather than off the disk, so closing the tab is no longer the moment a
+    // frame is lost from a folder the whole team shares. Held here so Undo below can take it back out.
+    const trashed: { record: TrashRecord | null } = { record: null };
     if (removed.entry.project && p.dir && p.writable) {
       const dir = p.dir;
       void run(async () => {
-        await deleteFrameFile(dir, key, folder.current);
+        trashed.record = await deleteFrameFile(dir, key, folder.current, removed.entry.name);
         folder.current = folder.current.filter((f) => f.key !== key);
       });
     }
     notify(`Deleted ${removed.entry.name}.`, () => {
       show(restoreFrame(store, framesRef.current, removed), frameDoc(removed.entry.key, removed.entry.name));
       pushLater(removed.entry.key);
+      // Queued behind both the delete and that re-write, because `run` is one at a time and in order: by the time
+      // this lands the record exists and the file is back, so the trash can let go. Leaving it would have the can
+      // offering something already in the folder, and Put back would make a second copy of it.
+      const dir = p.dir;
+      if (dir && projectRef.current.writable) {
+        void run(async () => {
+          if (!trashed.record) return;
+          await forgetTrashed(dir, trashed.record);
+          trashed.record = null;
+        });
+      }
     });
   };
 

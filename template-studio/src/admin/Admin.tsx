@@ -30,6 +30,7 @@ import {
 } from '../model/serialize.ts';
 import { STARTERS } from '../app/starters-list.ts';
 import { folderWorkspace, type Workspace } from '../workspace/workspace.ts';
+import { TrashCan, TrashPanel, useTrash } from '../app/Trash.tsx';
 import type { Project } from '../project/useProject.ts';
 import type { Template } from '../model/types.ts';
 
@@ -67,6 +68,12 @@ export function Admin({ project, notify }: AdminProps) {
   /** The template files in the folder, so a starter can say when the email it was edited as is waiting. */
   const [templateFiles, setTemplateFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * The library's own view of the trash. Removing a starter here has gone through it since the day the library
+   * shipped, and until now the only way to see what that had done was to open the board.
+   */
+  const trash = useTrash(project.dir, { writable: project.writable, epoch: folderStarters });
 
   const workspace: Workspace | null = useMemo(
     () => (project.dir ? folderWorkspace(project.dir, project.writable) : null),
@@ -251,6 +258,30 @@ export function Admin({ project, notify }: AdminProps) {
 
   return (
     <div class="ad">
+      <TrashPanel
+        trash={trash}
+        writable={project.writable}
+        onRestore={(record) => {
+          void (async () => {
+            try {
+              const at = await trash.restore(record);
+              await read();
+              if (!at) notify(`${record.name} is no longer in the trash.`);
+              else if (at !== record.path) notify(`${record.name} is back, as ${at.split('/').pop()} — something had taken its old name.`);
+              else notify(`${record.name} is back.`);
+            } catch (cause) {
+              notify(cause instanceof Error ? cause.message : `${record.name} could not be put back.`);
+            }
+          })();
+        }}
+        onEmpty={() => {
+          void (async () => {
+            const gone = await trash.empty();
+            trash.setOpen(false);
+            notify(`${gone} ${gone === 1 ? 'file' : 'files'} gone for good.`);
+          })();
+        }}
+      />
       <nav class="ad-tabs" role="tablist">
         {(
           [
@@ -263,6 +294,9 @@ export function Admin({ project, notify }: AdminProps) {
             {label}
           </button>
         ))}
+        {/* Beside the tabs, because Remove on any of them is what fills it. */}
+        <span class="ad-tabs-grow" />
+        <TrashCan trash={trash} className="folder-can" />
       </nav>
 
       {tab === 'starters' && (

@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 import { emptyTrash, keepInTrash, readTrash, restoreFromTrash, sweepTrash, TRASH_DIR } from '../src/workspace/trash.ts';
 import { folderWorkspace } from '../src/workspace/workspace.ts';
+import { deleteFrameFile } from '../src/project/frame-sync.ts';
 
 // --- a folder, in memory ------------------------------------------------------------------------------------
 
@@ -260,6 +261,38 @@ describe('the caps, against a folder', () => {
 });
 
 // --- the undo a delete hands back -----------------------------------------------------------------------------
+
+/**
+ * Freeform's own delete.
+ *
+ * The board and Freeform delete the same file. For a week the board's went through the trash and Freeform's was a
+ * bare removal, so which door you used decided whether the frame could come back — from a folder a whole team
+ * shares. Nobody chose that; it was just the half that was wired.
+ */
+describe('deleting a frame from Freeform', () => {
+  const FRAMES = '.scug/frames';
+  const folderFrame = (key: string, path: string) => ({ key, path, fileName: path.split('/').pop()!, name: 'A frame' }) as never;
+
+  it('puts the file in the trash under the frame’s own name, rather than removing it', async () => {
+    const dir = project();
+    await put(dir, `${FRAMES}/hero.frame.json`, '{"key":"k1"}');
+    const record = await deleteFrameFile(dir, 'k1', [folderFrame('k1', `${FRAMES}/hero.frame.json`)], 'Hero');
+
+    expect(record?.name).toBe('Hero');
+    expect(record?.kind).toBe('frame');
+    expect(await read(dir, `${FRAMES}/hero.frame.json`)).toBe(null);
+    expect((await readTrash(dir)).length).toBe(1);
+    // And it comes back where it was, which is the whole point of the change.
+    expect(await restoreFromTrash(dir, record!)).toBe(`${FRAMES}/hero.frame.json`);
+    expect(await read(dir, `${FRAMES}/hero.frame.json`)).toBe('{"key":"k1"}');
+  });
+
+  it('does nothing for a frame the folder does not hold, which is every frame with no project open', async () => {
+    const dir = project();
+    expect(await deleteFrameFile(dir, 'k1', [])).toBe(null);
+    expect(await readTrash(dir)).toEqual([]);
+  });
+});
 
 describe('deleting a template through the workspace', () => {
   const email = (name: string) => JSON.stringify({ schema: 6, id: 'e1', name, blocks: [] });

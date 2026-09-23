@@ -4,6 +4,7 @@ import type { Template } from '../model/types.ts';
 import type { TemplateFile } from '../workspace/workspace.ts';
 import type { Editor } from './useEditor.ts';
 import { TemplateIcon } from './icons.tsx';
+import { TrashCan, type TrashHandle } from './Trash.tsx';
 
 /** Somewhere to start from. The app supplies the list; the panel only offers it. */
 export interface Starter {
@@ -46,6 +47,11 @@ export interface TemplatesProps {
   onDelete?(file: TemplateFile): void;
   /** Removes the copies of a name the list does not show (`TemplateFile.copies`); absent when the folder cannot be written. */
   onTidy?(file: TemplateFile): void;
+  /**
+   * The project's trash, when there is a folder. The can sits beside the file count, which is where the deletes
+   * that fill it happen — Studio has put files in there since the trash shipped and had no way to look.
+   */
+  trash?: TrashHandle;
   onOpenFolder(): void;
   onChooseFiles(files: File[]): void;
 }
@@ -58,7 +64,7 @@ const when = (at: number) => {
   return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onTidy, onOpenFolder, onChooseFiles }: TemplatesProps) {
+export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onTidy, onOpenFolder, onChooseFiles, trash }: TemplatesProps) {
   const [menu, setMenu] = useState(false);
 
   // New and Duplicate, first. The app used to open on the standard email and stop there, so the
@@ -185,6 +191,7 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
           {label}
         </span>
         <span class="muted">{files.length}</span>
+        {trash && <TrashCan trash={trash} className="folder-can" />}
       </div>
 
       {files.length === 0 ? (

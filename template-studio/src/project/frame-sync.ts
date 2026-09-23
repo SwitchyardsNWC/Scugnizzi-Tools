@@ -9,6 +9,8 @@ import { applyPulls, dropFrames, readFrames, tagFrames, type FrameIndex, type Ke
 import type { Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { childDir, removeFile, writeFile } from './folder.ts';
+import { keepInTrash } from '../workspace/trash.ts';
+import type { TrashRecord } from '../model/trash.ts';
 
 type Dir = FileSystemDirectoryHandle;
 
@@ -84,8 +86,20 @@ export async function copyKeptPictures(dir: Dir, frames: FrameFile[], pictures: 
   return written;
 }
 
-export async function deleteFrameFile(dir: Dir, key: string, folder: FolderFrame[]): Promise<void> {
-  for (const f of folder) if (f.key === key) await removeFile(dir, f.path);
+/**
+ * A frame's file out of the project folder, and into the trash.
+ *
+ * Through the trash rather than straight off the disk, because this is the same file the board deletes through
+ * the can: deleting a frame from the board left it recoverable and deleting the same file from Freeform did not,
+ * which is not a difference anybody chose. Returns the record so the caller's Undo can let go of it — the undo
+ * here writes the file back from the store, so a record left standing would have the can offering something that
+ * is already in the folder.
+ *
+ * Null when the frame was not one of the folder's, which is every frame in a browser with no project open.
+ */
+export async function deleteFrameFile(dir: Dir, key: string, folder: FolderFrame[], name?: string): Promise<TrashRecord | null> {
+  for (const f of folder) if (f.key === key) return keepInTrash(dir, f.path, name ? { name } : {});
+  return null;
 }
 
 export interface FrameSyncResult {
