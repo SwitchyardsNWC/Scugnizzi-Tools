@@ -2994,3 +2994,38 @@ open it.*
 - **The panel rereads when it opens.** The board could rely on its file-listing epoch; Studio and the library have
   their own rhythms, and a shared panel cannot know any of them. Reading on open costs one folder listing at the
   moment somebody is waiting to see a list anyway.
+
+### 3.99 Social icons, and the ledger with its socials first
+
+*2026-09-29. Jared: "Make another ledger footer variation. that puts the social links above the unsubscribe. and
+make an option to use icons for the social media instead of text." Then, with new artwork: "Actually use these."*
+
+- **An email picture needs an address, and the repo already has one.** Gmail strips SVG and Outlook on Windows never
+  drew it; webp, which the artwork arrived as, is unreadable to most mail clients. So the icons are PNGs, and the
+  question was where they live. The site's deploy uploads the whole repository, so `email-assets/social/` is
+  published at a stable public URL the moment it is on `main`. Its README says the one rule that matters: nothing
+  in it may ever be moved or renamed, because every email already sent keeps asking for those exact names.
+- **The artwork was recovered, not redrawn.** Two of the three icons existed only as images attached to a message.
+  The session transcript stores attachments byte for byte, so they were decoded from there rather than traced by
+  hand. Instagram came from the original in Downloads, because the attached copy had been re-encoded.
+- **Carrying image data through my own output corrupted it.** The first pass generated the PNGs in the browser and
+  wrote them to disk by passing their base64 through a tool call. One string came out invalid; the others decoded
+  and could not be trusted either, since a changed character mid-string still leaves a valid header. Redone on
+  disk end to end: `sips` for the webp conversion and the resize, a stdlib-only Python pass that sets the colour
+  and leaves the alpha, and every file read back and compared before it counted. Long opaque data should never
+  travel through a place it can be retyped.
+- **Only the colour changes; the alpha is the artwork.** Every pixel gets the house off-white or navy and keeps its
+  own transparency, so the knockouts stay knockouts. That also flattened the webp's colour noise back to exactly
+  `#f7f6f3`.
+- **The tone follows the band, not the layout.** Off-white icons on the cream letterhead would vanish, so there is
+  a navy set, and which one a footer gets is read from its text colour. The first version of the test put a
+  letterhead layout on the standard email's navy section and expected navy icons. It got off-white, correctly: the
+  band under it was still navy. The test was wrong and the design was right, so both cases are tests now.
+- **Phones stack names and must not stack icons.** The footer's phone rules hide `sy-sep` and drop the second link
+  under the first, which is right for words. Icons are separated by a plain gap instead, so three pictures stay a
+  row; they keep `sy-tap` for the taller tap target.
+- **The canvas shows icons before they are published.** `withServedIcons` maps the published address onto this copy
+  of the site in the preview only, the same shape as `withLocalAssets`. On the live site the two addresses are
+  identical and it does nothing. The export never passes through it, which a test asserts.
+- **A test fails if a file goes missing.** Every network in every tone is checked against the folder on disk, so a
+  rename breaks the build instead of blanking somebody's inbox.

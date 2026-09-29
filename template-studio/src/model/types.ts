@@ -487,6 +487,9 @@ export interface BrandBlock extends BlockBase {
  */
 export type LegalLayout = 'classic' | 'masthead' | 'ledger' | 'stub' | 'letterhead';
 
+/** The networks a footer can name, in the order it names them. */
+export type SocialName = 'Instagram' | 'YouTube' | 'LinkedIn';
+
 /** Company, address, unsubscribe. Locked by default — a re-upload must fix every future send (1.7). */
 export interface LegalBlock extends BlockBase {
   type: 'legal';
@@ -503,6 +506,17 @@ export interface LegalBlock extends BlockBase {
   instagram?: string;
   youtube?: string;
   linkedin?: string;
+  /**
+   * Draws the social links as icons rather than their names (Jared, 2026-09-29), in every layout. Absent is false,
+   * so every footer written before this still names them. Each icon keeps the network's name as its alt text, which
+   * is what a reader with pictures off — Outlook on Windows, by default — sees in its place.
+   */
+  socialIcons?: boolean;
+  /**
+   * In the ledger, the social row above the legal links rather than below them (Jared, 2026-09-29: "puts the social
+   * links above the unsubscribe"). The other layouts set their socials on a line of their own and ignore it.
+   */
+  socialsFirst?: boolean;
   /**
    * Leaves out the Manage Preferences link. Absent is false, so every footer written before this keeps it.
    *

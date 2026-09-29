@@ -18,7 +18,7 @@
 import { DEFAULT_DESIGN_SYSTEM, bandedPreset, colorOf, firstPreset, theme as themeTokens, type DesignSystem } from './design-system.ts';
 import { bodyFieldName, sequentialIds } from './ids.ts';
 import { SCHEMA_VERSION } from './schema.ts';
-import type { Block, Column, LegalLayout, Lock, Preview, Section, Template } from './types.ts';
+import type { Block, Column, LegalBlock, LegalLayout, Lock, Preview, Section, Template } from './types.ts';
 
 export const SY_SITE = 'https://www.switchyards.com/';
 /** The social addresses in hand. LinkedIn is a field in the footer's inspector, blank until someone knows it. */
@@ -246,7 +246,7 @@ class Maker {
   letterheadHeader(): Section[] {
     return [this.rule(6), this.fixedPicture('Letterhead', SY_ASSETS.lockupNavy, 'Switchyards', SY_SITE, 120, { padTop: 30, padBottom: 20, align: 'center' })];
   }
-  footer(layout: Exclude<LegalLayout, 'classic'>): Section[] {
+  footer(layout: Exclude<LegalLayout, 'classic'>, options: Pick<LegalBlock, 'socialsFirst' | 'socialIcons'> = {}): Section[] {
     const letter = layout === 'letterhead';
     const ledger = layout === 'ledger';
     const pad = layout === 'stub' ? 20 : 40;
@@ -265,6 +265,9 @@ class Maker {
       // starters ship a masthead and a stub, so the one footer that had it was the one nobody was looking at.
       instagram: SY_SOCIAL.instagram,
       youtube: SY_SOCIAL.youtube,
+      // Only what was asked for, so a footer made without options is the same object it always was.
+      ...(options.socialsFirst ? { socialsFirst: true } : {}),
+      ...(options.socialIcons ? { socialIcons: true } : {}),
     };
     const legal = this.one(letter ? 'cream' : 'navy', block, { padTop: 0, padBottom: 0, align: layout === 'ledger' ? 'left' : 'center' }, { padTop: pad, padBottom: pad, domId: 'section-legal', bleed: true });
     // Jared, 2026-09-21: "make all the footers full width by default." The band runs to the window's edge and the
@@ -303,6 +306,7 @@ export const SY_BLOCKS: SyBlock[] = [
   block('sign-off', 'Sign-off', '“See you around the club, -Switchyards” and the drawing. Every email closes with it.', (m) => m.signOff()),
   block('footer-a', 'Footer · Masthead', 'The default footer, centred like a dateline: seals between hairlines, name and address, the notice, then the © mark and the legal links. Closes with the red band.', (m) => m.footer('masthead')),
   block('footer-b', 'Footer · Ledger', 'Two columns: identity on the left, an index of links on the right, each on its own hairline. For a text-heavy email with links worth repeating.', (m) => m.footer('ledger')),
+  block('footer-b-social', 'Footer · Ledger, socials first', 'The ledger with its social row at the top of the index, above Unsubscribe, so the ways to follow come before the way to leave.', (m) => m.footer('ledger', { socialsFirst: true })),
   block('footer-c', 'Footer · Stub', 'One row, seals left and legal right, then one typed line. For short operational sends, with the lockup header.', (m) => m.footer('stub')),
   block('footer-letterhead', 'Footer · Letterhead', 'The letterhead’s foot, on cream: a hairline, the address and the notice, a hairline, the legal links in red and the © mark, then the rule.', (m) => m.footer('letterhead')),
 ];

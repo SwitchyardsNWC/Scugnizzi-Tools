@@ -6,7 +6,7 @@ import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import { DOC_KIND_NAMES, type DocKind } from '../model/docs.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
-import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
+import { servedIconBase, withLocalAssets, withoutMissingPictures, withServedIcons } from '../app/local-assets.ts';
 import { withPrints } from '../app/printed-preview.ts';
 import { EMAIL_PAGE } from './board-helpers.ts';
 import type { EmailItem, FrameItem, DocItem } from './files.ts';
@@ -58,7 +58,10 @@ export function sectionSpans(frame: HTMLIFrameElement): SectionSpan[] {
  */
 export function EmailBody({ item, assets, prints, live, width, height, onHeight, onSections }: { item: EmailItem; assets: AssetFile[]; prints: Record<string, { url: string }> | undefined; live: boolean; width: number; height: number; onHeight(px: number): void; onSections?(spans: SectionSpan[]): void }) {
   // A page with effects shows its print in its drawing's place, as on Template Studio's canvas (printed-preview.ts).
-  const html = useMemo(() => (item.html && live ? withLocalAssets(prints && item.template ? withPrints(item.html, item.template, prints) : item.html, assets) : ''), [item.html, item.template, prints, assets, live]);
+  const html = useMemo(
+    () => (item.html && live ? withServedIcons(withLocalAssets(prints && item.template ? withPrints(item.html, item.template, prints) : item.html, assets), servedIconBase(location.href)) : ''),
+    [item.html, item.template, prints, assets, live],
+  );
   if (item.error) return <div class="pb-card-note">{item.error}</div>;
   if (!live) return <div class="pb-card-skeleton" />;
   const scale = width / EMAIL_PAGE;

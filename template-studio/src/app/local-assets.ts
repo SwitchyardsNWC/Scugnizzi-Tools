@@ -1,4 +1,5 @@
 import type { AssetFile } from '../workspace/workspace.ts';
+import { SOCIAL_ICON_BASE, SOCIAL_ICON_PATH } from '../model/social-icons.ts';
 
 // Showing a local picture on the canvas without letting one into a template.
 //
@@ -52,4 +53,30 @@ export function localImages(html: string): string[] {
     if (src && !isHostedUrl(src)) out.add(src);
   }
   return [...out];
+}
+
+/**
+ * Where this copy of the site serves `email-assets/social/`.
+ *
+ * On the published site that is the same address the email carries, and the mapping below does nothing. Running
+ * locally it is this machine's copy, which is what lets the canvas show an icon that is committed but not yet on
+ * `main`. Found by the `template-studio/` segment every page of the tools sits under, rather than by counting
+ * `../`, so it holds from any page the preview is drawn on.
+ */
+export function servedIconBase(href: string): string {
+  const url = new URL(href);
+  const at = url.pathname.indexOf('/template-studio/');
+  const root = at === -1 ? '/' : url.pathname.slice(0, at + 1);
+  return `${url.origin}${root}${SOCIAL_ICON_PATH}`;
+}
+
+/**
+ * Points a compiled *preview* at this copy of the social icons, for the same reason `withLocalAssets` exists.
+ *
+ * The export is compiled separately and never passes through here, so what ships always names the published
+ * address. The one thing this cannot tell you is whether that address is live yet: an icon added today shows on
+ * this canvas at once and in a sent email only once it is on `main`.
+ */
+export function withServedIcons(html: string, base: string): string {
+  return base === SOCIAL_ICON_BASE || !html.includes(SOCIAL_ICON_BASE) ? html : html.split(SOCIAL_ICON_BASE).join(base);
 }

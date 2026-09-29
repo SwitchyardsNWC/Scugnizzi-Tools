@@ -642,6 +642,18 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
           { kind: 'url', path: 'block.linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/…', help: 'The same, for LinkedIn.' },
           {
             kind: 'toggle',
+            path: 'block.socialIcons',
+            label: 'Social icons instead of names',
+            help: 'Draws Instagram, YouTube and LinkedIn as icons. Off-white on a dark band, navy on a light one, picked from the footer’s text colour. Where pictures are off, as in Outlook on Windows, each shows its name instead.',
+          },
+          {
+            kind: 'toggle',
+            path: 'block.socialsFirst',
+            label: 'Socials above the legal links',
+            help: 'Ledger only: the social row at the top of the index, above Unsubscribe. The other layouts give the socials a line of their own and leave it where it is.',
+          },
+          {
+            kind: 'toggle',
             path: 'block.hidePreferences',
             label: 'Leave out Manage Preferences',
             help: 'On, the footer offers Unsubscribe alone. Unsubscribe itself is never optional: the law asks for it and HubSpot refuses to publish a template without one.',
