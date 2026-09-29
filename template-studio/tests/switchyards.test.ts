@@ -56,7 +56,7 @@ describe('the Switchyards email system', () => {
   });
 
   it('offers these blocks and no others, the letterhead as a header and a footer', () => {
-    expect(SY_BLOCKS.map((b) => b.id)).toEqual(['header-letterhead', 'logo', 'hero', 'callout', 'image-caption', 'stamp', 'sign-off', 'footer-a', 'footer-b', 'footer-c', 'footer-letterhead']);
+    expect(SY_BLOCKS.map((b) => b.id)).toEqual(['header-letterhead', 'logo', 'hero', 'callout', 'image-caption', 'stamp', 'sign-off', 'footer-a', 'footer-b', 'footer-b-social', 'footer-c', 'footer-letterhead']);
     const ds = switchyardsDesignSystem();
     const head = SY_BLOCKS.find((b) => b.id === 'header-letterhead')!.make(ds);
     const foot = SY_BLOCKS.find((b) => b.id === 'footer-letterhead')!.make(ds);

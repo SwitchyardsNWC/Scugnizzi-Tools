@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { compile } from '../compile/compile.ts';
 import { IMAGES_DIR, packageReadme, planPackage } from '../model/export-package.ts';
 import { simulateDark } from '../compile/dark.ts';
-import { withLocalAssets, withoutMissingPictures } from './local-assets.ts';
+import { servedIconBase, withLocalAssets, withoutMissingPictures, withServedIcons } from './local-assets.ts';
 import { withPrints } from './printed-preview.ts';
 import { freeformSvg } from '../compile/freeform.ts';
 import { addFrameBlock, followFrame, isCurrent, linkedBlocks, type FrameScope, readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, unlinkFrame } from '../model/freeform-link.ts';
@@ -526,7 +526,7 @@ export function App() {
     // compiled separately and never passes through here, and `local-image` refuses to let one
     // through Checks. See local-assets.ts.
     // A freeform page with effects shows its print in its drawing's place (printed-preview.ts).
-    const withAssets = withLocalAssets(withPrints(preview.html, shownTemplate, prints), allAssets);
+    const withAssets = withServedIcons(withLocalAssets(withPrints(preview.html, shownTemplate, prints), allAssets), servedIconBase(location.href));
     return dark ? simulateDark(withAssets) : withAssets;
   }, [preview, dark, allAssets, prints, shownTemplate]);
 

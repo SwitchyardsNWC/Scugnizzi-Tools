@@ -18,7 +18,8 @@ import { el, frag, print, raw, text, voidEl, when, type IRNode, type Test } from
 import { imgStyle, section } from '../layout.ts';
 import { fontDecl, typeOf } from '../../model/design-system.ts';
 import { gutterPhoneRule, type BuildContext } from '../context.ts';
-import type { Column, LegalBlock, Section } from '../../model/types.ts';
+import type { Column, LegalBlock, Section, SocialName } from '../../model/types.ts';
+import { iconToneFor, SOCIAL_ICON_HEIGHT, SOCIAL_ICONS, socialIconUrl } from '../../model/social-icons.ts';
 import { richContent } from './fields.ts';
 import { inline } from '../friendly.ts';
 
@@ -233,12 +234,13 @@ export function noteHtml(note: string, linkColor: string): string {
 }
 
 /** The social links a footer names, in a fixed order, only those set. */
-export function socialLinks(block: Pick<LegalBlock, 'instagram' | 'youtube' | 'linkedin'>): Array<{ name: string; href: string }> {
-  return [
+export function socialLinks(block: Pick<LegalBlock, 'instagram' | 'youtube' | 'linkedin'>): Array<{ name: SocialName; href: string }> {
+  const all: Array<{ name: SocialName; href: string }> = [
     { name: 'Instagram', href: block.instagram?.trim() ?? '' },
     { name: 'YouTube', href: block.youtube?.trim() ?? '' },
     { name: 'LinkedIn', href: block.linkedin?.trim() ?? '' },
-  ].filter((l) => l.href);
+  ];
+  return all.filter((l) => l.href);
 }
 
 type Attrs = Record<string, string | number | null>;
@@ -314,10 +316,33 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
   const markText = block.mark?.trim() ?? '';
   const mark = markText ? el('span', { style: small('bold', '; letter-spacing:1px; text-transform:uppercase') }, text(markText)) : null;
   const socials = socialLinks(block);
-  const socialLink = (l: { name: string; href: string }) => el('a', { href: l.href, class: 'sy-tap', target: '_blank', style: `color:${link}; text-decoration:none` }, text(l.name));
+  // Icons or names (block.socialIcons). The icon's tone comes from the footer's own text colour, so the letterhead's
+  // cream gets navy icons and every dark band gets off-white ones without anybody having to choose.
+  const tone = iconToneFor(ink);
+  const socialLink = (l: { name: SocialName; href: string }) =>
+    block.socialIcons
+      ? el(
+          'a',
+          { href: l.href, class: 'sy-tap', target: '_blank', style: 'text-decoration:none' },
+          voidEl('img', {
+            src: socialIconUrl(l.name, tone),
+            // The network's name, which is what shows where pictures are off — Outlook on Windows by default. Styled
+            // so that fallback is the footer's small type in its link colour, rather than a browser's default.
+            alt: l.name,
+            width: SOCIAL_ICONS[l.name].width,
+            height: SOCIAL_ICON_HEIGHT,
+            style: `display:inline-block; width:${SOCIAL_ICONS[l.name].width}px; height:${SOCIAL_ICON_HEIGHT}px; border:0; outline:none; text-decoration:none; vertical-align:middle; ${font} font-size:12px; color:${link}`,
+          }),
+        )
+      : el('a', { href: l.href, class: 'sy-tap', target: '_blank', style: `color:${link}; text-decoration:none` }, text(l.name));
   const dot = () => el('span', { class: 'sy-sep' }, raw(' &nbsp;&middot;&nbsp; '));
-  /** The socials on one line, dotted, in the footer's small type. */
-  const socialLine = socials.length ? el('span', { style: small('normal') }, socials.flatMap((l, i) => (i ? [dot(), socialLink(l)] : [socialLink(l)]))) : null;
+  // Between icons, a plain gap rather than the dot. `sy-sep` is hidden on phones so that names can stack one under
+  // the other, which is right for words and wrong for icons: a row of three pictures should stay a row.
+  const gap = () => el('span', null, raw('&nbsp;&nbsp;&nbsp;&nbsp;'));
+  /** The socials on one line in the footer's small type: dotted when they are names, spaced when they are icons. */
+  const socialLine = socials.length
+    ? el('span', { style: small('normal') }, socials.flatMap((l, i) => (i ? [block.socialIcons ? gap() : dot(), socialLink(l)] : [socialLink(l)])))
+    : null;
   const width = block.logoWidth || (layout === 'letterhead' ? 120 : 180);
   const picture = (display: 'block' | 'inline-block') =>
     block.logoSrc
@@ -376,11 +401,14 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
             'td',
             { class: 'sy-stack sy-ledger', width: '42%', valign: 'top', style: `padding:0 0 0 20px; border-left:${hair}` },
             tbl([
+              // Socials first when the footer asks (block.socialsFirst), so a reader meets the ways to follow before
+              // the ways to leave. Same rows either way; only the order moves.
+              ...(block.socialsFirst ? socialRows : []),
               tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, unsubscribe))]),
               ...(showPreferences
                 ? [tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, preferences))])]
                 : []),
-              ...socialRows,
+              ...(block.socialsFirst ? [] : socialRows),
               ...(mark ? [tr([el('td', { style: 'padding:12px 0 0' }, mark)])] : []),
             ]),
           ),
