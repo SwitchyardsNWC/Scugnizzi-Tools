@@ -61,6 +61,12 @@ export interface Field {
    * set it, so the flag stays explicit rather than assumed.
    */
   exported: boolean;
+  /**
+   * `no_wrapper=True`: a tag rendered in place prints its bare value, without the span HubSpot
+   * otherwise puts around it. Only meaningful on a field that is not exported — the one such field
+   * today is HubSpot's own `preview_text`, whose documented shape is exactly this.
+   */
+  noWrapper?: boolean;
 }
 
 /** A condition. Structured rather than a string so preview mode can evaluate it and the linter read it. */

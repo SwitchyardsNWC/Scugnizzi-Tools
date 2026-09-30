@@ -8,6 +8,8 @@
 // comments (MSO conditionals are load-bearing markup, not decoration), and collapsed text — and the
 // sequences are compared. Anything that changes what a client renders changes the sequence.
 
+import { PREVIEW_TEXT } from '../src/compile/preview-text.ts';
+
 export type Token = string;
 
 const VOID = new Set(['img', 'br', 'meta', 'hr', 'input', 'link', 'source', 'area', 'base', 'col']);
@@ -175,12 +177,17 @@ export interface DeclaredField {
  * Every field declaration in source order. This is the HubSpot-facing contract: the Contents panel
  * lists fields in exactly this order (learnings 1.4), with exactly these labels, and the team's
  * existing emails are bound to exactly these names (learnings 1.10).
+ *
+ * Less one: `preview_text`, which every template declares and HubSpot lists under Settings rather
+ * than Contents (learnings 1.17). It is HubSpot's field, not one of the template's, and
+ * `preview-text.test.ts` holds it to its own contract.
  */
 export function declaredFields(html: string): DeclaredField[] {
   const out: DeclaredField[] = [];
   const re = /\{%\s*(text|rich_text|module|linked_image|boolean)\s+"([^"]+)"([\s\S]*?)%\}/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
+    if (m[2] === PREVIEW_TEXT) continue;
     const body = m[3] ?? '';
     out.push({
       kind: m[1]!,

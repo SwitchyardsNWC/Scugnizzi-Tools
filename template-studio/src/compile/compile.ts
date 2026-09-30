@@ -19,6 +19,7 @@ import type { Block, Column, Row, Section } from '../model/types.ts';
 import { hasDndArea } from '../model/dnd.ts';
 import { defaultBranch, serialize, type Branch, type Mode } from './serialize.ts';
 import { esc } from './escape.ts';
+import { previewTextNode } from './preview-text.ts';
 import { DEFAULT_DESIGN_SYSTEM, type DesignSystem } from '../model/design-system.ts';
 import type { Template } from '../model/types.ts';
 
@@ -96,6 +97,12 @@ export function compile(template: Template, options: CompileOptions): CompileRes
   const branch = options.branch ?? defaultBranch(body);
   const rendered = serialize(body, { mode: options.mode, branch });
 
+  // HubSpot's preview text, ahead of the email. Serialized on its own because it belongs outside the
+  // wrapper the shell draws around the blocks, but part of the tree the checks read, so a block field
+  // that ever took its name is a duplicate the linter catches (learnings 1.17).
+  const preheaderNode = previewTextNode(template.previewText);
+  const preheader = serialize(preheaderNode, { mode: options.mode, branch });
+
   // Only the exported file gets HubSpot's drag-and-drop stylesheet tag: in a preview the HubL has
   // already been substituted away, and a literal `{{ dnd_area_stylesheet }}` in the canvas head
   // would be text nobody asked for.
@@ -114,6 +121,7 @@ export function compile(template: Template, options: CompileOptions): CompileRes
       bodyClass: className('bg', pageBackground),
       head,
       body: rendered,
+      preheader,
     });
 
   const withAnnotation =
@@ -123,7 +131,7 @@ export function compile(template: Template, options: CompileOptions): CompileRes
 
   return {
     html: withAnnotation,
-    tree: body,
+    tree: frag([preheaderNode, body]),
     registry,
     // TextEncoder rather than Buffer: the compiler runs in the editor as well as under Node, and
     // `Buffer` is a Node global. Both give UTF-8 byte length, which is what Gmail counts.

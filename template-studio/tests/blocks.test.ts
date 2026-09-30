@@ -147,7 +147,8 @@ describe('declaration order follows document order', () => {
 
     const html = compile(template, { mode: 'hubl', date: '2026-09-11' }).html;
     const declared = [...html.matchAll(/\{%\s*(?:text|rich_text|module)\s+"([a-z_0-9]+)"/g)].map((m) => m[1]);
-    expect(declared).toEqual(['eyebrow', 'hero', 'intro', 'primary_text', 'primary_link', 'kicker', 'outro', 'sign_off']);
+    // HubSpot's preview text leads every template, ahead of the email itself (learnings 1.17).
+    expect(declared).toEqual(['preview_text', 'eyebrow', 'hero', 'intro', 'primary_text', 'primary_link', 'kicker', 'outro', 'sign_off']);
     expect(declared.length).toBeGreaterThanOrEqual(8);
   });
 });

@@ -364,6 +364,53 @@ whole region rather than one string. The label is separate and free to reword.
    still in document order.
 3. What `{{ dnd_area_stylesheet }}` actually injects, and whether it fights the head CSS.
 
+### 1.17 Preview text is a field HubSpot knows by name
+
+**Documented, and unverified in this account.** Added 2026-09-30, when Jared asked for "a tool to use Hubspots
+'Preview text'". The preview text is the grey line an inbox shows after the subject. In the email editor it is
+**Settings › Preview text**, set per email — but a coded template only gets that setting if it declares HubSpot's
+field for it. HubSpot's knowledge base calls the tag "required" and gives it as:
+
+```html
+<!-- Preview text (text which appears right after subject in certain email clients) -->
+<div id="preview_text" style="display:none!important">{% text "preview_text" label="Preview Text <span class=help-text>This will be used as the preview text that displays in some email clients</span>", value="", no_wrapper=True %}
+</div>
+```
+
+Required in the sense that the setting depends on it, not in the sense of 1.8: v1 never declared it and HubSpot
+published every v1 template anyway. Three things differ from every other field in this file, and they are on
+purpose:
+
+- **Its name is HubSpot's.** The Settings tab looks for `preview_text`, so it is never renamed, and `ids.ts`
+  reserves it so a Text block labelled "Preview text" cannot take it.
+- **It renders in place, unwrapped, and is not exported** (1.3). Its value has to land inside the hidden div, and
+  exported it would print nothing there. It is the one declaration `hubspot-contract.test.ts` exempts from "every
+  field exports".
+- **It is not in the Contents panel**, by HubSpot's account, so the tests that hold a template's Contents fields to
+  v1's leave it out and `preview-text.test.ts` holds it to its own contract.
+
+What the compiler adds to HubSpot's shape, as vendor practice rather than anything seen here:
+
+- **The hidden div carries more than `display:none!important`.** Outlook on Windows ignores `display` on a div and
+  needs `mso-hide:all`; `max-height:0`, `overflow:hidden`, `opacity:0` and a 1px font cover a client that honours
+  neither. It is the first thing in `<body>`, outside the wrapper table, so it sits in no cell and moves no layout.
+- **A spacer follows written preview text.** A client with room left after a short preview fills it with the
+  email's first words — here, the tagline in quotes and then the headline. `&#847;&zwnj;&nbsp;` a hundred times
+  (about 300 invisible characters, 1.8KB) fills the room with nothing instead. Only when Studio's preview text is
+  written: with none, the first words *are* the preview, and a spacer would blank the line. The cost is one case:
+  a template shipped with a default that the team then clears in Settings gets a blank line.
+
+**Still to confirm in a send:**
+
+1. That Settings › Preview text appears for a template carrying the tag, and whether the field also shows in
+   Contents.
+2. That Studio's default (`value=`) arrives in a new email's Settings, and is copied per email once, as rich text
+   defaults are (1.7).
+3. What the received source looks like: whether HubSpot adds a preview element of its own beside ours (1.11 says
+   it injects nothing into a coded template, but that send had no preview text set), and whether the spacer
+   survives the send untouched.
+4. The line in Gmail, Apple Mail on an iPhone, and Outlook on Windows — with preview text and without.
+
 ## 2. Email client rendering
 
 ### 2.1 Structure
@@ -3029,3 +3076,28 @@ make an option to use icons for the social media instead of text." Then, with ne
   identical and it does nothing. The export never passes through it, which a test asserts.
 - **A test fails if a file goes missing.** Every network in every tone is checked against the folder on disk, so a
   rename breaks the build instead of blanking somebody's inbox.
+
+### 3.100 Preview text, and the inbox list
+
+*2026-09-30. Jared: "In template studio - create a tool to use Hubspots 'Preview text'."*
+
+- **The export is most of it.** Every template now declares HubSpot's `preview_text` in HubSpot's own shape
+  (1.17), so the team gets Settings › Preview text on every email built from one — including the v1 standard
+  email, whose other fields are untouched. A new field name orphans nothing, which is the one thing 1.10 guards.
+- **The box is in Files, beside Name in HubSpot.** It is copy, so not Design; and the right pane is the selection.
+  What it holds is a default: each new email starts with it and the team changes it per email in HubSpot, which
+  the hint under it says in those words rather than implying Studio sets the send.
+- **An empty box shows what the inbox will show instead.** Its placeholder is the email's first words, read the way
+  a client reads them (`firstWords`: no styles, no Outlook-only markup, nothing hidden, no alt text, entities
+  decoded, bold words and links joined without a space). The first draft put a space before every full stop after
+  a bold date, because tags became spaces; inline tags now become nothing.
+- **Where preview text is read is the list, so the inbox view got one.** The panel is 204px across and a phone row
+  is 329px of text, so a specimen beside the box would have been a picture of a row at two-thirds size — true line
+  breaks, unreadable type. The inbox view already had the right widths, and a back arrow that did nothing. It now
+  goes to the list: on a desktop, Gmail's one line with the snippet after a dash; on a phone, Mail's two lines at
+  its real 15pt sizes, cut off where it cuts off. "See it in the inbox" under the box opens it there.
+- **The neighbours are bars.** Invented senders and subjects would be copy somebody could mistake for a
+  suggestion, and the one row that matters reads as real precisely because nothing around it pretends to be.
+- **The list is drawn over the message, not instead of it.** The canvas stays mounted underneath, so opening the
+  email again costs nothing, and it opens at its top, which is where opening an email lands.
+

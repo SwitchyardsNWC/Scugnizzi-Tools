@@ -12,6 +12,7 @@ import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './raster
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
+import { firstWords, previewTextOf } from '../compile/preview-text.ts';
 import type { Branch } from '../compile/serialize.ts';
 import { assetKind, assetNameOf, isAssetKind, isPatternKind, isSyKind, patternIdOf, syIdOf, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
 import { placePicture, replacePicture, type PicturePlace } from '../model/place-picture.ts';
@@ -154,6 +155,8 @@ export function App() {
   const [showCode, setShowCode] = useState(false);
   // The email in the thing that reads it, rather than on the thing that reads it.
   const [inbox, setInbox] = useState(false);
+  /** Inside the inbox, the list rather than the open message: where the preview text is read. */
+  const [inboxList, setInboxList] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rasterising, setRasterising] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
@@ -531,6 +534,18 @@ export function App() {
   }, [preview, dark, allAssets, prints, shownTemplate]);
 
   const errors = findings.filter((f) => f.severity === 'error');
+
+  /**
+   * What an inbox shows after the subject. The preview text as it is being typed — it is one line of copy, and
+   * waiting a beat for the canvas to catch up would make the row lag the box — or, with none, the email's own first
+   * words as the canvas has them, which is what a client falls back to (learnings 1.17).
+   */
+  const emailFirstWords = useMemo(() => firstWords(preview.html), [preview]);
+  const snippet = previewTextOf(editor.template.previewText) || emailFirstWords;
+  const showInInbox = useCallback(() => {
+    setInbox(true);
+    setInboxList(true);
+  }, []);
 
   /**
    * Selecting anywhere brings the block into view on the canvas.
@@ -1933,6 +1948,8 @@ export function App() {
           onOpenFile={(file) => void open(file)}
           onOpenFolder={pickFolder}
           trash={trash}
+          firstWords={emailFirstWords}
+          onShowInInbox={showInInbox}
         />
 
         <main class="canvas">
@@ -1979,7 +1996,10 @@ export function App() {
                 aria-pressed={inbox}
                 aria-label="Inbox"
                 title="Inbox — the email inside a message, with a sender, a subject line and the gutter a mail app draws around every message. That gutter is the one thing no email can remove (learnings 2.4), and it is where the page background shows."
-                onClick={() => setInbox((v) => !v)}
+                onClick={() => {
+                  setInbox((v) => !v);
+                  setInboxList(false);
+                }}
               >
                 <InboxIcon />
               </button>
@@ -2119,7 +2139,7 @@ export function App() {
             {/* A message, not a page. See Inbox.tsx for which parts of it are true — and note
                 that the chrome *contains* the stage rather than sitting above it, because on a
                 desktop the message has to sit beside the folder list. */}
-            <Framed inbox={inbox} subject={editor.template.name} device={device}>
+            <Framed inbox={inbox} subject={editor.template.name} snippet={snippet} list={inboxList} onList={setInboxList} device={device}>
             {/* The gutter a mail app draws around every message lives on this, not on the frame:
                 the email fills its own body, and what shows either side of it is the client. */}
             <div class="stage">

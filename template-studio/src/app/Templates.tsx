@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 
+import { previewTextOf } from '../compile/preview-text.ts';
 import type { Template } from '../model/types.ts';
 import type { TemplateFile } from '../workspace/workspace.ts';
 import type { Editor } from './useEditor.ts';
@@ -54,6 +55,10 @@ export interface TemplatesProps {
   trash?: TrashHandle;
   onOpenFolder(): void;
   onChooseFiles(files: File[]): void;
+  /** The email's first words: what an inbox shows while the preview text is empty, so the box shows it too. */
+  firstWords: string;
+  /** Opens the inbox at the list, where the preview text is read. */
+  onShowInInbox(): void;
 }
 
 const when = (at: number) => {
@@ -64,7 +69,7 @@ const when = (at: number) => {
   return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onTidy, onOpenFolder, onChooseFiles, trash }: TemplatesProps) {
+export function Templates({ editor, files, label, writable, viewOnly, onAllowEditing, folders, starters, onNew, onDuplicate, onOpen, onDelete, onTidy, onOpenFolder, onChooseFiles, trash, firstWords, onShowInInbox }: TemplatesProps) {
   const [menu, setMenu] = useState(false);
 
   // New and Duplicate, first. The app used to open on the standard email and stop there, so the
@@ -147,6 +152,7 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
   // the selection now — asking a question about the whole template from a pane that otherwise
   // describes one block meant deselecting to answer it. Rendered whether or not a folder is open:
   // a template has a name before it has a file.
+  const previewCount = [...previewTextOf(editor.template.previewText)].length;
   const identity = (
     <section class="this-template">
       <div class="field wide" title="What this template is called here, and the name its file gets.">
@@ -164,6 +170,35 @@ export function Templates({ editor, files, label, writable, viewOnly, onAllowEdi
           value={editor.template.hubspotLabel}
           onInput={(e) => editor.set('template.hubspotLabel', (e.target as HTMLInputElement).value)}
         />
+      </div>
+      {/* The line after the subject (learnings 1.17). Here rather than in Design because it is copy, and beside the
+          HubSpot name because it is the other thing on this panel that HubSpot reads by name. While it is empty the
+          box shows what the inbox will show instead: the email's first words, as a placeholder. */}
+      <div
+        class="field wide preview-text"
+        title="The grey line an inbox shows after the subject. In HubSpot it is Settings › Preview text, set for each email; what you write here is the default every new email starts with. Written, the export also fills the rest of the line with blank space, so the email's own first words do not follow it in."
+      >
+        <label for="preview-text">
+          Preview text
+          {previewCount > 0 && <span class="muted">{previewCount}</span>}
+        </label>
+        <textarea
+          id="preview-text"
+          rows={3}
+          value={editor.template.previewText ?? ''}
+          placeholder={firstWords || 'The line an inbox shows after the subject.'}
+          onInput={(e) => editor.set('template.previewText', (e.target as HTMLTextAreaElement).value)}
+        />
+        <div class="preview-text-foot">
+          <span class="hint">
+            {previewCount > 0
+              ? 'Each new email starts with this. The team changes it in HubSpot, under Settings.'
+              : 'Empty, so the inbox shows the email’s first words, as above.'}
+          </span>
+          <button class="link" title="The inbox list: the row this email arrives as, with the preview text after the subject." onClick={onShowInInbox}>
+            See it in the inbox
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -86,6 +86,10 @@ export interface SidebarProps {
   /** Removes the hidden copies of a file's name; absent when the folder cannot be written. */
   onTidy?(file: TemplateFile): void;
   onOpenFolder(): void;
+  /** The email's first words, for the Preview text box to show while it is empty (learnings 1.17). */
+  firstWords: string;
+  /** Opens the inbox at the list, where the preview text is read. */
+  onShowInInbox(): void;
 }
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof RailBlocks; title: string }> = [
@@ -168,6 +172,8 @@ export function Sidebar(props: SidebarProps) {
             onOpenFolder={props.onOpenFolder}
             onChooseFiles={props.onChooseFiles}
             {...(props.trash ? { trash: props.trash } : {})}
+            firstWords={props.firstWords}
+            onShowInInbox={props.onShowInInbox}
           />
         )}
         {shown === 'layers' && <Outline editor={props.editor} patternOf={props.patternOf} also={props.also} />}

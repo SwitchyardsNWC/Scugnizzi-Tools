@@ -22,7 +22,9 @@ export function sequentialIds(seed = 0): () => string {
   };
 }
 
-const RESERVED = new Set(['widget_data', 'content', 'module', 'page', 'site_settings', 'subject']);
+// `preview_text` is HubSpot's, and every template declares it (compile/preview-text.ts): a Text block
+// labelled "Preview text" gets `preview_text_field` rather than a duplicate the upload would refuse.
+const RESERVED = new Set(['widget_data', 'content', 'module', 'page', 'site_settings', 'subject', 'preview_text']);
 
 /** Slug-safe, lowercase, never empty, never reserved (learnings 1.10). */
 export function slug(input: string): string {
