@@ -18,6 +18,7 @@ import { bandedPreset, DEFAULT_DESIGN_SYSTEM, firstPreset, theme as themeTokens,
 import { fieldName, bodyFieldName } from './ids.ts';
 import { newDndArea } from './dnd.ts';
 import { MARKS } from './marks.ts';
+import { footerTypeName, footerTypeOf } from './footer-types.ts';
 import type { Align, Block, BlockType, Column, Row, Section } from './types.ts';
 
 export type ControlKind =
@@ -49,7 +50,9 @@ export type ControlKind =
   /** The drag and drop area's default content: its sections, columns and HubSpot modules. */
   | 'dnd'
   /** A background preset, listed from the template's own design system rather than from a fixed set. */
-  | 'preset';
+  | 'preset'
+  /** A footer's type: choosing one rebuilds the footer, rules and all (model/footer.ts). */
+  | 'footer-type';
 
 export interface Control {
   kind: ControlKind;
@@ -606,9 +609,9 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
 
   legal: {
     type: 'legal',
-    name: 'Legal footer',
+    name: 'Footer',
     summary: 'Company, address and unsubscribe. HubSpot will not publish a template without it.',
-    outline: () => 'Legal footer',
+    outline: (block) => (block.type === 'legal' ? `Footer · ${footerTypeName(footerTypeOf(block))}` : 'Footer'),
     groups: [
       {
         name: 'Content',
@@ -616,17 +619,10 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
         help: 'Company name, address and both unsubscribe links come from HubSpot’s own settings.',
         controls: [
           {
-            kind: 'select',
+            kind: 'footer-type',
             path: 'block.layout',
-            label: 'Layout',
-            options: [
-              ['classic', 'Classic'],
-              ['masthead', 'Masthead'],
-              ['ledger', 'Ledger'],
-              ['stub', 'Stub'],
-              ['letterhead', 'Letterhead'],
-            ],
-            help: 'Classic is the footer as it always was. The other four are the Switchyards email system’s: a centred masthead, a two-column ledger, a one-row stub for short sends, a cream letterhead for a note from a person. Same parts in every one; only the arrangement changes.',
+            label: 'Type',
+            help: 'The same parts in every one, arranged differently. Choosing a type rebuilds the footer — its band and the red rules either side — and keeps the social links, the switches and any words or picture you changed.',
           },
           { kind: 'url', path: 'block.logoSrc', label: 'Logo URL', placeholder: 'https://…', help: 'The picture at the top of the footer: the badge row on navy, the lockup on a letterhead.' },
           { kind: 'number', path: 'block.logoWidth', label: 'Logo width', min: 40, max: 400, suffix: 'px' },

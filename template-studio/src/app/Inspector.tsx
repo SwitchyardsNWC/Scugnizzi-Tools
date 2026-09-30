@@ -4,7 +4,8 @@ import { CATALOG, GROUP_GROUPS, type Control, type Group } from '../model/catalo
 import { COLUMN_BLOCKS } from '../compile/blocks/index.ts';
 import { colorOf, type ColorRef } from '../model/design-system.ts';
 import type { BlockType } from '../model/types.ts';
-import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans, hubspotFields } from '../model/edit.ts';
+import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans, hubspotFields, siteOf } from '../model/edit.ts';
+import { FOOTER_TYPES, footerTypeOf } from '../model/footer-types.ts';
 import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
@@ -252,6 +253,7 @@ function ControlField({
   if (control.kind === 'columns') return <ColumnsField editor={editor} />;
   if (control.kind === 'preset') return <PresetField control={control} editor={editor} />;
   if (control.kind === 'variant') return <VariantField control={control} editor={editor} />;
+  if (control.kind === 'footer-type') return <FooterTypeField control={control} editor={editor} />;
   if (control.kind === 'border') return <BorderField control={control} editor={editor} />;
   // A palette colour by name — the same slot the design panel uses, so the list cannot go stale
   // (learnings 3.48). `zero` names what an empty reference falls back to.
@@ -1527,6 +1529,36 @@ function setColumnFlag(editor: Editor, columnId: string, hideOnPhone: boolean) {
 
 /** Everything the team will see in HubSpot, in the order the Contents panel lists it. */
 /** The button variants, read from the design system so the list cannot go stale. */
+/**
+ * A footer's type, as the five of them side by side rather than a select: it is the first decision about a footer
+ * and the one it was dropped to make. Each says what it is for on hover. Choosing one rebuilds the footer.
+ */
+function FooterTypeField({ control, editor }: { control: Control; editor: Editor }) {
+  const { selection } = editor;
+  const block = selection.kind === 'block' ? siteOf(editor.template, selection.blockId)?.column.blocks.find((b) => b.id === selection.blockId) : undefined;
+  if (block?.type !== 'legal' || selection.kind !== 'block') return null;
+  const current = footerTypeOf(block);
+  return (
+    <div class="field wide" title={control.help}>
+      <label>{control.label}</label>
+      <div class="footer-types" role="radiogroup" aria-label="Footer type">
+        {FOOTER_TYPES.map((t) => (
+          <button
+            key={t.id}
+            class={`footer-type ${t.id === current ? 'on' : ''}`}
+            role="radio"
+            aria-checked={t.id === current}
+            title={t.summary}
+            onClick={() => editor.footerType(selection.blockId, t.id)}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function VariantField({ control, editor }: { control: Control; editor: Editor }) {
   const ds = designSystemOf(editor.template);
   const value = String(readValue(editor.template, editor.selection, control.path) ?? '');

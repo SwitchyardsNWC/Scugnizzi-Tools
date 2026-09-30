@@ -222,10 +222,8 @@ describe('the Manage Preferences link', () => {
  */
 describe('the ledger footer, as the system builds it', () => {
   it('opens on the ledger words, not the printing notice', async () => {
-    const { SY_BLOCKS, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
-    const item = SY_BLOCKS.find((b) => b.id === 'footer-b');
-    expect(item).toBeTruthy();
-    const sections = item!.make(DEFAULT_DESIGN_SYSTEM);
+    const { footerSections, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
+    const sections = footerSections('ledger', DEFAULT_DESIGN_SYSTEM);
     const block = sections.flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((b) => b.type === 'legal');
     expect(block).toBeTruthy();
     const legal = block as Extract<Block, { type: 'legal' }>;
@@ -238,21 +236,16 @@ describe('the ledger footer, as the system builds it', () => {
   });
 
   it('leaves the other footers on the printing notice, and gives them all the same mark', async () => {
-    const { SY_BLOCKS, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
+    const { footerSections, SY_COPY, SY_SOCIAL } = await import('../src/model/switchyards.ts');
     // The ledger's mark is the system's too (Jared: "delete ledgermarks and use the default one"), so the only
     // thing that sets the ledger apart from the rest is its note.
-    const ledgerItem = SY_BLOCKS.find((b) => b.id === 'footer-b')!;
-    const ledgerMark = (ledgerItem
-      .make(DEFAULT_DESIGN_SYSTEM)
+    const ledgerMark = (footerSections('ledger', DEFAULT_DESIGN_SYSTEM)
       .flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks)))
       .find((b) => b.type === 'legal') as Extract<Block, { type: 'legal' }>).mark;
-    const ids = ['footer-a', 'footer-c', 'footer-letterhead'];
+    const ids = ['masthead', 'stub', 'letterhead'] as const;
     let checked = 0;
     for (const id of ids) {
-      const item = SY_BLOCKS.find((b) => b.id === id);
-      expect(item, id).toBeTruthy();
-      const legal = item!
-        .make(DEFAULT_DESIGN_SYSTEM)
+      const legal = footerSections(id, DEFAULT_DESIGN_SYSTEM)
         .flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks)))
         .find((b) => b.type === 'legal') as Extract<Block, { type: 'legal' }> | undefined;
       expect(legal, id).toBeTruthy();

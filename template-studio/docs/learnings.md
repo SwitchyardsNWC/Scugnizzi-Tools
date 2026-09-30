@@ -3101,3 +3101,29 @@ make an option to use icons for the social media instead of text." Then, with ne
 - **The list is drawn over the message, not instead of it.** The canvas stays mounted underneath, so opening the
   email again costs nothing, and it opens at its top, which is where opening an email lands.
 
+
+### 3.101 One footer, and a palette that fits its pane
+
+*2026-09-30. Jared, with a screenshot of Blocks: "the blocks panel is looking bad. trim the fat. make just one footer
+block, you drop than choose the type. kill the stamp block."*
+
+- **Six footer cards were one block.** Five Switchyards footers and the plain Legal footer under Fixed were all the
+  legal block in five layouts. Now there is one Footer card, it lands as the masthead, and its type is the first
+  thing it asks: the menu on its name opens by itself the moment it is on the canvas, and Type heads the inspector.
+  The slash menu's footer takes the same path, because two ways to add a footer should not add two footers.
+- **A type is more than `layout`, which is why the old select was not enough.** The inspector already had a Layout
+  select, and it changed the arrangement and nothing else: the masthead's red rules stayed around a letterhead, the
+  letterhead kept the navy band, the ledger kept the printing notice. Choosing a type now rebuilds the footer from
+  that type (`model/footer.ts`) — the band and the rules either side that are its own — and carries what somebody
+  set: the social addresses, the switches, and any words or picture that are not the old type's defaults. The
+  note's HubSpot field keeps its name (1.10).
+- **The footer's rules are found by what they are, not remembered.** A rule is a section holding one stripes block
+  and nothing else, running to the window's edge, directly above or below the band. The header's rule stops at the
+  email's width, so it is never taken. A narrowed band carries over narrowed; its rules keep running to the edge,
+  which is also what lets the next change of type find them.
+- **"Ledger, socials first" was a switch dressed as a block.** The ledger already had *Socials above the legal
+  links*; the card only turned it on.
+- **The overflow was a grid track.** `.palette-list` was a grid with no column set, so the track took the widest
+  name's full width and "Footer · Ledger, socials first" pushed the whole Switchyards group past the pane with the
+  grips cut off. `minmax(0, 1fr)`, which `.list` had all along.
+- **The Stamp went**, as asked: a 240px picture the team picks, which the Image block already is.

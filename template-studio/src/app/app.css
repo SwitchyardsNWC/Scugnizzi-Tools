@@ -1036,7 +1036,9 @@ button.fig-pill:active { transform: scale(0.96); }
   color: var(--muted); margin: 0 0 7px; font-weight: 600;
 }
 .palette-group .hint { margin-bottom: 7px; }
-.palette-list { display: grid; gap: 5px; }
+/* One column that never outgrows the pane. Left as `auto`, the track took the widest name's full width, and one
+   long one pushed its whole group past the pane's edge with the grips cut off. */
+.palette-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
 
 .block-card {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -1493,6 +1495,15 @@ button.phone-row { cursor: pointer; }
 /* --- icon buttons in the tool row ------------------------------------------------------------------
  * The two device glyphs and the inbox switch. Square rather than the pill the named buttons use:
  * a glyph in a pill reads as a button with a missing label. */
+
+/* A footer's five types, side by side: the first decision about a footer and the one it was dropped to make. */
+.footer-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.footer-type {
+  padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.footer-type:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.footer-type.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--accent); font-weight: 600; }
 
 .icon-btn { padding: 0; width: 30px; display: grid; place-items: center; }
 .icon-btn .icon { opacity: 0.9; }

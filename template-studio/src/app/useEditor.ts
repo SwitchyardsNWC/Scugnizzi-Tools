@@ -26,8 +26,9 @@ import {
   type Selection,
 } from '../model/edit.ts';
 import { serializeDesignSystem, serializeTemplate, templateFileName } from '../model/serialize.ts';
+import { footerTypeName, setFooterType } from '../model/footer.ts';
 import type { DesignSystem } from '../model/design-system.ts';
-import type { BlockType, Template } from '../model/types.ts';
+import type { BlockType, LegalLayout, Template } from '../model/types.ts';
 import type { TemplateFile, Workspace } from '../workspace/workspace.ts';
 
 // Document state, undo, and saving.
@@ -81,6 +82,8 @@ export interface Editor {
   resizeColumns(rowId: string, spans: number[]): void;
   /** Turns a block into another kind of block, in place, keeping what both kinds have. */
   convert(blockId: string, type: BlockType): void;
+  /** Rebuilds the footer holding this block as another type, rules and all (model/footer.ts), and selects it. */
+  footerType(blockId: string, type: LegalLayout): void;
   /** Moves a block to another column of the row it is in. */
   moveToColumn(blockId: string, index: number): void;
   /** Adds a block to one column, at `index` or at the end, and selects it. */
@@ -318,6 +321,15 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
   const convert = useCallback(
     (blockId: string, type: BlockType) => {
       commit('Change type', convertBlock(template, blockId, type));
+    },
+    [template, commit],
+  );
+
+  const footerType = useCallback(
+    (blockId: string, type: LegalLayout) => {
+      const next = setFooterType(template, blockId, type);
+      if (next.template === template) return;
+      commit(`Footer: ${footerTypeName(type)}`, next.template, { select: { kind: 'block', sectionId: next.sectionId, blockId: next.blockId } });
     },
     [template, commit],
   );
@@ -610,6 +622,7 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       setColumns,
       resizeColumns,
       convert,
+      footerType,
       moveToColumn,
       addToColumn,
       group,
@@ -641,6 +654,6 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       conflictAt,
       dismissConflict: () => setConflictAt(null),
     }),
-    [template, selection, set, setAt, commit, undo, redo, canUndo, canRedo, past, setColumns, resizeColumns, convert, moveToColumn, addToColumn, group, ungroup, removeOne, removeMany, duplicateOne, nudge, dropInto, dropAsSection, addAt, addColumns, move, moveTo, duplicate, remove, add, load, create, adoptFile, save, saveError, write, file, conflictAt],
+    [template, selection, set, setAt, commit, undo, redo, canUndo, canRedo, past, setColumns, resizeColumns, convert, footerType, moveToColumn, addToColumn, group, ungroup, removeOne, removeMany, duplicateOne, nudge, dropInto, dropAsSection, addAt, addColumns, move, moveTo, duplicate, remove, add, load, create, adoptFile, save, saveError, write, file, conflictAt],
   );
 }
