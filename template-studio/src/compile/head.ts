@@ -155,6 +155,12 @@ export interface ShellOptions {
   bodyClass: string;
   head: string;
   body: string;
+  /**
+   * HubSpot's preview text, already serialized: the first thing in the body, ahead of everything a
+   * client could otherwise take for the preview (learnings 1.17). Outside the wrapper table, so it
+   * sits in no cell and moves no layout.
+   */
+  preheader?: string;
 }
 
 /** The full document. `<v:background>` is the only way Outlook paints a page background. */
@@ -196,7 +202,7 @@ function frame(body: string, ds: DesignSystem): string {
   );
 }
 
-export function emailDocument({ ds, title, pageBackground, bodyClass, head, body }: ShellOptions): string {
+export function emailDocument({ ds, title, pageBackground, bodyClass, head, body, preheader }: ShellOptions): string {
   const font = fontDecl(ds);
   const size = typeOf(ds, 'body').size;
   // The document's default text colour, from the preset rather than from a palette key.
@@ -215,6 +221,7 @@ export function emailDocument({ ds, title, pageBackground, bodyClass, head, body
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
     `${head}\n</head>\n` +
     `<body id="hs_body" class="${bodyClass}" bgcolor="${pageBackground}" style="margin:0 !important; padding:0 !important; background-color:${pageBackground}; ${font} font-size:${size}px; color:${ink}; word-break:break-word">\n` +
+    (preheader ? `${preheader}\n` : '') +
     `<!--[if gte mso 9]><v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t"><v:fill type="tile" size="100%,100%" color="${pageBackground}"/></v:background><![endif]-->\n` +
     `<div class="hse-body-background" lang="en" style="background-color:${pageBackground}" bgcolor="${pageBackground}">\n` +
     `<table role="presentation" class="hse-body-wrapper-table" cellpadding="0" cellspacing="0" style="margin:0; padding:0; width:100% !important; min-width:320px !important; height:100% !important; background-color:${pageBackground}" width="100%" height="100%" bgcolor="${pageBackground}"><tbody><tr>\n` +

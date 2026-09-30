@@ -54,7 +54,8 @@ describe('the fields the team will meet', () => {
     // put its own section, background or conditional around it (learnings 1.3). Counted against the
     // declarations rather than parsed per field, because one missing flag is one silently
     // unwrappable block.
-    const declarations = (out.html.match(/\{%\s*(?:text|rich_text|module)\s+"/g) ?? []).length;
+    // Less HubSpot's own `preview_text`, which HubSpot documents rendering in place (learnings 1.17).
+    const declarations = (out.html.match(/\{%\s*(?:text|rich_text|module)\s+"(?!preview_text")/g) ?? []).length;
     const exports = (out.html.match(/export_to_template_context=True/g) ?? []).length;
     expect(declarations).toBeGreaterThan(6);
     expect(exports).toBe(declarations);

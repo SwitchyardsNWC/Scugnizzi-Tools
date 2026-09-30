@@ -64,6 +64,13 @@ export interface Template {
   /** Emit the three dark-mode layers (learnings 2.5). */
   forceLight: boolean;
   /**
+   * The line an inbox shows after the subject. Exported as the default of HubSpot's own
+   * `preview_text` field, which the team edits per email in Settings › Preview text (learnings 1.17).
+   * Absent or blank means no default, and the inbox shows the email's first words instead — so a
+   * missing field is a valid document rather than a migration.
+   */
+  previewText?: string;
+  /**
    * The design system this template compiles against. Absent means the defaults, which is what
    * every document written before the design panel existed says — so a missing field is a valid
    * document rather than a migration.

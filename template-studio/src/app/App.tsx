@@ -12,6 +12,7 @@ import { fileNameFor, foreignImages, rasterise, textOf, xhtmlOf } from './raster
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { branchVariables, defaultsOf } from '../compile/branches.ts';
 import { lint, type Finding } from '../compile/lint.ts';
+import { firstWords, previewTextOf } from '../compile/preview-text.ts';
 import type { Branch } from '../compile/serialize.ts';
 import { assetKind, assetNameOf, isAssetKind, isPatternKind, isSyKind, patternIdOf, syIdOf, type DragKind, type PaletteKind, type PatternCard } from './Palette.tsx';
 import { placePicture, replacePicture, type PicturePlace } from '../model/place-picture.ts';
@@ -70,7 +71,9 @@ import { blankTemplate } from '../model/starters.ts';
 import { SY_BLOCKS } from '../model/switchyards.ts';
 import { cloneSection as copySection, designSystemOf as systemOf, freshIds as idsFor, takenFieldNames as fieldsTaken } from '../model/edit.ts';
 import { ADDABLE, CATALOG, SINGLETON } from '../model/catalog.ts';
-import type { Block, BlockType } from '../model/types.ts';
+import type { Block, BlockType, Section, Template } from '../model/types.ts';
+import type { Selection } from '../model/edit.ts';
+import { FOOTER_TYPES, footerTypeName, footerTypeOf } from '../model/footer-types.ts';
 import type { Starter } from './Templates.tsx';
 import type { PatternInfo } from './Inspector.tsx';
 import { BranchIcon, CopyIcon, DesktopIcon, EyeIcon, glyphFor, InboxIcon, MoonIcon, PhoneIcon, TickIcon } from './icons.tsx';
@@ -86,6 +89,34 @@ import { useDraftKeeping } from './useDraft.ts';
 
 /** Wide enough to show the page background either side of the 600px column, which is a setting. */
 const WIDTHS: Record<Device, number> = { desktop: 680, phone: 375 };
+
+/**
+ * One of the Switchyards email system's blocks (model/switchyards.ts), placed as its sections at a position: made on
+ * this template's design system, then cloned in so ids and field names collide with nothing, the way a pattern is.
+ *
+ * What it selects is the block the placement is about: a footer's own block rather than the red rule it opens on,
+ * so the footer is what the bar and the inspector are showing when it lands.
+ */
+function placeSy(t: Template, id: string, index: number | null): { label: string; template: Template; select: Selection | null; footer: string | null } | null {
+  const block = SY_BLOCKS.find((b) => b.id === id);
+  if (!block) return null;
+  const nextId = idsFor(t);
+  const taken = fieldsTaken(t);
+  const made = block.make(systemOf(t)).map((s) => copySection(s, nextId, taken));
+  const at = index ?? t.sections.length;
+  const sections = [...t.sections];
+  sections.splice(Math.max(0, Math.min(sections.length, at)), 0, ...made);
+  const lone = (s: Section) => (s.rows[0] && s.rows[0].columns.length === 1 ? s.rows[0].columns[0]!.blocks[0] : undefined);
+  const footer = made.find((s) => lone(s)?.type === 'legal');
+  const first = footer ?? made[0];
+  const firstBlock = first ? lone(first) : undefined;
+  return {
+    label: `Place ${block.name}`,
+    template: { ...t, sections },
+    select: first ? (firstBlock ? { kind: 'block', sectionId: first.id, blockId: firstBlock.id } : { kind: 'section', sectionId: first.id }) : null,
+    footer: footer && firstBlock ? firstBlock.id : null,
+  };
+}
 
 /**
  * How long after the last keystroke the canvas catches up.
@@ -154,6 +185,8 @@ export function App() {
   const [showCode, setShowCode] = useState(false);
   // The email in the thing that reads it, rather than on the thing that reads it.
   const [inbox, setInbox] = useState(false);
+  /** Inside the inbox, the list rather than the open message: where the preview text is read. */
+  const [inboxList, setInboxList] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rasterising, setRasterising] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
@@ -177,6 +210,8 @@ export function App() {
   }, []);
   /** A block to open for editing as soon as the canvas shows it — one the slash menu just added. */
   const [autoEdit, setAutoEdit] = useState<string | null>(null);
+  /** A footer just placed, whose types open on its name on the canvas as soon as it is there. */
+  const [autoMenu, setAutoMenu] = useState<string | null>(null);
   /** Set by an add from the slash menu, read by the effect that turns the resulting selection into `autoEdit`. */
   const wantEdit = useRef(false);
   const previewApi = useRef<PreviewApi | null>(null);
@@ -533,6 +568,18 @@ export function App() {
   const errors = findings.filter((f) => f.severity === 'error');
 
   /**
+   * What an inbox shows after the subject. The preview text as it is being typed — it is one line of copy, and
+   * waiting a beat for the canvas to catch up would make the row lag the box — or, with none, the email's own first
+   * words as the canvas has them, which is what a client falls back to (learnings 1.17).
+   */
+  const emailFirstWords = useMemo(() => firstWords(preview.html), [preview]);
+  const snippet = previewTextOf(editor.template.previewText) || emailFirstWords;
+  const showInInbox = useCallback(() => {
+    setInbox(true);
+    setInboxList(true);
+  }, []);
+
+  /**
    * Selecting anywhere brings the block into view on the canvas.
    *
    * After the canvas has caught up, not before: the preview lags the document by a beat so it does
@@ -621,7 +668,9 @@ export function App() {
     return {
       id: block.id,
       type: block.type,
-      label: CATALOG[block.type].name,
+      // A footer says which one it is, since that is the thing its name on the bar lets you change.
+      label: block.type === 'legal' ? `Footer · ${footerTypeName(footerTypeOf(block))}` : CATALOG[block.type].name,
+      footer: block.type === 'legal' ? footerTypeOf(block) : null,
       canUp: site.index > 0,
       canDown: site.index < site.column.blocks.length - 1,
     };
@@ -629,6 +678,21 @@ export function App() {
 
   /** What a block on the canvas may be turned into: the kinds that share a cell, by name. */
   const convertible = useMemo(() => STACKABLE.map((kind) => ({ kind, name: CATALOG[kind].name, summary: CATALOG[kind].summary })), []);
+
+  /** A selected footer's name on the canvas offers its types, not "Turn into" (model/footer.ts). */
+  const footerId = picked?.footer ? picked.id : null;
+  const footerNow = picked?.footer ?? null;
+  const footerVariants = useMemo(
+    () =>
+      footerId && footerNow
+        ? {
+            title: 'Footer type',
+            options: FOOTER_TYPES.map((t) => ({ id: t.id, name: t.name, summary: t.summary, current: t.id === footerNow })),
+            onPick: (id: string) => editor.footerType(footerId, id as (typeof FOOTER_TYPES)[number]['id']),
+          }
+        : null,
+    [footerId, footerNow, editor],
+  );
 
   // --- the slash menu's add-a-block half -----------------------------------------------------------
   //
@@ -662,6 +726,15 @@ export function App() {
       }
       const type = kind as BlockType;
       noteRecent(type);
+      // The footer is the one footer the palette offers, landing as the masthead with its types open, not the bare
+      // block: two ways to add a footer should not add two different footers.
+      if (type === 'legal') {
+        const placed = placeSy(editor.template, 'footer', sectionIndex + 1);
+        if (!placed) return;
+        editor.commit(placed.label, placed.template, placed.select ? { select: placed.select } : {});
+        if (placed.footer) setAutoMenu(placed.footer);
+        return;
+      }
       // A heading, a paragraph or a button added from the menu opens for typing straight away —
       // a menu that adds a heading and then waits for a double-click stops one step short.
       wantEdit.current = Boolean(TEXT_TARGETS[type]);
@@ -868,23 +941,12 @@ export function App() {
    */
   const placeSyBlockAt = useCallback(
     (id: string, index: number | null) => {
-      const block = SY_BLOCKS.find((b) => b.id === id);
-      if (!block) return;
-      const t = editor.template;
-      const nextId = idsFor(t);
-      const taken = fieldsTaken(t);
-      const made = block.make(systemOf(t)).map((s) => copySection(s, nextId, taken));
-      const at = index ?? t.sections.length;
-      const sections = [...t.sections];
-      sections.splice(Math.max(0, Math.min(sections.length, at)), 0, ...made);
-      const first = made[0];
-      const row = first?.rows[0];
-      const firstBlock = row && row.columns.length === 1 ? row.columns[0]!.blocks[0] : undefined;
-      editor.commit(
-        `Place ${block.name}`,
-        { ...t, sections },
-        first ? { select: firstBlock ? { kind: 'block', sectionId: first.id, blockId: firstBlock.id } : { kind: 'section', sectionId: first.id } } : {},
-      );
+      const placed = placeSy(editor.template, id, index);
+      if (!placed) return;
+      editor.commit(placed.label, placed.template, placed.select ? { select: placed.select } : {});
+      // A footer lands as the masthead with its types open on its name: dropping one and choosing what it is are
+      // one gesture (model/footer.ts).
+      if (placed.footer) setAutoMenu(placed.footer);
     },
     [editor],
   );
@@ -1933,6 +1995,8 @@ export function App() {
           onOpenFile={(file) => void open(file)}
           onOpenFolder={pickFolder}
           trash={trash}
+          firstWords={emailFirstWords}
+          onShowInInbox={showInInbox}
         />
 
         <main class="canvas">
@@ -1979,7 +2043,10 @@ export function App() {
                 aria-pressed={inbox}
                 aria-label="Inbox"
                 title="Inbox — the email inside a message, with a sender, a subject line and the gutter a mail app draws around every message. That gutter is the one thing no email can remove (learnings 2.4), and it is where the page background shows."
-                onClick={() => setInbox((v) => !v)}
+                onClick={() => {
+                  setInbox((v) => !v);
+                  setInboxList(false);
+                }}
               >
                 <InboxIcon />
               </button>
@@ -2119,7 +2186,7 @@ export function App() {
             {/* A message, not a page. See Inbox.tsx for which parts of it are true — and note
                 that the chrome *contains* the stage rather than sitting above it, because on a
                 desktop the message has to sit beside the folder list. */}
-            <Framed inbox={inbox} subject={editor.template.name} device={device}>
+            <Framed inbox={inbox} subject={editor.template.name} snippet={snippet} list={inboxList} onList={setInboxList} device={device}>
             {/* The gutter a mail app draws around every message lives on this, not on the frame:
                 the email fills its own body, and what shows either side of it is the client. */}
             <div class="stage">
@@ -2169,6 +2236,9 @@ export function App() {
               api={previewApi}
               autoEdit={autoEdit}
               onAutoEdited={() => setAutoEdit(null)}
+              variants={footerVariants}
+              autoMenu={autoMenu}
+              onAutoMenu={() => setAutoMenu(null)}
               spacing={spacingFor}
               padHot={padSpec}
               {...(picked

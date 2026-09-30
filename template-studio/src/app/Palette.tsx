@@ -77,10 +77,12 @@ const GROUPS: Array<{ name: string; types: PaletteKind[]; help?: string }> = [
   },
   { name: 'Content', types: ['heading', 'richtext', 'image', 'brand', 'button', 'freeform'] },
   { name: 'Layout', types: ['columns', 'divider', 'stripes', 'spacer', 'dndarea'] },
+  // The footer is not here: it is the one Footer card in Switchyards, which lands as the masthead and is then
+  // given its type — Classic among them (model/footer.ts).
   {
     name: 'Fixed',
-    types: ['topbar', 'legal'],
-    help: 'Full-bleed furniture. These draw their own band, so they cannot sit in a column.',
+    types: ['topbar'],
+    help: 'Full-bleed furniture. It draws its own band, so it cannot sit in a column.',
   },
 ];
 

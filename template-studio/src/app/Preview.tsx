@@ -170,6 +170,17 @@ export interface PreviewProps {
    */
   autoEdit?: string | null;
   onAutoEdited?(): void;
+  /**
+   * What the selected block comes in, when its name on the bar should offer that rather than "Turn into": a
+   * footer's types. Picking one hands its id back.
+   */
+  variants?: { title: string; options: Array<{ id: string; name: string; summary: string; current: boolean }>; onPick(id: string): void } | null;
+  /**
+   * A block whose variants menu should open the moment its bar is on the canvas — the footer just dropped, so
+   * dropping it and choosing its type are one gesture. Cleared through `onAutoMenu` once it has opened.
+   */
+  autoMenu?: string | null;
+  onAutoMenu?(): void;
 }
 
 export interface PreviewApi {
@@ -373,6 +384,9 @@ export function Preview({
   api,
   autoEdit,
   onAutoEdited,
+  variants,
+  autoMenu,
+  onAutoMenu,
   alsoSelected,
   onClipboard,
   spacing,
@@ -543,6 +557,20 @@ export function Preview({
     if (!onConvert || !convertible?.length) return;
     const items = convertible.filter((k) => k.kind !== selectedKind).map((k) => blockItem(k.kind, k.name, k.summary));
     setTypeMenu({ items, index: 0, top, left: Math.max(1, Math.min(left, width - 276)), title: 'Turn into', pick: (item) => item.kind && onConvert(blockId, item.kind as BlockType) });
+  };
+
+  /** The variants menu on a block's name: what this block comes in, the current one ticked. */
+  const openVariants = (top: number, left: number) => {
+    if (!variants?.options.length) return;
+    const items: SlashItem[] = variants.options.map((o) => ({ id: `variant-${o.id}`, label: o.name, group: 'turn', current: o.current, keywords: [], hint: o.summary, kind: o.id }));
+    setTypeMenu({
+      items,
+      index: Math.max(0, variants.options.findIndex((o) => o.current)),
+      top,
+      left: Math.max(1, Math.min(left, width - 276)),
+      title: variants.title,
+      pick: (item) => item.kind && variants.onPick(item.kind),
+    });
   };
 
   /** The type menu on a row's name: how many columns, and for a group, back to sections. */
@@ -1887,6 +1915,10 @@ export function Preview({
   // dependency list holds only what it responds to, and a keystroke elsewhere in the app does not re-resolve a drop.
   const live = useRef({ probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited });
   live.current = { probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited };
+  const openVariantsRef = useRef(openVariants);
+  openVariantsRef.current = openVariants;
+  const autoMenuRef = useRef(onAutoMenu);
+  autoMenuRef.current = onAutoMenu;
   const probeX = probe?.x ?? null;
   const probeY = probe?.y ?? null;
   useEffect(() => {
@@ -1995,6 +2027,16 @@ export function Preview({
     actions.current?.beginEditing(autoEdit);
     live.current.onAutoEdited?.();
   }, [ready, autoEdit, doc]);
+
+  // --- a footer just dropped, with its types open on its name ---------------------------------------
+  /** The last block opened by `autoMenu`, so a second placement of the bar does not open it twice. */
+  const autoMenued = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoMenu || !bar || selected !== autoMenu || autoMenued.current === autoMenu) return;
+    autoMenued.current = autoMenu;
+    openVariantsRef.current(bar.top + 27, bar.left);
+    autoMenuRef.current?.();
+  }, [autoMenu, bar, selected]);
 
   // --- selection outline, applied to the live document ------------------------------------------
   useEffect(() => {
@@ -2168,7 +2210,12 @@ export function Preview({
         // Rendered in the editor's own document rather than injected into the email, so nothing
         // here can reach the exported template — the same discipline as `annotate`.
         <div class="sy-bar" style={{ top: `${bar.top}px`, left: `${bar.left}px` }}>
-          {onConvert && selected && convertible?.length ? (
+          {variants?.options.length && selected ? (
+            <button class="sy-bar-name" title={`${variants.title}: choose one`} onClick={() => openVariants(bar.top + 27, bar.left)}>
+              {selectedKind && BLOCK_ICONS[selectedKind] ? (() => { const G = BLOCK_ICONS[selectedKind]; return <G />; })() : null}
+              {selectedLabel}
+            </button>
+          ) : onConvert && selected && convertible?.length ? (
             <button class="sy-bar-name" title="Change what this block is — a heading, text, a button…" onClick={() => openBlockTypes(selected, bar.top + 27, bar.left)}>
               {selectedKind && BLOCK_ICONS[selectedKind] ? (() => { const G = BLOCK_ICONS[selectedKind]; return <G />; })() : null}
               {selectedLabel}

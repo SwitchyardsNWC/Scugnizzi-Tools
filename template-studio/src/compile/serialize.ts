@@ -81,8 +81,12 @@ function emit(node: IRNode, mode: Mode, branch: Branch, out: string[]): void {
       // In preview it usually emits nothing, because an exported field's value is printed
       // separately by a `print` node. The exception is a tag that is *not* exported: it renders
       // where it stands (learnings 1.3), so the preview has to render its default there too —
-      // otherwise every rich text block comes out blank on the canvas.
-      if (!node.field.exported && node.field.html !== undefined) out.push(node.field.html);
+      // otherwise every rich text block comes out blank on the canvas. A text tag rendered in place
+      // prints its value the same way, escaped, as HubSpot would.
+      if (!node.field.exported) {
+        if (node.field.html !== undefined) out.push(node.field.html);
+        else if (node.field.value !== undefined) out.push(esc(node.field.value));
+      }
       return;
 
     case 'print':
@@ -127,9 +131,10 @@ export function testToHubl(test: Test): string {
 
 function declarationToHubl(field: Field): string {
   const exported = field.exported ? ', export_to_template_context=True' : '';
+  const wrapper = field.noWrapper ? ', no_wrapper=True' : '';
   switch (field.kind) {
     case 'text':
-      return `{% text "${field.name}" label="${hublAttr(field.label)}", value='${hublText(field.value ?? '')}'${exported} %}`;
+      return `{% text "${field.name}" label="${hublAttr(field.label)}", value='${hublText(field.value ?? '')}'${exported}${wrapper} %}`;
     case 'rich_text':
       return `{% rich_text "${field.name}" label="${hublAttr(field.label)}", html='${hublHtml(field.html ?? '')}'${exported} %}`;
     case 'module': {

@@ -15,9 +15,9 @@ import { compile } from '../src/compile/compile.ts';
 import { errorsIn, lint } from '../src/compile/lint.ts';
 import { servedIconBase, withServedIcons } from '../src/app/local-assets.ts';
 import { iconToneFor, isLightColour, SOCIAL_ICON_BASE, SOCIAL_ICONS, socialIconUrl, type IconTone } from '../src/model/social-icons.ts';
-import { SY_BLOCKS, switchyardsDesignSystem, switchyardsTemplate } from '../src/model/switchyards.ts';
+import { footerSections, switchyardsDesignSystem, switchyardsTemplate } from '../src/model/switchyards.ts';
 import { allBlocks } from '../src/model/edit.ts';
-import type { LegalBlock, SocialName, Template } from '../src/model/types.ts';
+import type { LegalBlock, LegalLayout, SocialName, Template } from '../src/model/types.ts';
 
 const NETWORKS = Object.keys(SOCIAL_ICONS) as SocialName[];
 const TONES: IconTone[] = ['offwhite', 'navy'];
@@ -29,12 +29,11 @@ const withFooter = (shape: Partial<LegalBlock>): Template => {
   Object.assign(legal, { linkedin: 'https://www.linkedin.com/company/switchyards', ...shape });
   return t;
 };
-/** The standard email with its footer replaced by one of the palette's, on the band that footer is built on. */
-const withPaletteFooter = (id: string, shape: Partial<LegalBlock>): Template => {
+/** The standard email with its footer replaced by one of the footer's types, on the band that type is built on. */
+const withPaletteFooter = (layout: Exclude<LegalLayout, 'classic'>, shape: Partial<LegalBlock>, options: Pick<LegalBlock, 'socialsFirst'> = {}): Template => {
   const t = switchyardsTemplate();
-  const item = SY_BLOCKS.find((b) => b.id === id)!;
   // The standard email ends on the masthead footer's three sections: its rule, the footer, and the closing band.
-  t.sections = [...t.sections.slice(0, -3), ...item.make(switchyardsDesignSystem())];
+  t.sections = [...t.sections.slice(0, -3), ...footerSections(layout, switchyardsDesignSystem(), options)];
   const legal = allBlocks(t).find((b) => b.type === 'legal') as LegalBlock;
   Object.assign(legal, { linkedin: 'https://www.linkedin.com/company/switchyards', ...shape });
   return t;
@@ -91,12 +90,12 @@ describe('icons instead of names', () => {
 
   it('gives the dark bands off-white icons and the cream letterhead navy ones', () => {
     // Each footer as the palette builds it, on its own band — the tone is read off the band, not the layout's name.
-    for (const id of ['footer-a', 'footer-b', 'footer-b-social', 'footer-c']) {
-      const icons = iconsIn(hubl(withPaletteFooter(id, { socialIcons: true })).html);
+    for (const [id, options] of [['masthead', {}], ['ledger', {}], ['ledger', { socialsFirst: true }], ['stub', {}]] as const) {
+      const icons = iconsIn(hubl(withPaletteFooter(id, { socialIcons: true }, options)).html);
       expect(icons.length, id).toBeGreaterThan(0);
       for (const tag of icons) expect(tag, id).toContain('-offwhite.png');
     }
-    const letter = iconsIn(hubl(withPaletteFooter('footer-letterhead', { socialIcons: true })).html);
+    const letter = iconsIn(hubl(withPaletteFooter('letterhead', { socialIcons: true })).html);
     expect(letter.length).toBeGreaterThan(0);
     for (const tag of letter) expect(tag).toContain('-navy.png');
   });
@@ -141,11 +140,10 @@ describe('the ledger with its socials first', () => {
     expect(usual.socials).toBeGreaterThan(usual.unsubscribe);
   });
 
-  it('is what the new palette block builds, and it still carries every legal link', () => {
-    const item = SY_BLOCKS.find((b) => b.id === 'footer-b-social');
-    expect(item?.name).toBe('Footer · Ledger, socials first');
-    const legal = item!
-      .make(switchyardsDesignSystem())
+  it('is what the ledger builds with the switch on, and it still carries every legal link', () => {
+    // A card of its own until 2026-09-30, when the footers became one block with a type; now it is the ledger's
+    // "Socials above the legal links" switch.
+    const legal = footerSections('ledger', switchyardsDesignSystem(), { socialsFirst: true })
       .flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks)))
       .find((b) => b.type === 'legal') as LegalBlock;
     expect(legal).toMatchObject({ layout: 'ledger', socialsFirst: true });

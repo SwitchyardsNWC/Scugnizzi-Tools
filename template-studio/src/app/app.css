@@ -31,6 +31,9 @@
   --mail-chip-ink: #1e6b3a;
   --mail-sel: #d3e3fd;
   --mail-compose: #f0f4f9;
+  /* A row already read, in the list; and the one colour a phone's mail app spends on its controls. */
+  --mail-read: #f2f6fc;
+  --mail-link: #007aff;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light dark;
@@ -58,6 +61,8 @@
     --mail-chip-ink: #a8dab5;
     --mail-sel: #0b57d0;
     --mail-compose: #2d2f31;
+    --mail-read: #262729;
+    --mail-link: #0a84ff;
   }
 }
 
@@ -1031,7 +1036,9 @@ button.fig-pill:active { transform: scale(0.96); }
   color: var(--muted); margin: 0 0 7px; font-weight: 600;
 }
 .palette-group .hint { margin-bottom: 7px; }
-.palette-list { display: grid; gap: 5px; }
+/* One column that never outgrows the pane. Left as `auto`, the track took the widest name's full width, and one
+   long one pushed its whole group past the pane's edge with the grips cut off. */
+.palette-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
 
 .block-card {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -1410,9 +1417,93 @@ button.fig-pill:active { transform: scale(0.96); }
 .device.phone .mail-addr { display: none; }
 .mail-when { margin-left: auto; flex: none; font-size: 11.5px; color: var(--faint); }
 
+/* --- the inbox list --------------------------------------------------------------------------------
+ * Where the preview text is read (learnings 1.17). Drawn over the message rather than in place of it:
+ * the canvas stays mounted underneath, so opening the email again costs nothing, and it opens at its
+ * top — which is where opening an email lands. The one real row is the email's; the rest are bars. */
+
+.gmail-main, .mail-phone { position: relative; }
+.gmail-tool.live { border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
+.gmail-tool.live:hover { background: color-mix(in srgb, var(--mail-ink) 9%, transparent); color: var(--mail-ink); }
+
+.gmail-list {
+  position: absolute; inset: 0; z-index: 3; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--mail);
+}
+.gmail-check {
+  flex: none; width: 12px; height: 12px; margin: 0 7px 0 8px;
+  border: 1.5px solid var(--mail-muted); border-radius: 2px; opacity: 0.75;
+}
+.gmail-count { margin-left: auto; padding-right: 8px; font-size: 11.5px; color: var(--mail-muted); }
+.gmail-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--mail-line); }
+.gmail-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; padding: 0 16px 0 2px;
+  border: 0; border-bottom: 1px solid var(--mail-line); background: var(--mail-read);
+  font: inherit; font-size: 13.5px; color: var(--mail-ink); text-align: left;
+}
+.gmail-row.unread { background: var(--mail); font-weight: 700; cursor: pointer; }
+/* Gmail lifts the row under the pointer rather than tinting it. */
+.gmail-row.unread:hover { position: relative; z-index: 1; box-shadow: 0 1px 2px rgb(60 64 67 / 0.3), 0 1px 3px 1px rgb(60 64 67 / 0.15); }
+.gmail-row-star { flex: none; display: grid; place-items: center; width: 20px; color: var(--mail-muted); }
+.gmail-row-star .icon { width: 14px; height: 14px; }
+.gmail-row-from { flex: none; width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmail-row-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmail-row-snippet { font-weight: 400; color: var(--mail-muted); }
+.gmail-row-when { flex: none; min-width: 52px; font-size: 12px; text-align: right; }
+.gmail-row.ghost i { display: block; height: 7px; border-radius: 99px; background: var(--mail-line); }
+.gmail-row.ghost .gmail-row-when i { width: 34px; margin-left: auto; }
+
+/* A phone's back control. Words as well as the arrow, because that is how a phone's mail app draws it. */
+.mail-back {
+  display: inline-flex; align-items: center; gap: 3px; margin: 0 0 7px -2px; padding: 0;
+  border: 0; background: none; font: inherit; font-size: 13px; color: var(--mail-link); cursor: pointer;
+}
+.mail-back .icon { width: 14px; height: 14px; }
+
+/* Mail on an iPhone, at its own sizes: the phone frame is 375 points across, so these are the real ones,
+   and the two lines the snippet gets are the real two lines. */
+.phone-list {
+  position: absolute; inset: 0; z-index: 3; overflow: hidden;
+  background: var(--mail); color: var(--mail-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+.phone-list-head { padding: 4px 16px 8px; }
+.phone-list-head span { display: block; font-size: 17px; color: var(--mail-link); }
+.phone-list-head b { display: block; margin-top: 6px; font-size: 30px; font-weight: 700; letter-spacing: 0.01em; }
+.phone-rows { list-style: none; margin: 0; padding: 0; }
+.phone-row {
+  position: relative; display: flex; width: 100%; padding: 10px 16px 11px 0;
+  border: 0; background: none; font: inherit; color: inherit; text-align: left;
+}
+.phone-row::after { content: ''; position: absolute; left: 30px; right: 0; bottom: 0; border-bottom: 0.5px solid var(--mail-line); }
+button.phone-row { cursor: pointer; }
+.phone-dot { flex: none; width: 30px; display: flex; justify-content: center; padding-top: 6px; }
+.phone-row.unread .phone-dot::before { content: ''; width: 10px; height: 10px; border-radius: 99px; background: var(--mail-link); }
+.phone-row-body { flex: 1; min-width: 0; display: grid; }
+.phone-row-top { display: flex; align-items: baseline; gap: 8px; }
+.phone-row-top b { flex: 1; min-width: 0; font-size: 17px; line-height: 22px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-row-when { flex: none; font-size: 15px; color: var(--mail-muted); }
+.phone-row-subject { font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-row-snippet {
+  min-height: 40px; font-size: 15px; line-height: 20px; color: var(--mail-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.phone-row.ghost i { display: block; height: 9px; margin: 6px 0 5px; border-radius: 99px; background: var(--mail-line); }
+.phone-row.ghost .phone-row-top { display: block; }
+.phone-row.ghost .phone-row-top i { height: 11px; margin: 5px 0 7px; }
+
 /* --- icon buttons in the tool row ------------------------------------------------------------------
  * The two device glyphs and the inbox switch. Square rather than the pill the named buttons use:
  * a glyph in a pill reads as a button with a missing label. */
+
+/* A footer's five types, side by side: the first decision about a footer and the one it was dropped to make. */
+.footer-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.footer-type {
+  padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.footer-type:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.footer-type.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--accent); font-weight: 600; }
 
 .icon-btn { padding: 0; width: 30px; display: grid; place-items: center; }
 .icon-btn .icon { opacity: 0.9; }
@@ -1503,6 +1594,17 @@ button.fig-pill:active { transform: scale(0.96); }
   display: grid; gap: 9px;
   padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid var(--line-soft);
 }
+
+/* Preview text is copy, so it is set in the type copy is read in rather than the code face other boxes use,
+   and while it is empty the placeholder is the email's own first words — italic, so it reads as a stand-in. */
+.field.preview-text > label { display: flex; align-items: baseline; gap: 6px; }
+.field.preview-text > label .muted { margin-left: auto; font-variant-numeric: tabular-nums; }
+.field.preview-text textarea { font-family: var(--sans); font-size: 12.5px; line-height: 1.4; }
+.field.preview-text textarea::placeholder { color: var(--faint); font-style: italic; }
+.preview-text-foot { display: grid; justify-items: start; gap: 4px; }
+.preview-text-foot .hint { margin: 0; font-size: 11.5px; line-height: 1.4; }
+.preview-text-foot .link { font-size: 11.5px; color: var(--accent); text-decoration: none; }
+.preview-text-foot .link:hover { text-decoration: underline; }
 
 /* New and Duplicate lead the panel. The menu of starters is a popover, the same one the preview
    state uses, so it opens over the list rather than pushing it down. */

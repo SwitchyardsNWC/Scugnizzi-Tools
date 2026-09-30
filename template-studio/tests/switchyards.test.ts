@@ -13,7 +13,7 @@ import { noteHtml, socialLinks } from '../src/compile/blocks/legal.ts';
 import { errorsIn, lint } from '../src/compile/lint.ts';
 import { allBlocks, cloneSection, freshIds, hubspotFields, takenFieldNames } from '../src/model/edit.ts';
 import { blankTemplate } from '../src/model/starters.ts';
-import { SY_BLOCKS, SY_COPY, switchyardsDesignSystem, switchyardsShortTemplate, switchyardsTemplate } from '../src/model/switchyards.ts';
+import { footerSections, SY_BLOCKS, SY_COPY, switchyardsDesignSystem, switchyardsShortTemplate, switchyardsTemplate } from '../src/model/switchyards.ts';
 import type { LegalBlock, Template } from '../src/model/types.ts';
 
 const hubl = (t: Template) => compile(t, { mode: 'hubl', date: '2026-09-18' });
@@ -56,10 +56,11 @@ describe('the Switchyards email system', () => {
   });
 
   it('offers these blocks and no others, the letterhead as a header and a footer', () => {
-    expect(SY_BLOCKS.map((b) => b.id)).toEqual(['header-letterhead', 'logo', 'hero', 'callout', 'image-caption', 'stamp', 'sign-off', 'footer-a', 'footer-b', 'footer-b-social', 'footer-c', 'footer-letterhead']);
+    // One footer, its type chosen after it lands, and no Stamp (Jared, 2026-09-30).
+    expect(SY_BLOCKS.map((b) => b.id)).toEqual(['header-letterhead', 'logo', 'hero', 'callout', 'image-caption', 'sign-off', 'footer']);
     const ds = switchyardsDesignSystem();
     const head = SY_BLOCKS.find((b) => b.id === 'header-letterhead')!.make(ds);
-    const foot = SY_BLOCKS.find((b) => b.id === 'footer-letterhead')!.make(ds);
+    const foot = footerSections('letterhead', ds);
     expect(head.flatMap((s) => s.rows[0]!.columns[0]!.blocks.map((b) => b.type))).toEqual(['stripes', 'image']);
     expect(foot.flatMap((s) => s.rows[0]!.columns[0]!.blocks.map((b) => b.type))).toEqual(['legal', 'stripes']);
     const legal = foot[0]!.rows[0]!.columns[0]!.blocks[0] as LegalBlock;
@@ -148,10 +149,8 @@ describe('the footer layouts', () => {
   it('gives every footer the window’s width, rules included', () => {
     // A footer is the floor of the page, so its band runs to the edge — and the rules above and below it are part
     // of the footer, so they go with it. A 600px red line over a band that runs to the edge reads as a mistake.
-    for (const id of ['footer-a', 'footer-b', 'footer-c', 'footer-letterhead']) {
-      const item = SY_BLOCKS.find((b) => b.id === id);
-      expect(item, id).toBeTruthy();
-      const sections = item!.make(switchyardsDesignSystem());
+    for (const id of ['masthead', 'ledger', 'stub', 'letterhead'] as const) {
+      const sections = footerSections(id, switchyardsDesignSystem());
       expect(sections.length, id).toBeGreaterThan(1);
       for (const section of sections) expect(section.bleed, `${id} / ${section.rows[0]!.columns[0]!.blocks[0]!.type}`).toBe(true);
     }

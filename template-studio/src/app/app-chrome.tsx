@@ -17,17 +17,23 @@ export type Device = 'desktop' | 'phone';
 export function Framed({
   inbox,
   subject,
+  snippet,
+  list,
+  onList,
   device,
   children,
 }: {
   inbox: boolean;
   subject: string;
+  snippet: string;
+  list: boolean;
+  onList(list: boolean): void;
   device: Device;
   children: ComponentChildren;
 }) {
   if (!inbox) return <>{children}</>;
   return (
-    <InboxChrome subject={subject} device={device}>
+    <InboxChrome subject={subject} snippet={snippet} list={list} onList={onList} device={device}>
       {children}
     </InboxChrome>
   );

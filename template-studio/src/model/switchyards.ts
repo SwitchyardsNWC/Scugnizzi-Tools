@@ -230,9 +230,6 @@ class Maker {
       this.copy('<p><small>Logan Square, June.</small></p>', 'Caption', { padTop: 6, padBottom: 20 }),
     ];
   }
-  stamp(): Section[] {
-    return [this.picture('Mark or seal', 240, { padTop: 20, padBottom: 20, align: 'center' })];
-  }
   signOff(): Section[] {
     return [
       this.copy(SY_COPY.signOff, 'Sign-off', { padTop: 10, padBottom: 10 }, false),
@@ -295,6 +292,9 @@ const block = (id: string, name: string, summary: string, make: (m: Maker) => Se
  * lockup headers are not among them: they open the two starters and are not for placing mid-email. Jared,
  * 2026-09-18: "footer letterhead block is supposed to be a header and footer seperated, not one block. you can
  * get rid of header lockup, Header tagline, Details, Schedule, Secondary image, Pair."
+ *
+ * And 2026-09-30: "the blocks panel is looking bad. trim the fat. make just one footer block, you drop than choose
+ * the type. kill the stamp block." Five footer cards became one, and the Stamp went.
  */
 export const SY_BLOCKS: SyBlock[] = [
   block('header-letterhead', 'Header · Letterhead', 'For a letter from a person: the red rule, then the navy lockup at 120px on cream. Pairs with the letterhead footer, with the letter between them.', (m) => m.letterheadHeader()),
@@ -302,14 +302,15 @@ export const SY_BLOCKS: SyBlock[] = [
   block('hero', 'Hero image', 'The one big graphic, edge to edge at 600px, square corners, 20px below. The team picks it in HubSpot.', (m) => m.hero()),
   block('callout', 'Callout', 'A navy card with the one line the reader should leave with, and one supporting line. One per email, never beside the button.', (m) => m.callout('3 clubs, 3 neighborhoods, Chicago.', 'Memberships drop October 22.')),
   block('image-caption', 'Image + caption', 'A photo edge to edge with a one-line caption in small type: a place and a time.', (m) => m.imageCaption()),
-  block('stamp', 'Stamp', 'A small mark centred at 240px: a seal, a badge, a monogram.', (m) => m.stamp()),
   block('sign-off', 'Sign-off', '“See you around the club, -Switchyards” and the drawing. Every email closes with it.', (m) => m.signOff()),
-  block('footer-a', 'Footer · Masthead', 'The default footer, centred like a dateline: seals between hairlines, name and address, the notice, then the © mark and the legal links. Closes with the red band.', (m) => m.footer('masthead')),
-  block('footer-b', 'Footer · Ledger', 'Two columns: identity on the left, an index of links on the right, each on its own hairline. For a text-heavy email with links worth repeating.', (m) => m.footer('ledger')),
-  block('footer-b-social', 'Footer · Ledger, socials first', 'The ledger with its social row at the top of the index, above Unsubscribe, so the ways to follow come before the way to leave.', (m) => m.footer('ledger', { socialsFirst: true })),
-  block('footer-c', 'Footer · Stub', 'One row, seals left and legal right, then one typed line. For short operational sends, with the lockup header.', (m) => m.footer('stub')),
-  block('footer-letterhead', 'Footer · Letterhead', 'The letterhead’s foot, on cream: a hairline, the address and the notice, a hairline, the legal links in red and the © mark, then the rule.', (m) => m.footer('letterhead')),
+  // One footer, whose type is chosen after it lands (model/footer.ts). It arrives as the masthead, the default.
+  block('footer', 'Footer', 'Company, address and the unsubscribe links, which HubSpot needs in every email. Drop it, then choose its type: masthead, ledger, stub, letterhead or classic.', (m) => m.footer('masthead')),
 ];
+
+/** A Switchyards footer of one layout, on a design system: the rule, the band and the closing rule it owns. */
+export function footerSections(layout: Exclude<LegalLayout, 'classic'>, ds: DesignSystem, options: Pick<LegalBlock, 'socialsFirst' | 'socialIcons'> = {}): Section[] {
+  return new Maker(ds).footer(layout, options);
+}
 
 // --- the two templates ------------------------------------------------------------------------------------------
 
