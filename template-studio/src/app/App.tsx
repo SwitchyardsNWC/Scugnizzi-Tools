@@ -1202,7 +1202,7 @@ export function App() {
     const els = cells.length ? cells : doc.querySelectorAll<HTMLElement>(`[data-sy-block][data-sy-section="${part}"]`);
     for (const el of els) {
       el.setAttribute('data-sy-noted', '');
-      el.style.outline = '2px dashed #7b61ff';
+      el.style.outline = '2px dashed #0b6fd8';
       el.style.outlineOffset = '-2px';
     }
   }, []);

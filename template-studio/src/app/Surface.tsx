@@ -69,7 +69,6 @@ import {
   ERASER,
   clampZoom,
   deg,
-  easeOutBack,
   easeInOutCubic,
   easeOutCubic,
   rotatePoint,
@@ -299,7 +298,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     setPhase('start');
     const id = requestAnimationFrame(() => {
       setPhase('enter');
-      animateView(fit, 640, easeOutBack, () => setPhase('idle'));
+      animateView(fit, 360, easeOutCubic, () => setPhase('idle'));
     });
     return () => {
       cancelAnimationFrame(id);
@@ -347,7 +346,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const f = fitView();
     if (!f) return;
     if (reduced) setView(f);
-    else animateView(f, 420, easeOutBack);
+    else animateView(f, 240, easeOutCubic);
   }, [fitView, animateView, setView, reduced]);
 
   // Wheel: ⌘ or a pinch zooms about the pointer, a plain wheel pans. Non-passive, or the page scrolls.
@@ -439,7 +438,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const waiting: string[] = [];
     for (const id of fresh.current) {
       const el = layerEl(id);
-      if (el) springy(el, POP, 440);
+      if (el) springy(el, POP, 120);
       else waiting.push(id);
     }
     fresh.current = waiting;
@@ -454,7 +453,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       onSelectLayer(null);
       const gone = () =>
         commit(sel.group ? 'Remove drawing' : 'Remove layer', sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id));
-      const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 220, 'forwards') : null));
+      const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 100, 'forwards') : null));
       const first = anims.find(Boolean);
       if (first) first.onfinish = gone;
       else gone();
@@ -1412,10 +1411,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         >
           <defs>
             <pattern id="fig-dots" width={22 * view.z} height={22 * view.z} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
-              <circle cx={1.3} cy={1.3} r={1.3} fill="rgba(70,58,38,0.17)" />
+              <circle cx={1.3} cy={1.3} r={1.3} style={{ fill: 'var(--fig-dots)' }} />
             </pattern>
             <filter id="fig-shadow" x="-20%" y="-20%" width="140%" height="150%">
-              <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#3a2f1d" flood-opacity="0.2" />
+              <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000000" flood-opacity="0.14" />
             </filter>
           </defs>
           <rect class="surface-dots" width="100%" height="100%" fill="url(#fig-dots)" />

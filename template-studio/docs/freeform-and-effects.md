@@ -243,3 +243,31 @@ the selected layers as one picture and keeps them editable underneath.
    default with the alt editable, and says so in the block's In HubSpot panel.
 3. **Retina and size.** 2× is right for photos and text; a 560px surface becomes a 1120px PNG,
    about 150–400KB. Worth a check finding above a size, since a heavy picture is a heavy email.
+
+## Layout tool, not whiteboard *(2026-11-10)*
+
+Jared: the freeform tool is "too cute"; it should feel like Figma or Canva, and the built-in filters
+need reworking. Decided the same day:
+
+- **Sticky notes go.** The tool is off the strip and out of the Add list. Notes already in a frame
+  still draw and edit, so nothing saved breaks.
+- **Stamps become brand library assets.** *Not built yet.*
+- **The pen stays**, for marking up and drawing in a frame.
+- **Text looks go; brand presets take their place**, which can be tweaked, edited, deleted and
+  added to. *Not built yet.*
+- **Effects work on a layer as well as the whole frame.** *Not built yet.*
+- **Light and dark.** Built.
+
+**What changed in the chrome.** Every colour on the canvas is a `--fig-*` token in `app.css`, with
+light and dark values. The canvas follows the app's theme now, where before it stayed light. A
+Theme row (System, Light, Dark) at the top of the Canvas menu sets `data-theme` on the root for
+Template Studio and Freeform together (`app/theme.ts`, key `scuggnizzi.theme`). The springy
+overshoot, tool wiggle, hover tilts, pop-in and poof are gone: there is one 120ms ease-out, and
+fades. The rounded system font and fully rounded pills are gone too: corners are 4–8px. Layer icons
+are one colour. Selection is one blue (`#0b6fd8`, medium blue; `#4b9eff`, light blue, on dark) and
+always comes with a shape cue as well: handles, a filled tool, a ring on the picked swatch.
+
+**Next, in order.** A properties panel with X, Y, W, H, rotation and opacity, plus snapping and
+smart guides. Then brand presets for text, in the design system and editable from the canvas.
+Then the brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
+effects moved into `effects/` beside Riso.

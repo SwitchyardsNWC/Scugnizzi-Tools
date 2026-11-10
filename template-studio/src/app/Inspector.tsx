@@ -658,7 +658,6 @@ const LAYER_KINDS: Array<{ kind: LayerKind; label: string; help: string }> = [
   { kind: 'rect', label: 'Rectangle', help: 'A box: fill, outline, corner radius.' },
   { kind: 'ellipse', label: 'Ellipse', help: 'A circle when its width and height match.' },
   { kind: 'line', label: 'Line', help: 'From one point to another.' },
-  { kind: 'sticky', label: 'Note', help: 'A sticky note with words on it.' },
   { kind: 'mark', label: 'Stamp', help: 'A brand mark, in any colour.' },
 ];
 

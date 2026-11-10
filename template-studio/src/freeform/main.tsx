@@ -38,6 +38,7 @@ import { blankTemplate } from '../model/starters.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { canvasBlob, freeformCanvas } from '../app/picture.ts';
+import { startTheme } from '../app/theme.ts';
 import { keepPicture, loadKeptPictures } from '../app/kept-pictures.ts';
 import { readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, type StudioPresence } from '../model/freeform-link.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
@@ -52,6 +53,8 @@ import { useProject, type Project } from '../project/useProject.ts';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
+
+startTheme();
 
 const store = siteStore();
 
