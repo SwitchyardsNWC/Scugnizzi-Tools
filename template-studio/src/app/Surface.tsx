@@ -34,6 +34,7 @@ import {
   type Box,
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
+import { savePresetFromLayer } from '../model/brand-presets.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
 import { useCanvasSettings } from './canvas-settings.ts';
@@ -159,7 +160,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   brushRef.current = brush;
   /** Where the eraser is over the page, for its ring. */
   const [eraserAt, setEraserAt] = useState<Point | null>(null);
-  /** The canvas type style new text is set in; null is the plain heading role. */
+  /** The brand preset new text is set in; null is the plain heading role. */
   const [look, setLook] = useState<string | null>(() => Object.keys(canvasTypeOf(ds))[0] ?? null);
   const lookRef = useRef(look);
   lookRef.current = look;
@@ -1638,6 +1639,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onRemove={() => layer && poof(layer)}
           onUngroup={() => sel.group && ungroup(sel.group)}
           onOrder={(d) => layer && orderKey(layer, d)}
+          onSavePreset={(mode, label) => {
+            const one = sel.group ? undefined : sel.layers[0];
+            if (one?.kind !== 'text') return;
+            const saved = savePresetFromLayer(tpl(), blockId, one, mode, label);
+            if (saved) commit(mode === 'update' ? 'Update preset' : 'New preset', saved.template);
+          }}
         />
       )}
 
@@ -1733,7 +1740,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                   key={k ?? 'plain'}
                   class={`fig-look ${currentLook === k ? 'on' : ''}`}
                   aria-pressed={currentLook === k}
-                  title={k ? `${canvasTypeOf(ds)[k]!.label}. Tune it in Design › Canvas type.` : 'Plain: the heading role from Design › Type.'}
+                  title={k ? `${canvasTypeOf(ds)[k]!.label}. Edit it in Design › Brand presets.` : 'Plain: the heading role from Design › Type.'}
                   onClick={() => chooseLook(k)}
                 >
                   <span dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Aa') }} />

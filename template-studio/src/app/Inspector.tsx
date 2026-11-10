@@ -924,7 +924,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
           {picked.kind === 'text' && (
             <>
               <div class="layer-grid">
-                <label class="layer-num wide" title="A playful style from Design › Canvas type, or a role from Design › Type.">
+                <label class="layer-num wide" title="A brand preset from Design › Brand presets, or a role from Design › Type.">
                   <span>Style</span>
                   <select
                     value={picked.look ? `look:${picked.look}` : picked.role}
@@ -933,7 +933,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                       patch(v.startsWith('look:') ? { look: v.slice(5) } : { role: v, look: undefined });
                     }}
                   >
-                    <optgroup label="Canvas type">
+                    <optgroup label="Brand presets">
                       {Object.entries(looks).map(([k, style]) => (
                         <option key={k} value={`look:${k}`}>
                           {style.label}

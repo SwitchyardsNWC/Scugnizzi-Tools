@@ -379,7 +379,7 @@ export interface TextTweaks {
   letterSpacing?: number;
   /** Percent. */
   lineHeight?: number;
-  /** The effect's strength, 0 to 100 — see `CanvasTextStyle.amount`. */
+  /** @deprecated The old single effect's strength. Nothing reads it since brand presets; cleared when a preset is picked or saved. */
   amount?: number;
   /** A key of the design system's `fonts`, over the style's own face. */
   font?: string;
@@ -422,8 +422,8 @@ interface LayerBase {
  * until it renders identically on export (docs/freeform-and-effects.md). Positions and sizes are
  * in the surface's own pixels.
  *
- * `look` on text names a style from Design › Canvas type: playful type that only ever ships as a
- * picture (learnings 3.68). Absent, the text is set in its email type role.
+ * `look` on text names a brand preset from the design system (Design › Brand presets): type that only
+ * ever ships as a picture (learnings 3.68). Absent, the text is set in its email type role.
  */
 export type FreeformLayer =
   | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string; styles?: StyleRange[] } & TextTweaks)

@@ -153,24 +153,41 @@ export interface ImageTokens {
   defaultWidth: number;
 }
 
-/** What a canvas type style does beyond the letters. Every one of them survives becoming a picture. */
+/**
+ * The old single-effect styles, kept only so a design system saved before brand presets still reads.
+ * `normalizePreset` turns each into the parts below; nothing new is written with them.
+ */
 export type CanvasEffect = 'none' | 'outline' | 'shadow' | 'highlight' | 'sticker' | 'wobble' | 'arc';
 
-export const CANVAS_EFFECTS: Array<[CanvasEffect, string]> = [
-  ['none', 'Plain'],
-  ['outline', 'Outline'],
-  ['shadow', 'Hard shadow'],
-  ['highlight', 'Highlighter'],
-  ['sticker', 'Sticker'],
-  ['wobble', 'Wobble'],
-  ['arc', 'Arc'],
-];
+/** An outline on the letters. `outside` draws it as a border around them, the way a die-cut tag reads. */
+export interface PresetStroke {
+  color: ColorRef;
+  /** Pixels. */
+  width: number;
+  outside?: boolean;
+}
+/** A shadow behind the letters. Blur 0 is a hard, printed offset. */
+export interface PresetShadow {
+  color: ColorRef;
+  x: number;
+  y: number;
+  blur: number;
+}
+/** A band of colour behind each line, from the baseline up. */
+export interface PresetHighlight {
+  color: ColorRef;
+  /** How much of the line it covers, 10 to 100 percent. */
+  cover: number;
+}
 
 /**
- * A text style for the freeform canvas. Its own category, because it follows none of the email's
- * rules: it only ever ships inside a picture, so it can do what email type cannot — a thick outline,
- * a hard offset shadow, a highlighter stroke, a sticker's white border, letters that wobble, a line
- * that bends (learnings 3.68).
+ * A brand preset: type for the freeform canvas, kept in the design system so every template and
+ * frame shares it.
+ *
+ * Jared: take away the text effects, "make brand presets. But allow them to be tweaked, edited,
+ * and deleted. And new ones added." So a preset is type settings plus up to four plain parts, each
+ * on or off: a stroke, a shadow, a highlight band, a curve. Nothing random and nothing novelty;
+ * everything here draws the same picture every time (learnings 3.68).
  */
 export interface CanvasTextStyle {
   label: string;
@@ -184,25 +201,79 @@ export interface CanvasTextStyle {
   italic?: boolean;
   letterSpacing?: number;
   color: ColorRef;
-  effect: CanvasEffect;
-  /** The outline, the shadow, the highlight or the sticker border. Null picks one that reads. */
-  effectColor: ColorRef;
-  /** How much, 0 to 100: an outline's width, a shadow's offset, a wobble's swing, an arc's bend. */
-  amount: number;
+  stroke?: PresetStroke;
+  shadow?: PresetShadow;
+  highlight?: PresetHighlight;
+  /** Bends the line along an arc, 1 to 100. Absent is straight. A curve sets one line. */
+  curve?: number;
+  /** @deprecated The old single effect. Read by `normalizePreset`, never written. */
+  effect?: CanvasEffect;
+  /** @deprecated See `effect`. */
+  effectColor?: ColorRef;
+  /** @deprecated See `effect`. */
+  amount?: number;
 }
 
+/**
+ * A preset in today's shape. One saved with the old single effect becomes the parts that draw it.
+ * Wobble has no part: it was a novelty, and those words now set straight.
+ */
+export function normalizePreset(style: CanvasTextStyle): CanvasTextStyle {
+  if (style.effect === undefined && style.effectColor === undefined && style.amount === undefined) return style;
+  const { effect, effectColor, amount, ...rest } = style;
+  const k = Math.max(0, Math.min(100, amount ?? 0)) / 100;
+  const out: CanvasTextStyle = { ...rest };
+  switch (effect) {
+    case 'outline':
+      out.stroke = { color: effectColor ?? null, width: Math.round((1 + k * 5) * 10) / 10 };
+      break;
+    case 'shadow': {
+      const d = Math.round((1 + k * 8) * 10) / 10;
+      out.shadow = { color: effectColor ?? '#FFB000', x: d, y: d, blur: 0 };
+      break;
+    }
+    case 'sticker':
+      out.stroke = { color: effectColor ?? '#ffffff', width: Math.round((2 + k * 8) * 10) / 10, outside: true };
+      break;
+    case 'highlight':
+      out.highlight = { color: effectColor ?? '#FFE58A', cover: Math.round(16 + k * 48) };
+      break;
+    case 'arc':
+      out.curve = Math.max(1, Math.round(k * 100));
+      break;
+    default:
+      break;
+  }
+  return out;
+}
+
+/**
+ * The presets a system ships with, named for what they are for rather than what they do. The keys
+ * are the old styles' keys, so text that already picked one keeps its preset.
+ */
 export const DEFAULT_CANVAS_TYPE: Record<string, CanvasTextStyle> = {
-  marker: { label: 'Marker', size: 34, weight: 'bold', lineHeight: 105, italic: true, color: null, effect: 'wobble', effectColor: null, amount: 28 },
-  sticker: { label: 'Sticker', size: 30, weight: 'bold', lineHeight: 112, uppercase: true, letterSpacing: 1, color: null, effect: 'sticker', effectColor: '#ffffff', amount: 40 },
-  outline: { label: 'Outline', size: 46, weight: 'bold', lineHeight: 100, uppercase: true, color: '#00000000', effect: 'outline', effectColor: null, amount: 30 },
-  retro: { label: 'Retro', font: 'georgia', size: 40, weight: 'bold', lineHeight: 104, color: null, effect: 'shadow', effectColor: '#FFB000', amount: 40 },
-  highlight: { label: 'Highlighter', size: 24, weight: 'bold', lineHeight: 135, color: null, effect: 'highlight', effectColor: '#FFE58A', amount: 55 },
-  arc: { label: 'Arc', size: 24, weight: 'bold', lineHeight: 100, uppercase: true, letterSpacing: 3, color: null, effect: 'arc', effectColor: null, amount: 45 },
+  marker: { label: 'Kicker', size: 14, weight: 'bold', lineHeight: 120, uppercase: true, letterSpacing: 3, color: null },
+  outline: { label: 'Outline display', size: 46, weight: 'bold', lineHeight: 100, uppercase: true, color: '#00000000', stroke: { color: null, width: 1.5 } },
+  retro: { label: 'Shadow display', size: 40, weight: 'bold', lineHeight: 104, color: null, shadow: { color: 'red', x: 3, y: 3, blur: 0 } },
+  sticker: { label: 'Tag', size: 22, weight: 'bold', lineHeight: 112, uppercase: true, letterSpacing: 1, color: '#ffffff', stroke: { color: null, width: 4, outside: true } },
+  highlight: { label: 'Marked line', size: 24, weight: 'bold', lineHeight: 135, color: null, highlight: { color: '#FFE58A', cover: 40 } },
+  arc: { label: 'Seal', size: 18, weight: 'bold', lineHeight: 100, uppercase: true, letterSpacing: 3, color: null, curve: 45 },
 };
 
-/** The system's canvas type, or the shipped styles for a system that has never set any. */
+const normalized = new WeakMap<Record<string, CanvasTextStyle>, Record<string, CanvasTextStyle>>();
+
+/**
+ * The system's brand presets, each in today's shape. A system that has never set any gets the
+ * shipped ones; a system whose presets were all deleted has none, which is a real answer.
+ */
 export function canvasTypeOf(ds: DesignSystem): Record<string, CanvasTextStyle> {
-  return ds.canvasType && Object.keys(ds.canvasType).length ? ds.canvasType : DEFAULT_CANVAS_TYPE;
+  const raw = ds.canvasType ?? DEFAULT_CANVAS_TYPE;
+  let out = normalized.get(raw);
+  if (!out) {
+    out = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, normalizePreset(v)]));
+    normalized.set(raw, out);
+  }
+  return out;
 }
 
 export interface DesignSystem {
@@ -282,7 +353,7 @@ export interface DesignSystem {
   fontStack: string;
   /** The stacks a role may name. Email has no webfonts worth relying on — this is what is installed. */
   fonts: Record<string, string>;
-  /** Playful type for the freeform canvas. Absent means the shipped styles. See `CanvasTextStyle`. */
+  /** Brand presets for type on the freeform canvas. Absent means the shipped ones; empty means none. See `CanvasTextStyle`. */
   canvasType?: Record<string, CanvasTextStyle>;
   /**
    * The phone breakpoint, in pixels. Stored as a number rather than as a finished media query

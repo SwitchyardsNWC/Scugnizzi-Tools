@@ -1047,7 +1047,16 @@ button.fig-pill:active { }
 .canvas-type-chip:hover { }
 .canvas-type-chip.on { border-color: var(--fig-accent); box-shadow: 0 0 0 1px var(--fig-accent); }
 .canvas-type-sample svg { display: block; width: 100%; height: auto; }
-.canvas-type-name { font-size: 11px; color: var(--fig-muted); font-weight: 600; }
+.canvas-type-name { font-size: 11px; color: #555555; font-weight: 600; }
+
+/* Brand presets (DesignPanel › BrandPresetsPanel): the list's actions, and one row per part. */
+.preset-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.preset-part { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius); }
+.preset-part-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.preset-part-state { margin-left: auto; font-family: var(--mono); font-size: 10.5px; font-weight: 400; color: var(--faint); }
+.preset-part.on .preset-part-state { color: var(--ink); }
+.preset-part-body { display: grid; gap: 8px; padding: 4px 8px 10px; border-top: 1px solid var(--line-soft); }
+.preset-part-body .dials { margin: 0; }
 
 /* Preview: the email and nothing else. The header stays — Export and the checks live there, and so
    does the way back — and the tools row keeps the device switches, which are part of looking. */

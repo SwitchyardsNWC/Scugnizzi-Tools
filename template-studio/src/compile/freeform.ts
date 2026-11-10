@@ -196,7 +196,6 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
   const s = textStyleOf(layer, ds);
   const color = colorOf(ds, layer.color) ?? colorOf(ds, s.color) ?? inkOf(ds);
   const font = s.font;
-  const k = Math.max(0, Math.min(100, s.amount)) / 100;
   const base =
     `margin:0; font-family:${font}; font-size:${num(s.size)}px; line-height:${num(s.lineHeight)}%; font-weight:${s.weight};${s.italic ? ' font-style:italic;' : ''} ` +
     `color:${color}; text-align:${layer.align};${s.uppercase ? ' text-transform:uppercase;' : ''}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
@@ -204,65 +203,22 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
 
   if (!look) return box(words, base);
 
-  switch (s.effect) {
-    case 'outline': {
-      const ec = colorOf(ds, s.effectColor) ?? inkOf(ds);
-      return box(words, `${base}; -webkit-text-stroke:${num(1 + k * 5)}px ${ec}`);
-    }
-    case 'shadow': {
-      const ec = colorOf(ds, s.effectColor) ?? '#FFB000';
-      const d = num(1 + k * 8);
-      return box(words, `${base}; text-shadow:${d}px ${d}px 0 ${ec}`);
-    }
-    case 'sticker': {
-      // A ring of hard shadows reads as a thick border in every engine, where a text stroke drawn
-      // outside the letters is not something every engine agrees about.
-      const ec = colorOf(ds, s.effectColor) ?? '#ffffff';
-      const w = 2 + k * 8;
-      const ring = Array.from({ length: 16 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2;
-        return `${num(Math.cos(a) * w)}px ${num(Math.sin(a) * w)}px 0 ${ec}`;
-      });
-      return box(words, `${base}; text-shadow:${[...ring, `0 ${num(w + 3)}px 0 rgba(0,0,0,0.18)`].join(', ')}`);
-    }
-    case 'highlight': {
-      const ec = colorOf(ds, s.effectColor) ?? '#FFE58A';
-      const from = Math.round(78 - k * 48);
-      return box(
-        `<span style="background:linear-gradient(transparent ${from}%, ${ec} ${from}%, ${ec} 94%, transparent 94%); padding:0 0.15em; -webkit-box-decoration-break:clone; box-decoration-break:clone">${words}</span>`,
-        base,
-      );
-    }
-    case 'wobble': {
-      let i = 0;
-      let at = 0;
-      // Each letter is its own span already, so its formatting simply joins that letter's style.
-      const per = layer.styles?.length ? marksPerChar(layer.text.length, layer.styles) : null;
-      const inner = [...layer.text]
-        .map((ch) => {
-          const index = at;
-          at += ch.length;
-          if (ch === '\n') return '<br/>';
-          if (ch === '\r') return '';
-          const css = per ? esc(marksCss(per[index] ?? {}, ds)) : '';
-          if (ch === ' ') return css ? `<span style="${css}"> </span>` : ' ';
-          const n = i++;
-          const turn = Math.sin(n * 1.7 + 0.4) * k * 14;
-          const lift = Math.cos(n * 2.3) * k * 5;
-          return `<span style="display:inline-block; transform:translateY(${num(lift)}px) rotate(${num(turn)}deg)${css ? `; ${css}` : ''}">${esc(ch)}</span>`;
-        })
-        .join('');
-      return box(inner, base);
-    }
-    case 'arc': {
-      const line = (s.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
-      const w = Math.max(1, layer.width);
-      const sag = k * w * 0.32;
-      const baseline = layer.y + s.size + sag;
-      const id = `sy-arc-${esc(layer.id)}-${Math.round(layer.x)}-${Math.round(layer.y)}-${Math.round(w)}`;
-      const [offset, anchor] = layer.align === 'left' ? ['0%', 'start'] : layer.align === 'right' ? ['100%', 'end'] : ['50%', 'middle'];
-      const d = `M${num(layer.x)} ${num(baseline)} Q${num(layer.x + w / 2)} ${num(baseline - sag * 2)} ${num(layer.x + w)} ${num(baseline)}`;
-      // SVG text on a path: formatted runs become tspans. A highlight has no SVG equivalent and is left out here.
+  const stroke = s.stroke;
+  const strokeColor = stroke ? (colorOf(ds, stroke.color) ?? inkOf(ds)) : '';
+  const shadow = s.shadow;
+  const shadowColor = shadow ? (colorOf(ds, shadow.color) ?? inkOf(ds)) : '';
+
+  if (s.curve > 0) {
+    // On a curve the words are SVG text on a path: the stroke is the text's own, painted under the
+    // fill, and the shadow a drop-shadow filter. A highlight band has no SVG equivalent and is left out.
+    const k = Math.min(100, s.curve) / 100;
+    const line = (s.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
+    const w = Math.max(1, layer.width);
+    const sag = k * w * 0.32;
+    const baseline = layer.y + s.size + sag;
+    const id = `sy-arc-${esc(layer.id)}-${Math.round(layer.x)}-${Math.round(layer.y)}-${Math.round(w)}`;
+    const [offset, anchor] = layer.align === 'left' ? ['0%', 'start'] : layer.align === 'right' ? ['100%', 'end'] : ['50%', 'middle'];
+    const d = `M${num(layer.x)} ${num(baseline)} Q${num(layer.x + w / 2)} ${num(baseline - sag * 2)} ${num(layer.x + w)} ${num(baseline)}`;
       const arcWords = layer.styles?.length
         ? runsOf(layer.text, layer.styles)
             .map((run) => {
@@ -279,16 +235,41 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
             })
             .join('')
         : esc(line);
-      return (
-        `<g ${mark}><defs><path id="${id}" d="${d}"/></defs>` +
-        `<rect x="${num(layer.x)}" y="${num(layer.y)}" width="${num(w)}" height="${num(s.size * 1.3 + sag)}" fill="none" pointer-events="all"/>` +
-        `<text font-family="${esc(font)}" font-size="${num(s.size)}" font-weight="${s.weight}"${s.italic ? ' font-style="italic"' : ''}${s.letterSpacing ? ` letter-spacing="${num(s.letterSpacing)}"` : ''} fill="${color}">` +
-        `<textPath href="#${id}" startOffset="${offset}" text-anchor="${anchor}">${arcWords}</textPath></text></g>`
-      );
-    }
-    default:
-      return box(words, base);
+    const strokeAttrs = stroke ? ` stroke="${strokeColor}" stroke-width="${num(stroke.outside ? stroke.width * 2 : stroke.width)}" stroke-linejoin="round" paint-order="stroke"` : '';
+    const filter = shadow
+      ? `<filter id="${id}-sh" x="-20%" y="-50%" width="140%" height="200%"><feDropShadow dx="${num(shadow.x)}" dy="${num(shadow.y)}" stdDeviation="${num(shadow.blur / 2)}" flood-color="${shadowColor}" flood-opacity="1"/></filter>`
+      : '';
+    return (
+      `<g ${mark}><defs><path id="${id}" d="${d}"/>${filter}</defs>` +
+      `<rect x="${num(layer.x)}" y="${num(layer.y)}" width="${num(w)}" height="${num(s.size * 1.3 + sag)}" fill="none" pointer-events="all"/>` +
+      `<text font-family="${esc(font)}" font-size="${num(s.size)}" font-weight="${s.weight}"${s.italic ? ' font-style="italic"' : ''}${s.letterSpacing ? ` letter-spacing="${num(s.letterSpacing)}"` : ''} fill="${color}"${strokeAttrs}${shadow ? ` filter="url(#${id}-sh)"` : ''}>` +
+      `<textPath href="#${id}" startOffset="${offset}" text-anchor="${anchor}">${arcWords}</textPath></text></g>`
+    );
   }
+
+  // Straight words: every part is CSS a picture carries exactly.
+  let css = base;
+  const shadows: string[] = [];
+  if (stroke && stroke.outside) {
+    // A border outside the letters: a ring of hard shadows reads the same in every engine, where a
+    // text stroke drawn outside the letters is not something every engine agrees about.
+    const ring = Math.max(8, Math.min(24, Math.round(stroke.width * 3)));
+    for (let i = 0; i < ring; i++) {
+      const a = (i / ring) * Math.PI * 2;
+      shadows.push(`${num(Math.cos(a) * stroke.width)}px ${num(Math.sin(a) * stroke.width)}px 0 ${strokeColor}`);
+    }
+  } else if (stroke) css += `; -webkit-text-stroke:${num(stroke.width)}px ${strokeColor}; paint-order:stroke fill`;
+  if (shadow) shadows.push(`${num(shadow.x)}px ${num(shadow.y)}px ${num(shadow.blur)}px ${shadowColor}`);
+  if (shadows.length) css += `; text-shadow:${shadows.join(', ')}`;
+  if (s.highlight) {
+    const hc = colorOf(ds, s.highlight.color) ?? '#FFE58A';
+    const from = Math.round(94 - Math.max(10, Math.min(100, s.highlight.cover)) * 0.94);
+    return box(
+      `<span style="background:linear-gradient(transparent ${from}%, ${hc} ${from}%, ${hc} 94%, transparent 94%); padding:0 0.15em; -webkit-box-decoration-break:clone; box-decoration-break:clone">${words}</span>`,
+      css,
+    );
+  }
+  return box(words, css);
 }
 
 /** A sample of a canvas type style, or of plain heading type, for the chips that pick one. The real renderer on a small page. */
@@ -297,7 +278,7 @@ export function canvasTypeSampleSvg(ds: DesignSystem, look: string | null, text 
   const size = style?.size ?? typeOf(ds, 'h2').size;
   const scale = Math.min(1, 30 / Math.max(1, size));
   const w = 150;
-  const h = style?.effect === 'arc' ? 72 : 56;
+  const h = style?.curve ? 72 : 56;
   const sample: FreeformBlock = {
     id: 'sample',
     type: 'freeform',

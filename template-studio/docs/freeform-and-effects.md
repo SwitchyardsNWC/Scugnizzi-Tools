@@ -254,7 +254,7 @@ need reworking. Decided the same day:
 - **Stamps become brand library assets.** *Not built yet.*
 - **The pen stays**, for marking up and drawing in a frame.
 - **Text looks go; brand presets take their place**, which can be tweaked, edited, deleted and
-  added to. *Not built yet.*
+  added to. They live in the design system. Built; see below.
 - **Effects work on a layer as well as the whole frame.** *Not built yet.*
 - **Light and dark.** Built.
 
@@ -267,7 +267,31 @@ fades. The rounded system font and fully rounded pills are gone too: corners are
 are one colour. Selection is one blue (`#0b6fd8`, medium blue; `#4b9eff`, light blue, on dark) and
 always comes with a shape cue as well: handles, a filled tool, a ring on the picked swatch.
 
+**Brand presets** *(2026-11-10)*. Jared: "Put brand presets in the design system." They are
+`ds.canvasType`, the same field the old canvas type styles used, so every template and frame on a
+design system shares them. A preset is type settings (font, weight, size, line height, tracking,
+case, colour) plus four parts, each on or off: **stroke** (width, colour, on or outside the
+letters), **shadow** (x, y, blur, colour), **highlight** (colour, how much of the line it covers)
+and **curve** (bend). Wobble is gone: it was a novelty. A preset saved with the old single
+`effect` reads as the parts that drew it (`normalizePreset`), and wobble's words set straight.
+
+The shipped six keep their old keys, so text that picked one keeps it, but they are rebuilt and
+named for use: Kicker, Outline display, Shadow display, Tag, Marked line, Seal.
+
+- **Design › Brand presets** lists them as samples drawn by the canvas renderer. New preset,
+  Duplicate, Delete, a Name field, the type settings, and one row per part. Deleting a preset that
+  text uses says how many layers will set back to plain type first. Deleting every preset leaves
+  none, not the shipped ones.
+- **On the canvas**, the text bar's chip picks a preset. Tune holds size, letter spacing and line
+  height. Once the text is tweaked, *Update preset* writes the tweaks into its preset, and every
+  text in it follows. *New preset* saves them under a new name and moves the layer onto it. Plain
+  words can become a preset too. Either way the tweaks fold in and clear, so the picture does not
+  change; one undo step. The code is `model/brand-presets.ts`.
+- **Not yet:** in the Freeform app on its own, the design system is the frame's copy, so a preset
+  saved there stays with that frame until the frame is in an email. Presets belong to Template
+  Studio's design system first.
+- A layer's old effect-strength tweak (`amount`) is no longer read.
+
 **Next, in order.** A properties panel with X, Y, W, H, rotation and opacity, plus snapping and
-smart guides. Then brand presets for text, in the design system and editable from the canvas.
-Then the brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
+smart guides. Then the brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
 effects moved into `effects/` beside Riso.

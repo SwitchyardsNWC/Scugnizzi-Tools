@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 
 import { brushSampleSvg, canvasTypeSampleSvg } from '../compile/freeform.ts';
-import { amountLabel, LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
+import { LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
+import { hasTweaks } from '../model/brand-presets.ts';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
 import { misregister, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
@@ -474,6 +475,8 @@ export interface FigBarProps {
   onRemove(): void;
   onUngroup(): void;
   onOrder(delta: number): void;
+  /** Saves the picked text's look into the design system's brand presets: into its own, or as a new one. */
+  onSavePreset?(mode: 'update' | 'new', label?: string): void;
 }
 
 type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' | 'brush' | null;
@@ -481,7 +484,7 @@ type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' |
 /** A design system font's key as a name: `georgia` is Georgia. */
 const fontName = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
-export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder }: FigBarProps) {
+export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset }: FigBarProps) {
   const [pop, setPop] = useState<Pop>(null);
   const one = group ? undefined : layers[0];
   const inverted = layers.length > 0 && layers.every((l) => l.invert);
@@ -545,11 +548,12 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
   let tweaks: JSX.Element | null = null;
 
   if (text && style) {
-    const lookLabel = text.look ? (looks[text.look]?.label ?? 'Style') : 'Plain';
-    const amount = amountLabel(style.effect);
+    const lookLabel = text.look ? (looks[text.look]?.label ?? 'Preset') : 'Plain';
+    const preset = text.look ? looks[text.look] : undefined;
+    const tweaked = hasTweaks(text);
     quick = (
       <>
-        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Text style  ·  or type / while editing" onClick={() => toggle('style')}>
+        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
           <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
           {lookLabel}
           <span class="caret">▾</span>
@@ -569,10 +573,19 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
         <Slide label="Size" unit="px" min={6} max={240} value={style.size} onInput={(v) => set('Text size', { size: v }, 'size')} />
         <Slide label="Letter spacing" unit="px" min={-6} max={30} step={0.5} value={style.letterSpacing} onInput={(v) => set('Letter spacing', { letterSpacing: v }, 'tracking')} />
         <Slide label="Line height" unit="%" min={60} max={220} value={style.lineHeight} onInput={(v) => set('Line height', { lineHeight: v }, 'leading')} />
-        {amount && <Slide label={amount} unit="" min={0} max={100} value={style.amount} onInput={(v) => set(amount, { amount: v }, 'amount')} />}
-        <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined })}>
-          Back to the style
-        </button>
+        {tweaked && (
+          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined })}>
+            Back to {preset ? preset.label : 'the role'}
+          </button>
+        )}
+        {onSavePreset && (
+          <SavePreset
+            presetName={preset?.label ?? null}
+            canUpdate={Boolean(preset) && tweaked}
+            onUpdate={() => onSavePreset('update')}
+            onNew={(name) => onSavePreset('new', name)}
+          />
+        )}
       </>
     );
   } else if (sticky && style) {
@@ -651,7 +664,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
       <div class="fig-bar-row">
         {quick}
         {tweaks && (
-          <button class={`fig-icon-btn ${pop === 'tweak' ? 'on' : ''}`} title="Tweak spacing and effects" aria-label="Tweak" onClick={() => toggle('tweak')}>
+          <button class={`fig-icon-btn ${pop === 'tweak' ? 'on' : ''}`} title="Size and spacing, and saving them as a brand preset" aria-label="Tune" onClick={() => toggle('tweak')}>
             {icon(<path key="a" d="M4 7h9M17 7h3M4 17h3M11 17h9" />, <circle key="b" cx="15" cy="7" r="2" />, <circle key="c" cx="9" cy="17" r="2" />)}
           </button>
         )}
@@ -943,4 +956,62 @@ function readSaved(): SavedRisoPreset[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Saving a tweaked text back into the design system: into its preset, which every layer in it then
+ * follows, or as a new preset under a name. Both are one undo step.
+ */
+function SavePreset({ presetName, canUpdate, onUpdate, onNew }: { presetName: string | null; canUpdate: boolean; onUpdate(): void; onNew(name: string): void }) {
+  const [naming, setNaming] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement | null>(null);
+  const open = naming !== null;
+  // Selected once as it opens, so typing replaces the suggested name.
+  useEffect(() => {
+    if (open) {
+      field.current?.focus();
+      field.current?.select();
+    }
+  }, [open]);
+  if (naming !== null) {
+    return (
+      <form
+        class="fig-fx-name"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onNew(naming.trim() || 'New preset');
+          setNaming(null);
+        }}
+      >
+        <input
+          ref={field}
+          value={naming}
+          maxLength={40}
+          placeholder="Name this preset"
+          aria-label="Preset name"
+          onInput={(e) => setNaming((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            // Letters are words here, not the canvas's tool keys.
+            e.stopPropagation();
+            if (e.key === 'Escape') setNaming(null);
+          }}
+        />
+        <button class="fig-chip primary" type="submit">
+          Save
+        </button>
+      </form>
+    );
+  }
+  return (
+    <div class="fig-fx-actions">
+      {canUpdate && (
+        <button class="fig-chip" title={`Rewrite ${presetName} with these settings. Every text in it follows.`} onClick={onUpdate}>
+          Update preset
+        </button>
+      )}
+      <button class="fig-chip" title="Save these settings as a new brand preset in the design system." onClick={() => setNaming(presetName ? `${presetName} copy` : '')}>
+        New preset
+      </button>
+    </div>
+  );
 }
