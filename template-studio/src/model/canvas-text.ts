@@ -24,6 +24,8 @@ export interface ResolvedText {
   lineHeight: number;
   italic: boolean;
   uppercase: boolean;
+  /** The case the letters are drawn in. `uppercase` is `textCase === 'upper'`, kept for the renderer's curve. */
+  textCase: 'none' | 'upper' | 'lower' | 'title';
   letterSpacing: number;
   /** The style's own colour, before the layer's. Null is the ink. */
   color: ColorRef;
@@ -46,6 +48,7 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         lineHeight: look.lineHeight,
         italic: Boolean(look.italic),
         uppercase: Boolean(look.uppercase),
+        textCase: look.uppercase ? 'upper' : 'none',
         letterSpacing: look.letterSpacing ?? 0,
         color: look.color,
         stroke: look.stroke ?? null,
@@ -61,6 +64,7 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         italic: false,
         // A note is handwriting on paper: its words stay as typed whatever the role says.
         uppercase: layer.kind === 'text' && Boolean(role.uppercase),
+        textCase: layer.kind === 'text' && role.uppercase ? 'upper' : 'none',
         letterSpacing: layer.kind === 'text' ? (role.letterSpacing ?? 0) : 0,
         color: null,
         stroke: null,
@@ -77,6 +81,9 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
     ...(layer.size !== undefined ? { size: layer.size } : {}),
     ...(layer.letterSpacing !== undefined ? { letterSpacing: layer.letterSpacing } : {}),
     ...(layer.lineHeight !== undefined ? { lineHeight: layer.lineHeight } : {}),
+    ...(layer.weight !== undefined ? { weight: layer.weight } : {}),
+    ...(layer.italic !== undefined ? { italic: layer.italic } : {}),
+    ...(layer.textCase !== undefined ? { textCase: layer.textCase, uppercase: layer.textCase === 'upper' } : {}),
   };
 }
 
@@ -87,12 +94,12 @@ export function presetParts(style: { stroke?: unknown; shadow?: unknown; highlig
 
 // --- names ------------------------------------------------------------------------------------------
 
-export const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Box', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Stamp' };
+export const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Box', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Mark' };
 
 /** What the layer list calls a layer: its words, its mark, or its kind. */
 export function layerName(l: FreeformLayer): string {
   if (l.kind === 'text' || l.kind === 'sticky') return l.text.trim().split(/\r?\n/)[0]!.slice(0, 32) || LAYER_NAMES[l.kind];
-  if (l.kind === 'mark') return MARKS.find((m) => m.key === l.mark)?.name ?? 'Stamp';
+  if (l.kind === 'mark') return MARKS.find((m) => m.key === l.mark)?.name ?? 'Mark';
   if (l.kind === 'image') return l.src.split('/').pop()?.slice(0, 32) || 'Image';
   return LAYER_NAMES[l.kind];
 }

@@ -21,6 +21,7 @@ import {
   newGroupId,
   paintGroup,
   paintLayer,
+  paintOne,
   parseLayerClip,
   pasteLayers,
   removeGroup,
@@ -35,6 +36,12 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { BRAND_DRAG, BrandLibrary, type BrandItem } from './BrandLibrary.tsx';
+import { EMAIL_MAX, FRAME_MAX } from '../model/frame-sizes.ts';
+import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
+import { measureImage, shownImageHref } from './picture-size.ts';
+import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
+import { BRAND_PRESETS } from './features.ts';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
@@ -118,6 +125,8 @@ export interface SurfaceApi {
 }
 
 export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone }: SurfaceProps) {
+  /** In the Freeform app a page can be a poster; in an email it is a block, which a column limits. */
+  const pageMax = standalone ? FRAME_MAX : EMAIL_MAX;
   const site = siteOf(editor.template, blockId);
   const block = site?.column.blocks[site.index];
   const ds = designSystemOf(editor.template);
@@ -153,6 +162,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const paintRef = useRef(paint);
   paintRef.current = paint;
   const [paintsOpen, setPaintsOpen] = useState(false);
+  /** The brand library, docked on the left: marks, the project's pictures, the palette. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [stamp, setStamp] = useState(MARKS[0]!.key);
   const stampRef = useRef(stamp);
   stampRef.current = stamp;
@@ -162,7 +173,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   /** Where the eraser is over the page, for its ring. */
   const [eraserAt, setEraserAt] = useState<Point | null>(null);
   /** The brand preset new text is set in; null is the plain heading role. */
-  const [look, setLook] = useState<string | null>(() => Object.keys(canvasTypeOf(ds))[0] ?? null);
+  const [look, setLook] = useState<string | null>(() => (BRAND_PRESETS ? (Object.keys(canvasTypeOf(ds))[0] ?? null) : null));
   const lookRef = useRef(look);
   lookRef.current = look;
   /** The group this marker session's strokes go into. A new session starts with each new pen tool. */
@@ -170,6 +181,11 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   /** How many times the clipboard has been pasted since it was copied, so each paste steps further out. */
   const pasteCount = useRef(0);
   const [pageDrag, setPageDrag] = useState(false);
+  /** The selection box being dragged, in page coordinates. */
+  const [marquee, setMarquee] = useState<Box | null>(null);
+  /** The picture being cropped: double-click one, then drag it inside its frame. Escape or a click elsewhere ends it. */
+  const [cropping, setCropping] = useState<string | null>(null);
+  const [cropHref, setCropHref] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[]; snapped: QuickShape | null } | null>(null);
   const [space, setSpace] = useState(false);
@@ -456,7 +472,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       if (!sel) return;
       onSelectLayer(null);
       const gone = () =>
-        commit(sel.group ? 'Remove drawing' : 'Remove layer', sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id));
+        commit(
+          sel.multi ? 'Remove layers' : sel.group ? 'Remove drawing' : 'Remove layer',
+          sel.multi ? removeUnits(tpl(), blockId, b!, sel.units) : sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id),
+        );
       const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 100, 'forwards') : null));
       const first = anims.find(Boolean);
       if (first) first.onfinish = gone;
@@ -633,14 +652,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const b = blockRef.current;
     const sel = b ? selectionOf(b, layerRef.current) : null;
     if (!sel) return;
-    commit('Colour', sel.group ? paintGroup(tpl(), blockId, sel.group, color) : paintLayer(tpl(), blockId, sel.layers[0]!.id, color));
+    commit('Colour', sel.multi ? replaceLayers(tpl(), blockId, sel.layers.map((l) => paintOne(l, color))) : sel.group ? paintGroup(tpl(), blockId, sel.group, color) : paintLayer(tpl(), blockId, sel.layers[0]!.id, color));
   };
 
   const chooseLook = (next: string | null) => {
     setLook(next);
     const b = blockRef.current;
     const sel = b ? selectionOf(b, layerRef.current) : null;
-    const one = sel && !sel.group ? sel.layers[0] : undefined;
+    const one = sel && !sel.many ? sel.layers[0] : undefined;
     if (one?.kind === 'text') commit('Text style', updateLayer(tpl(), blockId, one.id, next ? { look: next } : { look: undefined }));
   };
 
@@ -701,6 +720,41 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     });
   }
 
+  /**
+   * The layer under the pointer, topmost first. A text layer's drawing reaches down to the foot of the page so
+   * its words can wrap, so it counts as hit only inside its measured box; under that, whatever is beneath it.
+   */
+  const layerAt = (clientX: number, clientY: number, p: Point): string | null => {
+    const b = blockRef.current;
+    if (!b) return null;
+    for (const el of document.elementsFromPoint(clientX, clientY)) {
+      const id = el.closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer');
+      if (!id) continue;
+      const l = b.layers.find((x) => x.id === id);
+      if (!l) continue;
+      if (l.kind === 'text') {
+        const box = boundsOf(l, textHeights[l.id]);
+        if (p.x < box.x || p.x > box.x + box.width || p.y < box.y || p.y > box.y + box.height) continue;
+      }
+      return id;
+    }
+    return null;
+  };
+
+  /**
+   * Into crop: the picture's own size is needed to know how far it overflows, so a picture placed before that
+   * was kept is measured first, from the address the canvas is showing it at.
+   */
+  const startCrop = async (l: Extract<FreeformLayer, { kind: 'image' }>) => {
+    if (!l.natural) {
+      const natural = await measureImage(l.id);
+      if (!natural) return;
+      commit('Crop', updateLayer(tpl(), blockId, l.id, { natural, fit: l.fit ?? 'fill' }));
+    }
+    setCropHref(shownImageHref(l.id));
+    setCropping(l.id);
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     const b = blockRef.current;
     const svg = svgEl.current;
@@ -740,8 +794,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     }
     const sel = selectionOf(b, layerRef.current);
     if (handle && sel) {
-      const one = sel.group ? undefined : sel.layers[0]!;
-      if (sel.group) {
+      const one = sel.many ? undefined : sel.layers[0]!;
+      if (sel.many) {
         drag.current = { kind: 'resizeMany', layers: sel.layers, handle: handle as Handle, box: groupBox(sel.layers, textHeights), x: p.x, y: p.y };
       } else if (handle === 'rot' && one) {
         const box = boxOf(one);
@@ -792,7 +846,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       return;
     }
 
-    const hit = target.closest('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
+    const hit = layerAt(event.clientX, event.clientY, p);
     if (hit) {
       const l = b.layers.find((x) => x.id === hit);
       if (!l) return;
@@ -808,8 +862,36 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         event.preventDefault();
         return;
       }
-      onSelectLayer(gid ? groupKey(gid) : hit);
-      drag.current = { kind: 'move', layers: gid ? membersOf(b, gid) : [l], x: p.x, y: p.y, moved: false };
+      if (!gid && again && l.kind === 'image' && l.src.trim()) {
+        onSelectLayer(hit);
+        void startCrop(l);
+        event.preventDefault();
+        return;
+      }
+      if (cropping === hit && l.kind === 'image') {
+        drag.current = { kind: 'crop', layer: l, focus: { x: l.focusX ?? 0.5, y: l.focusY ?? 0.5 }, x: p.x, y: p.y };
+        event.preventDefault();
+        return;
+      }
+      if (cropping) setCropping(null);
+      const unit = gid ? groupKey(gid) : hit;
+      // Shift adds the thing to what is picked, or takes it out. Pressing on something already among several
+      // picked things keeps them all picked, so the drag moves them together.
+      const before = selectionOf(b, layerRef.current);
+      let movers: FreeformLayer[] = gid ? membersOf(b, gid) : [l];
+      if (event.shiftKey) {
+        const next = toggleUnit(layerRef.current, unit);
+        onSelectLayer(next);
+        const now = next ? selectionOf(b, next) : null;
+        if (!now || !now.units.includes(unit)) {
+          event.preventDefault();
+          return;
+        }
+        movers = now.layers;
+      } else if (before?.multi && before.units.includes(unit)) {
+        movers = before.layers;
+      } else onSelectLayer(unit);
+      drag.current = { kind: 'move', layers: movers, x: p.x, y: p.y, moved: false };
       // Held still on it for a beat: the hand from here, so dragging moves the page and not the layer.
       const { clientX, clientY } = event;
       window.clearTimeout(holdPan.current);
@@ -821,8 +903,15 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }, settingsRef.current.holdPanMs);
     } else {
       lastPress.current = null;
-      onSelectLayer(null);
-      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
+      if (cropping) setCropping(null);
+      if (current === 'select' && event.pointerType !== 'touch') {
+        // A selection box, as in any layout tool. The page still pans with Space, the hand, or a finger.
+        if (!event.shiftKey) onSelectLayer(null);
+        drag.current = { kind: 'marquee', from: p, base: event.shiftKey ? layerRef.current : null };
+      } else {
+        onSelectLayer(null);
+        drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
+      }
     }
     event.preventDefault();
   };
@@ -835,7 +924,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (!state) {
       // Hover: a soft outline on whatever the pointer is over, as long as nothing is being done.
       if (toolRef.current === 'select' && phaseRef.current === 'idle' && !spaceRef.current && b) {
-        const hit = (event.target as Element).closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
+        const hit = layerAt(event.clientX, event.clientY, toSurface(event.clientX, event.clientY));
         const l = hit ? b.layers.find((x) => x.id === hit) : undefined;
         const key = l?.group && !event.altKey && membersOf(b, l.group).length > 1 ? groupKey(l.group) : hit;
         if (key !== hoverRef.current) {
@@ -846,7 +935,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       return;
     }
     if (!b) return;
-    if (state.kind !== 'pan' && state.kind !== 'pen' && state.kind !== 'create' && state.kind !== 'erase') setDragging(true);
+    if (state.kind !== 'pan' && state.kind !== 'pen' && state.kind !== 'create' && state.kind !== 'erase' && state.kind !== 'marquee') setDragging(true);
     const p = toSurface(event.clientX, event.clientY);
     const key = `surface:${blockId}`;
     switch (state.kind) {
@@ -939,8 +1028,24 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         const s = siteOf(tpl(), blockId);
         if (!s) return;
         const at = { kind: 'block' as const, sectionId: s.section.id, blockId };
-        if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(700, Math.round(state.width + (p.x - state.x)))));
-        if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(1200, Math.round(state.height + (p.y - state.y)))));
+        if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(pageMax.width, Math.round(state.width + (p.x - state.x)))));
+        if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(pageMax.height, Math.round(state.height + (p.y - state.y)))));
+        return;
+      }
+      case 'crop': {
+        if (state.layer.kind !== 'image') return;
+        const f = focusAfterDrag(state.layer, state.focus, p.x - state.x, p.y - state.y);
+        commit('Crop', updateLayer(tpl(), blockId, state.layer.id, f), `${key}:crop:${state.layer.id}`);
+        return;
+      }
+      case 'marquee': {
+        const box = boxFromCorners(state.from, p);
+        setMarquee(box);
+        // What the box touches is picked as it grows, added to what was there when Shift was held.
+        const hits = box.width * viewRef.current.z > 3 || box.height * viewRef.current.z > 3 ? marqueeUnits(b, box, textHeights) : [];
+        let key = state.base;
+        for (const u of hits) if (!selectionOf(b, key)?.units.includes(u)) key = toggleUnit(key, u);
+        if (key !== layerRef.current) onSelectLayer(key);
         return;
       }
     }
@@ -957,6 +1062,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     drag.current = null;
     setGhost(null);
     setGuides([]);
+    setMarquee(null);
     setPageDrag(false);
     setDragging(false);
     if (!state) return;
@@ -1106,6 +1212,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (event.key === 'Escape') {
       event.preventDefault();
       if (editingText) setEditingText(null);
+      else if (cropping) setCropping(null);
       else if (toolRef.current !== 'select') setTool('select');
       else if (layerRef.current) onSelectLayer(null);
       else leave();
@@ -1122,6 +1229,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
       return;
     }
+    if (!meta && !event.altKey && event.key.toLowerCase() === 'e') {
+      setLibraryOpen((o) => !o);
+      return;
+    }
     if (!meta && !event.altKey && event.key.length === 1) {
       const found = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase());
       if (found) {
@@ -1129,13 +1240,24 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         return;
       }
     }
+    if (meta && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      onSelectLayer(keyOfUnits(allUnits(b)));
+      return;
+    }
     const picked = layerRef.current;
     const sel = selectionOf(b, picked);
     if (!picked || !sel) return;
+    if (meta && event.key.toLowerCase() === 'g') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (sel.group) ungroup(sel.group);
+      } else if (sel.multi) groupPicked();
+      return;
+    }
     if (meta && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      if (sel.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, sel.group), sel.layers.length);
-      else place('Duplicate layer', duplicateLayer(tpl(), blockId, picked));
+      duplicateKey(picked);
       return;
     }
     if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -1229,17 +1351,30 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   );
   if (api) api.current = { dropAsset };
 
+  /**
+   * A thing from the brand library onto the page: where it was dropped, or the page's middle. A mark is a
+   * quarter of the page's short side, so it lands at a size that reads on an email header and on a poster.
+   */
+  const placeBrand = (item: BrandItem, client: { x: number; y: number } | null) => {
+    const b = blockRef.current;
+    if (!b) return;
+    if (item.kind === 'picture') return dropAsset({ name: item.name, size: 0, url: item.url }, client);
+    const at = client ? toSurface(client.x, client.y) : { x: b.width / 2, y: b.height / 2 };
+    place('Add mark', addMarkAt(tpl(), blockId, item.key, at, paintRef.current, 0, Math.min(b.width, b.height) * 0.25));
+    setTool('select');
+  };
+
   if (!block || block.type !== 'freeform' || !site) return null;
 
   // --- what is drawn -------------------------------------------------------------------------------
 
   const idle = phase === 'idle';
   const sel = idle ? selectionOf(block, layer) : null;
-  const picked = sel && !sel.group ? sel.layers[0] : undefined;
-  const pickedBox = sel ? (sel.group ? groupBox(sel.layers, textHeights) : boxOf(sel.layers[0]!)) : null;
+  const picked = sel && !sel.many ? sel.layers[0] : undefined;
+  const pickedBox = sel ? (sel.many ? groupBox(sel.layers, textHeights) : boxOf(sel.layers[0]!)) : null;
   const hoverSel = hover && hover !== layer && idle && tool === 'select' ? selectionOf(block, hover) : null;
   const hovered = hoverSel && !hoverSel.group ? hoverSel.layers[0] : undefined;
-  const hoveredBox = hoverSel ? (hoverSel.group ? groupBox(hoverSel.layers, textHeights) : boxOf(hoverSel.layers[0]!)) : null;
+  const hoveredBox = hoverSel ? (hoverSel.many ? groupBox(hoverSel.layers, textHeights) : boxOf(hoverSel.layers[0]!)) : null;
   const hs = HANDLE / view.z;
   const allHandles: Array<{ h: Handle; x: number; y: number; cursor: string }> = pickedBox
     ? [
@@ -1288,7 +1423,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           width: Math.max(10, box.width - pad * 2) * view.z,
           height: typing.kind === 'sticky' ? Math.max(10, box.height - pad * 2) * view.z : Math.max(size * 1.3, textHeights[typing.id] ?? 0) * view.z,
           size: size * view.z,
-          style: { lineHeight: st.lineHeight, weight: st.weight, uppercase: st.uppercase, letterSpacing: st.letterSpacing },
+          style: { lineHeight: st.lineHeight, weight: st.weight, uppercase: st.uppercase, textCase: st.textCase, letterSpacing: st.letterSpacing },
           italic: st.italic,
           font: st.font,
           color: colorOf(ds, typing.color) ?? colorOf(ds, st.color) ?? (typing.kind === 'sticky' ? '#2b2620' : ink),
@@ -1309,8 +1444,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const duplicateKey = (key: string) => {
     const b = blockRef.current;
     const s = b ? selectionOf(b, key) : null;
-    if (!s) return;
-    if (s.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, s.group), s.layers.length);
+    if (!s || !b) return;
+    if (s.multi) {
+      const made = duplicateUnits(tpl(), blockId, b, s.units);
+      commit('Duplicate layers', made.template);
+      onSelectLayer(made.key);
+    } else if (s.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, s.group), s.layers.length);
     else place('Duplicate layer', duplicateLayer(tpl(), blockId, key));
   };
   const orderKey = (key: string, delta: number) => {
@@ -1319,6 +1458,27 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const gid = groupOfKey(key);
     const at = groupRuns(b.layers).findIndex((it) => (gid ? it.kind === 'group' && it.id === gid : it.kind === 'layer' && it.layer.id === key));
     if (at !== -1) commit('Reorder', moveItem(tpl(), blockId, key, at + delta));
+  };
+  /** The things picked made into one group, which stays picked. */
+  const groupPicked = () => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (!b || !s?.multi) return;
+    const made = groupUnits(tpl(), blockId, b, s.units);
+    if (!made) return;
+    commit('Group', made.template);
+    onSelectLayer(made.key);
+  };
+  /** The things picked lined up with each other, or spaced evenly. */
+  const alignPicked = (edge: UnitEdge) => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (b && s?.multi) commit(`Align ${edge}`, replaceLayers(tpl(), blockId, alignUnits(b, s.units, edge, textHeights)));
+  };
+  const distributePicked = (axis: 'x' | 'y') => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (b && s?.multi) commit(axis === 'x' ? 'Distribute across' : 'Distribute down', replaceLayers(tpl(), blockId, distributeUnits(b, s.units, axis, textHeights)));
   };
   const ungroup = (gid: string) => {
     commit('Ungroup drawing', ungroupLayers(tpl(), blockId, gid));
@@ -1331,7 +1491,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     for (const [k, v] of Object.entries(patch)) editorRef.current.setAt(at, `block.${k}`, v);
   };
 
-  const slashItems: CanvasCommand[] = typing && slash ? filterCommands(canvasCommands(typing, ds), slash.query) : [];
+  const slashItems: CanvasCommand[] = typing && slash ? filterCommands(canvasCommands(typing, ds).filter((c) => BRAND_PRESETS || c.group !== 'Preset'), slash.query) : [];
   /** Words and formatting into the layer and the editor together, with the selection put back where it belongs. */
   const rewrite = (label: string, next: { text: string; styles: StyleRange[] }, extra: Record<string, unknown>, start: number, end: number, coalesce?: string) => {
     const el = textRef.current;
@@ -1405,7 +1565,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     ].map((p) => (rotation ? rotatePoint(p, centre, rotation) : p));
     const minY = Math.min(...pts.map((p) => p.y));
     const maxY = Math.max(...pts.map((p) => p.y));
-    const lift = sel.group || picked?.kind === 'line' ? 14 : 42;
+    const lift = sel.many || picked?.kind === 'line' ? 14 : 42;
     const above = view.y + minY * view.z - lift;
     const below = above < 130;
     const width = work.current?.clientWidth ?? 1200;
@@ -1433,8 +1593,29 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     : null;
 
   return (
-    <div class={`surface fig phase-${phase} tool-${tool} ${space || held || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''}`}>
-      <div class="surface-work" ref={work} tabIndex={-1}>
+    <div class={`surface fig phase-${phase} tool-${tool} ${space || held || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''} ${libraryOpen ? 'with-library' : ''}`}>
+      <div
+        class="surface-work"
+        ref={work}
+        tabIndex={-1}
+        onDragOver={(e) => {
+          if (e.dataTransfer?.types.includes(BRAND_DRAG)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDrop={(e) => {
+          const raw = e.dataTransfer?.getData(BRAND_DRAG);
+          if (!raw) return;
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            placeBrand(JSON.parse(raw) as BrandItem, { x: e.clientX, y: e.clientY });
+          } catch {
+            // Not ours after all.
+          }
+        }}
+      >
         <div class="surface-backdrop" aria-hidden="true" />
         <svg
           class="surface-svg"
@@ -1506,6 +1687,21 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               {tool === 'eraser' && eraserAt && idle && (
                 <circle cx={eraserAt.x} cy={eraserAt.y} r={ERASER / view.z} fill="rgba(255,255,255,0.65)" stroke="#1e1c19" stroke-width={1.5 / view.z} />
               )}
+              {(() => {
+                // Cropping: the whole picture shows faintly past its frame, so you can see what you are moving.
+                const c = cropping ? block.layers.find((l) => l.id === cropping) : undefined;
+                const place = c?.kind === 'image' ? imagePlacement(c) : null;
+                if (!c || !place || !cropHref) return null;
+                return (
+                  <g pointer-events="none" transform={rotateAbout(c, boxOf(c))}>
+                    <image href={cropHref} x={place.x} y={place.y} width={place.width} height={place.height} preserveAspectRatio="none" opacity={0.3} />
+                    <rect x={place.x} y={place.y} width={place.width} height={place.height} fill="none" stroke={ACCENT} stroke-width={1 / view.z} stroke-dasharray={`${4 / view.z} ${3 / view.z}`} />
+                  </g>
+                );
+              })()}
+              {marquee && (
+                <rect class="surface-marquee" x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height} stroke-width={1 / view.z} />
+              )}
               {guides.map((g, i) =>
                 g.axis === 'x' ? (
                   <line key={`g${i}`} class="surface-guide" x1={g.at} y1={g.from} x2={g.at} y2={g.to} stroke-width={1 / view.z} />
@@ -1523,7 +1719,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                     fill="none"
                     stroke={ACCENT}
                     stroke-width={1.5 / view.z}
-                    stroke-dasharray={sel.group ? `${5 / view.z} ${4 / view.z}` : undefined}
+                    stroke-dasharray={sel.many ? `${5 / view.z} ${4 / view.z}` : undefined}
                   />
                   {picked?.kind === 'line' ? (
                     <>
@@ -1536,7 +1732,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                         <circle key={hd.h} data-handle={hd.h} cx={hd.x} cy={hd.y} r={hs / 2} class="surface-handle" style={{ cursor: hd.cursor }} />
                       ))}
                       {/* A drawing scales but does not turn: its strokes have no one centre to turn about. */}
-                      {!sel.group && (
+                      {!sel.many && (
                         <>
                           <line x1={centre.x} y1={pickedBox.y} x2={centre.x} y2={pickedBox.y - 24 / view.z} stroke={ACCENT} stroke-width={1.5 / view.z} />
                           <circle data-handle="rot" cx={centre.x} cy={pickedBox.y - 24 / view.z} r={hs * 0.62} class="surface-handle rot" />
@@ -1576,7 +1772,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               fontStyle: field.italic ? 'italic' : 'normal',
               color: field.color,
               textAlign: field.align,
-              textTransform: field.style.uppercase ? 'uppercase' : 'none',
+              textTransform: ({ none: 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize' } as const)[field.style.textCase],
               letterSpacing: field.style.letterSpacing ? `${field.style.letterSpacing * view.z}px` : undefined,
               transform: typing.rotation ? `rotate(${typing.rotation}deg)` : undefined,
             }}
@@ -1685,13 +1881,27 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onDuplicate={() => layer && duplicateKey(layer)}
           onRemove={() => layer && poof(layer)}
           onUngroup={() => sel.group && ungroup(sel.group)}
+          multi={sel.multi}
+          onGroup={groupPicked}
           onOrder={(d) => layer && orderKey(layer, d)}
-          onSavePreset={(mode, label) => {
-            const one = sel.group ? undefined : sel.layers[0];
+          onSavePreset={!BRAND_PRESETS ? undefined : (mode, label) => {
+            const one = sel.many ? undefined : sel.layers[0];
             if (one?.kind !== 'text') return;
             const saved = savePresetFromLayer(tpl(), blockId, one, mode, label);
             if (saved) commit(mode === 'update' ? 'Update preset' : 'New preset', saved.template);
           }}
+        />
+      )}
+
+      {libraryOpen && (
+        <BrandLibrary
+          ds={ds}
+          assets={assets}
+          ink={paint}
+          onInk={(c) => choosePaint(c)}
+          onPlace={(item) => placeBrand(item, null)}
+          onPaint={() => undefined}
+          onClose={() => setLibraryOpen(false)}
         />
       )}
 
@@ -1701,9 +1911,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           ds={ds}
           picked={layer}
           hover={hover}
-          onPick={(key) => {
+          onPick={(key, add) => {
             setTool('select');
-            onSelectLayer(key);
+            onSelectLayer(add && key ? toggleUnit(layerRef.current, key) : key);
           }}
           onHover={(key) => {
             hoverRef.current = key;
@@ -1719,6 +1929,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
           heights={textHeights}
+          pageMax={pageMax}
+          onAlignUnits={alignPicked}
+          onDistribute={distributePicked}
+          onGroup={groupPicked}
           onLayers={(label, next, coalesce) => commit(label, replaceLayers(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}
@@ -1768,7 +1982,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         )}
       </div>
 
-      {(tool === 'stamp' || tool === 'text' || tool === 'pen' || paintsOpen) && (
+      {(tool === 'stamp' || (tool === 'text' && BRAND_PRESETS) || tool === 'pen' || paintsOpen) && (
         <div class="fig-chrome fig-trays">
           {paintsOpen && (
             <div class="fig-tray fig-paints" role="group" aria-label="Colour">
@@ -1782,7 +1996,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               ))}
             </div>
           )}
-          {tool === 'text' && (
+          {tool === 'text' && BRAND_PRESETS && (
             <div class="fig-tray fig-looks" role="group" aria-label="Text style">
               {[null, ...Object.keys(canvasTypeOf(ds))].map((k) => (
                 <button
@@ -1837,6 +2051,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             </button>
           ))}
         </div>
+        <button
+          class={`fig-tool ${libraryOpen ? 'on' : ''}`}
+          aria-pressed={libraryOpen}
+          aria-label="Brand library"
+          title={'Brand library  ·  E\nMarks, the project’s pictures and the palette. Click to place, or drag onto the page.'}
+          onClick={() => setLibraryOpen((o) => !o)}
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+            <circle cx="17" cy="17" r="3.5" />
+          </svg>
+        </button>
         <span class="fig-sep" aria-hidden="true" />
         <button
           class={`fig-swatch ${paintsOpen ? 'on' : ''} ${swatch ? '' : 'none'}`}
@@ -1850,7 +2078,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
       {hint && idle && (
         <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
-          Double-click text to type · / for presets · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
+          Double-click text to type · / for type · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
         </div>
       )}
     </div>

@@ -3,10 +3,15 @@ import type { JSX } from 'preact';
 
 import { brushSampleSvg, canvasTypeSampleSvg } from '../compile/freeform.ts';
 import { LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
-import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
+import { canvasTypeOf, colorOf, firstPreset, theme, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
 import { hasTweaks } from '../model/brand-presets.ts';
+import { BRAND_PRESETS } from './features.ts';
 import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
+import { unitsOf } from '../model/selection.ts';
+import { FRAME_SIZES, sizeOf } from '../model/frame-sizes.ts';
+import { frameToPicture, imagePlacement, MAX_ZOOM, type ImageLayer } from '../model/image-layer.ts';
+import { measureImage, shownImageHref } from './picture-size.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
@@ -31,7 +36,7 @@ const icon = (...children: JSX.Element[]) => (
   </svg>
 );
 
-const KIND_ICONS: Record<FreeformLayer['kind'] | 'group', () => JSX.Element> = {
+const KIND_ICONS: Record<FreeformLayer['kind'] | 'group' | 'bundle', () => JSX.Element> = {
   text: () => icon(<path key="a" d="M6 6.5h12M12 6.5v12" />),
   sticky: () => icon(<path key="a" d="M5 4.5h14v9.8L14.3 19.5H5z" />, <path key="b" d="M14 19.3v-5h5" />),
   rect: () => icon(<rect key="a" x="4" y="6" width="16" height="12" rx="2.5" />),
@@ -40,6 +45,7 @@ const KIND_ICONS: Record<FreeformLayer['kind'] | 'group', () => JSX.Element> = {
   path: () => icon(<path key="a" d="M4 16c3-7 5 3 8-3s5 2 8-4" />),
   image: () => icon(<rect key="a" x="4" y="5" width="16" height="14" rx="2" />, <path key="b" d="M4 16l5-5 4 4 2-2 5 5" />),
   mark: () => icon(<circle key="a" cx="12" cy="9" r="4.6" />, <path key="b" d="M9.5 13.2L9 16.5h6l-.5-3.3M6 19.5h12" />),
+  bundle: () => icon(<rect key="a" x="3.5" y="3.5" width="17" height="17" rx="2.5" strokeDasharray="3 2.5" />, <rect key="b" x="8" y="8" width="8" height="8" rx="1.5" />),
   group: () => icon(<path key="a" d="M3 15c2.5-6 4.5 2 7-3s4 1.5 6-2" />, <path key="b" d="M8 20c2.5-5 4.5 1.5 7-2.5s3.5 1 6-1.5" />),
 };
 
@@ -57,7 +63,8 @@ export interface FigLayersProps {
   ds: DesignSystem;
   picked: string | null;
   hover: string | null;
-  onPick(key: string | null): void;
+  /** `add`: Shift was held, so the row joins or leaves what is picked. */
+  onPick(key: string | null, add?: boolean): void;
   onHover(key: string | null): void;
   /** Double-click on words: type into them. */
   onEdit(layerId: string): void;
@@ -79,10 +86,17 @@ export interface FigLayersProps {
   heights: Record<string, number>;
   /** Swaps in changed layers from the properties panel. `coalesce` makes a run of edits one undo step. */
   onLayers(label: string, next: FreeformLayer[], coalesce?: string): void;
+  /** Several things picked: line them up with each other, space them, make them a group. */
+  /** The largest page this canvas allows: an email block's, or a Freeform frame's. */
+  pageMax: { width: number; height: number };
+  onAlignUnits(edge: AlignEdge): void;
+  onDistribute(axis: 'x' | 'y'): void;
+  onGroup(): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, pageMax }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const pickedUnits = unitsOf(picked);
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** Where a drag would land, as a gap in the list as shown: 0 is above the first row. */
   const [gap, setGap] = useState<number | null>(null);
@@ -106,7 +120,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
     return (
       <li
         key={key}
-        class={`fig-layer ${picked === key ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
         draggable={index !== null}
         onDragStart={(e) => {
           if (index === null) return;
@@ -131,7 +145,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
         onMouseEnter={() => onHover(key)}
         onMouseLeave={() => onHover(null)}
       >
-        <button class="fig-layer-main" title={`${LAYER_NAMES[l.kind]}. Drag to reorder.`} onClick={() => onPick(picked === key ? null : key)} onDblClick={() => (l.kind === 'text' || l.kind === 'sticky') && onEdit(l.id)}>
+        <button class="fig-layer-main" title={`${LAYER_NAMES[l.kind]}. Drag to reorder.`} onClick={(e) => onPick(e.shiftKey ? key : picked === key ? null : key, e.shiftKey)} onDblClick={() => (l.kind === 'text' || l.kind === 'sticky') && onEdit(l.id)}>
           <span class={`fig-layer-icon k-${l.kind}`}>{KIND_ICONS[l.kind]()}</span>
           <span class="fig-layer-name">{layerName(l)}</span>
         </button>
@@ -166,7 +180,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           return (
             <li key={key} class="fig-group">
               <div
-                class={`fig-layer ${picked === key ? 'on' : ''} ${hover === key ? 'hover' : ''} ${gap === index && dragKey ? 'gap-before' : ''} ${gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+                class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${gap === index && dragKey ? 'gap-before' : ''} ${gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer?.setData('text/x-fig-layer', key);
@@ -193,9 +207,10 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
                 <button class={`fig-fold ${expanded ? 'open' : ''}`} aria-expanded={expanded} aria-label={expanded ? 'Fold the drawing' : 'Show its strokes'} onClick={() => setOpen((o) => ({ ...o, [item.id]: !o[item.id] }))}>
                   {icon(<path key="a" d="M9 6l6 6-6 6" />)}
                 </button>
-                <button class="fig-layer-main" title="A drawing: strokes made in one go. They move, scale, colour and delete together. Alt-click a stroke on the canvas to pick it alone." onClick={() => onPick(picked === key ? null : key)}>
-                  <span class="fig-layer-icon k-group">{KIND_ICONS.group()}</span>
-                  <span class="fig-layer-name">Drawing</span>
+                <button class="fig-layer-main" title="A group: they move, scale, colour and delete together. Alt-click one on the canvas to pick it alone." onClick={(e) => onPick(e.shiftKey ? key : picked === key ? null : key, e.shiftKey)}>
+                  {/* Strokes from one pen session are a drawing; anything grouped by hand is a group. */}
+                  <span class="fig-layer-icon k-group">{item.layers.every((l) => l.kind === 'path') ? KIND_ICONS.group() : KIND_ICONS.bundle()}</span>
+                  <span class="fig-layer-name">{item.layers.every((l) => l.kind === 'path') ? 'Drawing' : 'Group'}</span>
                   <span class="fig-badge">{item.layers.length}</span>
                 </button>
                 <span class="fig-layer-actions">
@@ -215,20 +230,37 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       </ul>
 
       {picked && selectionOf(block, picked) ? (
-        <FigProps block={block} pickedKey={picked} heights={heights} onLayers={onLayers} />
+        <FigProps block={block} ds={ds} pickedKey={picked} heights={heights} onLayers={onLayers} onAlignUnits={onAlignUnits} onDistribute={onDistribute} onGroup={onGroup} />
       ) : (
       <div class="fig-page">
         <div class="fig-page-row">
           <b>Page</b>
           <label title="Width of the picture, in pixels">
             W
-            <input type="number" min={40} max={700} value={block.width} onChange={(e) => onPage({ width: clamp(Number((e.target as HTMLInputElement).value), 40, 700) })} />
+            <input type="number" min={40} max={pageMax.width} value={block.width} onChange={(e) => onPage({ width: clamp(Number((e.target as HTMLInputElement).value), 40, pageMax.width) })} />
           </label>
           <label title="Height of the picture, in pixels">
             H
-            <input type="number" min={20} max={1200} value={block.height} onChange={(e) => onPage({ height: clamp(Number((e.target as HTMLInputElement).value), 20, 1200) })} />
+            <input type="number" min={20} max={pageMax.height} value={block.height} onChange={(e) => onPage({ height: clamp(Number((e.target as HTMLInputElement).value), 20, pageMax.height) })} />
           </label>
         </div>
+        <label class="fig-prop wide" title="A standard size. The layers stay where they are.">
+          <span class="fig-prop-label">Size</span>
+          <select
+            value={sizeOf(block.width, block.height)?.key ?? ''}
+            onChange={(e) => {
+              const s = FRAME_SIZES.find((x) => x.key === (e.target as HTMLSelectElement).value);
+              if (s) onPage({ width: s.width, height: s.height });
+            }}
+          >
+            <option value="">Custom</option>
+            {FRAME_SIZES.filter((s) => s.width <= pageMax.width && s.height <= pageMax.height).map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label} · {s.width} × {s.height}
+              </option>
+            ))}
+          </select>
+        </label>
         <div class="fig-page-row dots" role="group" aria-label="Page background">
           <button class={`fig-dot clear ${block.background === null ? 'on' : ''}`} title="No background: the email shows through" aria-label="No background" onClick={() => onPage({ background: null })} />
           {palette.map((name) => (
@@ -241,7 +273,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       {(() => {
         // The one layer picked has its own stack; nothing picked, or a drawing, is the page's.
         const sel = picked ? selectionOf(block, picked) : null;
-        const layer = sel && !sel.group ? sel.layers[0] : undefined;
+        const layer = sel && !sel.many ? sel.layers[0] : undefined;
         return layer ? (
           <FigEffects
             key={`layer:${layer.id}`}
@@ -697,6 +729,9 @@ export interface FigBarProps {
   onRemove(): void;
   onUngroup(): void;
   onOrder(delta: number): void;
+  /** Several things picked rather than one: no per-kind controls, and a Group button. */
+  multi?: boolean;
+  onGroup?(): void;
   /** Saves the picked text's look into the design system's brand presets: into its own, or as a new one. */
   onSavePreset?(mode: 'update' | 'new', label?: string): void;
 }
@@ -706,11 +741,11 @@ type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' |
 /** A design system font's key as a name: `georgia` is Georgia. */
 const fontName = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
-export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset }: FigBarProps) {
+export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset, multi, onGroup }: FigBarProps) {
   const [pop, setPop] = useState<Pop>(null);
-  const one = group ? undefined : layers[0];
+  const one = group || multi ? undefined : layers[0];
   const inverted = layers.length > 0 && layers.every((l) => l.invert);
-  const id = group ?? one?.id ?? '';
+  const id = group ?? (multi ? layers.map((l) => l.id).join(',') : one?.id) ?? '';
   const palette = Object.keys(ds.colors).slice(0, 8);
   const toggle = (p: Pop) => setPop((cur) => (cur === p ? null : p));
   const set = (label: string, patch: Record<string, unknown>, coalesce?: string) => onChange(label, (l) => ({ ...l, ...patch }) as FreeformLayer, coalesce ? `${coalesce}:${id}` : undefined);
@@ -775,13 +810,21 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
     const tweaked = hasTweaks(text);
     quick = (
       <>
-        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
-          <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
-          {lookLabel}
-          <span class="caret">▾</span>
-        </button>
+        {BRAND_PRESETS && (
+          <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
+            <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
+            {lookLabel}
+            <span class="caret">▾</span>
+          </button>
+        )}
         {fontChip}
         {stepper('Size', style.size, style.size >= 40 ? 4 : 2, 6, 240, (v) => set('Text size', { size: v }, 'size'))}
+        <button class={`fig-icon-btn ${style.weight === 'bold' ? 'on' : ''}`} title="Bold" aria-label="Bold" aria-pressed={style.weight === 'bold'} onClick={() => set('Bold', { weight: style.weight === 'bold' ? 'normal' : 'bold' })}>
+          <span class="fmt-glyph">B</span>
+        </button>
+        <button class={`fig-icon-btn ${style.italic ? 'on' : ''}`} title="Italic" aria-label="Italic" aria-pressed={style.italic} onClick={() => set('Italic', { italic: !style.italic })}>
+          <span class="fmt-glyph italic">I</span>
+        </button>
         <button class="fig-icon-btn" title={`Align ${text.align} · click for ${NEXT_ALIGN[text.align]}`} aria-label="Alignment" onClick={() => set('Align', { align: NEXT_ALIGN[text.align] })}>
           {ALIGN_ICONS[text.align]()}
         </button>
@@ -796,7 +839,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
         <Slide label="Letter spacing" unit="px" min={-6} max={30} step={0.5} value={style.letterSpacing} onInput={(v) => set('Letter spacing', { letterSpacing: v }, 'tracking')} />
         <Slide label="Line height" unit="%" min={60} max={220} value={style.lineHeight} onInput={(v) => set('Line height', { lineHeight: v }, 'leading')} />
         {tweaked && (
-          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined })}>
+          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined, weight: undefined, italic: undefined, textCase: undefined })}>
             Back to {preset ? preset.label : 'the role'}
           </button>
         )}
@@ -864,7 +907,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
     quick = (
       <>
         <button class={`fig-chip ${pop === 'mark' ? 'on' : ''}`} title="Which mark" onClick={() => toggle('mark')}>
-          {MARKS.find((m) => m.key === one.mark)?.name ?? 'Stamp'}
+          {MARKS.find((m) => m.key === one.mark)?.name ?? 'Mark'}
           <span class="caret">▾</span>
         </button>
         <button class={`fig-swatch-btn ${pop === 'colour' ? 'on' : ''}`} title="Colour" aria-label="Colour" onClick={() => toggle('colour')}>
@@ -891,8 +934,13 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
           </button>
         )}
         {(quick || tweaks) && <span class="fig-sep" aria-hidden="true" />}
+        {multi && onGroup && (
+          <button class="fig-icon-btn" title="Group  ·  ⌘G" aria-label="Group" onClick={onGroup}>
+            {icon(<rect key="a" x="3" y="3" width="18" height="18" rx="3" strokeDasharray="3 3" />, <rect key="b" x="7" y="7" width="10" height="10" rx="2" />)}
+          </button>
+        )}
         {group && (
-          <button class="fig-icon-btn" title="Ungroup the drawing" aria-label="Ungroup" onClick={onUngroup}>
+          <button class="fig-icon-btn" title="Ungroup  ·  ⇧⌘G" aria-label="Ungroup" onClick={onUngroup}>
             {icon(<rect key="a" x="3" y="3" width="8" height="8" rx="2" />, <rect key="b" x="13" y="13" width="8" height="8" rx="2" />)}
           </button>
         )}
@@ -942,7 +990,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
           {pop === 'mark' && one?.kind === 'mark' && (
             <div class="fig-bar-looks">
               {MARKS.map((m) => (
-                <button key={m.key} class={`fig-stamp ${one.mark === m.key ? 'on' : ''}`} title={m.name} onClick={() => set('Stamp', { mark: m.key, height: Math.round(one.width / m.ratio) })}>
+                <button key={m.key} class={`fig-stamp ${one.mark === m.key ? 'on' : ''}`} title={m.name} onClick={() => set('Mark', { mark: m.key, height: Math.round(one.width / m.ratio) })}>
                   <svg viewBox={m.viewBox} fill={swatch(one.color, '#1e1c19')} aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.body }} />
                 </button>
               ))}
@@ -1291,20 +1339,46 @@ const ALIGNS: Array<{ edge: AlignEdge; label: string; d: string }> = [
  * and a row that lines it up with the page. A drawing (a group) shows the box around its strokes and
  * scales them together; it does not turn. Text finds its own height, so H is shown but not set.
  */
-function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBlock; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
+function FigProps({ block, ds, pickedKey, heights, onLayers, onAlignUnits, onDistribute, onGroup }: { block: FreeformBlock; ds: DesignSystem; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers']; onAlignUnits: FigLayersProps['onAlignUnits']; onDistribute: FigLayersProps['onDistribute']; onGroup(): void }) {
   const sel = selectionOf(block, pickedKey);
   if (!sel) return null;
-  const group = Boolean(sel.group);
+  const group = sel.many;
   const g = geometryOf(sel.layers, group, heights);
   if (!g) return null;
   const one = sel.layers[0]!;
-  const name = group ? 'Drawing' : LAYER_NAMES[one.kind];
+  const name = sel.multi ? `${sel.units.length} selected` : group ? 'Group' : LAYER_NAMES[one.kind];
   const box = (label: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => onLayers(label, withGeometry(sel.layers, group, patch, heights));
   return (
     <div class="fig-page fig-props">
       <div class="fig-page-row">
         <b>{name}</b>
+        {sel.multi && (
+          <button class="fig-text-btn" title="Make these one group  ·  ⌘G" onClick={onGroup}>
+            Group
+          </button>
+        )}
       </div>
+      {sel.multi && (
+        <div class="fig-align" role="group" aria-label="Align to each other">
+          {ALIGNS.map((a) => (
+            <button key={a.edge} class="fig-icon-btn" title={`${a.label} to each other`} aria-label={`${a.label} to each other`} onClick={() => onAlignUnits(a.edge)}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d={a.d} />
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+      {sel.multi && (
+        <div class="fig-text-row">
+          <button class="fig-chip" disabled={sel.units.length < 3} title="Even gaps across, first and last stay put. Needs three or more." onClick={() => onDistribute('x')}>
+            Distribute across
+          </button>
+          <button class="fig-chip" disabled={sel.units.length < 3} title="Even gaps down, first and last stay put. Needs three or more." onClick={() => onDistribute('y')}>
+            Distribute down
+          </button>
+        </div>
+      )}
       <div class="fig-prop-grid">
         <PropNum label="X" title="Left edge, in pixels from the page's left" value={g.x} onCommit={(v) => box('Move', { x: v })} />
         <PropNum label="Y" title="Top edge, in pixels from the page's top" value={g.y} onCommit={(v) => box('Move', { y: v })} />
@@ -1328,6 +1402,8 @@ function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBloc
         />
         <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
       </div>
+      {!sel.many && one.kind === 'text' && <TextProps layer={one} ds={ds} onLayers={onLayers} />}
+      {!sel.many && one.kind === 'image' && one.src.trim() && <ImageProps layer={one} onLayers={onLayers} />}
       <div class="fig-align" role="group" aria-label="Align to page">
         {ALIGNS.map((a) => (
           <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>
@@ -1337,6 +1413,177 @@ function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBloc
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// --- the text tool's settings --------------------------------------------------------------------
+
+const CASES: Array<{ v: 'none' | 'upper' | 'lower' | 'title'; label: string; title: string }> = [
+  { v: 'none', label: '–', title: 'As typed' },
+  { v: 'upper', label: 'AG', title: 'Uppercase' },
+  { v: 'lower', label: 'ag', title: 'Lowercase' },
+  { v: 'title', label: 'Ag', title: 'Title case' },
+];
+const ALIGN_LABELS: Record<Align, string> = { left: 'Align left', center: 'Align centre', right: 'Align right' };
+
+/**
+ * Text, set the way a layout tool sets it: face, weight, size, line height, letter spacing, alignment,
+ * case, italic and colour, each one field. Jared: "make a solid text tool." Every value starts from the
+ * text's type role and becomes the layer's own once changed; Reset takes them all back to the role.
+ */
+function TextProps({ layer, ds, onLayers }: { layer: Extract<FreeformLayer, { kind: 'text' }>; ds: DesignSystem; onLayers: FigLayersProps['onLayers'] }) {
+  const t = textStyleOf(layer, ds);
+  const set = (label: string, patch: Partial<Extract<FreeformLayer, { kind: 'text' }>>, coalesce?: string) =>
+    onLayers(label, [{ ...layer, ...patch } as FreeformLayer], coalesce ? `text:${layer.id}:${coalesce}` : undefined);
+  const fonts = Object.keys(ds.fonts);
+  const palette = Object.keys(ds.colors);
+  // What the words are actually drawn in: their own colour, the role's, or the theme's ink.
+  const hex = colorOf(ds, layer.color) ?? colorOf(ds, t.color) ?? theme(ds, firstPreset(ds)).text;
+  const tweaked = hasTweaks(layer) || layer.color !== null;
+  return (
+    <div class="fig-text-props">
+      <div class="fig-page-row">
+        <b>Type</b>
+        {tweaked && (
+          <button
+            class="fig-text-btn"
+            title="Back to the type role's settings"
+            onClick={() => set('Reset text', { font: undefined, weight: undefined, italic: undefined, textCase: undefined, size: undefined, lineHeight: undefined, letterSpacing: undefined, color: null })}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      <label class="fig-prop wide" title="Typeface, from the design system">
+        <span class="fig-prop-label">Aa</span>
+        <select value={layer.font ?? ''} onChange={(e) => set('Font', { font: (e.target as HTMLSelectElement).value || undefined })} style={{ fontFamily: t.font }}>
+          <option value="">Role font</option>
+          {fonts.map((f) => (
+            <option key={f} value={f} style={{ fontFamily: ds.fonts[f] }}>
+              {fontName(f)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div class="fig-prop-grid">
+        <label class="fig-prop" title="Weight">
+          <span class="fig-prop-label">Wt</span>
+          <select value={t.weight} onChange={(e) => set('Weight', { weight: (e.target as HTMLSelectElement).value as 'normal' | 'bold' })}>
+            <option value="normal">Regular</option>
+            <option value="bold">Bold</option>
+          </select>
+        </label>
+        <PropNum label="Sz" title="Size, in pixels" value={t.size} min={4} max={400} onCommit={(v) => set('Text size', { size: v })} />
+        <PropNum label="Lh" title="Line height, as a percentage of the size" value={t.lineHeight} min={50} max={300} suffix="%" onCommit={(v) => set('Line height', { lineHeight: v })} />
+        <PropNum label="Ls" title="Letter spacing, in pixels" value={t.letterSpacing} min={-20} max={80} step={0.5} onCommit={(v) => set('Letter spacing', { letterSpacing: v })} />
+      </div>
+      <div class="fig-text-row">
+        <span class="fig-seg" role="group" aria-label="Alignment">
+          {(['left', 'center', 'right'] as Align[]).map((a) => (
+            <button key={a} class={layer.align === a ? 'on' : ''} aria-pressed={layer.align === a} title={ALIGN_LABELS[a]} aria-label={ALIGN_LABELS[a]} onClick={() => set(ALIGN_LABELS[a], { align: a })}>
+              {ALIGN_ICONS[a]()}
+            </button>
+          ))}
+        </span>
+        <span class="fig-seg" role="group" aria-label="Case">
+          {CASES.map((c) => (
+            <button key={c.v} class={t.textCase === c.v ? 'on' : ''} aria-pressed={t.textCase === c.v} title={c.title} onClick={() => set(c.title, { textCase: c.v })}>
+              {c.label}
+            </button>
+          ))}
+        </span>
+        <button class={`fig-icon-btn ${t.italic ? 'on' : ''}`} title="Italic" aria-label="Italic" aria-pressed={t.italic} onClick={() => set('Italic', { italic: !t.italic })}>
+          <span class="fmt-glyph italic">I</span>
+        </button>
+      </div>
+      <div class="fig-text-colour">
+        <div class="fig-bar-dots">
+          <button class={`fig-dot none ${layer.color === null ? 'on' : ''}`} title="The role's colour" aria-label="The role's colour" onClick={() => set('Colour', { color: null })} />
+          {palette.map((name) => (
+            <button key={name} class={`fig-dot ${layer.color === name ? 'on' : ''}`} style={{ background: colorOf(ds, name) ?? undefined }} title={`${name}, ${colorOf(ds, name)}`} aria-label={name} onClick={() => set('Colour', { color: name })} />
+          ))}
+        </div>
+        <HexField label="Colour" value={hex.slice(0, 7).toLowerCase()} onInput={(v) => set('Colour', { color: v }, 'colour')} />
+      </div>
+    </div>
+  );
+}
+
+// --- pictures ---------------------------------------------------------------------------------------------
+
+/**
+ * A picture in its frame: fill, fit or stretch, how far in, the point kept in view, round corners or an
+ * ellipse. Jared: "crop and mask inside a shape, fill or fit, rounded corners, focal point." Click the
+ * small picture to set the focal point; double-click the picture on the canvas to drag it inside its frame.
+ */
+function ImageProps({ layer, onLayers }: { layer: ImageLayer; onLayers: FigLayersProps['onLayers'] }) {
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => setHref(shownImageHref(layer.id)), [layer.id, layer.src]);
+  /** Changes that need the picture's own size measure it first, once, for a picture placed before it was kept. */
+  const set = async (label: string, patch: Partial<ImageLayer>, coalesce?: string) => {
+    const natural = layer.natural ?? (await measureImage(layer.id)) ?? undefined;
+    onLayers(label, [{ ...layer, ...(natural ? { natural } : {}), ...patch } as FreeformLayer], coalesce ? `image:${layer.id}:${coalesce}` : undefined);
+  };
+  const fit = layer.fit ?? 'fill';
+  const fx = layer.focusX ?? 0.5;
+  const fy = layer.focusY ?? 0.5;
+  const crops = fit !== 'stretch' && (imagePlacement(layer)?.width ?? Infinity) >= layer.width - 0.5;
+  return (
+    <div class="fig-text-props">
+      <div class="fig-page-row">
+        <b>Picture</b>
+        <button class="fig-text-btn" title="Back to the whole picture, centred, filling the frame" onClick={() => void set('Reset crop', { fit: 'fill', zoom: undefined, focusX: undefined, focusY: undefined })}>
+          Reset
+        </button>
+      </div>
+      <div class="fig-text-row">
+        <span class="fig-seg" role="group" aria-label="How the picture sits in its frame">
+          {(['fill', 'fit', 'stretch'] as const).map((f) => (
+            <button key={f} class={fit === f ? 'on' : ''} aria-pressed={fit === f} title={f === 'fill' ? 'Cover the frame, cropping the overflow' : f === 'fit' ? 'Show the whole picture inside the frame' : 'Stretch to the frame'} onClick={() => void set(`Picture ${f}`, { fit: f })}>
+              {f}
+            </button>
+          ))}
+        </span>
+        <span class="fig-seg" role="group" aria-label="Shape">
+          <button class={layer.mask !== 'ellipse' ? 'on' : ''} aria-pressed={layer.mask !== 'ellipse'} title="Rectangle" aria-label="Rectangle mask" onClick={() => void set('Rectangle', { mask: undefined })}>
+            ▭
+          </button>
+          <button class={layer.mask === 'ellipse' ? 'on' : ''} aria-pressed={layer.mask === 'ellipse'} title="Ellipse" aria-label="Ellipse mask" onClick={() => void set('Ellipse', { mask: 'ellipse' })}>
+            ◯
+          </button>
+        </span>
+      </div>
+      <div class="fig-prop-grid">
+        <PropNum label="Zm" title={`Zoom, 100 to ${MAX_ZOOM * 100}%`} value={Math.round((layer.zoom ?? 1) * 100)} min={100} max={MAX_ZOOM * 100} step={5} suffix="%" disabled={fit === 'stretch'} onCommit={(v) => void set('Zoom', { zoom: v / 100 })} />
+        <PropNum label="Rd" title="Corner radius, in pixels" value={layer.radius ?? 0} min={0} max={1000} disabled={layer.mask === 'ellipse'} onCommit={(v) => void set('Corners', { radius: v || undefined })} />
+      </div>
+      {href && crops && (
+        <button
+          class="fig-focus"
+          title="Click the part of the picture to keep in view"
+          aria-label="Set the focal point"
+          onClick={(e) => {
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const img = (e.currentTarget as HTMLElement).querySelector('img');
+            const ir = img?.getBoundingClientRect() ?? r;
+            const x = Math.max(0, Math.min(1, (e.clientX - ir.left) / ir.width));
+            const y = Math.max(0, Math.min(1, (e.clientY - ir.top) / ir.height));
+            void set('Focal point', { focusX: Math.round(x * 1000) / 1000, focusY: Math.round(y * 1000) / 1000 });
+          }}
+        >
+          <span class="fig-focus-frame">
+            <img src={href} alt="" />
+            <i style={{ left: `${fx * 100}%`, top: `${fy * 100}%` }} aria-hidden="true" />
+          </span>
+        </button>
+      )}
+      <div class="fig-text-row">
+        <button class="fig-chip" disabled={!layer.natural} title="Make the frame the picture's own shape, at this width" onClick={() => onLayers('Frame to picture', [frameToPicture(layer)])}>
+          Frame to picture
+        </button>
+      </div>
+      <p class="fig-fx-hint">Double-click the picture on the canvas to drag it inside its frame.</p>
     </div>
   );
 }

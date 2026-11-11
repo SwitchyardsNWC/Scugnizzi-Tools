@@ -383,6 +383,11 @@ export interface TextTweaks {
   amount?: number;
   /** A key of the design system's `fonts`, over the style's own face. */
   font?: string;
+  /** Over the role's weight, from the text tool. */
+  weight?: 'normal' | 'bold';
+  italic?: boolean;
+  /** How the letters are cased when drawn; the words as typed are kept. */
+  textCase?: 'none' | 'upper' | 'lower' | 'title';
 }
 
 /**
@@ -431,7 +436,28 @@ interface LayerBase {
  */
 export type FreeformLayer =
   | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string; styles?: StyleRange[] } & TextTweaks)
-  | (LayerBase & { kind: 'image'; src: string; x: number; y: number; width: number; height: number; opacity: number })
+  | (LayerBase & {
+      kind: 'image';
+      src: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      opacity: number;
+      /** How the picture sits in its frame: cover it (the default), show all of it, or stretch to it. */
+      fit?: 'fill' | 'fit' | 'stretch';
+      /** The point of the picture kept in view when it is cropped, 0 to 1 across and down. Absent is the centre. */
+      focusX?: number;
+      focusY?: number;
+      /** How far in, from 1 (the picture as `fit` sets it) to 5. */
+      zoom?: number;
+      /** Rounded corners, in pixels. */
+      radius?: number;
+      /** Cut to an ellipse in place of the frame's rectangle. */
+      mask?: 'ellipse';
+      /** The picture's own size, which the crop is worked out from. Images placed before it was kept have none. */
+      natural?: { width: number; height: number };
+    })
   | (LayerBase & { kind: 'rect'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number; radius: number })
   | (LayerBase & { kind: 'ellipse'; x: number; y: number; width: number; height: number; fill: ColorRef; stroke: ColorRef; strokeWidth: number })
   | (LayerBase & { kind: 'line'; x1: number; y1: number; x2: number; y2: number; stroke: ColorRef; strokeWidth: number })

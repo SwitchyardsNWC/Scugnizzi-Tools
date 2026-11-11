@@ -231,7 +231,7 @@ export function addImageLayerAt(template: Template, blockId: string, src: string
     const centre = at ?? { x: block.width / 2, y: block.height / 2 };
     return {
       ...block,
-      layers: [...block.layers, { kind: 'image', id: newLayerId(block), src, x: Math.round(centre.x - width / 2), y: Math.round(centre.y - height / 2), width, height, opacity: 1 }],
+      layers: [...block.layers, { kind: 'image', id: newLayerId(block), src, x: Math.round(centre.x - width / 2), y: Math.round(centre.y - height / 2), width, height, opacity: 1, natural: { width: natural.width, height: natural.height } }],
     };
   });
 }
@@ -398,9 +398,9 @@ export function addStickyAt(template: Template, blockId: string, at: Point, fill
 }
 
 /** A brand mark stamped at a point, at its own proportions. The tilt is the caller's, so the recipe stays exact. */
-export function addMarkAt(template: Template, blockId: string, key: string, at: Point, color: ColorRef, rotation = 0): Template {
+export function addMarkAt(template: Template, blockId: string, key: string, at: Point, color: ColorRef, rotation = 0, size?: number): Template {
   const mark = markOf(key);
-  const width = 88;
+  const width = Math.round(size ?? 88);
   const height = Math.round(width / mark.ratio);
   return withFreeform(template, blockId, (block) => ({
     ...block,

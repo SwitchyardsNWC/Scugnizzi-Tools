@@ -9,6 +9,7 @@ import { FOOTER_TYPES, footerTypeOf } from '../model/footer-types.ts';
 import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
+import { BRAND_PRESETS } from './features.ts';
 import type { FreeformLayer } from '../model/types.ts';
 import type { DndColumn, DndModule, DndSection, Lock } from '../model/types.ts';
 import { newDndColumn, newDndModule, newDndSection } from '../model/dnd.ts';
@@ -659,10 +660,10 @@ const LAYER_KINDS: Array<{ kind: LayerKind; label: string; help: string }> = [
   { kind: 'rect', label: 'Rectangle', help: 'A box: fill, outline, corner radius.' },
   { kind: 'ellipse', label: 'Ellipse', help: 'A circle when its width and height match.' },
   { kind: 'line', label: 'Line', help: 'From one point to another.' },
-  { kind: 'mark', label: 'Stamp', help: 'A brand mark, in any colour.' },
+  { kind: 'mark', label: 'Mark', help: 'A brand mark, in any colour.' },
 ];
 
-const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Stamp' };
+const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Mark' };
 
 /** A compact number: label on the left, the field on the right, for a layer's geometry. */
 function Num({ label, value, onChange, min, max }: { label: string; value: number; onChange(v: number): void; min?: number; max?: number }) {
@@ -794,7 +795,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
     l.kind === 'text' || l.kind === 'sticky'
       ? l.text.trim().slice(0, 24) || LAYER_NAMES[l.kind]
       : l.kind === 'mark'
-        ? (MARKS.find((m) => m.key === l.mark)?.name ?? 'Stamp')
+        ? (MARKS.find((m) => m.key === l.mark)?.name ?? 'Mark')
         : LAYER_NAMES[l.kind];
   const strokeOf = (l: FreeformLayer | undefined) => (l && (l.kind === 'path' || l.kind === 'line') ? l : undefined);
   const firstStroke = strokeOf(members.find((m) => m.kind === 'path' || m.kind === 'line'));
@@ -935,7 +936,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                     }}
                   >
                     <optgroup label="Brand presets">
-                      {Object.entries(looks).map(([k, style]) => (
+                      {Object.entries(BRAND_PRESETS ? looks : {}).map(([k, style]) => (
                         <option key={k} value={`look:${k}`}>
                           {style.label}
                         </option>

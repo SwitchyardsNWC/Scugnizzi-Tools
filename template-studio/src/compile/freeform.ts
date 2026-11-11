@@ -11,6 +11,7 @@
 
 import { canvasTypeOf, colorOf, firstPreset, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { textStyleOf } from '../model/canvas-text.ts';
+import { imagePlacement, isPlainImage, type ImageLayer } from '../model/image-layer.ts';
 import { marksPerChar, runsOf } from '../model/rich-text.ts';
 import { BRUSHES, layerBox } from '../model/freeform.ts';
 import { markOf } from '../model/marks.ts';
@@ -93,6 +94,36 @@ function rotationOf(layer: FreeformLayer): string {
   return ` transform="rotate(${num(angle)} ${num(box.x + box.width / 2)} ${num(box.y + box.height / 2)})"`;
 }
 
+/**
+ * A picture in its frame. One placed the old way, with nothing set, draws exactly as it always did. Otherwise
+ * the whole picture is placed from `imagePlacement` and clipped by the frame: its rectangle, rounded, or an
+ * ellipse. The clip's id carries the frame's geometry, so two pages on one email cannot share a wrong one.
+ */
+function imageSvg(layer: ImageLayer, mark: string): string {
+  const fade = layer.opacity < 1 ? ` opacity="${num(layer.opacity)}"` : '';
+  const place = imagePlacement(layer);
+  const shaped = Boolean(layer.radius) || layer.mask === 'ellipse';
+  if (!place && !shaped && isPlainImage(layer)) {
+    return `<image ${mark} href="${esc(layer.src)}" x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" preserveAspectRatio="xMidYMid slice"${fade}/>`;
+  }
+  const { x, y, width: w, height: h } = layer;
+  const id = `sy-clip-${esc(layer.id)}-${Math.round(x)}-${Math.round(y)}-${Math.round(w)}-${Math.round(h)}`;
+  const clip =
+    layer.mask === 'ellipse'
+      ? `<ellipse cx="${num(x + w / 2)}" cy="${num(y + h / 2)}" rx="${num(w / 2)}" ry="${num(h / 2)}"/>`
+      : `<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}"${layer.radius ? ` rx="${num(Math.min(layer.radius, w / 2, h / 2))}"` : ''}/>`;
+  // Without its own size, the frame's aspect does the cropping, as before, with the focus as an alignment.
+  const picture = place
+    ? `<image href="${esc(layer.src)}" x="${num(place.x)}" y="${num(place.y)}" width="${num(place.width)}" height="${num(place.height)}" preserveAspectRatio="none"${fade}/>`
+    : `<image href="${esc(layer.src)}" x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" preserveAspectRatio="${layer.fit === 'stretch' ? 'none' : `xMidYMid ${layer.fit === 'fit' ? 'meet' : 'slice'}`}"${fade}/>`;
+  // The empty rect takes the pointer across the whole frame, even where a fitted picture leaves it bare.
+  return (
+    `<g ${mark}><defs><clipPath id="${id}">${clip}</clipPath></defs>` +
+    `<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" fill="none" pointer-events="all"/>` +
+    `<g clip-path="url(#${id})">${picture}</g></g>`
+  );
+}
+
 function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number): string {
   // An image draws its own opacity on the picture; every other kind takes it on the layer's element.
   const fade = layer.kind !== 'image' && typeof layer.opacity === 'number' && layer.opacity < 1 ? ` opacity="${num(Math.max(0, layer.opacity))}"` : '';
@@ -134,10 +165,7 @@ function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number)
         // Nothing picked yet: a dashed frame at the size it will be, so it can be found and sized.
         return `<rect ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" fill="none" stroke="#9aa0a6" stroke-width="2" stroke-dasharray="7 5"/>`;
       }
-      return (
-        `<image ${mark} href="${esc(layer.src)}" x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" ` +
-        `preserveAspectRatio="xMidYMid slice"${layer.opacity < 1 ? ` opacity="${num(layer.opacity)}"` : ''}/>`
-      );
+      return imageSvg(layer, mark);
     case 'rect':
       return (
         `<rect ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}"` +
@@ -186,6 +214,10 @@ function paint(fill: string | null, stroke: string | null, strokeWidth: number, 
  * The wobble's swing and the arc's bend are functions of the letter's index and the style, never of
  * chance, so the same recipe draws the same picture every time.
  */
+const CASE_CSS = { none: '', upper: ' text-transform:uppercase;', lower: ' text-transform:lowercase;', title: ' text-transform:capitalize;' } as const;
+const caseOf = (t: string, c: 'none' | 'upper' | 'lower' | 'title') =>
+  c === 'upper' ? t.toUpperCase() : c === 'lower' ? t.toLowerCase() : c === 'title' ? t.replace(/(^|\s)(\S)/g, (_, a: string, b: string) => a + b.toUpperCase()) : t;
+
 function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSystem, mark: string, surfaceHeight: number): string {
   const look = layer.look ? canvasTypeOf(ds)[layer.look] : undefined;
   const words = richWords(layer.text, layer.styles, ds);
@@ -200,7 +232,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
   const font = s.font;
   const base =
     `margin:0; font-family:${font}; font-size:${num(s.size)}px; line-height:${num(s.lineHeight)}%; font-weight:${s.weight};${s.italic ? ' font-style:italic;' : ''} ` +
-    `color:${color}; text-align:${layer.align};${s.uppercase ? ' text-transform:uppercase;' : ''}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
+    `color:${color}; text-align:${layer.align};${CASE_CSS[s.textCase]}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
     'overflow-wrap:break-word; word-wrap:break-word';
 
   if (!look) return box(words, base);
@@ -214,7 +246,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
     // On a curve the words are SVG text on a path: the stroke is the text's own, painted under the
     // fill, and the shadow a drop-shadow filter. A highlight band has no SVG equivalent and is left out.
     const k = Math.min(100, s.curve) / 100;
-    const line = (s.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
+    const line = caseOf(layer.text, s.textCase).replace(/\s*\r?\n\s*/g, ' ');
     const w = Math.max(1, layer.width);
     const sag = k * w * 0.32;
     const baseline = layer.y + s.size + sag;
@@ -224,7 +256,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
       const arcWords = layer.styles?.length
         ? runsOf(layer.text, layer.styles)
             .map((run) => {
-              const t = esc((s.uppercase ? run.text.toUpperCase() : run.text).replace(/\r?\n/g, ' '));
+              const t = esc(caseOf(run.text, s.textCase).replace(/\r?\n/g, ' '));
               const m = run.marks;
               const lines = [m.underline ? 'underline' : '', m.strike ? 'line-through' : ''].filter(Boolean).join(' ');
               const attrs =
