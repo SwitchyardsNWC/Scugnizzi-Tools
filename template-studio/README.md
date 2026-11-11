@@ -7,8 +7,8 @@ whose tokens actually reach the output.
 
 **Next action:** Patterns — a section saved once and reused across templates, with explicit
 updates and detach. Also unblocked and not yet built: one design system per *folder* rather than
-per template, multi-column rows, the four footer variants, the city-links block, and a paste
-sanitiser so rich text can be edited on the canvas too.
+per template, the city-links block. The footers are built: five types, styled from Design › Footer
+with a per-footer override (learnings 3.102).
 See [`docs/architecture.md`](docs/architecture.md) §4.
 
 ```bash

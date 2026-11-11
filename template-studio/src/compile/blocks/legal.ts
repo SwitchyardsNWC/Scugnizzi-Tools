@@ -16,9 +16,10 @@
 
 import { el, frag, print, raw, text, voidEl, when, type IRNode, type Test } from '../ir.ts';
 import { imgStyle, section } from '../layout.ts';
-import { fontDecl, typeOf } from '../../model/design-system.ts';
+import { colorOf, fontDecl, typeOf } from '../../model/design-system.ts';
+import { DENSITY, footerStyleOf, showsPart, smallLineHeight } from '../../model/footer-style.ts';
 import { gutterPhoneRule, type BuildContext } from '../context.ts';
-import type { Column, LegalBlock, Section, SocialName } from '../../model/types.ts';
+import type { Align, Column, LegalBlock, Section, SocialName } from '../../model/types.ts';
 import { iconToneFor, SOCIAL_ICON_HEIGHT, SOCIAL_ICONS, socialIconUrl } from '../../model/social-icons.ts';
 import { richContent } from './fields.ts';
 import { inline } from '../friendly.ts';
@@ -101,7 +102,7 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
     `<p style="${pm}line-height:115%; font-size:12px; color:${ink}; font-weight:normal">${noteHtml(block.note, link)}</p>`,
   );
 
-  const logo = block.logoSrc
+  const logo = block.logoSrc && showsPart(block, 'logo')
     ? el('table', { class: 'hse-image-wrapper', role: 'presentation', width: '100%', cellpadding: '0', cellspacing: '0' }, [
         el('tbody', null, [
           el('tr', null, [
@@ -167,7 +168,7 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
                       voidEl('br', {}),
                       address,
                     ]),
-                    el('div', { style: `line-height:115%; font-size:12px; color:${ink}` }, note.value),
+                    ...(showsPart(block, 'note') ? [el('div', { style: `line-height:115%; font-size:12px; color:${ink}` }, note.value)] : []),
                     el('p', { style: `${pm}line-height:100%` }, raw('&nbsp;')),
                     el('p', pm ? { style: pm.trim().replace(/;$/, '') } : null, [
                       el('span', { style: `color:${ink}; font-size:12px` }, [
@@ -202,7 +203,7 @@ function renderClassic(block: LegalBlock, sec: Section, col: Column, ctx: BuildC
   );
 
   return frag([
-    note.declaration,
+    ...(showsPart(block, 'note') ? [note.declaration] : []),
     section(frag(logo ? [logo, textCell] : [textCell]), {
       ds: ctx.ds,
       band: sec.bandColor,
@@ -249,17 +250,53 @@ const tbl = (rows: IRNode[], attrs: Attrs = {}): IRNode =>
 const tr = (cells: IRNode[]): IRNode => el('tr', null, cells);
 
 
+/**
+ * The address, broken only at its comma: the street on one side, the city, state and zip on the other. A footer
+ * line at a phone's width has to break somewhere, and between those two is the only place that still reads as an
+ * address (learnings 2.x: `white-space:nowrap` on each item, not on the container).
+ */
+function addressParts(p: BuildContext['preview']): IRNode {
+  const hasAddress2: Test = { k: 'path', path: 'site_settings.company_street_address_2', field: 'site_settings.company_street_address_2' };
+  return frag([
+    el('span', { style: 'white-space:nowrap' }, [
+      print('site_settings.company_street_address_1', p.address),
+      when(hasAddress2, [text(' '), print('site_settings.company_street_address_2', '')]),
+    ]),
+    text(', '),
+    el('span', { style: 'white-space:nowrap' }, [
+      print('site_settings.company_city', p.city),
+      text(', '),
+      print('site_settings.company_state', p.state),
+      raw('&nbsp;'),
+      print('site_settings.company_zip', p.zip),
+    ]),
+  ]);
+}
+
 function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'classic'>, block: LegalBlock, sec: Section, col: Column, ctx: BuildContext): IRNode {
   const p = ctx.preview;
   const ds = ctx.ds;
+  // Design › Footer, then this footer's own departures from it (model/footer-style.ts).
+  const st = footerStyleOf(ds, block);
   const ink = sec.textColor;
-  const link = sec.linkColor;
+  const link = colorOf(ds, st.linkColor) ?? sec.linkColor;
+  const deco = st.linkUnderline ? 'underline' : 'none';
   const font = fontDecl(ds);
   const h3 = typeOf(ds, 'h3');
   const gut = ds.pagePadding;
-  const hair = `1px solid ${ink}`;
-  const small = (weight: 'normal' | 'bold', extra = '') => `${font} font-size:13px; line-height:17px; font-weight:${weight}; color:${ink}${extra}`;
-  const nameStyle = `${font} font-size:${h3.size}px; line-height:${h3.lineHeight}%; font-weight:bold; color:${ink}`;
+  const k = DENSITY[st.density].scale;
+  /** One of the footer's gaps, at its density. Regular is the gap as it was drawn. */
+  const g = (px: number) => Math.round(px * k);
+  const hair = `${st.hairlineWidth}px solid ${colorOf(ds, st.hairlineColor) ?? ink}`;
+  /** A hairline on one side of a cell, or nothing when Design › Footer has turned them off. */
+  const line = (side: 'top' | 'bottom' | 'left') => (st.hairlines ? `; border-${side}:${hair}` : '');
+  const smallLh = smallLineHeight(st.smallSize);
+  const sized = (size: number, weight: 'normal' | 'bold', extra = '') =>
+    `${font} font-size:${size}px; line-height:${smallLineHeight(size)}px; font-weight:${weight}; color:${ink}${extra}`;
+  const small = (weight: 'normal' | 'bold', extra = '') => sized(st.smallSize, weight, extra);
+  const nameStyle = `${font} font-size:${st.nameSize ?? h3.size}px; line-height:${h3.lineHeight}%; font-weight:bold; color:${ink}`;
+  // Where the stacked types set their parts. The ledger and the stub are arranged by their type.
+  const al: Align = layout === 'masthead' || layout === 'letterhead' ? (block.align ?? 'center') : 'left';
 
   if (sec.bandColor) {
     const band = sec.bandColor;
@@ -269,41 +306,33 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
       ),
     );
   }
-  ctx.once(`sy-footer-phone-${ink}`, () =>
+  ctx.once(`sy-footer-phone-${st.hairlines ? hair : 'none'}-${k}`, () =>
     ctx.mobile.push(
       `.sy-stack { display:block !important; width:100% !important; text-align:left !important; padding-left:0 !important; padding-right:0 !important }`,
+      // A centred or right-set masthead stays that way when its colophon stacks. More specific than `.sy-stack`.
+      `td.sy-al-center { text-align:center !important } td.sy-al-right { text-align:right !important }`,
       `.sy-tap { display:inline-block !important; padding:12px 0 !important }`,
       `.sy-sep { display:none !important }`,
       // With the dot gone, the second link goes under the first rather than against it.
       `.sy-tap + .sy-sep + .sy-tap { display:block !important }`,
-      `.sy-ledger { border-left:0 !important; border-top:${hair} !important; padding-left:0 !important; padding-top:20px !important }`,
-      `.sy-ledger-l { padding-right:0 !important; padding-bottom:20px !important }`,
+      `.sy-ledger { border-left:0 !important; border-top:${st.hairlines ? hair : '0'} !important; padding-left:0 !important; padding-top:${g(20)}px !important }`,
+      `.sy-ledger-l { padding-right:0 !important; padding-bottom:${g(20)}px !important }`,
     ),
   );
 
   const company = print('site_settings.company_name', p.company);
-  const hasAddress2: Test = { k: 'path', path: 'site_settings.company_street_address_2', field: 'site_settings.company_street_address_2' };
-  const addressText = frag([
-    print('site_settings.company_street_address_1', p.address),
-    when(hasAddress2, [text(' '), print('site_settings.company_street_address_2', '')]),
-    text(', '),
-    print('site_settings.company_city', p.city),
-    text(', '),
-    print('site_settings.company_state', p.state),
-    raw('&nbsp;'),
-    print('site_settings.company_zip', p.zip),
-  ]);
   const query = {
     k: 'attrPrint' as const,
     path: '(site_settings.company_street_address_1 ~ ", " ~ site_settings.company_city ~ ", " ~ site_settings.company_state ~ " " ~ site_settings.company_zip)|urlencode',
     fallback: encodeURIComponent(`${p.address}, ${p.city}, ${p.state} ${p.zip}`),
   };
   // Our own anchor around the address, in the ink and without a line, so no client draws its own blue one (learnings 2.7).
-  const address = el('a', { href: ['https://www.google.com/maps/search/?api=1&query=', query], target: '_blank', style: `color:${ink} !important; text-decoration:none !important` }, addressText);
-  const note = richContent(block.noteLock, `<p style="margin:0; font-size:13px; line-height:17px; color:${ink}">${noteHtml(block.note, link)}</p>`);
+  const address = el('a', { href: ['https://www.google.com/maps/search/?api=1&query=', query], target: '_blank', style: `color:${ink} !important; text-decoration:none !important` }, addressParts(p));
+  const showNote = showsPart(block, 'note');
+  const note = richContent(block.noteLock, `<p style="margin:0; font-size:${st.smallSize}px; line-height:${smallLh}px; color:${ink}">${noteHtml(block.note, link)}</p>`);
 
   const legalLink = (path: string, fallback: string, label: string) =>
-    el('a', { href: { k: 'attrPrint' as const, path, fallback }, class: 'sy-tap', style: `color:${link}; text-decoration:none`, 'data-unsubscribe': 'true', target: '_blank' }, text(label));
+    el('a', { href: { k: 'attrPrint' as const, path, fallback }, class: 'sy-tap', style: `color:${link}; text-decoration:${deco}`, 'data-unsubscribe': 'true', target: '_blank' }, text(label));
   const unsubscribe = legalLink('unsubscribe_link_all', '#unsubscribe', 'Unsubscribe');
   // Manage Preferences is a courtesy and can be left out; Unsubscribe is the law's and HubSpot's, and stays.
   const showPreferences = !block.hidePreferences;
@@ -313,28 +342,35 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
     { style: small('normal') },
     showPreferences ? [unsubscribe, el('span', { class: 'sy-sep' }, raw(' &nbsp;&middot;&nbsp; ')), preferences] : [unsubscribe],
   );
-  const markText = block.mark?.trim() ?? '';
-  const mark = markText ? el('span', { style: small('bold', '; letter-spacing:1px; text-transform:uppercase') }, text(markText)) : null;
-  const socials = socialLinks(block);
+  const markText = showsPart(block, 'mark') ? (block.mark?.trim() ?? '') : '';
+  // One unbroken run: "© SWITCHYARDS U.S.A." split over two lines reads as two marks.
+  const mark = markText
+    ? el('span', { style: sized(st.markSize ?? st.smallSize, 'bold', `; letter-spacing:${st.markTracking}px${st.markCaps ? '; text-transform:uppercase' : ''}; white-space:nowrap`) }, text(markText))
+    : null;
+  const socials = showsPart(block, 'socials') ? socialLinks(block) : [];
+  // Above or below the legal links: where this footer says, else where its type puts them.
+  const socialsAbove = block.socialsAt ? block.socialsAt === 'above' : layout === 'ledger' ? Boolean(block.socialsFirst) : layout === 'masthead';
   // Icons or names (block.socialIcons). The icon's tone comes from the footer's own text colour, so the letterhead's
   // cream gets navy icons and every dark band gets off-white ones without anybody having to choose.
   const tone = iconToneFor(ink);
-  const socialLink = (l: { name: SocialName; href: string }) =>
-    block.socialIcons
-      ? el(
-          'a',
-          { href: l.href, class: 'sy-tap', target: '_blank', style: 'text-decoration:none' },
-          voidEl('img', {
-            src: socialIconUrl(l.name, tone),
-            // The network's name, which is what shows where pictures are off — Outlook on Windows by default. Styled
-            // so that fallback is the footer's small type in its link colour, rather than a browser's default.
-            alt: l.name,
-            width: SOCIAL_ICONS[l.name].width,
-            height: SOCIAL_ICON_HEIGHT,
-            style: `display:inline-block; width:${SOCIAL_ICONS[l.name].width}px; height:${SOCIAL_ICON_HEIGHT}px; border:0; outline:none; text-decoration:none; vertical-align:middle; ${font} font-size:12px; color:${link}`,
-          }),
-        )
-      : el('a', { href: l.href, class: 'sy-tap', target: '_blank', style: `color:${link}; text-decoration:none` }, text(l.name));
+  const iconH = st.iconSize;
+  const socialLink = (l: { name: SocialName; href: string }) => {
+    if (!block.socialIcons) return el('a', { href: l.href, class: 'sy-tap', target: '_blank', style: `color:${link}; text-decoration:${deco}` }, text(l.name));
+    const w = Math.round((SOCIAL_ICONS[l.name].width * iconH) / SOCIAL_ICON_HEIGHT);
+    return el(
+      'a',
+      { href: l.href, class: 'sy-tap', target: '_blank', style: 'text-decoration:none' },
+      voidEl('img', {
+        src: socialIconUrl(l.name, tone),
+        // The network's name, which is what shows where pictures are off — Outlook on Windows by default. Styled
+        // so that fallback is the footer's small type in its link colour, rather than a browser's default.
+        alt: l.name,
+        width: w,
+        height: iconH,
+        style: `display:inline-block; width:${w}px; height:${iconH}px; border:0; outline:none; text-decoration:none; vertical-align:middle; ${font} font-size:12px; color:${link}`,
+      }),
+    );
+  };
   const dot = () => el('span', { class: 'sy-sep' }, raw(' &nbsp;&middot;&nbsp; '));
   // Between icons, a plain gap rather than the dot. `sy-sep` is hidden on phones so that names can stack one under
   // the other, which is right for words and wrong for icons: a row of three pictures should stay a row.
@@ -345,7 +381,7 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
     : null;
   const width = block.logoWidth || (layout === 'letterhead' ? 120 : 180);
   const picture = (display: 'block' | 'inline-block') =>
-    block.logoSrc
+    block.logoSrc && showsPart(block, 'logo')
       ? voidEl('img', {
           src: block.logoSrc,
           alt: { k: 'attrPrint' as const, path: 'site_settings.company_name', fallback: p.company },
@@ -355,61 +391,73 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
       : null;
 
   const name = el('p', { style: `margin:0; ${nameStyle}` }, company);
-  const addressLine = (align: string) => el('td', { align, style: `${small('bold')}; text-align:${align}; padding:0` }, address);
+  const addressLine = (align: string, padding = '0') => el('td', { align, style: `${small('bold')}; text-align:${align}; padding:${padding}` }, address);
   const noteCell = (align: string, padding: string) => el('td', { align, style: `${small('normal')}; text-align:${align}; padding:${padding}` }, note.value);
+  /** A centred cell, or one set to this footer's alignment. */
+  const cellAt = (padding: string, children: IRNode | IRNode[], extra = '') => el('td', { align: al, style: `padding:${padding}${extra}; text-align:${al}` }, children);
 
   let inner: IRNode;
   if (layout === 'masthead') {
     const seals = picture('inline-block');
+    const socialsHere = socialLine && socialsAbove;
+    const socialsAfter = socialLine && !socialsAbove;
+    // The parts above the colophon each end on the gap it needs, whichever of them is last.
+    const beforeColophon = g(20);
     inner = tbl([
-      ...(seals ? [tr([el('td', { align: 'center', style: `padding:14px 0; border-top:${hair}; border-bottom:${hair}; font-size:0; line-height:0` }, seals)])] : []),
-      tr([el('td', { align: 'center', style: `${nameStyle}; text-align:center; padding:${seals ? 20 : 0}px 0 0` }, name)]),
-      tr([addressLine('center')]),
-      tr([noteCell('center', socialLine ? '20px 0 0' : '20px 0 20px')]),
-      ...(socialLine ? [tr([el('td', { align: 'center', style: 'padding:14px 0 20px; text-align:center' }, socialLine)])] : []),
+      ...(seals ? [tr([el('td', { align: al, style: `padding:${g(14)}px 0${line('top')}${line('bottom')}; font-size:0; line-height:0` }, seals)])] : []),
+      tr([el('td', { align: al, style: `${nameStyle}; text-align:${al}; padding:${seals ? g(20) : 0}px 0 0` }, name)]),
+      tr([addressLine(al, showNote || socialsHere ? '0' : `0 0 ${beforeColophon}px`)]),
+      ...(showNote ? [tr([noteCell(al, socialsHere ? `${g(20)}px 0 0` : `${g(20)}px 0 ${beforeColophon}px`)])] : []),
+      ...(socialsHere ? [tr([cellAt(`${showNote ? g(14) : g(20)}px 0 ${beforeColophon}px`, socialLine)])] : []),
       tr([
         el(
           'td',
-          { style: `padding:0; border-top:${hair}` },
+          { style: `padding:0${line('top')}` },
           tbl([
-            tr([
-              el('td', { class: 'sy-stack', width: '50%', style: 'padding:14px 0 0' }, mark ?? raw('&nbsp;')),
-              el('td', { class: 'sy-stack', width: '50%', align: 'right', style: 'padding:14px 0 0; text-align:right' }, links),
-            ]),
+            tr(
+              mark
+                ? [
+                    el('td', { class: `sy-stack${al === 'left' ? '' : ` sy-al-${al}`}`, width: '50%', style: `padding:${g(14)}px 0 0` }, mark),
+                    el('td', { class: `sy-stack${al === 'left' ? '' : ` sy-al-${al}`}`, width: '50%', align: 'right', style: `padding:${g(14)}px 0 0; text-align:right` }, links),
+                  ]
+                : // No mark, so nothing to balance the links against: they take the row and the footer's alignment.
+                  [el('td', { align: al, style: `padding:${g(14)}px 0 0; text-align:${al}` }, links)],
+            ),
           ]),
         ),
       ]),
+      ...(socialsAfter ? [tr([cellAt(`${g(14)}px 0 0`, socialLine)])] : []),
     ]);
   } else if (layout === 'ledger') {
     const seals = picture('block');
     // The socials share one row of the index, dotted, rather than a row each (Jared, 2026-09-18).
-    const socialRows = socialLine ? [tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, socialLine)])] : [];
+    const socialRows = socialLine ? [tr([el('td', { style: `padding:${g(12)}px 0${line('bottom')}` }, socialLine)])] : [];
     inner = tbl(
       [
         tr([
           el(
             'td',
-            { class: 'sy-stack sy-ledger-l', width: '58%', valign: 'top', style: 'padding:0 20px 0 0' },
+            { class: 'sy-stack sy-ledger-l', width: '58%', valign: 'top', style: `padding:0 ${g(20)}px 0 0` },
             tbl([
-              ...(seals ? [tr([el('td', { style: 'padding:0 0 20px; font-size:0; line-height:0' }, seals)])] : []),
+              ...(seals ? [tr([el('td', { style: `padding:0 0 ${g(20)}px; font-size:0; line-height:0` }, seals)])] : []),
               tr([el('td', { align: 'left', style: `${nameStyle}; text-align:left; padding:0` }, name)]),
               tr([addressLine('left')]),
-              tr([noteCell('left', '20px 0 0')]),
+              ...(showNote ? [tr([noteCell('left', `${g(20)}px 0 0`)])] : []),
             ]),
           ),
           el(
             'td',
-            { class: 'sy-stack sy-ledger', width: '42%', valign: 'top', style: `padding:0 0 0 20px; border-left:${hair}` },
+            { class: 'sy-stack sy-ledger', width: '42%', valign: 'top', style: `padding:0 0 0 ${g(20)}px${line('left')}` },
             tbl([
-              // Socials first when the footer asks (block.socialsFirst), so a reader meets the ways to follow before
-              // the ways to leave. Same rows either way; only the order moves.
-              ...(block.socialsFirst ? socialRows : []),
-              tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, unsubscribe))]),
+              // Socials first when the footer asks, so a reader meets the ways to follow before the ways to leave.
+              // Same rows either way; only the order moves.
+              ...(socialsAbove ? socialRows : []),
+              tr([el('td', { style: `padding:${g(12)}px 0${line('bottom')}` }, el('span', { style: small('normal') }, unsubscribe))]),
               ...(showPreferences
-                ? [tr([el('td', { style: `padding:12px 0; border-bottom:${hair}` }, el('span', { style: small('normal') }, preferences))])]
+                ? [tr([el('td', { style: `padding:${g(12)}px 0${line('bottom')}` }, el('span', { style: small('normal') }, preferences))])]
                 : []),
-              ...(block.socialsFirst ? [] : socialRows),
-              ...(mark ? [tr([el('td', { style: 'padding:12px 0 0' }, mark)])] : []),
+              ...(socialsAbove ? [] : socialRows),
+              ...(mark ? [tr([el('td', { style: `padding:${g(12)}px 0 0` }, mark)])] : []),
             ]),
           ),
         ]),
@@ -418,14 +466,20 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
     );
   } else if (layout === 'stub') {
     const seals = picture('block');
+    const nowrap = (child: IRNode) => el('span', { style: 'white-space:nowrap' }, child);
     inner = tbl([
       tr([
-        el('td', { class: 'sy-stack', width: '50%', valign: 'middle', style: 'padding:0 0 14px; font-size:0; line-height:0' }, seals ?? raw('&nbsp;')),
-        el('td', { class: 'sy-stack', width: '50%', valign: 'middle', align: 'right', style: 'padding:0 0 14px; text-align:right' }, socialLine ? [links, dot(), socialLine] : links),
+        el('td', { class: 'sy-stack', width: '50%', valign: 'middle', style: `padding:0 0 ${g(14)}px; font-size:0; line-height:0` }, seals ?? raw('&nbsp;')),
+        el(
+          'td',
+          { class: 'sy-stack', width: '50%', valign: 'middle', align: 'right', style: `padding:0 0 ${g(14)}px; text-align:right` },
+          socialLine ? (socialsAbove ? [socialLine, dot(), links] : [links, dot(), socialLine]) : links,
+        ),
       ]),
       tr([
-        el('td', { colspan: '2', style: `padding:14px 0 0; border-top:${hair}` }, [
-          el('span', { style: small('bold') }, [company, raw(' &nbsp;&middot;&nbsp; '), address, ...(mark ? [raw(' &nbsp;&middot;&nbsp; ')] : [])]),
+        // The one typed line breaks between its parts, never inside one: the name, each half of the address, the mark.
+        el('td', { colspan: '2', style: `padding:${g(14)}px 0 0${line('top')}` }, [
+          el('span', { style: small('bold') }, [nowrap(company), raw(' &nbsp;&middot;&nbsp; '), address, ...(mark ? [raw(' &nbsp;&middot;&nbsp; ')] : [])]),
           ...(mark ? [mark] : []),
         ]),
       ]),
@@ -433,14 +487,15 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
   } else {
     // Letterhead: cream, a note from a person. The lockup where the seals would be, and the legal links in the link colour.
     const lockup = picture('inline-block');
+    const linksRow = (top: boolean) => tr([cellAt(top ? `${g(20)}px 0 0` : `${g(10)}px 0 0`, links, top ? line('top') : '')]);
+    const socialsRow = (top: boolean) => (socialLine ? [tr([cellAt(top ? `${g(20)}px 0 0` : `${g(10)}px 0 0`, socialLine, top ? line('top') : '')])] : []);
     inner = tbl([
-      ...(lockup ? [tr([el('td', { align: 'center', style: 'padding:0 0 20px; font-size:0; line-height:0' }, lockup)])] : []),
-      tr([el('td', { align: 'center', style: `${nameStyle}; text-align:center; padding:20px 0 0; border-top:${hair}` }, name)]),
-      tr([addressLine('center')]),
-      tr([noteCell('center', '20px 0 20px')]),
-      tr([el('td', { align: 'center', style: `padding:20px 0 0; border-top:${hair}; text-align:center` }, links)]),
-      ...(socialLine ? [tr([el('td', { align: 'center', style: 'padding:10px 0 0; text-align:center' }, socialLine)])] : []),
-      ...(mark ? [tr([el('td', { align: 'center', style: 'padding:10px 0 0; text-align:center' }, mark)])] : []),
+      ...(lockup ? [tr([el('td', { align: al, style: `padding:0 0 ${g(20)}px; font-size:0; line-height:0` }, lockup)])] : []),
+      tr([el('td', { align: al, style: `${nameStyle}; text-align:${al}; padding:${g(20)}px 0 0${line('top')}` }, name)]),
+      tr([addressLine(al, showNote ? '0' : `0 0 ${g(20)}px`)]),
+      ...(showNote ? [tr([noteCell(al, `${g(20)}px 0 ${g(20)}px`)])] : []),
+      ...(socialsAbove && socialLine ? [...socialsRow(true), linksRow(false)] : [linksRow(true), ...socialsRow(false)]),
+      ...(mark ? [tr([cellAt(`${g(10)}px 0 0`, mark)])] : []),
     ]);
   }
 
@@ -459,5 +514,5 @@ function renderSystemFooter(layout: Exclude<LegalBlock['layout'], undefined | 'c
     ]),
   );
   void col;
-  return frag([note.declaration, section(outer, { ds, band: sec.bandColor, container: sec.containerColor, domId: 'section-legal', bleed: sec.bleed ?? false })]);
+  return frag([...(showNote ? [note.declaration] : []), section(outer, { ds, band: sec.bandColor, container: sec.containerColor, domId: 'section-legal', bleed: sec.bleed ?? false })]);
 }

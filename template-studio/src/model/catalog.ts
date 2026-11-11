@@ -52,7 +52,11 @@ export type ControlKind =
   /** A background preset, listed from the template's own design system rather than from a fixed set. */
   | 'preset'
   /** A footer's type: choosing one rebuilds the footer, rules and all (model/footer.ts). */
-  | 'footer-type';
+  | 'footer-type'
+  /** Which of a footer's parts it shows (model/footer-style.ts). */
+  | 'footer-parts'
+  /** A footer's departures from Design › Footer, each following the system until set. */
+  | 'footer-style';
 
 export interface Control {
   kind: ControlKind;
@@ -75,6 +79,12 @@ export interface Control {
    * one of those.
    */
   when?: 'stack' | 'canvas';
+  /**
+   * Only shown when this says so of the block. For a control that one variant of a block draws and another
+   * ignores — the footer's mark, which `classic` never draws — so the panel does not carry a control wired to
+   * nothing.
+   */
+  show?: (block: Block) => boolean;
 }
 
 export interface Group {
@@ -84,6 +94,8 @@ export interface Group {
   open?: boolean;
   /** Only inside the freeform canvas, or only outside it. Absent is both. */
   when?: 'canvas' | 'email';
+  /** Only shown when this says so of the block, as on a control. */
+  show?: (block: Block) => boolean;
   controls: Control[];
 }
 
@@ -104,6 +116,9 @@ const ALIGN: Array<[string, string]> = [
   ['center', 'Center'],
   ['right', 'Right'],
 ];
+
+/** A footer of one of the four Switchyards types: the ones that draw a mark, socials and Design › Footer. */
+const notClassic = (block: Block): boolean => block.type === 'legal' && footerTypeOf(block) !== 'classic';
 
 /**
  * What an Appearance panel is now, and what it is not.
@@ -632,21 +647,16 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             label: 'Note',
             help: 'The notice line. Plain text, with **bold** and [a link](https://…) if you like, or HTML written out: a <a>, a <br>, an <em>. In the Switchyards footer: “Please consider the environment and do not print this email. Nobody prints emails.”',
           },
-          { kind: 'text', path: 'block.mark', label: 'Mark', placeholder: '© Switchyards U.S.A.', help: 'The colophon mark, set in small letterspaced caps. Blank shows none. Not drawn by the classic layout.' },
-          { kind: 'url', path: 'block.instagram', label: 'Instagram', placeholder: 'https://instagram.com/…', help: 'Named in the footer’s small type: on its own line in the masthead and letterhead, a row in the ledger, after the legal links in the stub. Blank leaves it out.' },
-          { kind: 'url', path: 'block.youtube', label: 'YouTube', placeholder: 'https://youtube.com/…', help: 'The same, for YouTube.' },
-          { kind: 'url', path: 'block.linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/…', help: 'The same, for LinkedIn.' },
+          { kind: 'text', path: 'block.mark', label: 'Mark', placeholder: '© Switchyards U.S.A.', help: 'The colophon mark, set in small letterspaced caps. Blank shows none.', show: notClassic },
+          { kind: 'url', path: 'block.instagram', label: 'Instagram', placeholder: 'https://instagram.com/…', help: 'Named in the footer’s small type: on its own line in the masthead and letterhead, a row in the ledger, beside the legal links in the stub. Blank leaves it out.', show: notClassic },
+          { kind: 'url', path: 'block.youtube', label: 'YouTube', placeholder: 'https://youtube.com/…', help: 'The same, for YouTube.', show: notClassic },
+          { kind: 'url', path: 'block.linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/…', help: 'The same, for LinkedIn.', show: notClassic },
           {
             kind: 'toggle',
             path: 'block.socialIcons',
             label: 'Social icons instead of names',
             help: 'Draws Instagram, YouTube and LinkedIn as icons. Off-white on a dark band, navy on a light one, picked from the footer’s text colour. Where pictures are off, as in Outlook on Windows, each shows its name instead.',
-          },
-          {
-            kind: 'toggle',
-            path: 'block.socialsFirst',
-            label: 'Socials above the legal links',
-            help: 'Ledger only: the social row at the top of the index, above Unsubscribe. The other layouts give the socials a line of their own and leave it where it is.',
+            show: notClassic,
           },
           {
             kind: 'toggle',
@@ -657,14 +667,58 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
         ],
       },
       {
+        name: 'Arrangement',
+        help: 'Where this footer’s parts sit and which of them it shows. How they look is Design › Footer, and Footer style below.',
+        controls: [
+          {
+            kind: 'footer-parts',
+            path: 'block.hide',
+            label: 'Show',
+            help: 'The parts this footer shows. Off keeps what you set, for when it comes back. The name, the address and Unsubscribe are not here: HubSpot refuses a template without them.',
+          },
+          {
+            kind: 'select',
+            path: 'block.align',
+            label: 'Align',
+            // Centre first, so a footer that has never been set reads as what it draws.
+            options: [
+              ['center', 'Center'],
+              ['left', 'Left'],
+              ['right', 'Right'],
+            ],
+            help: 'Where the seals, the name, the address and the notice sit. The colophon stays a two-ended line on a desktop and follows this on a phone.',
+            show: (b) => b.type === 'legal' && (b.layout === 'masthead' || b.layout === 'letterhead'),
+          },
+          {
+            kind: 'select',
+            path: 'block.socialsAt',
+            label: 'Socials',
+            options: [
+              ['', 'Where the type puts them'],
+              ['above', 'Above the legal links'],
+              ['below', 'Below the legal links'],
+            ],
+            help: 'The masthead puts them above the legal links, the other types below. A ledger that was set to socials first keeps them first until you choose.',
+            show: notClassic,
+          },
+        ],
+      },
+      {
+        name: 'Footer style',
+        help: 'Sizes, hairlines, density and links for this footer alone. Each follows Design › Footer until you give it a value; the chain or Design hands it back.',
+        show: notClassic,
+        controls: [{ kind: 'footer-style', path: 'block.style', label: 'Style' }],
+      },
+      {
         name: 'Appearance',
+        show: (b) => !notClassic(b),
         controls: [
           {
             kind: 'select',
             path: 'column.align',
             label: 'Align',
             options: ALIGN,
-            help: 'Where the company, address and links sit. Right is the Switchyards footer; a centred one is the more common shape.',
+            help: 'Where the company, address and links sit. Right is the classic footer as it shipped.',
           },
         ],
       },

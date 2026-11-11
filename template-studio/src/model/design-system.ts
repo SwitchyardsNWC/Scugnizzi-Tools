@@ -7,6 +7,8 @@
 // Templates reference tokens by name and resolve at export. A block may override with a literal;
 // the inspector flags it so overrides stay deliberate rather than accidental.
 
+import type { FooterStyle } from './footer-style.ts';
+
 export interface TypeStyle {
   size: number;
   /** Percent. */
@@ -375,6 +377,12 @@ export interface DesignSystem {
    * waiting to be typed.
    */
   mobileBreakpoint: number;
+  /**
+   * How the Switchyards footers look: sizes, hairlines, density, links (model/footer-style.ts). Partial and
+   * optional, like `canvasType`: a key left out is the shipped value, so a system file written before this
+   * draws the footer it drew. A footer can override any of it on its own block.
+   */
+  footer?: Partial<FooterStyle>;
 }
 
 /**

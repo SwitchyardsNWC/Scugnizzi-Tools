@@ -3127,3 +3127,37 @@ block, you drop than choose the type. kill the stamp block."*
   name's full width and "Footer · Ledger, socials first" pushed the whole Switchyards group past the pane with the
   grips cut off. `minmax(0, 1fr)`, which `.list` had all along.
 - **The Stamp went**, as asked: a 240px picture the team picks, which the Image block already is.
+
+### 3.102 Design control over the footers
+
+*2026-11-11. Jared: "check Template studio code for enhancements and bugs. I want more design control over footers."
+Asked where, he chose the Design panel with a per-footer override; asked what, all four: type, rules and spacing,
+arrangement, links; asked about links, underlined by default.*
+
+- **The look was literals in the renderer.** 13px small type, 1px hairlines in the ink, gaps of 14 and 20, a mark in
+  tracked capitals, links with `text-decoration:none`. They are tokens now (`model/footer-style.ts`), in
+  `ds.footer`: partial and optional like `canvasType`, so a system file written before this draws what it drew.
+  Design › Footer edits them; a footer's own Footer style group overrides any of them, each following the system
+  until given a value — the chain for numbers, Design / On / Off for switches, empty for colours.
+- **Arrangement belongs to the footer, not the system.** Alignment (masthead and letterhead), which parts it shows,
+  and where the socials sit are on the block: one footer's decision, carried across a change of type.
+- **Underlined by default, which changes every footer.** On the navy band the links and the text are both cream
+  (#f7f6f3), so nothing said which words could be clicked; on the letterhead only the red did. Colour alone cannot
+  carry that. The classic footer already had the browser's own underline.
+- **Align was a control wired to nothing.** Appearance › Align wrote `column.align`, which only the classic footer
+  read; the other four had `void col`. Its help still said "Right is the Switchyards footer". Now the classic footer
+  shows that control, the masthead and letterhead show their own, and the ledger and stub, which are arranged by
+  their type, show neither. `show` on a control or a group (catalog.ts) is how a variant hides what it ignores:
+  the classic footer no longer offers a mark, socials or icons it never drew.
+- **A centred masthead went left on phones.** `.sy-stack` set every stacked cell left, so the colophon snapped to
+  the edge under a centred name. The masthead's colophon cells carry `sy-al-center` / `sy-al-right`, matched by a
+  more specific `td.` rule.
+- **The stub's one line broke inside its parts.** At 600px the mark split ("DETTAGLI E / PULIZIA"); on a phone the
+  street did. The name, each half of the address and the mark are each `white-space:nowrap` (2.x, "on each item,
+  not on the container"), so the line breaks only at a separator or the address's comma.
+- **What cannot be hidden is not offered.** The name, the address and Unsubscribe are HubSpot's (1.8), so the parts
+  are the logo, the note, the socials and the mark. Hiding one keeps what it held. A hidden note drops its HubSpot
+  field rather than declaring one nobody sees. With the mark gone the legal links take the colophon row and the
+  footer's alignment, rather than sitting right of a blank.
+- **"Socials first" was ledger-only and named for one direction.** `socialsAt` is above or below on every type;
+  absent is where the type puts them, and a ledger that said `socialsFirst` keeps them first until somebody chooses.
