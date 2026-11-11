@@ -292,6 +292,25 @@ named for use: Kicker, Outline display, Shadow display, Tag, Marked line, Seal.
   Studio's design system first.
 - A layer's old effect-strength tweak (`amount`) is no longer read.
 
-**Next, in order.** A properties panel with X, Y, W, H, rotation and opacity, plus snapping and
-smart guides. Then the brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
+**Properties and snapping** *(2026-11-11)*. Jared: "build the properties panel and snapping next."
+
+- **Properties.** With a layer picked, the panel under Layers shows its numbers in place of the
+  page's: X, Y, W, H, R (degrees) and Op (opacity), and a row of six buttons that align it to the
+  page's left, centre, right, top, middle or bottom. A field commits on Enter, on leaving it, or
+  on the arrow keys, and follows a drag on the canvas while it is not being typed into. A drawing
+  (a group of strokes) shows the box around them and scales them together, and does not turn.
+  Text shows its height but does not take one, since it is as tall as its words. Nothing picked
+  shows the page, as before (`model/properties.ts`).
+- **Opacity on every layer.** `opacity` is now on every kind, not only images, and draws as the
+  layer's own `opacity`. At 100% the field is removed, so a recipe nobody fades is unchanged.
+- **Snapping.** A layer or drawing being moved snaps its edges and centre to the page's edges and
+  centre, and to every other layer's. A layer being resized snaps only the edges its handle moves.
+  The pull is six screen pixels at any zoom. The lines it found draw while the drag lasts, in
+  red-orange (`#f24822`) so they read apart from selection blue. A turned layer counts by the box
+  its turned corners cover; a turned layer's own resize does not snap, and nor does a
+  proportional (Shift, or stamp corner) one. Hold ⌘ or Ctrl to place freely, as in Figma. Canvas
+  › Drawing › Smart guides turns it off (`model/snap.ts`).
+- Arrow keys already nudged 1px, or 10px with Shift.
+
+**Next.** The brand library replacing Stamp. Then effects on a single layer. Then per-layer effects, with the Image Effects tool's
 effects moved into `effects/` beside Riso.

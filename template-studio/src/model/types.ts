@@ -415,6 +415,8 @@ interface LayerBase {
   invert?: boolean;
   /** Strokes drawn in one marker session share one, and move, scale, colour and delete as one. */
   group?: string;
+  /** 0 to 1, from the properties panel. Absent is opaque. An image carries its own, required. */
+  opacity?: number;
 }
 
 /**

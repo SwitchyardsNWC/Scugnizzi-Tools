@@ -35,6 +35,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
 import { useCanvasSettings } from './canvas-settings.ts';
@@ -174,6 +175,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
   const [textHeights, setTextHeights] = useState<Record<string, number>>({});
+  /** The smart guides of the drag under way: the lines a moved or resized layer snapped to. */
+  const [guides, setGuides] = useState<Guide[]>([]);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -850,21 +853,35 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         setView({ ...state.view, x: state.view.x + (event.clientX - state.x), y: state.view.y + (event.clientY - state.y) });
         return;
       case 'move': {
-        const dx = p.x - state.x;
-        const dy = p.y - state.y;
+        let dx = p.x - state.x;
+        let dy = p.y - state.y;
         if (!state.moved && Math.hypot(dx, dy) * viewRef.current.z < 3) return;
         state.moved = true;
         window.clearTimeout(holdPan.current);
+        const snap = snapping(event, state.layers.map((l) => l.id));
+        if (snap) {
+          const start = boundsOfLayers(state.layers, textHeights);
+          const found = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, snap.targets, snap.threshold);
+          dx += found.dx;
+          dy += found.dy;
+          setGuides(found.guides);
+        } else setGuides([]);
         commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
       case 'resizeMany': {
-        const box = boxFromHandle(state.box, state.handle, p.x - state.x, p.y - state.y, event.shiftKey);
+        let box = boxFromHandle(state.box, state.handle, p.x - state.x, p.y - state.y, event.shiftKey);
+        const snap = event.shiftKey ? null : snapping(event, state.layers.map((l) => l.id));
+        if (snap) {
+          const found = snapResize(box, state.handle, snap.targets, snap.threshold);
+          box = found.box;
+          setGuides(found.guides);
+        } else setGuides([]);
         commit('Resize drawing', replaceLayers(tpl(), blockId, scaleLayers(state.layers, state.box, box)), `${key}:resize:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
       case 'resize':
-        commit('Resize layer', updateLayer(tpl(), blockId, state.layer.id, fields(resized(state, p, event.shiftKey))), `${key}:resize:${state.layer.id}`);
+        commit('Resize layer', updateLayer(tpl(), blockId, state.layer.id, fields(resized(state, p, event.shiftKey, snapping(event, [state.layer.id])))), `${key}:resize:${state.layer.id}`);
         return;
       case 'endpoint': {
         if (state.layer.kind !== 'line') return;
@@ -936,6 +953,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (svg) release(svg as unknown as HTMLElement, event.pointerId);
     drag.current = null;
     setGhost(null);
+    setGuides([]);
     setPageDrag(false);
     setDragging(false);
     if (!state) return;
@@ -999,7 +1017,19 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
    * rebuilt there with the opposite side anchored; and then shifted so that anchor stays where it
    * was on screen, which a rotated box otherwise walks away from.
    */
-  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: Point, uniform: boolean): FreeformLayer => {
+  /**
+   * What a drag can snap to now, or null when snapping is off: the Canvas menu's Smart guides, set aside
+   * while ⌘ or Ctrl is held, as in Figma. The threshold is six screen pixels at any zoom.
+   */
+  const snapping = (event: PointerEvent, moving: string[]): { targets: Box[]; threshold: number } | null => {
+    const b = blockRef.current;
+    if (!b || !settingsRef.current.smartGuides || event.metaKey || event.ctrlKey) return null;
+    const ids = new Set(moving);
+    const others = b.layers.filter((l) => !ids.has(l.id)).map((l) => boundsOf(l, textHeights[l.id]));
+    return { targets: snapTargets(b, others), threshold: 6 / viewRef.current.z };
+  };
+
+  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: Point, uniform: boolean, snap: { targets: Box[]; threshold: number } | null = null): FreeformLayer => {
     const angle = state.layer.rotation ?? 0;
     const start = state.box;
     const c = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
@@ -1028,6 +1058,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       if (h.includes('n')) y = start.y + start.height - height;
     }
     let box: Box = { x, y, width, height };
+    // Only a square-on layer snaps its edges: a turned one's edges are not where its box's are.
+    const proportional = (uniform || state.layer.kind === 'mark') && h.length === 2;
+    if (snap && !angle && !proportional) {
+      const found = snapResize(box, h, snap.targets, snap.threshold);
+      box = found.box;
+      setGuides(found.guides);
+    } else setGuides([]);
     if (angle) {
       const anchor = {
         x: h.includes('w') ? start.x + start.width : h.includes('e') ? start.x : c.x,
@@ -1466,6 +1503,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               {tool === 'eraser' && eraserAt && idle && (
                 <circle cx={eraserAt.x} cy={eraserAt.y} r={ERASER / view.z} fill="rgba(255,255,255,0.65)" stroke="#1e1c19" stroke-width={1.5 / view.z} />
               )}
+              {guides.map((g, i) =>
+                g.axis === 'x' ? (
+                  <line key={`g${i}`} class="surface-guide" x1={g.at} y1={g.from} x2={g.at} y2={g.to} stroke-width={1 / view.z} />
+                ) : (
+                  <line key={`g${i}`} class="surface-guide" x1={g.from} y1={g.at} x2={g.to} y2={g.at} stroke-width={1 / view.z} />
+                ),
+              )}
               {pickedBox && centre && sel && (
                 <g transform={rotation ? `rotate(${rotation} ${centre.x} ${centre.y})` : undefined}>
                   <rect
@@ -1671,6 +1715,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onUngroup={ungroup}
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
+          heights={textHeights}
+          onLayers={(label, next) => commit(label, replaceLayers(tpl(), blockId, next))}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}
           effectNote={fxNote}
@@ -1801,7 +1847,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
       {hint && idle && (
         <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
-          Double-click text to type · / for styles · hold Space to pan · hold still to snap a shape · ⌘C ⌘V copy layers
+          Double-click text to type · / for presets · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
         </div>
       )}
     </div>

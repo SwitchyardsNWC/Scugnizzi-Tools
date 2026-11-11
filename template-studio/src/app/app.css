@@ -58,6 +58,7 @@
   --fig-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 6px 16px -6px rgb(0 0 0 / 0.16);
   --fig-shadow-sm: 0 0 0 1px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.12);
   --fig-ease: cubic-bezier(0.2, 0, 0, 1);
+  --fig-guide: #f24822;
   --fig-swatch-edge: rgb(0 0 0 / 0.16);
   --fig-check: #e2e2e2;
   --fig-blend: multiply;
@@ -929,6 +930,8 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .surface-page-grip { fill: #fff; stroke: rgb(40 30 10 / 0.22); stroke-width: 1px; vector-effect: non-scaling-stroke; transition: fill 120ms; }
 .surface-page-grip:hover { fill: var(--fig-accent); stroke: var(--fig-accent); }
 .surface-selection { pointer-events: none; }
+/* Smart guides (model/snap.ts): the line a dragged layer snapped to. Red-orange, apart from selection blue; drawn only while dragging. */
+.surface-guide { stroke: var(--fig-guide); pointer-events: none; }
 .surface-selection [data-handle] { pointer-events: auto; }
 .surface-text {
   position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; border-radius: 2px; resize: none; overflow: hidden;
@@ -1896,6 +1899,16 @@ button.phone-row { cursor: pointer; }
 }
 .fig-page input:focus { outline: 2px solid var(--fig-accent); }
 .fig-page-row.dots { flex-wrap: wrap; gap: 6px; }
+/* The properties of what is picked (FigPanel › FigProps): numbers in a grid, then align to the page. */
+.fig-prop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; }
+.fig-prop { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; background: var(--fig-hover); }
+.fig-prop:focus-within { outline: 1.5px solid var(--fig-accent); }
+.fig-prop.off { opacity: 0.55; }
+.fig-prop-label { flex: none; width: 18px; font-size: 11px; font-weight: 600; color: var(--fig-faint); }
+.fig-prop input { flex: 1; min-width: 0; width: 100%; height: 26px; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--fig-ink); font-variant-numeric: tabular-nums; outline: none; -moz-appearance: textfield; }
+.fig-prop input::-webkit-inner-spin-button, .fig-prop input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.fig-prop-unit { flex: none; font-size: 11px; color: var(--fig-faint); }
+.fig-align { display: flex; justify-content: space-between; }
 .fig-dot.clear, .fig-swatch-btn span.empty { background: repeating-conic-gradient(var(--fig-check) 0 25%, var(--fig-surface) 0 50%) 0 0 / 8px 8px; }
 
 /* The mini menu over what is picked. Above it, the pop opens upward; below it, downward. */

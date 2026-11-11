@@ -114,6 +114,7 @@ export function CanvasSettingsPanel() {
       </div>
       <div class="cv-section">
         <div class="cv-head">Drawing</div>
+        <Toggle label="Smart guides" help="On the Freeform canvas, a layer being moved or resized snaps to the page's edges and centre and to other layers, and shows the line it found. Hold ⌘ or Ctrl while dragging to place it freely." value={s.smartGuides} onChange={(v) => set({ smartGuides: v })} />
         <Toggle label="Quick shapes" help="Hold the pen still at the end of a stroke and it snaps to a line, box, circle or triangle." value={s.quickShapes} onChange={(v) => set({ quickShapes: v })} />
         <Slider label="Hold" help="How long to hold still before the stroke snaps." value={s.holdMs} range={CANVAS_RANGES.holdMs} format={fmt.holdMs} disabled={!s.quickShapes} onChange={(v) => set({ holdMs: v })} />
         <div class="cv-row" title="On a tablet, whether a finger draws. Auto: it draws until a pencil is seen, then it pans while the pencil draws.">

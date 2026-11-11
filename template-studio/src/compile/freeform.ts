@@ -94,7 +94,9 @@ function rotationOf(layer: FreeformLayer): string {
 }
 
 function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number): string {
-  const mark = `data-sy-layer="${esc(layer.id)}"${rotationOf(layer)}${layer.invert ? ` filter="url(#${INVERT})"` : ''}`;
+  // An image draws its own opacity on the picture; every other kind takes it on the layer's element.
+  const fade = layer.kind !== 'image' && typeof layer.opacity === 'number' && layer.opacity < 1 ? ` opacity="${num(Math.max(0, layer.opacity))}"` : '';
+  const mark = `data-sy-layer="${esc(layer.id)}"${rotationOf(layer)}${layer.invert ? ` filter="url(#${INVERT})"` : ''}${fade}`;
   const ink = inkOf(ds);
   switch (layer.kind) {
     case 'text':

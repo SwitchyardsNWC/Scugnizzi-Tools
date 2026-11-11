@@ -6,6 +6,8 @@ import { LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../mode
 import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
 import { hasTweaks } from '../model/brand-presets.ts';
+import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
+import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
 import { misregister, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
@@ -73,9 +75,13 @@ export interface FigLayersProps {
   effectNote?: string | null;
   /** The printed picture is being made again after a change. */
   effectBusy?: boolean;
+  /** Text layers' measured heights, which their recipes do not hold. */
+  heights: Record<string, number>;
+  /** Swaps in changed layers from the properties panel. `coalesce` makes a run of edits one undo step. */
+  onLayers(label: string, next: FreeformLayer[], coalesce?: string): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** Where a drag would land, as a gap in the list as shown: 0 is above the first row. */
@@ -208,6 +214,9 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
         {n === 0 && <li class="fig-empty">Nothing here yet. Grab a tool from the dock and make a mess.</li>}
       </ul>
 
+      {picked && selectionOf(block, picked) ? (
+        <FigProps block={block} pickedKey={picked} heights={heights} onLayers={onLayers} />
+      ) : (
       <div class="fig-page">
         <div class="fig-page-row">
           <b>Page</b>
@@ -227,6 +236,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           ))}
         </div>
       </div>
+      )}
 
       <FigEffects effects={block.effects} onEffects={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
     </div>
@@ -1012,6 +1022,109 @@ function SavePreset({ presetName, canUpdate, onUpdate, onNew }: { presetName: st
       <button class="fig-chip" title="Save these settings as a new brand preset in the design system." onClick={() => setNaming(presetName ? `${presetName} copy` : '')}>
         New preset
       </button>
+    </div>
+  );
+}
+
+// --- properties -------------------------------------------------------------------------------------
+
+/** One number: a short label, the field, committed on Enter, on leaving the field, or on the arrow keys. */
+function PropNum({ label, title, value, min, max, step = 1, suffix, disabled, onCommit }: { label: string; title: string; value: number; min?: number; max?: number; step?: number; suffix?: string; disabled?: boolean; onCommit(v: number): void }) {
+  const field = useRef<HTMLInputElement | null>(null);
+  // The field shows the layer's number unless it is being typed into; a drag on the canvas updates it live.
+  useEffect(() => {
+    const el = field.current;
+    if (el && document.activeElement !== el) el.value = String(value);
+  }, [value]);
+  const commit = (el: HTMLInputElement) => {
+    const v = Number(el.value);
+    if (!Number.isFinite(v)) return void (el.value = String(value));
+    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+    if (clamped !== value) onCommit(clamped);
+    else el.value = String(value);
+  };
+  return (
+    <label class={`fig-prop ${disabled ? 'off' : ''}`} title={title}>
+      <span class="fig-prop-label">{label}</span>
+      <input
+        ref={field}
+        type="number"
+        defaultValue={String(value)}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        onChange={(e) => commit(e.currentTarget)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') commit(e.currentTarget);
+        }}
+      />
+      {suffix && <span class="fig-prop-unit">{suffix}</span>}
+    </label>
+  );
+}
+
+const ALIGNS: Array<{ edge: AlignEdge; label: string; d: string }> = [
+  { edge: 'left', label: 'Align left', d: 'M4 4v16M8 8h10M8 16h6' },
+  { edge: 'centre', label: 'Align centre', d: 'M12 4v16M6 8h12M8 16h8' },
+  { edge: 'right', label: 'Align right', d: 'M20 4v16M6 8h10M10 16h6' },
+  { edge: 'top', label: 'Align top', d: 'M4 4h16M8 8v10M16 8v6' },
+  { edge: 'middle', label: 'Align middle', d: 'M4 12h16M8 6v12M16 8v8' },
+  { edge: 'bottom', label: 'Align bottom', d: 'M4 20h16M8 6v10M16 10v6' },
+];
+
+/**
+ * Exact numbers for what is picked, the way a layout tool shows them: X, Y, W, H, rotation, opacity,
+ * and a row that lines it up with the page. A drawing (a group) shows the box around its strokes and
+ * scales them together; it does not turn. Text finds its own height, so H is shown but not set.
+ */
+function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBlock; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
+  const sel = selectionOf(block, pickedKey);
+  if (!sel) return null;
+  const group = Boolean(sel.group);
+  const g = geometryOf(sel.layers, group, heights);
+  if (!g) return null;
+  const one = sel.layers[0]!;
+  const name = group ? 'Drawing' : LAYER_NAMES[one.kind];
+  const box = (label: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => onLayers(label, withGeometry(sel.layers, group, patch, heights));
+  return (
+    <div class="fig-page fig-props">
+      <div class="fig-page-row">
+        <b>{name}</b>
+      </div>
+      <div class="fig-prop-grid">
+        <PropNum label="X" title="Left edge, in pixels from the page's left" value={g.x} onCommit={(v) => box('Move', { x: v })} />
+        <PropNum label="Y" title="Top edge, in pixels from the page's top" value={g.y} onCommit={(v) => box('Move', { y: v })} />
+        <PropNum label="W" title="Width, in pixels" value={g.width} min={1} onCommit={(v) => box('Resize', { width: v })} />
+        <PropNum
+          label="H"
+          title={g.heightFixed ? 'Text is as tall as its words. Change the width or the size to change it.' : 'Height, in pixels'}
+          value={g.height}
+          min={1}
+          disabled={g.heightFixed}
+          onCommit={(v) => box('Resize', { height: v })}
+        />
+        <PropNum
+          label="R"
+          title={g.rotation === null ? 'A drawing scales but does not turn.' : 'Rotation, in degrees clockwise'}
+          value={g.rotation ?? 0}
+          step={1}
+          suffix="°"
+          disabled={g.rotation === null}
+          onCommit={(v) => onLayers('Rotate', [withRotation(one, v)])}
+        />
+        <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
+      </div>
+      <div class="fig-align" role="group" aria-label="Align to page">
+        {ALIGNS.map((a) => (
+          <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d={a.d} />
+            </svg>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
