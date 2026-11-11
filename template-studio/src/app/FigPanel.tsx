@@ -3,9 +3,10 @@ import type { JSX } from 'preact';
 
 import { brushSampleSvg, canvasTypeSampleSvg } from '../compile/freeform.ts';
 import { LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
-import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
+import { canvasTypeOf, colorOf, firstPreset, theme, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
 import { hasTweaks } from '../model/brand-presets.ts';
+import { BRAND_PRESETS } from './features.ts';
 import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
@@ -215,7 +216,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       </ul>
 
       {picked && selectionOf(block, picked) ? (
-        <FigProps block={block} pickedKey={picked} heights={heights} onLayers={onLayers} />
+        <FigProps block={block} ds={ds} pickedKey={picked} heights={heights} onLayers={onLayers} />
       ) : (
       <div class="fig-page">
         <div class="fig-page-row">
@@ -775,13 +776,21 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
     const tweaked = hasTweaks(text);
     quick = (
       <>
-        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
-          <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
-          {lookLabel}
-          <span class="caret">▾</span>
-        </button>
+        {BRAND_PRESETS && (
+          <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
+            <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
+            {lookLabel}
+            <span class="caret">▾</span>
+          </button>
+        )}
         {fontChip}
         {stepper('Size', style.size, style.size >= 40 ? 4 : 2, 6, 240, (v) => set('Text size', { size: v }, 'size'))}
+        <button class={`fig-icon-btn ${style.weight === 'bold' ? 'on' : ''}`} title="Bold" aria-label="Bold" aria-pressed={style.weight === 'bold'} onClick={() => set('Bold', { weight: style.weight === 'bold' ? 'normal' : 'bold' })}>
+          <span class="fmt-glyph">B</span>
+        </button>
+        <button class={`fig-icon-btn ${style.italic ? 'on' : ''}`} title="Italic" aria-label="Italic" aria-pressed={style.italic} onClick={() => set('Italic', { italic: !style.italic })}>
+          <span class="fmt-glyph italic">I</span>
+        </button>
         <button class="fig-icon-btn" title={`Align ${text.align} · click for ${NEXT_ALIGN[text.align]}`} aria-label="Alignment" onClick={() => set('Align', { align: NEXT_ALIGN[text.align] })}>
           {ALIGN_ICONS[text.align]()}
         </button>
@@ -796,7 +805,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
         <Slide label="Letter spacing" unit="px" min={-6} max={30} step={0.5} value={style.letterSpacing} onInput={(v) => set('Letter spacing', { letterSpacing: v }, 'tracking')} />
         <Slide label="Line height" unit="%" min={60} max={220} value={style.lineHeight} onInput={(v) => set('Line height', { lineHeight: v }, 'leading')} />
         {tweaked && (
-          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined })}>
+          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined, weight: undefined, italic: undefined, textCase: undefined })}>
             Back to {preset ? preset.label : 'the role'}
           </button>
         )}
@@ -1291,7 +1300,7 @@ const ALIGNS: Array<{ edge: AlignEdge; label: string; d: string }> = [
  * and a row that lines it up with the page. A drawing (a group) shows the box around its strokes and
  * scales them together; it does not turn. Text finds its own height, so H is shown but not set.
  */
-function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBlock; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
+function FigProps({ block, ds, pickedKey, heights, onLayers }: { block: FreeformBlock; ds: DesignSystem; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
   const sel = selectionOf(block, pickedKey);
   if (!sel) return null;
   const group = Boolean(sel.group);
@@ -1328,6 +1337,7 @@ function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBloc
         />
         <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
       </div>
+      {!group && one.kind === 'text' && <TextProps layer={one} ds={ds} onLayers={onLayers} />}
       <div class="fig-align" role="group" aria-label="Align to page">
         {ALIGNS.map((a) => (
           <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>
@@ -1336,6 +1346,99 @@ function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBloc
             </svg>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// --- the text tool's settings --------------------------------------------------------------------
+
+const CASES: Array<{ v: 'none' | 'upper' | 'lower' | 'title'; label: string; title: string }> = [
+  { v: 'none', label: '–', title: 'As typed' },
+  { v: 'upper', label: 'AG', title: 'Uppercase' },
+  { v: 'lower', label: 'ag', title: 'Lowercase' },
+  { v: 'title', label: 'Ag', title: 'Title case' },
+];
+const ALIGN_LABELS: Record<Align, string> = { left: 'Align left', center: 'Align centre', right: 'Align right' };
+
+/**
+ * Text, set the way a layout tool sets it: face, weight, size, line height, letter spacing, alignment,
+ * case, italic and colour, each one field. Jared: "make a solid text tool." Every value starts from the
+ * text's type role and becomes the layer's own once changed; Reset takes them all back to the role.
+ */
+function TextProps({ layer, ds, onLayers }: { layer: Extract<FreeformLayer, { kind: 'text' }>; ds: DesignSystem; onLayers: FigLayersProps['onLayers'] }) {
+  const t = textStyleOf(layer, ds);
+  const set = (label: string, patch: Partial<Extract<FreeformLayer, { kind: 'text' }>>, coalesce?: string) =>
+    onLayers(label, [{ ...layer, ...patch } as FreeformLayer], coalesce ? `text:${layer.id}:${coalesce}` : undefined);
+  const fonts = Object.keys(ds.fonts);
+  const palette = Object.keys(ds.colors);
+  // What the words are actually drawn in: their own colour, the role's, or the theme's ink.
+  const hex = colorOf(ds, layer.color) ?? colorOf(ds, t.color) ?? theme(ds, firstPreset(ds)).text;
+  const tweaked = hasTweaks(layer) || layer.color !== null;
+  return (
+    <div class="fig-text-props">
+      <div class="fig-page-row">
+        <b>Type</b>
+        {tweaked && (
+          <button
+            class="fig-text-btn"
+            title="Back to the type role's settings"
+            onClick={() => set('Reset text', { font: undefined, weight: undefined, italic: undefined, textCase: undefined, size: undefined, lineHeight: undefined, letterSpacing: undefined, color: null })}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      <label class="fig-prop wide" title="Typeface, from the design system">
+        <span class="fig-prop-label">Aa</span>
+        <select value={layer.font ?? ''} onChange={(e) => set('Font', { font: (e.target as HTMLSelectElement).value || undefined })} style={{ fontFamily: t.font }}>
+          <option value="">Role font</option>
+          {fonts.map((f) => (
+            <option key={f} value={f} style={{ fontFamily: ds.fonts[f] }}>
+              {fontName(f)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div class="fig-prop-grid">
+        <label class="fig-prop" title="Weight">
+          <span class="fig-prop-label">Wt</span>
+          <select value={t.weight} onChange={(e) => set('Weight', { weight: (e.target as HTMLSelectElement).value as 'normal' | 'bold' })}>
+            <option value="normal">Regular</option>
+            <option value="bold">Bold</option>
+          </select>
+        </label>
+        <PropNum label="Sz" title="Size, in pixels" value={t.size} min={4} max={400} onCommit={(v) => set('Text size', { size: v })} />
+        <PropNum label="Lh" title="Line height, as a percentage of the size" value={t.lineHeight} min={50} max={300} suffix="%" onCommit={(v) => set('Line height', { lineHeight: v })} />
+        <PropNum label="Ls" title="Letter spacing, in pixels" value={t.letterSpacing} min={-20} max={80} step={0.5} onCommit={(v) => set('Letter spacing', { letterSpacing: v })} />
+      </div>
+      <div class="fig-text-row">
+        <span class="fig-seg" role="group" aria-label="Alignment">
+          {(['left', 'center', 'right'] as Align[]).map((a) => (
+            <button key={a} class={layer.align === a ? 'on' : ''} aria-pressed={layer.align === a} title={ALIGN_LABELS[a]} aria-label={ALIGN_LABELS[a]} onClick={() => set(ALIGN_LABELS[a], { align: a })}>
+              {ALIGN_ICONS[a]()}
+            </button>
+          ))}
+        </span>
+        <span class="fig-seg" role="group" aria-label="Case">
+          {CASES.map((c) => (
+            <button key={c.v} class={t.textCase === c.v ? 'on' : ''} aria-pressed={t.textCase === c.v} title={c.title} onClick={() => set(c.title, { textCase: c.v })}>
+              {c.label}
+            </button>
+          ))}
+        </span>
+        <button class={`fig-icon-btn ${t.italic ? 'on' : ''}`} title="Italic" aria-label="Italic" aria-pressed={t.italic} onClick={() => set('Italic', { italic: !t.italic })}>
+          <span class="fmt-glyph italic">I</span>
+        </button>
+      </div>
+      <div class="fig-text-colour">
+        <div class="fig-bar-dots">
+          <button class={`fig-dot none ${layer.color === null ? 'on' : ''}`} title="The role's colour" aria-label="The role's colour" onClick={() => set('Colour', { color: null })} />
+          {palette.map((name) => (
+            <button key={name} class={`fig-dot ${layer.color === name ? 'on' : ''}`} style={{ background: colorOf(ds, name) ?? undefined }} title={`${name}, ${colorOf(ds, name)}`} aria-label={name} onClick={() => set('Colour', { color: name })} />
+          ))}
+        </div>
+        <HexField label="Colour" value={hex.slice(0, 7).toLowerCase()} onInput={(v) => set('Colour', { color: v }, 'colour')} />
       </div>
     </div>
   );

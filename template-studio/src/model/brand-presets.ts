@@ -85,7 +85,7 @@ export function presetUses(template: Template, key: string): number {
 
 /** The layer's own departures from its preset. */
 export function hasTweaks(layer: TextLayer): boolean {
-  return layer.size !== undefined || layer.letterSpacing !== undefined || layer.lineHeight !== undefined || layer.font !== undefined;
+  return layer.size !== undefined || layer.letterSpacing !== undefined || layer.lineHeight !== undefined || layer.font !== undefined || layer.weight !== undefined || layer.italic !== undefined || layer.textCase !== undefined;
 }
 
 /** The preset the layer is in, with its own tweaks folded in. */

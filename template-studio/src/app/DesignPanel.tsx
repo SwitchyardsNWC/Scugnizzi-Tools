@@ -1,4 +1,5 @@
 import { canvasTypeOf, type CanvasTextStyle } from '../model/design-system.ts';
+import { BRAND_PRESETS } from './features.ts';
 import { addPreset as addBrandPreset, duplicatePreset, freshLabel, presetUses, removePreset as removeBrandPreset, updatePreset as updateBrandPreset, withPresets } from '../model/brand-presets.ts';
 import { roleIsStyled } from '../compile/colors.ts';
 import { canvasTypeSampleSvg } from '../compile/freeform.ts';
@@ -173,7 +174,7 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
       <ButtonPanel editor={editor} ds={ds} phone={phone} />
       <ImagePanel editor={editor} ds={ds} />
       {/* Playful type for the freeform canvas, last and on its own: it follows none of the email's rules above. */}
-      <BrandPresetsPanel editor={editor} ds={ds} />
+      {BRAND_PRESETS && <BrandPresetsPanel editor={editor} ds={ds} />}
 
       <SystemFooter
         editor={editor}

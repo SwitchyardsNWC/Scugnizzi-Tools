@@ -35,6 +35,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { BRAND_PRESETS } from './features.ts';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
@@ -162,7 +163,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   /** Where the eraser is over the page, for its ring. */
   const [eraserAt, setEraserAt] = useState<Point | null>(null);
   /** The brand preset new text is set in; null is the plain heading role. */
-  const [look, setLook] = useState<string | null>(() => Object.keys(canvasTypeOf(ds))[0] ?? null);
+  const [look, setLook] = useState<string | null>(() => (BRAND_PRESETS ? (Object.keys(canvasTypeOf(ds))[0] ?? null) : null));
   const lookRef = useRef(look);
   lookRef.current = look;
   /** The group this marker session's strokes go into. A new session starts with each new pen tool. */
@@ -1288,7 +1289,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           width: Math.max(10, box.width - pad * 2) * view.z,
           height: typing.kind === 'sticky' ? Math.max(10, box.height - pad * 2) * view.z : Math.max(size * 1.3, textHeights[typing.id] ?? 0) * view.z,
           size: size * view.z,
-          style: { lineHeight: st.lineHeight, weight: st.weight, uppercase: st.uppercase, letterSpacing: st.letterSpacing },
+          style: { lineHeight: st.lineHeight, weight: st.weight, uppercase: st.uppercase, textCase: st.textCase, letterSpacing: st.letterSpacing },
           italic: st.italic,
           font: st.font,
           color: colorOf(ds, typing.color) ?? colorOf(ds, st.color) ?? (typing.kind === 'sticky' ? '#2b2620' : ink),
@@ -1331,7 +1332,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     for (const [k, v] of Object.entries(patch)) editorRef.current.setAt(at, `block.${k}`, v);
   };
 
-  const slashItems: CanvasCommand[] = typing && slash ? filterCommands(canvasCommands(typing, ds), slash.query) : [];
+  const slashItems: CanvasCommand[] = typing && slash ? filterCommands(canvasCommands(typing, ds).filter((c) => BRAND_PRESETS || c.group !== 'Preset'), slash.query) : [];
   /** Words and formatting into the layer and the editor together, with the selection put back where it belongs. */
   const rewrite = (label: string, next: { text: string; styles: StyleRange[] }, extra: Record<string, unknown>, start: number, end: number, coalesce?: string) => {
     const el = textRef.current;
@@ -1576,7 +1577,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               fontStyle: field.italic ? 'italic' : 'normal',
               color: field.color,
               textAlign: field.align,
-              textTransform: field.style.uppercase ? 'uppercase' : 'none',
+              textTransform: ({ none: 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize' } as const)[field.style.textCase],
               letterSpacing: field.style.letterSpacing ? `${field.style.letterSpacing * view.z}px` : undefined,
               transform: typing.rotation ? `rotate(${typing.rotation}deg)` : undefined,
             }}
@@ -1686,7 +1687,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onRemove={() => layer && poof(layer)}
           onUngroup={() => sel.group && ungroup(sel.group)}
           onOrder={(d) => layer && orderKey(layer, d)}
-          onSavePreset={(mode, label) => {
+          onSavePreset={!BRAND_PRESETS ? undefined : (mode, label) => {
             const one = sel.group ? undefined : sel.layers[0];
             if (one?.kind !== 'text') return;
             const saved = savePresetFromLayer(tpl(), blockId, one, mode, label);
@@ -1768,7 +1769,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         )}
       </div>
 
-      {(tool === 'stamp' || tool === 'text' || tool === 'pen' || paintsOpen) && (
+      {(tool === 'stamp' || (tool === 'text' && BRAND_PRESETS) || tool === 'pen' || paintsOpen) && (
         <div class="fig-chrome fig-trays">
           {paintsOpen && (
             <div class="fig-tray fig-paints" role="group" aria-label="Colour">
@@ -1782,7 +1783,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               ))}
             </div>
           )}
-          {tool === 'text' && (
+          {tool === 'text' && BRAND_PRESETS && (
             <div class="fig-tray fig-looks" role="group" aria-label="Text style">
               {[null, ...Object.keys(canvasTypeOf(ds))].map((k) => (
                 <button
@@ -1850,7 +1851,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
       {hint && idle && (
         <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
-          Double-click text to type · / for presets · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
+          Double-click text to type · / for type · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
         </div>
       )}
     </div>

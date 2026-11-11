@@ -186,6 +186,10 @@ function paint(fill: string | null, stroke: string | null, strokeWidth: number, 
  * The wobble's swing and the arc's bend are functions of the letter's index and the style, never of
  * chance, so the same recipe draws the same picture every time.
  */
+const CASE_CSS = { none: '', upper: ' text-transform:uppercase;', lower: ' text-transform:lowercase;', title: ' text-transform:capitalize;' } as const;
+const caseOf = (t: string, c: 'none' | 'upper' | 'lower' | 'title') =>
+  c === 'upper' ? t.toUpperCase() : c === 'lower' ? t.toLowerCase() : c === 'title' ? t.replace(/(^|\s)(\S)/g, (_, a: string, b: string) => a + b.toUpperCase()) : t;
+
 function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSystem, mark: string, surfaceHeight: number): string {
   const look = layer.look ? canvasTypeOf(ds)[layer.look] : undefined;
   const words = richWords(layer.text, layer.styles, ds);
@@ -200,7 +204,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
   const font = s.font;
   const base =
     `margin:0; font-family:${font}; font-size:${num(s.size)}px; line-height:${num(s.lineHeight)}%; font-weight:${s.weight};${s.italic ? ' font-style:italic;' : ''} ` +
-    `color:${color}; text-align:${layer.align};${s.uppercase ? ' text-transform:uppercase;' : ''}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
+    `color:${color}; text-align:${layer.align};${CASE_CSS[s.textCase]}${s.letterSpacing ? ` letter-spacing:${num(s.letterSpacing)}px;` : ''} ` +
     'overflow-wrap:break-word; word-wrap:break-word';
 
   if (!look) return box(words, base);
@@ -214,7 +218,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
     // On a curve the words are SVG text on a path: the stroke is the text's own, painted under the
     // fill, and the shadow a drop-shadow filter. A highlight band has no SVG equivalent and is left out.
     const k = Math.min(100, s.curve) / 100;
-    const line = (s.uppercase ? layer.text.toUpperCase() : layer.text).replace(/\s*\r?\n\s*/g, ' ');
+    const line = caseOf(layer.text, s.textCase).replace(/\s*\r?\n\s*/g, ' ');
     const w = Math.max(1, layer.width);
     const sag = k * w * 0.32;
     const baseline = layer.y + s.size + sag;
@@ -224,7 +228,7 @@ function textSvg(layer: Extract<FreeformLayer, { kind: 'text' }>, ds: DesignSyst
       const arcWords = layer.styles?.length
         ? runsOf(layer.text, layer.styles)
             .map((run) => {
-              const t = esc((s.uppercase ? run.text.toUpperCase() : run.text).replace(/\r?\n/g, ' '));
+              const t = esc(caseOf(run.text, s.textCase).replace(/\r?\n/g, ' '));
               const m = run.marks;
               const lines = [m.underline ? 'underline' : '', m.strike ? 'line-through' : ''].filter(Boolean).join(' ');
               const attrs =

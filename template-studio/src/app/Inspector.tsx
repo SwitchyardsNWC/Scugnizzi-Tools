@@ -9,6 +9,7 @@ import { FOOTER_TYPES, footerTypeOf } from '../model/footer-types.ts';
 import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
+import { BRAND_PRESETS } from './features.ts';
 import type { FreeformLayer } from '../model/types.ts';
 import type { DndColumn, DndModule, DndSection, Lock } from '../model/types.ts';
 import { newDndColumn, newDndModule, newDndSection } from '../model/dnd.ts';
@@ -935,7 +936,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                     }}
                   >
                     <optgroup label="Brand presets">
-                      {Object.entries(looks).map(([k, style]) => (
+                      {Object.entries(BRAND_PRESETS ? looks : {}).map(([k, style]) => (
                         <option key={k} value={`look:${k}`}>
                           {style.label}
                         </option>

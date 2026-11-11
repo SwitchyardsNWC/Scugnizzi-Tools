@@ -24,6 +24,8 @@ export interface ResolvedText {
   lineHeight: number;
   italic: boolean;
   uppercase: boolean;
+  /** The case the letters are drawn in. `uppercase` is `textCase === 'upper'`, kept for the renderer's curve. */
+  textCase: 'none' | 'upper' | 'lower' | 'title';
   letterSpacing: number;
   /** The style's own colour, before the layer's. Null is the ink. */
   color: ColorRef;
@@ -46,6 +48,7 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         lineHeight: look.lineHeight,
         italic: Boolean(look.italic),
         uppercase: Boolean(look.uppercase),
+        textCase: look.uppercase ? 'upper' : 'none',
         letterSpacing: look.letterSpacing ?? 0,
         color: look.color,
         stroke: look.stroke ?? null,
@@ -61,6 +64,7 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         italic: false,
         // A note is handwriting on paper: its words stay as typed whatever the role says.
         uppercase: layer.kind === 'text' && Boolean(role.uppercase),
+        textCase: layer.kind === 'text' && role.uppercase ? 'upper' : 'none',
         letterSpacing: layer.kind === 'text' ? (role.letterSpacing ?? 0) : 0,
         color: null,
         stroke: null,
@@ -77,6 +81,9 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
     ...(layer.size !== undefined ? { size: layer.size } : {}),
     ...(layer.letterSpacing !== undefined ? { letterSpacing: layer.letterSpacing } : {}),
     ...(layer.lineHeight !== undefined ? { lineHeight: layer.lineHeight } : {}),
+    ...(layer.weight !== undefined ? { weight: layer.weight } : {}),
+    ...(layer.italic !== undefined ? { italic: layer.italic } : {}),
+    ...(layer.textCase !== undefined ? { textCase: layer.textCase, uppercase: layer.textCase === 'upper' } : {}),
   };
 }
 

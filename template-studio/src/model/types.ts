@@ -383,6 +383,11 @@ export interface TextTweaks {
   amount?: number;
   /** A key of the design system's `fonts`, over the style's own face. */
   font?: string;
+  /** Over the role's weight, from the text tool. */
+  weight?: 'normal' | 'bold';
+  italic?: boolean;
+  /** How the letters are cased when drawn; the words as typed are kept. */
+  textCase?: 'none' | 'upper' | 'lower' | 'title';
 }
 
 /**
