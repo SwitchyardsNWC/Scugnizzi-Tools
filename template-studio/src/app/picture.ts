@@ -6,6 +6,7 @@
 
 import { freeformSvg } from '../compile/freeform.ts';
 import { ImageEffects } from '../effects/image.ts';
+import { InkBleed } from '../effects/ink.ts';
 import { Riso } from '../effects/riso.ts';
 import type { DesignSystem } from '../model/design-system.ts';
 import { liveSteps } from '../model/effects.ts';
@@ -81,6 +82,15 @@ export function runSteps(data: Uint8ClampedArray, W: number, H: number, steps: E
     group = [];
   };
   for (const step of liveSteps(steps)) {
+    if (step.effect === 'ink') {
+      // Ink bleed reads and writes the picture whole, so it runs between the float groups, mixed by its strength.
+      flush();
+      const before = data.slice();
+      InkBleed.apply(step, data, W, H, unit);
+      const k = typeof step.strength === 'number' ? Math.max(0, Math.min(1, step.strength)) : 1;
+      if (k < 1) for (let i = 0; i < data.length; i++) data[i] = Math.round(before[i]! + (data[i]! - before[i]!) * k);
+      continue;
+    }
     if (step.effect !== 'riso') {
       group.push(step);
       continue;

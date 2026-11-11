@@ -10,6 +10,7 @@
 import { Riso } from '../effects/riso.ts';
 import { withFreeform } from './freeform.ts';
 import { ImageEffects, type ImageEffectKind } from '../effects/image.ts';
+import { InkBleed } from '../effects/ink.ts';
 import type { EffectKind, EffectStep, FreeformBlock, FreeformLayer, RisoInk, RisoPress, RisoStep, Template } from './types.ts';
 
 /** Where Freeform leaves the picture and the settings for the Riso tool. */
@@ -156,9 +157,9 @@ export function misregister(step: RisoStep, misreg: number, seed = step.seed): R
 // shape, before it is laid over the layers below; the page's runs last, on everything.
 
 /** Every step the Add menu offers, in its order. */
-export const EFFECT_KINDS: EffectKind[] = ['adjust', 'duotone', 'halftone', 'posterize', 'grain', 'texture', 'blur', 'sharpen', 'vignette', 'riso'];
+export const EFFECT_KINDS: EffectKind[] = ['adjust', 'duotone', 'halftone', 'posterize', 'grain', 'texture', 'blur', 'sharpen', 'vignette', 'ink', 'riso'];
 
-export const EFFECT_LABELS: Record<EffectKind, string> = { ...ImageEffects.LABELS, riso: 'Riso print' };
+export const EFFECT_LABELS: Record<EffectKind, string> = { ...ImageEffects.LABELS, riso: 'Riso print', ink: 'Ink bleed' };
 
 export const EFFECT_HELP: Record<EffectKind, string> = {
   adjust: 'Exposure, white balance, brightness, contrast, saturation and vibrance.',
@@ -171,11 +172,13 @@ export const EFFECT_HELP: Record<EffectKind, string> = {
   sharpen: 'Crisper detail, leaving flat areas and grain alone.',
   vignette: 'Darker towards the edges, like a lens.',
   riso: 'Printed through the Riso press in one to three inks.',
+  ink: 'Ink that spreads, wears and drifts: photocopy, fax, ribbon or rubber stamp.',
 };
 
 /** A new step of a kind, at its defaults. Steps with grain take the seed given. */
 export function newStep(kind: EffectKind, seed = 1): EffectStep {
   if (kind === 'riso') return risoStep(0, seed);
+  if (kind === 'ink') return inkStep(0, seed);
   const d = ImageEffects.DEFAULTS[kind as ImageEffectKind];
   return { effect: kind, ...structuredClone(d), ...(kind === 'grain' || kind === 'texture' ? { seed } : {}) } as EffectStep;
 }
@@ -258,6 +261,7 @@ export const LOOKS: Array<{ name: string; desc: string; steps: () => EffectStep[
       { effect: 'texture', kind: 'paper', amount: 15, scale: 50, blend: 'multiply', seed: 1 },
     ],
   },
+  ...InkBleed.PRESETS.map((p, i) => ({ name: p.name, desc: `Ink bleed: ${p.desc}`, steps: () => [inkStep(i, 1) as EffectStep] })),
   ...RISO_PRESETS.map((p, i) => ({ name: p.name, desc: `Riso: ${p.desc}`, steps: () => [risoStep(i, 1) as EffectStep] })),
 ];
 
@@ -331,6 +335,28 @@ export function normalizeStep(value: unknown): EffectStep | null {
       };
     case 'blur':
       return { effect: 'blur', radius: num(v['radius'], 0, 40, 3), ...base };
+    case 'ink': {
+      const d = InkBleed.DEFAULTS;
+      const f = (k: keyof typeof d) => num(v[k], 0, 1, d[k]);
+      return {
+        effect: 'ink',
+        spread: num(v['spread'], 0, 3, d.spread),
+        rough: f('rough'),
+        soft: num(v['soft'], 0, 3, d.soft),
+        fade: f('fade'),
+        grit: f('grit'),
+        stamp: f('stamp'),
+        elong: f('elong'),
+        jitter: f('jitter'),
+        smudge: f('smudge'),
+        grain: f('grain'),
+        dust: f('dust'),
+        speckle: f('speckle'),
+        streaks: f('streaks'),
+        seed: Math.max(1, Math.round(num(v['seed'], 1, 1e9, 1))),
+        ...base,
+      };
+    }
     case 'vignette':
       return { effect: 'vignette', amount: num(v['amount'], 0, 100, 70), spread: num(v['spread'], 5, 130, 85), feather: num(v['feather'], 0, 100, 60), roundness: num(v['roundness'], 0, 100, 0), ...base };
     default:
@@ -348,4 +374,10 @@ export function withRisoStep(steps: EffectStep[] | undefined, step: RisoStep): E
   if (at < 0) return [...list, step];
   const old = list[at]!;
   return list.map((s, i) => (i === at ? { ...step, ...(old.off ? { off: true } : {}), ...(old.strength !== undefined ? { strength: old.strength } : {}) } : s));
+}
+
+/** An ink bleed step from one of the tool's looks. */
+export function inkStep(preset = 0, seed = 1): EffectStep {
+  const p = InkBleed.PRESETS[preset] ?? InkBleed.PRESETS[0]!;
+  return { effect: 'ink', ...p.apply, seed };
 }

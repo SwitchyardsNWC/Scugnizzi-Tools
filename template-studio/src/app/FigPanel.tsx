@@ -15,6 +15,7 @@ import { measureImage, shownImageHref } from './picture-size.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
+import { InkBleed } from '../effects/ink.ts';
 import { EFFECT_HELP, EFFECT_KINDS, EFFECT_LABELS, LOOKS, withLayerEffects, misregister, moveStep, newStep, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
 import type { MarkKey, MarkState } from '../model/rich-text.ts';
 import type { Align, EffectKind, EffectStep, FreeformBlock, FreeformLayer, RisoInk, RisoStep, TextMarks } from '../model/types.ts';
@@ -338,6 +339,7 @@ function Seg<T extends string>({ label, value, options, onPick }: { label: strin
 
 /** One step's own dials. Riso has its own set. */
 function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: EffectStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
+  const onOpenInk = () => window.open(new URL('../../text bleed/ink-bleed.html', window.location.href).href, '_blank');
   const name = EFFECT_LABELS[step.effect];
   const dial = (label: string, unit: string, min: number, max: number, value: number, patch: (v: number) => Partial<EffectStep>, stepBy = 1) => (
     <Slide label={label} unit={unit} min={min} max={max} step={stepBy} value={value} onInput={(v) => set({ ...step, ...patch(v) } as EffectStep, `${name} ${label.toLowerCase()}`, `fx-${step.effect}-${label}`)} />
@@ -411,6 +413,46 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
       );
     case 'blur':
       return <div class="fig-sliders fig-step-body">{dial('Radius', 'px', 0, 40, step.radius, (v) => ({ radius: v }), 0.5)}</div>;
+    case 'ink':
+      // The ink bleed tool's dials, grouped as it groups them. Paper applies to a page; a layer has none.
+      return (
+        <div class="fig-sliders fig-step-body fig-ink">
+          <div class="fig-riso-looks" role="group" aria-label="Ink looks">
+            {InkBleed.PRESETS.map((p) => (
+              <button key={p.name} title={p.desc} onClick={() => set({ ...step, ...p.apply }, `Ink · ${p.name}`)}>
+                <span class="fig-riso-look-name">{p.name}</span>
+              </button>
+            ))}
+          </div>
+          <span class="fig-fx-sub">Ink</span>
+          {dial('Spread', '', 0, 300, Math.round(step.spread * 100), (v) => ({ spread: v / 100 }))}
+          {dial('Rough', '%', 0, 100, Math.round(step.rough * 100), (v) => ({ rough: v / 100 }))}
+          {dial('Soft', '', 0, 300, Math.round(step.soft * 100), (v) => ({ soft: v / 100 }))}
+          {dial('Worn', '%', 0, 100, Math.round(step.fade * 100), (v) => ({ fade: v / 100 }))}
+          {dial('Grit', '%', 0, 100, Math.round(step.grit * 100), (v) => ({ grit: v / 100 }))}
+          {dial('Stamp', '%', 0, 100, Math.round(step.stamp * 100), (v) => ({ stamp: v / 100 }))}
+          {dial('Smudge', '%', 0, 100, Math.round(step.smudge * 100), (v) => ({ smudge: v / 100 }))}
+          <span class="fig-fx-sub">Copier</span>
+          {dial('Stretch', '%', 0, 100, Math.round(step.elong * 100), (v) => ({ elong: v / 100 }))}
+          {dial('Drift', '%', 0, 100, Math.round(step.jitter * 100), (v) => ({ jitter: v / 100 }))}
+          <span class="fig-fx-sub">Paper · on the page</span>
+          {dial('Grain', '%', 0, 100, Math.round(step.grain * 100), (v) => ({ grain: v / 100 }))}
+          {dial('Dust', '%', 0, 100, Math.round(step.dust * 100), (v) => ({ dust: v / 100 }))}
+          {dial('Speckle', '%', 0, 100, Math.round(step.speckle * 100), (v) => ({ speckle: v / 100 }))}
+          {dial('Streaks', '%', 0, 100, Math.round(step.streaks * 100), (v) => ({ streaks: v / 100 }))}
+          <div class="fig-riso-actions">
+            <button class="fig-text-btn" title="A new roll of the same wear" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle ink')}>
+              Reshuffle
+            </button>
+            <span class="grow" />
+            {onOpenInk && (
+              <button class="fig-text-btn" title="Open the ink bleed tool, for type set letter by letter with typewriter strikes" onClick={onOpenInk}>
+                Ink bleed tool ↗
+              </button>
+            )}
+          </div>
+        </div>
+      );
     case 'sharpen':
       return (
         <div class="fig-sliders fig-step-body">

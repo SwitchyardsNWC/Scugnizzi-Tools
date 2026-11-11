@@ -2177,7 +2177,7 @@ button.phone-row { cursor: pointer; }
 .fig-riso-swatches button.on { box-shadow: 0 0 0 2px var(--fig-surface), 0 0 0 3.5px var(--fig-ink); }
 .fig-riso-screen { display: flex; }
 .fig-riso-screen button { flex: 1; }
-.fig-step-body.fig-riso .fig-slide { grid-template-columns: 58px minmax(0, 1fr) 44px; }
+.fig-step-body.fig-riso .fig-slide, .fig-step-body.fig-ink .fig-slide { grid-template-columns: 58px minmax(0, 1fr) 44px; }
 .fig-riso-papers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .fig-riso-papers button { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover); font: inherit; font-size: 12px; color: var(--fig-ink); cursor: pointer; }
 .fig-riso-papers button.on { box-shadow: inset 0 0 0 1.5px var(--fig-ink); }
