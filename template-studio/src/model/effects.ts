@@ -156,19 +156,20 @@ export function misregister(step: RisoStep, misreg: number, seed = step.seed): R
 // shape, before it is laid over the layers below; the page's runs last, on everything.
 
 /** Every step the Add menu offers, in its order. */
-export const EFFECT_KINDS: EffectKind[] = ['adjust', 'duotone', 'halftone', 'posterize', 'grain', 'texture', 'blur', 'vignette', 'riso'];
+export const EFFECT_KINDS: EffectKind[] = ['adjust', 'duotone', 'halftone', 'posterize', 'grain', 'texture', 'blur', 'sharpen', 'vignette', 'riso'];
 
 export const EFFECT_LABELS: Record<EffectKind, string> = { ...ImageEffects.LABELS, riso: 'Riso print' };
 
 export const EFFECT_HELP: Record<EffectKind, string> = {
-  adjust: 'Brightness, contrast and saturation.',
-  duotone: 'Two colours: the darks become one, the lights the other.',
-  halftone: 'Dots on a turned screen, as big as the picture is dark.',
-  posterize: 'A few flat levels of each colour.',
-  grain: 'Film grain. The same grain every time.',
+  adjust: 'Exposure, white balance, brightness, contrast, saturation and vibrance.',
+  duotone: 'Two colours: the darks become one, the lights the other, blended evenly.',
+  halftone: 'Print screens: one ink, or CMYK. Tones come out true from a distance.',
+  posterize: 'A few flat levels of each colour, with print dithering if you like.',
+  grain: 'Film grain with a size, gentler in deep shadow and bright highlight.',
   texture: 'Paper, canvas, fibre, concrete or crosshatch laid over it.',
   blur: 'Soft focus. On a layer it softens the edges too.',
-  vignette: 'Darker towards the corners.',
+  sharpen: 'Crisper detail, leaving flat areas and grain alone.',
+  vignette: 'Darker towards the edges, like a lens.',
   riso: 'Printed through the Riso press in one to three inks.',
 };
 
@@ -176,7 +177,7 @@ export const EFFECT_HELP: Record<EffectKind, string> = {
 export function newStep(kind: EffectKind, seed = 1): EffectStep {
   if (kind === 'riso') return risoStep(0, seed);
   const d = ImageEffects.DEFAULTS[kind as ImageEffectKind];
-  return { effect: kind, ...structuredClone(d), ...(kind === 'grain' ? { seed } : {}) } as EffectStep;
+  return { effect: kind, ...structuredClone(d), ...(kind === 'grain' || kind === 'texture' ? { seed } : {}) } as EffectStep;
 }
 
 /** Steps that do something: not switched off and not at no strength. */
@@ -248,6 +249,15 @@ export const LOOKS: Array<{ name: string; desc: string; steps: () => EffectStep[
       { effect: 'halftone', spacing: 7, angle: 30, shape: 'circle', contrast: 8, ink: '#0d1a33', paper: '#f0c040' },
     ],
   },
+  {
+    name: 'Four-colour print',
+    desc: 'CMYK screens at press angles, a little dot gain, on uncoated stock',
+    steps: () => [
+      { effect: 'adjust', brightness: 0, contrast: 10, saturation: 0, vibrance: 20 },
+      { effect: 'halftone', spacing: 5, angle: 45, shape: 'circle', contrast: 5, ink: '#000000', paper: '#f7f3ea', mode: 'cmyk', gain: 15 },
+      { effect: 'texture', kind: 'paper', amount: 15, scale: 50, blend: 'multiply', seed: 1 },
+    ],
+  },
   ...RISO_PRESETS.map((p, i) => ({ name: p.name, desc: `Riso: ${p.desc}`, steps: () => [risoStep(i, 1) as EffectStep] })),
 ];
 
@@ -277,11 +287,23 @@ export function normalizeStep(value: unknown): EffectStep | null {
       return r ? { ...r, ...base } : null;
     }
     case 'adjust':
-      return { effect: 'adjust', brightness: num(v['brightness'], -100, 100, 0), contrast: num(v['contrast'], -100, 100, 0), saturation: num(v['saturation'], -100, 100, 0), ...base };
+      return {
+        effect: 'adjust',
+        exposure: num(v['exposure'], -3, 3, 0),
+        brightness: num(v['brightness'], -100, 100, 0),
+        contrast: num(v['contrast'], -100, 100, 0),
+        saturation: num(v['saturation'], -100, 100, 0),
+        vibrance: num(v['vibrance'], -100, 100, 0),
+        temperature: num(v['temperature'], -100, 100, 0),
+        tint: num(v['tint'], -100, 100, 0),
+        ...base,
+      };
     case 'duotone':
-      return { effect: 'duotone', shadow: hex(v['shadow'], '#1a0533'), highlight: hex(v['highlight'], '#e8e0d8'), ...base };
+      return { effect: 'duotone', shadow: hex(v['shadow'], '#1a0533'), highlight: hex(v['highlight'], '#e8e0d8'), balance: num(v['balance'], -100, 100, 0), ...base };
     case 'posterize':
-      return { effect: 'posterize', levels: Math.round(num(v['levels'], 2, 12, 4)), gamma: num(v['gamma'], 1, 10, 5), ...base };
+      return { effect: 'posterize', levels: Math.round(num(v['levels'], 2, 12, 4)), gamma: num(v['gamma'], 1, 10, 5), dither: oneOf(v['dither'], ['none', 'ordered', 'diffusion'] as const, 'none'), ...base };
+    case 'sharpen':
+      return { effect: 'sharpen', amount: num(v['amount'], 0, 200, 80), radius: num(v['radius'], 0.3, 5, 1), threshold: num(v['threshold'], 0, 50, 2), ...base };
     case 'halftone':
       return {
         effect: 'halftone',
@@ -291,23 +313,26 @@ export function normalizeStep(value: unknown): EffectStep | null {
         contrast: num(v['contrast'], 1, 10, 5),
         ink: hex(v['ink'], '#000000'),
         paper: hex(v['paper'], '#ffffff'),
+        mode: oneOf(v['mode'], ['mono', 'cmyk'] as const, 'mono'),
+        gain: num(v['gain'], 0, 100, 0),
         ...base,
       };
     case 'grain':
-      return { effect: 'grain', amount: num(v['amount'], 0, 100, 40), mono: num(v['mono'], 0, 100, 80), seed: Math.max(1, Math.round(num(v['seed'], 1, 1e9, 1))), ...base };
+      return { effect: 'grain', amount: num(v['amount'], 0, 100, 40), mono: num(v['mono'], 0, 100, 80), size: num(v['size'], 0.5, 4, 1), seed: Math.max(1, Math.round(num(v['seed'], 1, 1e9, 1))), ...base };
     case 'texture':
       return {
         effect: 'texture',
         kind: oneOf(v['kind'], ['paper', 'canvas', 'fibers', 'concrete', 'crosshatch'] as const, 'paper'),
         amount: num(v['amount'], 0, 100, 35),
         scale: num(v['scale'], 5, 100, 50),
-        blend: oneOf(v['blend'], ['multiply', 'overlay', 'screen', 'soft-light'] as const, 'multiply'),
+        blend: oneOf(v['blend'], ['multiply', 'overlay', 'soft-light', 'hard-light', 'screen'] as const, 'multiply'),
+        seed: Math.max(1, Math.round(num(v['seed'], 1, 1e9, 1))),
         ...base,
       };
     case 'blur':
       return { effect: 'blur', radius: num(v['radius'], 0, 40, 3), ...base };
     case 'vignette':
-      return { effect: 'vignette', amount: num(v['amount'], 0, 100, 70), spread: num(v['spread'], 5, 100, 85), ...base };
+      return { effect: 'vignette', amount: num(v['amount'], 0, 100, 70), spread: num(v['spread'], 5, 130, 85), feather: num(v['feather'], 0, 100, 60), roundness: num(v['roundness'], 0, 100, 0), ...base };
     default:
       return null;
   }

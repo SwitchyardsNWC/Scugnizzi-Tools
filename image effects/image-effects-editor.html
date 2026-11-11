@@ -488,6 +488,7 @@ body {
 <body>
 <script src="../tool-banner.js" data-tool="Image effects editor"></script>
 <script src="../tool-kit.js"></script>
+<script src="../effects/image.js"></script>
 
 <div class="header">
   <h1>Image Effects Editor</h1>
@@ -834,7 +835,6 @@ function useImage(img, name, remember) {
   fn.textContent = name;
   fn.style.display = 'block';
   document.getElementById('downloadBtn').disabled = false;
-  texCache = null; texCacheKey = '';
   resetZoom();
   renderEffects();
   if (remember && window.ToolKit) {
@@ -859,11 +859,6 @@ function loadImage(file) {
 
 // ─── Effect pipeline ─────────────────────────────────────────────────────────
 
-function hexToRgb(hex) {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : null;
-}
-
 let renderPending = false;
 
 function renderEffects() {
@@ -880,294 +875,34 @@ function renderEffects() {
   });
 }
 
+/**
+ * The tool's settings as a stack for the shared engine, in the order this tool has always run them: blur,
+ * then duotone and posterize, then the halftone, the texture, the grain, and the vignette last.
+ */
+function stepsFromState() {
+  const s = state;
+  const steps = [];
+  if (s.blur.enabled)      steps.push({ effect: 'blur', radius: s.blur.radius });
+  if (s.duotone.enabled)   steps.push({ effect: 'duotone', shadow: s.duotone.shadow, highlight: s.duotone.highlight });
+  if (s.posterize.enabled) steps.push({ effect: 'posterize', levels: s.posterize.levels, gamma: s.posterize.gamma });
+  if (s.halftone.enabled)  steps.push({ effect: 'halftone', spacing: s.halftone.spacing, angle: s.halftone.angle, shape: s.halftone.shape, contrast: s.halftone.contrast, ink: s.halftone.color, paper: s.halftone.bgColor });
+  if (s.texture.enabled)   steps.push({ effect: 'texture', kind: s.texture.type, amount: s.texture.intensity, scale: s.texture.scale, blend: s.texture.blend, seed: 1 });
+  if (s.grain.enabled)     steps.push({ effect: 'grain', amount: s.grain.intensity, mono: s.grain.mono, size: 1, seed: 1 });
+  if (s.vignette.enabled)  steps.push({ effect: 'vignette', amount: s.vignette.intensity, spread: s.vignette.spread });
+  return steps;
+}
+
+// The effects themselves are the shared engine, effects/image.js, which Template Studio's Freeform canvas
+// runs too: a look tuned here is the same picture there. It works in float linear light and encodes once.
 function _doRender() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-
-  // 1. Draw image — apply blur during draw to avoid edge haloes
-  if (state.blur.enabled) {
-    const r = state.blur.radius;
-    ctx.filter = `blur(${r}px)`;
-    ctx.drawImage(currentImage, -r * 2, -r * 2, W + r * 4, H + r * 4);
-    ctx.filter = 'none';
-  } else {
-    ctx.drawImage(currentImage, 0, 0, W, H);
-  }
-
-  // 2. Pixel-level: duotone → posterize
-  let imgData = ctx.getImageData(0, 0, W, H);
-  if (state.duotone.enabled)   applyDuotone(imgData);
-  if (state.posterize.enabled) applyPosterize(imgData);
+  ctx.drawImage(currentImage, 0, 0, W, H);
+  const steps = stepsFromState();
+  if (!steps.length) return;
+  const imgData = ctx.getImageData(0, 0, W, H);
+  ImageEffects.run(steps, imgData.data, W, H, 1);
   ctx.putImageData(imgData, 0, 0);
-
-  // 3. Halftone — reads canvas then replaces it with dot pattern
-  if (state.halftone.enabled) applyHalftone(W, H);
-
-  // 4. Texture overlay (physical medium, under grain)
-  if (state.texture.enabled) applyTextureOverlay(W, H);
-
-  // 5. Grain on top of texture/halftone
-  if (state.grain.enabled) {
-    imgData = ctx.getImageData(0, 0, W, H);
-    applyGrain(imgData);
-    ctx.putImageData(imgData, 0, 0);
-  }
-
-  // 6. Vignette — always last
-  if (state.vignette.enabled) applyVignetteOverlay(W, H);
-}
-
-function applyDuotone(imageData) {
-  const sh = hexToRgb(state.duotone.shadow);
-  const hi = hexToRgb(state.duotone.highlight);
-  if (!sh || !hi) return;
-  const d = imageData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const t = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) / 255;
-    d[i]   = Math.round(sh.r + (hi.r - sh.r) * t);
-    d[i+1] = Math.round(sh.g + (hi.g - sh.g) * t);
-    d[i+2] = Math.round(sh.b + (hi.b - sh.b) * t);
-  }
-}
-
-function applyHalftone(W, H) {
-  const { spacing, color, bgColor, angle, shape, contrast } = state.halftone;
-  const srcData = ctx.getImageData(0, 0, W, H);
-
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = color;
-
-  const rad   = (angle * Math.PI) / 180;
-  const cosA  = Math.cos(rad);
-  const sinA  = Math.sin(rad);
-  const cx    = W / 2, cy = H / 2;
-  // enough steps to cover the full rotated canvas in both axes
-  const halfDiag = Math.ceil(Math.sqrt(W * W + H * H) / 2 / spacing) + 2;
-  // contrast: slider 1-10 → power curve 0.2-2.0  (5 = linear)
-  const contrastPow = contrast / 5;
-
-  ctx.save();
-  for (let gi = -halfDiag; gi <= halfDiag; gi++) {
-    for (let gj = -halfDiag; gj <= halfDiag; gj++) {
-      // rotate grid coordinates to screen space
-      const gx = gi * spacing;
-      const gy = gj * spacing;
-      const sx = gx * cosA - gy * sinA + cx;
-      const sy = gx * sinA + gy * cosA + cy;
-
-      if (sx < -spacing || sx > W + spacing || sy < -spacing || sy > H + spacing) continue;
-
-      const brightness  = sampleBilinear(srcData.data, W, H, sx, sy);
-      const t           = Math.pow(brightness / 255, contrastPow);
-      const radius      = (1 - t) * spacing * 0.56;
-
-      if (radius > 0.4) drawHalftoneDot(sx, sy, radius, spacing, shape);
-    }
-  }
-  ctx.restore();
-}
-
-function sampleBilinear(data, W, H, x, y) {
-  const x0 = Math.max(0, Math.min(W - 1, Math.floor(x)));
-  const y0 = Math.max(0, Math.min(H - 1, Math.floor(y)));
-  const x1 = Math.min(W - 1, x0 + 1);
-  const y1 = Math.min(H - 1, y0 + 1);
-  const fx = x - Math.floor(x), fy = y - Math.floor(y);
-  const luma = (i) => data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-  return luma((y0*W+x0)*4) * (1-fx)*(1-fy)
-       + luma((y0*W+x1)*4) * fx   *(1-fy)
-       + luma((y1*W+x0)*4) * (1-fx)*fy
-       + luma((y1*W+x1)*4) * fx   *fy;
-}
-
-function drawHalftoneDot(x, y, radius, spacing, shape) {
-  switch (shape) {
-    case 'circle':
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'square': {
-      const s = radius * Math.SQRT2;
-      ctx.fillRect(x - s/2, y - s/2, s, s);
-      break;
-    }
-    case 'diamond': {
-      const d = radius * 1.3;
-      ctx.beginPath();
-      ctx.moveTo(x,     y - d);
-      ctx.lineTo(x + d, y    );
-      ctx.lineTo(x,     y + d);
-      ctx.lineTo(x - d, y    );
-      ctx.closePath();
-      ctx.fill();
-      break;
-    }
-    case 'line': {
-      // horizontal bar — full cell width, height proportional to darkness
-      ctx.fillRect(x - spacing/2, y - radius, spacing, radius * 2);
-      break;
-    }
-    case 'ellipse': {
-      // wider than tall, creating a more organic feel
-      ctx.beginPath();
-      ctx.ellipse(x, y, radius * 1.4, radius * 0.7, 0, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-  }
-}
-
-function applyGrain(imageData) {
-  const d = imageData.data;
-  const amount = (state.grain.intensity / 100) * 70;
-  const monoMix = state.grain.mono / 100;
-
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * amount;
-    if (monoMix >= 0.99) {
-      // pure monochromatic grain (same noise on all channels)
-      d[i]   = Math.max(0, Math.min(255, d[i]   + n));
-      d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
-      d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
-    } else {
-      // colour grain: independent noise per channel
-      const nr = (Math.random() - 0.5) * amount;
-      const ng = (Math.random() - 0.5) * amount;
-      const nb = (Math.random() - 0.5) * amount;
-      const mono = n;
-      d[i]   = Math.max(0, Math.min(255, d[i]   + mono * monoMix + nr * (1 - monoMix)));
-      d[i+1] = Math.max(0, Math.min(255, d[i+1] + mono * monoMix + ng * (1 - monoMix)));
-      d[i+2] = Math.max(0, Math.min(255, d[i+2] + mono * monoMix + nb * (1 - monoMix)));
-    }
-  }
-}
-
-function applyVignetteOverlay(W, H) {
-  const intensity = state.vignette.intensity / 100;
-  const spread    = state.vignette.spread    / 100;
-  const cx = W / 2, cy = H / 2;
-  const outerR = Math.sqrt(W * W + H * H) / 2 * spread;
-  const innerR = outerR * 0.25;
-  const g = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-  g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, `rgba(0,0,0,${intensity})`);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-}
-
-// ─── Posterize ───────────────────────────────────────────────────────────────
-
-function applyPosterize(imageData) {
-  const { levels, gamma } = state.posterize;
-  const d = imageData.data;
-  const step = 255 / (levels - 1);
-  const g = gamma / 5; // 1-10 → 0.2-2.0 power curve
-
-  for (let i = 0; i < d.length; i += 4) {
-    d[i]   = Math.round(Math.round(Math.pow(d[i]   / 255, g) * (levels - 1)) * step);
-    d[i+1] = Math.round(Math.round(Math.pow(d[i+1] / 255, g) * (levels - 1)) * step);
-    d[i+2] = Math.round(Math.round(Math.pow(d[i+2] / 255, g) * (levels - 1)) * step);
-  }
-}
-
-// ─── Texture ─────────────────────────────────────────────────────────────────
-
-let texCache = null, texCacheKey = '';
-
-function applyTextureOverlay(W, H) {
-  const { type, intensity, scale, blend } = state.texture;
-  const key = `${type}-${scale}-${W}-${H}`;
-  if (texCacheKey !== key) {
-    texCache    = buildTextureTile(type, 256, scale);
-    texCacheKey = key;
-  }
-  const pat = ctx.createPattern(texCache, 'repeat');
-  ctx.save();
-  ctx.globalCompositeOperation = blend;
-  ctx.globalAlpha = intensity / 100;
-  ctx.fillStyle = pat;
-  ctx.fillRect(0, 0, W, H);
-  ctx.restore();
-}
-
-function buildTextureTile(type, size, scale) {
-  const tc = document.createElement('canvas');
-  tc.width = tc.height = size;
-  const tx = tc.getContext('2d');
-  const img = tx.createImageData(size, size);
-  const d   = img.data;
-  const freq = 8 / scale; // scale 5-100 → freq 1.6-0.08
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      let v = texPixel(type, x, y, freq, size);
-      v = Math.max(0, Math.min(255, v));
-      d[i] = d[i+1] = d[i+2] = v;
-      d[i+3] = 255;
-    }
-  }
-  tx.putImageData(img, 0, 0);
-  return tc;
-}
-
-function texPixel(type, x, y, freq, size) {
-  switch (type) {
-    case 'paper':
-      return fbm(x * freq, y * freq, 4) * 255;
-    case 'canvas': {
-      const cell = Math.max(2, Math.round(6 / freq));
-      const half = Math.floor(cell / 2);
-      const xi = x % cell, yi = y % cell;
-      const weft = yi < half;
-      const v = weft ? (xi < half ? 180 : 130) : (xi < half ? 130 : 180);
-      return v + (smoothNoise(x * freq * 4, y * freq * 4) - 0.5) * 20;
-    }
-    case 'fibers': {
-      const streak = fbm(x * freq * 0.15, y * freq * 3, 3);
-      return streak * 255;
-    }
-    case 'concrete': {
-      const n  = fbm(x * freq * 1.5, y * freq * 1.5, 3);
-      const n2 = smoothNoise(x * freq * 5, y * freq * 5);
-      return (n * 0.7 + n2 * 0.3) * 255;
-    }
-    case 'crosshatch': {
-      const cell = Math.max(3, Math.round(8 / freq));
-      const xi = x % cell, yi = y % cell;
-      const onH = yi === 0 || yi === 1;
-      const onV = xi === 0 || xi === 1;
-      const onD = (x - y + 1024) % cell < 2;
-      return (onH || onV || onD) ? 80 : 220;
-    }
-    default: return 128;
-  }
-}
-
-// Value noise helpers
-function hash2(x, y) {
-  return Math.abs(Math.sin(x * 127.1 + y * 311.7) * 43758.5453) % 1;
-}
-
-function smoothNoise(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  const a = hash2(ix,   iy),   b = hash2(ix+1, iy);
-  const c = hash2(ix, iy+1),   d2 = hash2(ix+1, iy+1);
-  return a*(1-ux)*(1-uy) + b*ux*(1-uy) + c*(1-ux)*uy + d2*ux*uy;
-}
-
-function fbm(x, y, oct) {
-  let v = 0, amp = 0.5, f = 1, tot = 0;
-  for (let i = 0; i < oct; i++) {
-    v += smoothNoise(x * f, y * f) * amp;
-    tot += amp; amp *= 0.5; f *= 2;
-  }
-  return v / tot;
 }
 
 // ─── Prompt generation ───────────────────────────────────────────────────────
@@ -1333,11 +1068,11 @@ wireSlider('posterize-levels', 'posterize', 'levels', 'val-posterize-levels');
 wireSlider('posterize-gamma',  'posterize', 'gamma',  'val-posterize-gamma');
 wireSlider('texture-intensity', 'texture', 'intensity', 'val-texture-intensity');
 wireSlider('texture-scale',     'texture', 'scale',     'val-texture-scale', v => String(v), v => {
-  texCache = null; texCacheKey = ''; return parseInt(v);
+  return parseInt(v);
 });
 
 document.getElementById('texture-type').addEventListener('change', function () {
-  state.texture.type = this.value; texCache = null; texCacheKey = '';
+  state.texture.type = this.value;
   renderEffects(); markPresetDirty();
 });
 document.getElementById('texture-blend').addEventListener('change', function () {

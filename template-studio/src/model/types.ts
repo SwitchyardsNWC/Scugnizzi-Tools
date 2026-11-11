@@ -646,14 +646,26 @@ export interface StepBase {
 export type EffectStep = StepBase &
   (
     | { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number }
-    | { effect: 'adjust'; brightness: number; contrast: number; saturation: number }
-    | { effect: 'duotone'; shadow: string; highlight: string }
-    | { effect: 'posterize'; levels: number; gamma: number }
-    | { effect: 'halftone'; spacing: number; angle: number; shape: 'circle' | 'square' | 'diamond' | 'line' | 'ellipse'; contrast: number; ink: string; paper: string }
-    | { effect: 'grain'; amount: number; mono: number; seed: number }
-    | { effect: 'texture'; kind: 'paper' | 'canvas' | 'fibers' | 'concrete' | 'crosshatch'; amount: number; scale: number; blend: 'multiply' | 'overlay' | 'screen' | 'soft-light' }
+    // Settings added in engine version 2 are optional, so a step saved before them reads as it did.
+    | { effect: 'adjust'; brightness: number; contrast: number; saturation: number; exposure?: number; vibrance?: number; temperature?: number; tint?: number }
+    | { effect: 'duotone'; shadow: string; highlight: string; balance?: number }
+    | { effect: 'posterize'; levels: number; gamma: number; dither?: 'none' | 'ordered' | 'diffusion' }
+    | {
+        effect: 'halftone';
+        spacing: number;
+        angle: number;
+        shape: 'circle' | 'square' | 'diamond' | 'line' | 'ellipse';
+        contrast: number;
+        ink: string;
+        paper: string;
+        mode?: 'mono' | 'cmyk';
+        gain?: number;
+      }
+    | { effect: 'grain'; amount: number; mono: number; seed: number; size?: number }
+    | { effect: 'texture'; kind: 'paper' | 'canvas' | 'fibers' | 'concrete' | 'crosshatch'; amount: number; scale: number; blend: 'multiply' | 'overlay' | 'soft-light' | 'hard-light' | 'screen'; seed?: number }
     | { effect: 'blur'; radius: number }
-    | { effect: 'vignette'; amount: number; spread: number }
+    | { effect: 'vignette'; amount: number; spread: number; feather?: number; roundness?: number }
+    | { effect: 'sharpen'; amount: number; radius: number; threshold: number }
   );
 export type EffectKind = EffectStep['effect'];
 export type RisoStep = Extract<EffectStep, { effect: 'riso' }>;

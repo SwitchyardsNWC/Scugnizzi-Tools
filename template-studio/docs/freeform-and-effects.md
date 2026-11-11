@@ -339,9 +339,50 @@ named for use: Kicker, Outline display, Shadow display, Tag, Marked line, Seal.
   misprint, soak, grain, paper, saved looks, and Open in Riso on the page. Riso is now handed the
   picture as it stands just before its step, and its settings come back into that step, keeping
   where it sits, its strength, and every other step.
-- **Not yet:** the Image Effects tool still runs its own copy of the filters; moving it onto
-  `effects/image.js` is the next step for "one code path". Looks have no thumbnails yet. Effects
-  on a drawing (a group) go on the page, not on the group.
+- **Not yet:** Looks have no thumbnails. Effects on a drawing (a group) go on the page, not on the
+  group.
+
+**One engine, version 2** *(2026-11-11)*. Jared: "Move it into the shared file. Update the effects
+engine to get pro level results."
+
+- **One code path.** The Image Effects tool loads `effects/image.js` and runs its settings through
+  it as a stack, in the order it always ran them. Its own copy of the filters is gone. A look tuned
+  there is the same picture in Freeform.
+- **A float pipeline.** A stack is decoded once into 32-bit linear light, every step runs there,
+  and it is encoded once with a fraction of a level of fixed dither. Steps no longer round to 8
+  bits for each other, so gradients do not band. Freeform runs each group of steps between Riso
+  steps as one pass. A step that changes nothing returns the picture byte for byte.
+- **Light where light adds.** Blur is an exact gaussian (three boxes past a σ of 12 image pixels)
+  in linear light, premultiplied, so a red/green seam does not go muddy and soft layer edges keep
+  their colour. Exposure, white balance, the vignette and the halftone's sampling are in linear
+  light. Contrast, posterize, grain response and blends are in perceptual sRGB.
+- **Halftone.** Dot area comes from the spot function's measured quantiles, and the target is the
+  light the original reflected, between this paper and this ink. So a screened flat tone averages
+  back to itself: within 3 levels for every dot shape from tone 40 up, and for round, diamond and
+  elliptical dots right down to black. Round dots are Euclidean: round in the highlights, a
+  checkerboard at 50%, round holes in the shadows, as on a press. Each cell's tone is averaged
+  over the cell. Edges are anti-aliased from the spot function's slope inside a cell, and sampled
+  in or out at cell borders, where neighbouring dots meet. New: **CMYK** (four screens at 15°, 75°,
+  0° and 45°, inks multiplying over the paper) and **dot gain**. About 0.3 s mono and 0.6 s CMYK
+  for a 560 × 280 page at 2×.
+- **Grain** is gaussian, has a **size**, and responds like film, strongest in the midtones.
+- **Duotone** blends through Oklab, so the steps between the two colours are even, with a
+  **balance**.
+- **Posterize** can dither, **ordered** (Bayer) or **diffusion** (Floyd–Steinberg, serpentine), in
+  page pixels.
+- **Adjust** adds **exposure** (stops), **vibrance**, **warmth** and **tint**. White balance holds
+  overall brightness. Contrast is an S-curve that holds black and white.
+- **Vignette** darkens in stops, up to 2½, with **feather** and **roundness**. `spread` 100 reaches
+  the corners.
+- **Texture** comes from seeded value noise that never repeats, gets a **reshuffle**, and adds
+  hard light.
+- **Sharpen** is new: an unsharp mask on lightness, with a threshold so flat areas and grain stay
+  calm.
+- **Compatibility.** Settings new in version 2 are optional, so a step saved before them reads.
+  The same settings look different from version 1, by design: tones are now right. The Image
+  Effects tool's presets were tuned on version 1; Newsprint and Screen print print darker,
+  because a dark sky now gets the ink it should.
+- A new Freeform look, **Four-colour print**, shows the CMYK screens.
 
 **Next.** The brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
 effects moved into `effects/` beside Riso.

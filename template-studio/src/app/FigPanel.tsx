@@ -316,9 +316,13 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
     case 'adjust':
       return (
         <div class="fig-sliders fig-step-body">
+          {dial('Exposure', ' st', -3, 3, step.exposure ?? 0, (v) => ({ exposure: v }), 0.1)}
           {dial('Brightness', '', -100, 100, step.brightness, (v) => ({ brightness: v }))}
           {dial('Contrast', '', -100, 100, step.contrast, (v) => ({ contrast: v }))}
           {dial('Saturation', '', -100, 100, step.saturation, (v) => ({ saturation: v }))}
+          {dial('Vibrance', '', -100, 100, step.vibrance ?? 0, (v) => ({ vibrance: v }))}
+          {dial('Warmth', '', -100, 100, step.temperature ?? 0, (v) => ({ temperature: v }))}
+          {dial('Tint', '', -100, 100, step.tint ?? 0, (v) => ({ tint: v }))}
         </div>
       );
     case 'duotone':
@@ -326,6 +330,7 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
         <div class="fig-sliders fig-step-body">
           <HexField label="Shadows" value={step.shadow} onInput={(v) => set({ ...step, shadow: v }, 'Duotone shadows', 'fx-duo-sh')} />
           <HexField label="Highlights" value={step.highlight} onInput={(v) => set({ ...step, highlight: v }, 'Duotone highlights', 'fx-duo-hi')} />
+          {dial('Balance', '', -100, 100, step.balance ?? 0, (v) => ({ balance: v }))}
         </div>
       );
     case 'posterize':
@@ -333,16 +338,19 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
         <div class="fig-sliders fig-step-body">
           {dial('Levels', '', 2, 12, step.levels, (v) => ({ levels: v }))}
           {dial('Gamma', '', 1, 10, step.gamma, (v) => ({ gamma: v }), 0.5)}
+          <Seg label="Dither" value={step.dither ?? 'none'} options={['none', 'ordered', 'diffusion'] as const} onPick={(v) => set({ ...step, dither: v }, 'Posterize dither')} />
         </div>
       );
     case 'halftone':
       return (
         <div class="fig-sliders fig-step-body">
+          <Seg label="Inks" value={step.mode ?? 'mono'} options={['mono', 'cmyk'] as const} onPick={(v) => set({ ...step, mode: v }, 'Halftone inks')} />
           <Seg label="Dot" value={step.shape} options={['circle', 'square', 'diamond', 'line', 'ellipse'] as const} onPick={(v) => set({ ...step, shape: v }, 'Halftone dot')} />
           {dial('Screen', 'px', 2, 40, step.spacing, (v) => ({ spacing: v }), 0.5)}
           {dial('Angle', '°', 0, 180, step.angle, (v) => ({ angle: v }))}
           {dial('Contrast', '', 1, 10, step.contrast, (v) => ({ contrast: v }), 0.5)}
-          <HexField label="Ink" value={step.ink} onInput={(v) => set({ ...step, ink: v }, 'Halftone ink', 'fx-ht-ink')} />
+          {dial('Dot gain', '%', 0, 100, step.gain ?? 0, (v) => ({ gain: v }))}
+          {(step.mode ?? 'mono') === 'mono' && <HexField label="Ink" value={step.ink} onInput={(v) => set({ ...step, ink: v }, 'Halftone ink', 'fx-ht-ink')} />}
           <HexField label="Paper" value={step.paper} onInput={(v) => set({ ...step, paper: v }, 'Halftone paper', 'fx-ht-paper')} />
         </div>
       );
@@ -350,6 +358,7 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
       return (
         <div class="fig-sliders fig-step-body">
           {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Size', 'px', 0.5, 4, step.size ?? 1, (v) => ({ size: v }), 0.1)}
           {dial('Mono', '%', 0, 100, step.mono, (v) => ({ mono: v }))}
           <button class="fig-reset" title="A new roll of the same grain" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle grain')}>
             Reshuffle
@@ -360,18 +369,31 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
       return (
         <div class="fig-sliders fig-step-body">
           <Seg label="Surface" value={step.kind} options={['paper', 'canvas', 'fibers', 'concrete', 'crosshatch'] as const} onPick={(v) => set({ ...step, kind: v }, 'Texture surface')} />
-          <Seg label="Blend" value={step.blend} options={['multiply', 'overlay', 'screen', 'soft-light'] as const} onPick={(v) => set({ ...step, blend: v }, 'Texture blend')} />
+          <Seg label="Blend" value={step.blend} options={['multiply', 'overlay', 'soft-light', 'hard-light', 'screen'] as const} onPick={(v) => set({ ...step, blend: v }, 'Texture blend')} />
           {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
           {dial('Scale', '', 5, 100, step.scale, (v) => ({ scale: v }))}
+          <button class="fig-reset" title="Another piece of the same surface" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle texture')}>
+            Reshuffle
+          </button>
         </div>
       );
     case 'blur':
       return <div class="fig-sliders fig-step-body">{dial('Radius', 'px', 0, 40, step.radius, (v) => ({ radius: v }), 0.5)}</div>;
+    case 'sharpen':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 200, step.amount, (v) => ({ amount: v }))}
+          {dial('Radius', 'px', 0.3, 5, step.radius, (v) => ({ radius: v }), 0.1)}
+          {dial('Threshold', '', 0, 50, step.threshold, (v) => ({ threshold: v }))}
+        </div>
+      );
     case 'vignette':
       return (
         <div class="fig-sliders fig-step-body">
           {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
-          {dial('Spread', '%', 5, 100, step.spread, (v) => ({ spread: v }))}
+          {dial('Spread', '%', 5, 130, step.spread, (v) => ({ spread: v }))}
+          {dial('Feather', '%', 0, 100, step.feather ?? 60, (v) => ({ feather: v }))}
+          {dial('Roundness', '%', 0, 100, step.roundness ?? 0, (v) => ({ roundness: v }))}
         </div>
       );
   }

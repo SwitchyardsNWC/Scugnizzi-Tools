@@ -70,15 +70,22 @@ function context(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 
 /**
  * A stack of steps on RGBA bytes, in place, top first. Riso goes through the press; the rest through the
- * image effects. Every step keeps the picture's own transparency but blur, and each is mixed back by its
+ * image effects engine, each run between Riso steps as one float pass. Every step keeps the picture's own transparency but blur, and each is mixed back by its
  * strength, the same rule for both so a stack reads the same whatever is in it.
  */
 export function runSteps(data: Uint8ClampedArray, W: number, H: number, steps: EffectStep[] | undefined, unit: number): Uint8ClampedArray {
+  // The image effects between two Riso steps run as one float pass: decoded once, encoded once.
+  let group: EffectStep[] = [];
+  const flush = () => {
+    if (group.length) ImageEffects.run(group, data, W, H, unit);
+    group = [];
+  };
   for (const step of liveSteps(steps)) {
     if (step.effect !== 'riso') {
-      ImageEffects.apply(step, data, W, H, unit);
+      group.push(step);
       continue;
     }
+    flush();
     const before = data.slice();
     const printed = Riso.render(Riso.prepare(data, W, H), step, step.seed, unit);
     const k = typeof step.strength === 'number' ? Math.max(0, Math.min(1, step.strength)) : 1;
@@ -89,6 +96,7 @@ export function runSteps(data: Uint8ClampedArray, W: number, H: number, steps: E
       data[i + 3] = before[i + 3]!;
     }
   }
+  flush();
   return data;
 }
 

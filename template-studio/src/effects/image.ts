@@ -16,7 +16,13 @@ export interface ImageEffectsApi {
   SHAPES: string[];
   TEXTURES: string[];
   BLENDS: string[];
-  /** One step on RGBA bytes, in place. `unit` is image pixels per page pixel. */
+  DITHERS: string[];
+  /**
+   * A stack of steps on RGBA bytes, in place: decoded once into float linear light, run, encoded once.
+   * Riso steps are skipped; callers run the press between groups of these. `unit` is image pixels per page pixel.
+   */
+  run(steps: EffectStep[], data: Uint8ClampedArray, width: number, height: number, unit?: number): Uint8ClampedArray;
+  /** One step, in place: a stack of one. */
   apply(step: EffectStep, data: Uint8ClampedArray, width: number, height: number, unit?: number): Uint8ClampedArray;
 }
 
