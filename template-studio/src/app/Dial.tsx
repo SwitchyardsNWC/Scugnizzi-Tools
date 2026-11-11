@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { capture, release } from './pointer.ts';
+import { typedValue } from './dial-value.ts';
 
 // A number you drag.
 //
@@ -117,17 +118,10 @@ export function Dial({ value, onChange, label, min = 0, max = 100, step = 1, suf
 
   const openField = () => setDraft(n === 0 && zero ? '' : String(n));
 
-  /**
-   * What a finished edit means. Empty is zero — which is what `zero` names in the field — and
-   * anything unparseable leaves the value alone rather than replacing it with NaN.
-   *
-   * Clamped but *not* snapped to the step: a scrub is for finding a number and the keyboard is for
-   * knowing one, so a typed 103 stays 103 even where dragging moves in fives.
-   */
+  /** What a finished edit means is `typedValue`'s to say (dial-value.ts); nothing changes when it says nothing. */
   const commit = (raw: string) => {
-    const text = raw.trim();
-    if (text === '') onChange(0);
-    else if (Number.isFinite(Number(text))) onChange(clamp(Number(text)));
+    const next = typedValue(raw, min, max, zero);
+    if (next !== null) onChange(next);
     setDraft(null);
   };
 
