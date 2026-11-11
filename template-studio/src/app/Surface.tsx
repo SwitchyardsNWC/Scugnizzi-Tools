@@ -36,6 +36,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { underStyle } from '../project/ground.ts';
 import { BRAND_DRAG, BrandLibrary, type BrandItem } from './BrandLibrary.tsx';
 import { EMAIL_MAX, FRAME_MAX } from '../model/frame-sizes.ts';
 import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
@@ -530,7 +531,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       const b = blockRef.current;
       if (!b) return;
       try {
-        const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b) }));
+        // Printed at the resolution the screen shows it, up to 4×, so a zoomed-in print is sharp rather than
+        // stretched. The export stays at 2×, and every distance in the press is in page pixels at any scale.
+        const scale = Math.min(4, Math.max(2, Math.ceil(viewRef.current.z * (window.devicePixelRatio || 1))));
+        const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale, ground: groundOf(b) }));
         if (cancelled) return;
         if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
         fxUrl.current = URL.createObjectURL(blob);
@@ -904,8 +908,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     } else {
       lastPress.current = null;
       if (cropping) setCropping(null);
-      if (current === 'select' && event.pointerType !== 'touch') {
-        // A selection box, as in any layout tool. The page still pans with Space, the hand, or a finger.
+      const onPage = p.x >= 0 && p.y >= 0 && p.x <= b.width && p.y <= b.height;
+      if (current === 'select' && event.pointerType !== 'touch' && (onPage || event.shiftKey)) {
+        // On the page, a selection box; off it, the drag moves the canvas, as it always did. Shift selects anywhere.
         if (!event.shiftKey) onSelectLayer(null);
         drag.current = { kind: 'marquee', from: p, base: event.shiftKey ? layerRef.current : null };
       } else {
@@ -957,6 +962,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           dx += found.dx;
           dy += found.dy;
           setGuides(found.guides);
+          if (settingsRef.current.snap) {
+            // The grid catches the axes no guide did: the box's corner lands on a step.
+            const step = settingsRef.current.gridStep;
+            if (!found.guides.some((g) => g.axis === 'x')) dx = Math.round((start.x + dx) / step) * step - start.x;
+            if (!found.guides.some((g) => g.axis === 'y')) dy = Math.round((start.y + dy) / step) * step - start.y;
+          }
         } else setGuides([]);
         commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
@@ -1390,6 +1401,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     : [];
   // Text has a width and finds its own height, so only its sides pull; a stamp only its corners.
   const handles = allHandles.filter((hd) => (picked?.kind === 'text' ? hd.h === 'e' || hd.h === 'w' : picked?.kind === 'mark' ? hd.h.length === 2 : true));
+  /** The Canvas menu's Background under the page: off, lines, dots or a cutting mat, fixed to the page as the view moves. */
+  const under = underStyle(settings, view);
   const pickedText = picked?.kind === 'text' ? picked : undefined;
   const currentLook = pickedText ? (pickedText.look ?? null) : look;
   const rotation = picked?.rotation ?? 0;
@@ -1617,6 +1630,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         }}
       >
         <div class="surface-backdrop" aria-hidden="true" />
+        {under && <div class={`surface-under fig-under-${settings.ground}`} style={under} aria-hidden="true" />}
         <svg
           class="surface-svg"
           ref={svgEl}
@@ -1639,7 +1653,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000000" flood-opacity="0.14" />
             </filter>
           </defs>
-          <rect class="surface-dots" width="100%" height="100%" fill="url(#fig-dots)" />
+
           <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
             <rect class="surface-page-shadow" x={0} y={0} width={block.width} height={block.height} fill={pageFill} filter="url(#fig-shadow)" />
             <rect x={0} y={0} width={block.width} height={block.height} fill={pageFill} />
