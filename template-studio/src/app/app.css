@@ -1845,6 +1845,32 @@ button.phone-row { cursor: pointer; }
 }
 .surface.phase-start .fig-panel, .surface.phase-exit .fig-panel { transform: translateX(8px); }
 .fig-panel-open { top: 64px; right: 14px; }
+/* The brand library (BrandLibrary.tsx), docked on the left as the layers are on the right. */
+.fig-library {
+  top: 64px; left: 14px; bottom: 96px; width: 248px; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--fig-surface); border-radius: 8px; color: var(--fig-ink); font-size: 13px; box-shadow: var(--fig-shadow);
+}
+.surface.phase-start .fig-library, .surface.phase-exit .fig-library { transform: translateX(-8px); }
+/* With the library open, the dock and the hint centre on the room left between the two panels. */
+.surface.fig.with-library .fig-hint, .surface.fig.with-library .fig-dock, .surface.fig.with-library .fig-trays { left: calc(50% + 131px); }
+.surface.fig.with-panel.with-library .fig-hint, .surface.fig.with-panel.with-library .fig-dock, .surface.fig.with-panel.with-library .fig-trays { left: calc((100% - 300px) / 2 + 131px); }
+.fig-library-body { display: grid; align-content: start; gap: 8px; padding: 4px 12px 14px; overflow-y: auto; }
+.fig-library-search { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--fig-hover); font: inherit; font-size: 12.5px; color: var(--fig-ink); }
+.fig-library-search:focus { outline: 1.5px solid var(--fig-accent); }
+.fig-library-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fig-library-item { display: grid; gap: 4px; justify-items: center; padding: 8px 6px 6px; border: 0; border-radius: 6px; background: var(--fig-paper); font: inherit; color: #555555; cursor: grab; }
+.fig-library-item:hover { box-shadow: inset 0 0 0 1.5px var(--fig-accent); }
+.fig-library-item svg { width: 100%; height: 44px; }
+.fig-library-grid.pictures .fig-library-item img { width: 100%; height: 64px; object-fit: cover; border-radius: 3px; }
+.fig-library-item span { max-width: 100%; overflow: hidden; font-size: 11px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.fig-library-ink { display: inline-flex; align-items: center; gap: 6px; }
+.fig-library-ink i { width: 14px; height: 14px; border-radius: 999px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-library-ink code, .fig-library-colours code { font-family: var(--mono); font-size: 11px; color: var(--fig-muted); }
+.fig-library-colours { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.fig-library-colours button { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--fig-ink); text-align: left; cursor: pointer; }
+.fig-library-colours button:hover { background: var(--fig-hover); }
+.fig-library-colours i { width: 18px; height: 18px; border-radius: 4px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-library-colours b { font-weight: 500; }
 .fig-panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 16px; }
 .fig-panel-head b { font-size: 14px; }
 .fig-panel .grow { flex: 1; }

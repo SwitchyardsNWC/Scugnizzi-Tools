@@ -907,7 +907,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
     quick = (
       <>
         <button class={`fig-chip ${pop === 'mark' ? 'on' : ''}`} title="Which mark" onClick={() => toggle('mark')}>
-          {MARKS.find((m) => m.key === one.mark)?.name ?? 'Stamp'}
+          {MARKS.find((m) => m.key === one.mark)?.name ?? 'Mark'}
           <span class="caret">▾</span>
         </button>
         <button class={`fig-swatch-btn ${pop === 'colour' ? 'on' : ''}`} title="Colour" aria-label="Colour" onClick={() => toggle('colour')}>
@@ -990,7 +990,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
           {pop === 'mark' && one?.kind === 'mark' && (
             <div class="fig-bar-looks">
               {MARKS.map((m) => (
-                <button key={m.key} class={`fig-stamp ${one.mark === m.key ? 'on' : ''}`} title={m.name} onClick={() => set('Stamp', { mark: m.key, height: Math.round(one.width / m.ratio) })}>
+                <button key={m.key} class={`fig-stamp ${one.mark === m.key ? 'on' : ''}`} title={m.name} onClick={() => set('Mark', { mark: m.key, height: Math.round(one.width / m.ratio) })}>
                   <svg viewBox={m.viewBox} fill={swatch(one.color, '#1e1c19')} aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.body }} />
                 </button>
               ))}

@@ -81,13 +81,6 @@ export const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string
       ),
   },
   { tool: 'text', label: 'Text', key: 'T', help: 'Click to place words in the heading role.', icon: () => glyph(<path key="a" d="M6 6.5h12M12 6.5v12M9.5 18.5h5" />) },
-  {
-    tool: 'stamp',
-    label: 'Stamp',
-    key: 'E',
-    help: 'Brand marks. Pick one from the tray and click to stamp, as many as you like.',
-    icon: () => glyph(<circle key="a" cx="12" cy="9" r="4.6" />, <path key="b" d="M9.5 13.2L9 16.5h6l-.5-3.3" />, <path key="c" d="M6 19.5h12" />),
-  },
 ];
 
 /** With a pencil about, a finger on these tools pans instead of drawing: the pencil draws, the hand moves the page. */

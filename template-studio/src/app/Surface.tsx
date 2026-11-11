@@ -36,6 +36,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { BRAND_DRAG, BrandLibrary, type BrandItem } from './BrandLibrary.tsx';
 import { EMAIL_MAX, FRAME_MAX } from '../model/frame-sizes.ts';
 import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
 import { measureImage, shownImageHref } from './picture-size.ts';
@@ -161,6 +162,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const paintRef = useRef(paint);
   paintRef.current = paint;
   const [paintsOpen, setPaintsOpen] = useState(false);
+  /** The brand library, docked on the left: marks, the project's pictures, the palette. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [stamp, setStamp] = useState(MARKS[0]!.key);
   const stampRef = useRef(stamp);
   stampRef.current = stamp;
@@ -1226,6 +1229,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
       return;
     }
+    if (!meta && !event.altKey && event.key.toLowerCase() === 'e') {
+      setLibraryOpen((o) => !o);
+      return;
+    }
     if (!meta && !event.altKey && event.key.length === 1) {
       const found = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase());
       if (found) {
@@ -1343,6 +1350,19 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     [blockId, place, toSurface, tpl],
   );
   if (api) api.current = { dropAsset };
+
+  /**
+   * A thing from the brand library onto the page: where it was dropped, or the page's middle. A mark is a
+   * quarter of the page's short side, so it lands at a size that reads on an email header and on a poster.
+   */
+  const placeBrand = (item: BrandItem, client: { x: number; y: number } | null) => {
+    const b = blockRef.current;
+    if (!b) return;
+    if (item.kind === 'picture') return dropAsset({ name: item.name, size: 0, url: item.url }, client);
+    const at = client ? toSurface(client.x, client.y) : { x: b.width / 2, y: b.height / 2 };
+    place('Add mark', addMarkAt(tpl(), blockId, item.key, at, paintRef.current, 0, Math.min(b.width, b.height) * 0.25));
+    setTool('select');
+  };
 
   if (!block || block.type !== 'freeform' || !site) return null;
 
@@ -1573,8 +1593,29 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     : null;
 
   return (
-    <div class={`surface fig phase-${phase} tool-${tool} ${space || held || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''}`}>
-      <div class="surface-work" ref={work} tabIndex={-1}>
+    <div class={`surface fig phase-${phase} tool-${tool} ${space || held || tool === 'hand' ? 'panning' : ''} ${panelOpen ? 'with-panel' : ''} ${libraryOpen ? 'with-library' : ''}`}>
+      <div
+        class="surface-work"
+        ref={work}
+        tabIndex={-1}
+        onDragOver={(e) => {
+          if (e.dataTransfer?.types.includes(BRAND_DRAG)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDrop={(e) => {
+          const raw = e.dataTransfer?.getData(BRAND_DRAG);
+          if (!raw) return;
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            placeBrand(JSON.parse(raw) as BrandItem, { x: e.clientX, y: e.clientY });
+          } catch {
+            // Not ours after all.
+          }
+        }}
+      >
         <div class="surface-backdrop" aria-hidden="true" />
         <svg
           class="surface-svg"
@@ -1852,6 +1893,18 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         />
       )}
 
+      {libraryOpen && (
+        <BrandLibrary
+          ds={ds}
+          assets={assets}
+          ink={paint}
+          onInk={(c) => choosePaint(c)}
+          onPlace={(item) => placeBrand(item, null)}
+          onPaint={() => undefined}
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
+
       {panelOpen ? (
         <FigLayers
           block={block}
@@ -1998,6 +2051,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             </button>
           ))}
         </div>
+        <button
+          class={`fig-tool ${libraryOpen ? 'on' : ''}`}
+          aria-pressed={libraryOpen}
+          aria-label="Brand library"
+          title={'Brand library  ·  E\nMarks, the project’s pictures and the palette. Click to place, or drag onto the page.'}
+          onClick={() => setLibraryOpen((o) => !o)}
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+            <circle cx="17" cy="17" r="3.5" />
+          </svg>
+        </button>
         <span class="fig-sep" aria-hidden="true" />
         <button
           class={`fig-swatch ${paintsOpen ? 'on' : ''} ${swatch ? '' : 'none'}`}

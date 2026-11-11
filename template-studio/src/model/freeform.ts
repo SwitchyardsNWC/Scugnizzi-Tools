@@ -398,9 +398,9 @@ export function addStickyAt(template: Template, blockId: string, at: Point, fill
 }
 
 /** A brand mark stamped at a point, at its own proportions. The tilt is the caller's, so the recipe stays exact. */
-export function addMarkAt(template: Template, blockId: string, key: string, at: Point, color: ColorRef, rotation = 0): Template {
+export function addMarkAt(template: Template, blockId: string, key: string, at: Point, color: ColorRef, rotation = 0, size?: number): Template {
   const mark = markOf(key);
-  const width = 88;
+  const width = Math.round(size ?? 88);
   const height = Math.round(width / mark.ratio);
   return withFreeform(template, blockId, (block) => ({
     ...block,

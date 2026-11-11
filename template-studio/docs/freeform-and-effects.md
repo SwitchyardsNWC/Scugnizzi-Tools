@@ -396,3 +396,42 @@ engine to get pro level results."
 
 **Next.** The brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
 effects moved into `effects/` beside Riso.
+
+## Text, selection, pictures, sizes, brand library *(2026-11-11)*
+
+Jared, asked how Freeform could be better and given a list: "do 2, 4, 5, 6. Let's remove text templates
+for now and make a solid text tool." That is the brand library, frame sizes and starters, picture
+handling, and multi-select.
+
+- **Text tool.** Brand presets are held back (`app/features.ts`, `BRAND_PRESETS = false`): the model and
+  renderer keep them, so text already in one draws as before, but no chip, tray, slash command or Design
+  panel offers them. New text starts in its type role. The properties panel has a **Type** section:
+  font, weight, size, line height, letter spacing, alignment, case (as typed, upper, lower, title),
+  italic and colour with its hex, and Reset back to the role. The canvas bar has bold and italic.
+  `weight`, `italic` and `textCase` are layer settings, drawn on straight and curved text alike.
+- **Multi-select.** Shift-click on the canvas or in the layers list; a selection box on empty canvas (a
+  finger, Space or the hand still pans); ⌘A. A multi-selection is a key of its own (`multi:…`,
+  `model/selection.ts`), so it moves, scales, colours, copies and deletes as one, and a drawing inside it
+  stays whole. The panel adds align to each other, distribute across and down (three or more, the ends
+  stay put) and Group; ⌘G groups and ⇧⌘G ungroups. Hand-made groups are named Group, pen sessions Drawing.
+  Text is now hit only inside its measured box: its drawing reaches the foot of the page so its words
+  can wrap, which had made most of the page count as the text.
+- **Pictures.** A picture keeps its own size and sits in its frame by fit (fill, fit, stretch), zoom up to
+  500% and a focal point. Double-click it to crop: drag it inside its frame, the whole picture shown
+  faintly past the frame. The panel's **Picture** section sets fit, rectangle or ellipse, zoom, corner
+  radius, the focal point by clicking a thumbnail, and Frame to picture. Pictures placed before this are
+  measured from the canvas the first time a crop setting needs their size. One with nothing set draws
+  exactly as before (`model/image-layer.ts`).
+- **Frame sizes and starters.** New frame opens a picker: email header and hero, Instagram post,
+  portrait and story, LinkedIn, letter flyer, 18 × 24 poster and table tent; then Blank, Headline, Photo
+  and caption or Event, laid out from the frame's short side (`model/frame-sizes.ts`). The Page section
+  has a Size menu. A Freeform app frame can be up to 2400 × 3600; a page edited inside an email keeps the
+  700 × 1200 a column allows.
+- **Brand library.** In place of the Stamp tool, a panel docked on the left (the dock button, or E):
+  the brand marks, drawn in the chosen colour at a quarter of the page's short side; the project's own
+  pictures; and the palette, each colour with its name and hex, which paints what is picked and sets the
+  marks' colour. Click to place in the page's middle, or drag onto the page. Placed marks are called Mark.
+- **Not yet.** An email block that follows a frame larger than an email column takes the frame's size;
+  linking should scale it down, type included. The library has no patterns or approved photography of its
+  own yet; it shows what the project holds. Hosted pictures (HubSpot URLs) cannot be drawn into the
+  export, since the browser will not read their pixels back, so the library uses the project's files.

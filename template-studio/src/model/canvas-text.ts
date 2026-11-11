@@ -94,12 +94,12 @@ export function presetParts(style: { stroke?: unknown; shadow?: unknown; highlig
 
 // --- names ------------------------------------------------------------------------------------------
 
-export const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Box', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Stamp' };
+export const LAYER_NAMES: Record<FreeformLayer['kind'], string> = { text: 'Text', image: 'Image', rect: 'Box', ellipse: 'Ellipse', line: 'Line', path: 'Stroke', sticky: 'Note', mark: 'Mark' };
 
 /** What the layer list calls a layer: its words, its mark, or its kind. */
 export function layerName(l: FreeformLayer): string {
   if (l.kind === 'text' || l.kind === 'sticky') return l.text.trim().split(/\r?\n/)[0]!.slice(0, 32) || LAYER_NAMES[l.kind];
-  if (l.kind === 'mark') return MARKS.find((m) => m.key === l.mark)?.name ?? 'Stamp';
+  if (l.kind === 'mark') return MARKS.find((m) => m.key === l.mark)?.name ?? 'Mark';
   if (l.kind === 'image') return l.src.split('/').pop()?.slice(0, 32) || 'Image';
   return LAYER_NAMES[l.kind];
 }
