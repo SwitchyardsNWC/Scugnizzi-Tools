@@ -11,6 +11,7 @@
 import { collectColors, className, emptyRegistry, register, type Registry } from './colors.ts';
 import { createContext } from './context.ts';
 import { annotation, emailDocument as shell, forceLightHead, headCss } from './head.ts';
+import { designComment } from './embed.ts';
 import { el, frag, raw, text, type IRNode } from './ir.ts';
 import { blockParts, COLUMN_BLOCKS, renderBlock } from './blocks/index.ts';
 import { cell, columnsRow, COLUMN_PHONE_CSS, section as sectionOf, type ColumnCell } from './layout.ts';
@@ -45,6 +46,16 @@ export interface CompileOptions {
    * flag, and the same goes for the empty-column slots.
    */
   annotate?: boolean;
+
+  /**
+   * Carry the design inside the exported file: a HubL comment after the generated-by line holding the template as it
+   * is saved, and the design system it compiled with, so a template read back from HubSpot can be opened again
+   * (embed.ts, learnings 1.19). `hubl` mode only. Opt-in so the tests that compare two documents' output byte for
+   * byte keep comparing the email; the app turns it on for everything that ships (Export, Copy, the code drawer).
+   */
+  embedDesign?: boolean;
+  /** The suite version, written into the embedded design. Passed in, because the compiler reads no build globals. */
+  by?: string;
 }
 
 export interface CompileResult {
@@ -52,7 +63,10 @@ export interface CompileResult {
   /** The tree, after the colour pass. The linter and the branch enumerator both want this. */
   tree: IRNode;
   registry: Registry;
-  /** Bytes of the emitted document. Gmail clips at ~102KB (learnings 2.12). */
+  /**
+   * Bytes of the emitted document, the embedded design left out: HubSpot does not render HubL comments, so it never
+   * reaches the inbox, and Gmail clips at ~102KB of what does (learnings 2.12).
+   */
   bytes: number;
   branch: Branch;
 }
@@ -124,10 +138,15 @@ export function compile(template: Template, options: CompileOptions): CompileRes
       preheader,
     });
 
+  const embedded =
+    options.mode === 'hubl' && options.embedDesign
+      ? designComment(template, ds, { overridden: options.ds !== undefined, ...(options.by ? { by: options.by } : {}) })
+      : '';
   const withAnnotation =
     options.mode === 'hubl'
-      ? annotation(template.hubspotLabel || template.name || 'Email template', options.date ?? today()) + html
+      ? annotation(template.hubspotLabel || template.name || 'Email template', options.date ?? today()) + embedded + html
       : html;
+  const encoder = new TextEncoder();
 
   return {
     html: withAnnotation,
@@ -135,7 +154,7 @@ export function compile(template: Template, options: CompileOptions): CompileRes
     registry,
     // TextEncoder rather than Buffer: the compiler runs in the editor as well as under Node, and
     // `Buffer` is a Node global. Both give UTF-8 byte length, which is what Gmail counts.
-    bytes: new TextEncoder().encode(withAnnotation).length,
+    bytes: encoder.encode(withAnnotation).length - (embedded ? encoder.encode(embedded).length : 0),
     branch,
   };
 }

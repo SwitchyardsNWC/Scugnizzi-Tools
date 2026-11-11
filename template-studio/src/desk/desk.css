@@ -116,7 +116,8 @@
   --diff-del: #301b16;
 }
 
-html, body { height: 100%; }
+html, body, #desk { height: 100%; }
+body { margin: 0; }
 body {
   background: var(--surface-sunken);
   color: var(--text-primary);
@@ -184,11 +185,13 @@ a:hover { color: var(--text-primary); }
 .btn.ghost { border-color: transparent; background: transparent; }
 .btn.ghost:hover { background: var(--surface-row-hover); }
 .btn:disabled { cursor: not-allowed; color: var(--action-disabled-text); background: var(--action-disabled-surface); border-color: var(--action-disabled-surface); }
-.seg { display: inline-flex; border: 1px solid var(--border-card); border-radius: 6px; overflow: hidden; flex-wrap: wrap; }
+.seg { justify-self: start; display: inline-flex; border: 1px solid var(--border-card); border-radius: 6px; overflow: hidden; flex-wrap: wrap; }
 .seg button { border: 0; background: transparent; padding: 7px 12px 3px; line-height: 14px; font-size: var(--t-meta); cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--border-card); }
 .seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-card); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.only-phone { display: none; }
+label.btn { position: relative; }
 
 /* --- chips and state: a square glyph, a word, and a tint. Never the tint alone. --------------------------------- */
 .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 4px; padding: 3px 6px 1px; font-size: var(--t-label); line-height: 14px; white-space: nowrap; }
@@ -241,7 +244,7 @@ pre.source { margin: 0; max-height: 560px; overflow: auto; font-family: var(--fo
 
 /* --- forms ---------------------------------------------------------------------------------------------------- */
 .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
-.field { display: grid; gap: 4px; min-width: 0; }
+.field { display: grid; gap: 4px; min-width: 0; align-content: start; }
 .field label { font-size: var(--t-meta); color: var(--text-secondary); }
 .field .hint { font-size: var(--t-meta); color: var(--text-muted); }
 .field input, .field select {
@@ -273,6 +276,7 @@ pre.source { margin: 0; max-height: 560px; overflow: auto; font-family: var(--fo
   .shell-header { flex-wrap: wrap; padding-block: 8px; }
   .shell[data-open="true"] .rail { display: none; }
   .shell[data-open="false"] .main { display: none; }
+  .only-phone { display: inline-flex; }
   .rail { border-right: 0; }
   .frame-wrap iframe { height: 640px; }
   body { font-size: 16px; }

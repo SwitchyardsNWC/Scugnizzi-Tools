@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { compile } from '../compile/compile.ts';
+import { SUITE_VERSION } from '../version.ts';
 import { IMAGES_DIR, packageReadme, planPackage } from '../model/export-package.ts';
 import { simulateDark } from '../compile/dark.ts';
 import { servedIconBase, withLocalAssets, withoutMissingPictures, withServedIcons } from './local-assets.ts';
@@ -516,7 +517,8 @@ export function App() {
     return () => clearTimeout(id);
   }, [editor.template]);
 
-  const hubl = useMemo(() => compile(shownTemplate, { mode: 'hubl' }), [shownTemplate]);
+  // Everything that ships carries its own design (learnings 1.19), so the code drawer shows those bytes too.
+  const hubl = useMemo(() => compile(shownTemplate, { mode: 'hubl', embedDesign: true, by: SUITE_VERSION }), [shownTemplate]);
   const variables = useMemo(() => branchVariables(hubl.tree), [hubl]);
   /**
    * The export as it would go: local pictures the folder has are packed beside the template and pointed at with
@@ -1378,7 +1380,7 @@ export function App() {
    * so rather than throwing.
    */
   const copyCode = useCallback(async () => {
-    const text = compile(editor.template, { mode: 'hubl' }).html;
+    const text = compile(editor.template, { mode: 'hubl', embedDesign: true, by: SUITE_VERSION }).html;
     let ok = false;
     try {
       await navigator.clipboard.writeText(text);
@@ -1656,7 +1658,7 @@ export function App() {
   const exportTemplate = useCallback(async () => {
     const folder = slug(editor.template.name);
     const name = `${folder}.html`;
-    const out = compile(editor.template, { mode: 'hubl' });
+    const out = compile(editor.template, { mode: 'hubl', embedDesign: true, by: SUITE_VERSION });
     const plan = planPackage(out.html, inFolder);
     const upload = 'Upload it in Design Manager, open it once so it validates, then publish.';
     if (plan.pictures.length === 0) {

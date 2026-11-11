@@ -33,6 +33,17 @@
 >
 > `exports/baseline.html` already carries an area with two sections, a split row and four stock
 > modules, so it can answer all three without a new probe file.
+>
+> **Queued for the next send (added 2026-11-11, the design inside the file).** Export carries the template's
+> design in a HubL comment now (learnings 1.19). One upload of `exports/baseline.html` re-exported from the app
+> answers all three:
+>
+> - **O** — Does a file carrying the design comment, about 95KB for the baseline, upload, validate and publish in
+>   Design Manager? Then read it back with the desk: does the comment come back whole?
+> - **P** — Is the comment absent from the received source of a send? It should be, since HubL comments are not
+>   rendered; this is the check.
+> - **Q** — Make one draft from the desk and record what `CREATE` returned, so the desk's result panel reads the
+>   real fields rather than the ones the connector's description names.
 
 One upload, one email, one send. Everything in Phase 1 waits on the answers, so this is worth an
 afternoon before anything else happens.

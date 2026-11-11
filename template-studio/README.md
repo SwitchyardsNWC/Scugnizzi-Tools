@@ -28,6 +28,7 @@ makes it (the tools directory links to `template-studio/dist/`).
 | `npm run compile -- <file.json>` | Compiles a template to a HubSpot coded email template on stdout. `--preview` for the readable version, `--out <file>` to write one. |
 | `npm run golden` | Regenerates the golden file by driving v1's own compiler |
 | `npm run baseline` | Rebuilds `templates/baseline.template.json` — every block and style on one page — and its two exports |
+| `npm run desk` | Builds the HubSpot desk, the claude.ai artifact, to `dist-desk/` (`index.html`, `desk.js`, and `preview.html` to open locally) |
 
 The compiler is pure and DOM-free, so it runs under plain `node --experimental-strip-types` with no
 build step, and its tests need no browser.
@@ -36,6 +37,9 @@ build step, and its tests need no browser.
 - `src/compile/` — the tree, the serializer, the colour registry, the linter, one file per block
 - `src/workspace/` — the folder, via the File System Access API, with a file-picker fallback
 - `src/app/` — the editor: outline, inspector, canvas, the design panel, undo, autosave
+- `src/desk/` — the HubSpot desk: reads the portal's templates through the viewer's HubSpot connector, compares them
+  with this build, makes draft emails (learnings 1.19, 3.103). `src/model/hubl-source.ts` reads any template's HubL;
+  `src/compile/embed.ts` writes and reads the design every export carries
 
 Adding a block type is a renderer in `src/compile/blocks/` and an entry in `src/model/catalog.ts`.
 The inspector builds itself from the second one, which is the thing v1 could not do.
