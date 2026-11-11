@@ -288,14 +288,34 @@ describe('brand presets', () => {
     expect(canvasTypeOf({ ...DEFAULT_DESIGN_SYSTEM, canvasType: {} })).toEqual({});
   });
 
+  /** A preset of each part, so the renderer is tested on parts rather than on whatever the shipped presets use. */
+  const parts = {
+    ...DEFAULT_DESIGN_SYSTEM,
+    canvasType: {
+      stroked: { label: 'Stroked', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, stroke: { color: '#011272', width: 2 } },
+      tagged: { label: 'Tagged', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, stroke: { color: '#011272', width: 4, outside: true } },
+      shadowed: { label: 'Shadowed', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, shadow: { color: '#d10000', x: 3, y: 3, blur: 0 } },
+      marked: { label: 'Marked', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, highlight: { color: '#FFE58A', cover: 40 } },
+      curved: { label: 'Curved', size: 30, weight: 'bold' as const, lineHeight: 100, uppercase: true, color: null, curve: 45 },
+    },
+  };
+  const partOf = (look: string) => freeformSvg(withLook(look), parts);
+
   it('draws each part as something the picture carries', () => {
     expect(svgOf()).not.toContain('text-shadow');
-    expect(svgOf('outline')).toContain('-webkit-text-stroke:');
-    expect(svgOf('retro')).toContain('text-shadow:3px 3px 0px');
-    expect((svgOf('sticker').match(/px 0 #011272/g) ?? []).length).toBe(12);
-    expect(svgOf('highlight')).toContain('linear-gradient(transparent');
-    expect(svgOf('marker')).not.toContain('display:inline-block');
-    expect(svgOf('arc')).toMatch(/<textPath href="#sy-arc-t-10-10-300" startOffset="50%" text-anchor="middle">HEY<\/textPath>/);
+    expect(partOf('stroked')).toContain('-webkit-text-stroke:2px #011272');
+    expect(partOf('shadowed')).toContain('text-shadow:3px 3px 0px #d10000');
+    expect((partOf('tagged').match(/px 0 #011272/g) ?? []).length).toBe(12);
+    expect(partOf('marked')).toContain('linear-gradient(transparent');
+    expect(partOf('curved')).toMatch(/<textPath href="#sy-arc-t-10-10-300" startOffset="50%" text-anchor="middle">HEY<\/textPath>/);
+  });
+
+  it('ships presets drawn from type alone, named for their use', () => {
+    const shipped = Object.values(DEFAULT_CANVAS_TYPE);
+    expect(shipped.map((p) => p.label)).toEqual(['Letterhead', 'Display serif', 'Shop sign', 'Supper club', 'Typed menu', 'Window gilding']);
+    expect(shipped.filter((p) => p.stroke || p.shadow || p.highlight)).toEqual([]);
+    expect(svgOf('arc')).toContain('<textPath');
+    expect(svgOf('highlight')).toContain(`font-family:${DEFAULT_DESIGN_SYSTEM.fonts['courier']}`);
   });
 
   it('combines parts: a stroke and a shadow together, and both on a curve', () => {
@@ -318,12 +338,13 @@ describe('brand presets', () => {
   });
 
   it('draws the same every time, and a changed preset is a stale picture', () => {
-    expect(svgOf('arc')).toBe(svgOf('arc'));
+    expect(partOf('curved')).toBe(partOf('curved'));
     expect(recipeHash(withLook('outline'))).not.toBe(recipeHash(withLook('retro')));
   });
 
   it('samples a style with the same renderer', () => {
-    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, 'retro', 'Aa')).toContain('text-shadow:');
+    expect(canvasTypeSampleSvg(parts, 'shadowed', 'Aa')).toContain('text-shadow:');
+    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, 'sticker', 'Aa')).toContain('font-style:italic');
     expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, null, 'Aa')).toContain('>Aa</div>');
   });
 });
@@ -366,14 +387,14 @@ describe('the canvas’s own controls', () => {
     expect(tweaked).toContain('font-size:72px');
     expect(tweaked).toContain('letter-spacing:6px');
     expect(tweaked).toContain('line-height:140%');
-    expect(tweaked).toContain('text-shadow:3px 3px 0px');
+    expect(tweaked).toContain('text-transform:uppercase');
     expect(textStyleOf({ ...text, size: 72 }, ds).size).toBe(72);
   });
 
   it('answers to slash commands for styles, sizes, spacing and colour', () => {
     const text = { kind: 'text' as const, id: 'l1', text: 'Hi', role: 'h2', color: null, x: 0, y: 0, width: 300, align: 'left' as const };
     const all = canvasCommands(text, ds);
-    expect(filterCommands(all, 'kick')[0]!.patch).toEqual({ look: 'marker', amount: undefined });
+    expect(filterCommands(all, 'letterh')[0]!.patch).toEqual({ look: 'marker', amount: undefined });
     expect(filterCommands(all, 'huge')[0]!.patch).toEqual({ size: Math.round(textStyleOf(text, ds).size * 2.2) });
     expect(filterCommands(all, 'wide')[0]!.id).toBe('spacing-wide');
     expect(filterCommands(all, 'navy')[0]!.patch).toEqual({ color: 'navy' });

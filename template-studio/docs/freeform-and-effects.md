@@ -276,7 +276,17 @@ and **curve** (bend). Wobble is gone: it was a novelty. A preset saved with the 
 `effect` reads as the parts that drew it (`normalizePreset`), and wobble's words set straight.
 
 The shipped six keep their old keys, so text that picked one keeps it, but they are rebuilt and
-named for use: Kicker, Outline display, Shadow display, Tag, Marked line, Seal.
+named for use. *(Redrawn 2026-11-11.)* Jared: "Update the saved text presets to be less cheesy.
+Dig through mymind for typographic styles I like." His saves kept returning to quiet tracked caps,
+typewriter menus, painted shop fascias, script beside clean caps, a high-contrast display serif
+and gilded window lettering, and never to outlines, drop shadows or highlighters. So the six are
+type alone: **Letterhead** (tracked caps; the PY letterhead, El Bar's section heads), **Display
+serif** (Georgia set tight; New Hideaki, the Butte des Morts sign), **Shop sign** (bold caps in the
+palette's red; Trust Butchery, 24 HRS), **Supper club** (italic serif for script; El Bar, La
+Panetteria), **Typed menu** (Courier caps, open leading; the stamped tasting-menu strips, Index
+Monospace) and **Window gilding** (gold `#c9a13b`, antique gold, tracked bold caps on a gentle
+arch; Victory Brands). Only the last uses a part, a curve. The fonts are the ones the design system
+already has; a true script or a monospace with more character waits on fonts the picture can embed.
 
 - **Design › Brand presets** lists them as samples drawn by the canvas renderer. New preset,
   Duplicate, Delete, a Name field, the type settings, and one row per part. Deleting a preset that

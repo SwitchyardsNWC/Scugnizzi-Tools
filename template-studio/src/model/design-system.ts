@@ -250,14 +250,27 @@ export function normalizePreset(style: CanvasTextStyle): CanvasTextStyle {
 /**
  * The presets a system ships with, named for what they are for rather than what they do. The keys
  * are the old styles' keys, so text that already picked one keeps its preset.
+ *
+ * Jared: "Update the saved text presets to be less cheesy. Dig through mymind for typographic styles I
+ * like." What his saves keep returning to, and what each preset is drawn from:
+ *
+ * - Letterhead: quiet caps, tracked wide. The PY letterhead, El Bar's section heads, a sign-design card.
+ * - Display serif: high contrast, set tight. New Hideaki, the Butte des Morts supper club sign.
+ * - Shop sign: bold caps in one flat colour, like a painted fascia. Trust Butchery, 24 HRS, Gary Implement Co.
+ * - Supper club: an italic serif standing in for script. El Bar, La Panetteria, Hanson's lettering.
+ * - Typed menu: typewriter caps with air between lines. The stamped tasting-menu strips, Index Monospace.
+ * - Window gilding: gold caps, tracked, on a gentle arch. Victory Brands, "by appointment only".
+ *
+ * Type alone carries them. One uses a curve and none a stroke, shadow or highlight: the parts are there
+ * for a preset that needs one, not as the look.
  */
 export const DEFAULT_CANVAS_TYPE: Record<string, CanvasTextStyle> = {
-  marker: { label: 'Kicker', size: 14, weight: 'bold', lineHeight: 120, uppercase: true, letterSpacing: 3, color: null },
-  outline: { label: 'Outline display', size: 46, weight: 'bold', lineHeight: 100, uppercase: true, color: '#00000000', stroke: { color: null, width: 1.5 } },
-  retro: { label: 'Shadow display', size: 40, weight: 'bold', lineHeight: 104, color: null, shadow: { color: 'red', x: 3, y: 3, blur: 0 } },
-  sticker: { label: 'Tag', size: 22, weight: 'bold', lineHeight: 112, uppercase: true, letterSpacing: 1, color: '#ffffff', stroke: { color: null, width: 4, outside: true } },
-  highlight: { label: 'Marked line', size: 24, weight: 'bold', lineHeight: 135, color: null, highlight: { color: '#FFE58A', cover: 40 } },
-  arc: { label: 'Seal', size: 18, weight: 'bold', lineHeight: 100, uppercase: true, letterSpacing: 3, color: null, curve: 45 },
+  marker: { label: 'Letterhead', size: 12, weight: 'normal', lineHeight: 140, uppercase: true, letterSpacing: 6, color: null },
+  outline: { label: 'Display serif', font: 'georgia', size: 56, weight: 'normal', lineHeight: 92, letterSpacing: -1.5, color: null },
+  retro: { label: 'Shop sign', size: 44, weight: 'bold', lineHeight: 92, uppercase: true, letterSpacing: 0.5, color: 'red' },
+  sticker: { label: 'Supper club', font: 'georgia', size: 36, weight: 'normal', lineHeight: 105, italic: true, color: null },
+  highlight: { label: 'Typed menu', font: 'courier', size: 13, weight: 'normal', lineHeight: 160, uppercase: true, letterSpacing: 2, color: null },
+  arc: { label: 'Window gilding', size: 14, weight: 'bold', lineHeight: 100, uppercase: true, letterSpacing: 4, color: '#c9a13b', curve: 22 },
 };
 
 const normalized = new WeakMap<Record<string, CanvasTextStyle>, Record<string, CanvasTextStyle>>();

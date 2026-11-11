@@ -30,23 +30,23 @@ const presetsOf = (t: Template) => canvasTypeOf(designSystemOf(t));
 
 describe('brand presets', () => {
   it('adds under a fresh name and key', () => {
-    const { presets, key } = addPreset(DEFAULT_CANVAS_TYPE, { ...DEFAULT_CANVAS_TYPE.marker!, label: 'Kicker' });
-    expect(key).toBe('kicker-2');
-    expect(presets[key]!.label).toBe('Kicker 2');
-    expect(freshLabel(presets, 'kicker')).toBe('kicker 3');
+    const { presets, key } = addPreset(DEFAULT_CANVAS_TYPE, { ...DEFAULT_CANVAS_TYPE.marker!, label: 'Letterhead' });
+    expect(key).toBe('letterhead-2');
+    expect(presets[key]!.label).toBe('Letterhead 2');
+    expect(freshLabel(presets, 'letterhead')).toBe('letterhead 3');
   });
 
   it('copies right after the original', () => {
     const { presets, key } = duplicatePreset(DEFAULT_CANVAS_TYPE, 'outline');
     const keys = Object.keys(presets);
     expect(keys[keys.indexOf('outline') + 1]).toBe(key);
-    expect(presets[key]!.label).toBe('Outline display copy');
-    expect(presets[key]!.stroke).not.toBe(DEFAULT_CANVAS_TYPE.outline!.stroke);
+    expect(presets[key]!.label).toBe('Display serif copy');
+    expect(presets[key]).not.toBe(DEFAULT_CANVAS_TYPE.outline);
   });
 
   it('switches a part off by leaving it out of the file', () => {
-    const next = updatePreset(DEFAULT_CANVAS_TYPE, 'retro', { shadow: undefined });
-    expect('shadow' in next.retro!).toBe(false);
+    const next = updatePreset(DEFAULT_CANVAS_TYPE, 'arc', { curve: undefined });
+    expect('curve' in next.arc!).toBe(false);
   });
 
   it('deletes down to none, and words in a deleted preset set plain', () => {
@@ -56,7 +56,7 @@ describe('brand presets', () => {
     for (const k of Object.keys(presets)) presets = removePreset(presets, k);
     t = withPresets(t, presets);
     expect(presetsOf(t)).toEqual({});
-    expect(freeformSvg(block([text()]), designSystemOf(t))).not.toContain('text-shadow');
+    expect(freeformSvg(block([text()]), designSystemOf(t))).not.toContain('text-transform:uppercase');
   });
 
   it('saves a tweak into its preset without changing the picture', () => {
@@ -77,7 +77,7 @@ describe('brand presets', () => {
     expect(saved.key).toBe('event-headline');
     expect(layerOf(saved.template).look).toBe('event-headline');
     expect(presetsOf(saved.template).retro!.size).toBe(DEFAULT_CANVAS_TYPE.retro!.size);
-    expect(presetsOf(saved.template)['event-headline']).toMatchObject({ label: 'Event headline', size: 50, shadow: DEFAULT_CANVAS_TYPE.retro!.shadow });
+    expect(presetsOf(saved.template)['event-headline']).toMatchObject({ label: 'Event headline', size: 50, color: DEFAULT_CANVAS_TYPE.retro!.color, uppercase: true });
   });
 
   it('makes a preset from plain words, and refuses to update one they do not have', () => {
