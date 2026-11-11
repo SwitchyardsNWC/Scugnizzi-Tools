@@ -8,6 +8,7 @@ import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.t
 import { hasTweaks } from '../model/brand-presets.ts';
 import { BRAND_PRESETS } from './features.ts';
 import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
+import { unitsOf } from '../model/selection.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
@@ -32,7 +33,7 @@ const icon = (...children: JSX.Element[]) => (
   </svg>
 );
 
-const KIND_ICONS: Record<FreeformLayer['kind'] | 'group', () => JSX.Element> = {
+const KIND_ICONS: Record<FreeformLayer['kind'] | 'group' | 'bundle', () => JSX.Element> = {
   text: () => icon(<path key="a" d="M6 6.5h12M12 6.5v12" />),
   sticky: () => icon(<path key="a" d="M5 4.5h14v9.8L14.3 19.5H5z" />, <path key="b" d="M14 19.3v-5h5" />),
   rect: () => icon(<rect key="a" x="4" y="6" width="16" height="12" rx="2.5" />),
@@ -41,6 +42,7 @@ const KIND_ICONS: Record<FreeformLayer['kind'] | 'group', () => JSX.Element> = {
   path: () => icon(<path key="a" d="M4 16c3-7 5 3 8-3s5 2 8-4" />),
   image: () => icon(<rect key="a" x="4" y="5" width="16" height="14" rx="2" />, <path key="b" d="M4 16l5-5 4 4 2-2 5 5" />),
   mark: () => icon(<circle key="a" cx="12" cy="9" r="4.6" />, <path key="b" d="M9.5 13.2L9 16.5h6l-.5-3.3M6 19.5h12" />),
+  bundle: () => icon(<rect key="a" x="3.5" y="3.5" width="17" height="17" rx="2.5" strokeDasharray="3 2.5" />, <rect key="b" x="8" y="8" width="8" height="8" rx="1.5" />),
   group: () => icon(<path key="a" d="M3 15c2.5-6 4.5 2 7-3s4 1.5 6-2" />, <path key="b" d="M8 20c2.5-5 4.5 1.5 7-2.5s3.5 1 6-1.5" />),
 };
 
@@ -58,7 +60,8 @@ export interface FigLayersProps {
   ds: DesignSystem;
   picked: string | null;
   hover: string | null;
-  onPick(key: string | null): void;
+  /** `add`: Shift was held, so the row joins or leaves what is picked. */
+  onPick(key: string | null, add?: boolean): void;
   onHover(key: string | null): void;
   /** Double-click on words: type into them. */
   onEdit(layerId: string): void;
@@ -80,10 +83,15 @@ export interface FigLayersProps {
   heights: Record<string, number>;
   /** Swaps in changed layers from the properties panel. `coalesce` makes a run of edits one undo step. */
   onLayers(label: string, next: FreeformLayer[], coalesce?: string): void;
+  /** Several things picked: line them up with each other, space them, make them a group. */
+  onAlignUnits(edge: AlignEdge): void;
+  onDistribute(axis: 'x' | 'y'): void;
+  onGroup(): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const pickedUnits = unitsOf(picked);
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** Where a drag would land, as a gap in the list as shown: 0 is above the first row. */
   const [gap, setGap] = useState<number | null>(null);
@@ -107,7 +115,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
     return (
       <li
         key={key}
-        class={`fig-layer ${picked === key ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
         draggable={index !== null}
         onDragStart={(e) => {
           if (index === null) return;
@@ -132,7 +140,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
         onMouseEnter={() => onHover(key)}
         onMouseLeave={() => onHover(null)}
       >
-        <button class="fig-layer-main" title={`${LAYER_NAMES[l.kind]}. Drag to reorder.`} onClick={() => onPick(picked === key ? null : key)} onDblClick={() => (l.kind === 'text' || l.kind === 'sticky') && onEdit(l.id)}>
+        <button class="fig-layer-main" title={`${LAYER_NAMES[l.kind]}. Drag to reorder.`} onClick={(e) => onPick(e.shiftKey ? key : picked === key ? null : key, e.shiftKey)} onDblClick={() => (l.kind === 'text' || l.kind === 'sticky') && onEdit(l.id)}>
           <span class={`fig-layer-icon k-${l.kind}`}>{KIND_ICONS[l.kind]()}</span>
           <span class="fig-layer-name">{layerName(l)}</span>
         </button>
@@ -167,7 +175,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           return (
             <li key={key} class="fig-group">
               <div
-                class={`fig-layer ${picked === key ? 'on' : ''} ${hover === key ? 'hover' : ''} ${gap === index && dragKey ? 'gap-before' : ''} ${gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+                class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${gap === index && dragKey ? 'gap-before' : ''} ${gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer?.setData('text/x-fig-layer', key);
@@ -194,9 +202,10 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
                 <button class={`fig-fold ${expanded ? 'open' : ''}`} aria-expanded={expanded} aria-label={expanded ? 'Fold the drawing' : 'Show its strokes'} onClick={() => setOpen((o) => ({ ...o, [item.id]: !o[item.id] }))}>
                   {icon(<path key="a" d="M9 6l6 6-6 6" />)}
                 </button>
-                <button class="fig-layer-main" title="A drawing: strokes made in one go. They move, scale, colour and delete together. Alt-click a stroke on the canvas to pick it alone." onClick={() => onPick(picked === key ? null : key)}>
-                  <span class="fig-layer-icon k-group">{KIND_ICONS.group()}</span>
-                  <span class="fig-layer-name">Drawing</span>
+                <button class="fig-layer-main" title="A group: they move, scale, colour and delete together. Alt-click one on the canvas to pick it alone." onClick={(e) => onPick(e.shiftKey ? key : picked === key ? null : key, e.shiftKey)}>
+                  {/* Strokes from one pen session are a drawing; anything grouped by hand is a group. */}
+                  <span class="fig-layer-icon k-group">{item.layers.every((l) => l.kind === 'path') ? KIND_ICONS.group() : KIND_ICONS.bundle()}</span>
+                  <span class="fig-layer-name">{item.layers.every((l) => l.kind === 'path') ? 'Drawing' : 'Group'}</span>
                   <span class="fig-badge">{item.layers.length}</span>
                 </button>
                 <span class="fig-layer-actions">
@@ -216,7 +225,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       </ul>
 
       {picked && selectionOf(block, picked) ? (
-        <FigProps block={block} ds={ds} pickedKey={picked} heights={heights} onLayers={onLayers} />
+        <FigProps block={block} ds={ds} pickedKey={picked} heights={heights} onLayers={onLayers} onAlignUnits={onAlignUnits} onDistribute={onDistribute} onGroup={onGroup} />
       ) : (
       <div class="fig-page">
         <div class="fig-page-row">
@@ -242,7 +251,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       {(() => {
         // The one layer picked has its own stack; nothing picked, or a drawing, is the page's.
         const sel = picked ? selectionOf(block, picked) : null;
-        const layer = sel && !sel.group ? sel.layers[0] : undefined;
+        const layer = sel && !sel.many ? sel.layers[0] : undefined;
         return layer ? (
           <FigEffects
             key={`layer:${layer.id}`}
@@ -698,6 +707,9 @@ export interface FigBarProps {
   onRemove(): void;
   onUngroup(): void;
   onOrder(delta: number): void;
+  /** Several things picked rather than one: no per-kind controls, and a Group button. */
+  multi?: boolean;
+  onGroup?(): void;
   /** Saves the picked text's look into the design system's brand presets: into its own, or as a new one. */
   onSavePreset?(mode: 'update' | 'new', label?: string): void;
 }
@@ -707,11 +719,11 @@ type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' |
 /** A design system font's key as a name: `georgia` is Georgia. */
 const fontName = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
-export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset }: FigBarProps) {
+export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset, multi, onGroup }: FigBarProps) {
   const [pop, setPop] = useState<Pop>(null);
-  const one = group ? undefined : layers[0];
+  const one = group || multi ? undefined : layers[0];
   const inverted = layers.length > 0 && layers.every((l) => l.invert);
-  const id = group ?? one?.id ?? '';
+  const id = group ?? (multi ? layers.map((l) => l.id).join(',') : one?.id) ?? '';
   const palette = Object.keys(ds.colors).slice(0, 8);
   const toggle = (p: Pop) => setPop((cur) => (cur === p ? null : p));
   const set = (label: string, patch: Record<string, unknown>, coalesce?: string) => onChange(label, (l) => ({ ...l, ...patch }) as FreeformLayer, coalesce ? `${coalesce}:${id}` : undefined);
@@ -900,8 +912,13 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
           </button>
         )}
         {(quick || tweaks) && <span class="fig-sep" aria-hidden="true" />}
+        {multi && onGroup && (
+          <button class="fig-icon-btn" title="Group  ·  ⌘G" aria-label="Group" onClick={onGroup}>
+            {icon(<rect key="a" x="3" y="3" width="18" height="18" rx="3" strokeDasharray="3 3" />, <rect key="b" x="7" y="7" width="10" height="10" rx="2" />)}
+          </button>
+        )}
         {group && (
-          <button class="fig-icon-btn" title="Ungroup the drawing" aria-label="Ungroup" onClick={onUngroup}>
+          <button class="fig-icon-btn" title="Ungroup  ·  ⇧⌘G" aria-label="Ungroup" onClick={onUngroup}>
             {icon(<rect key="a" x="3" y="3" width="8" height="8" rx="2" />, <rect key="b" x="13" y="13" width="8" height="8" rx="2" />)}
           </button>
         )}
@@ -1300,20 +1317,46 @@ const ALIGNS: Array<{ edge: AlignEdge; label: string; d: string }> = [
  * and a row that lines it up with the page. A drawing (a group) shows the box around its strokes and
  * scales them together; it does not turn. Text finds its own height, so H is shown but not set.
  */
-function FigProps({ block, ds, pickedKey, heights, onLayers }: { block: FreeformBlock; ds: DesignSystem; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
+function FigProps({ block, ds, pickedKey, heights, onLayers, onAlignUnits, onDistribute, onGroup }: { block: FreeformBlock; ds: DesignSystem; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers']; onAlignUnits: FigLayersProps['onAlignUnits']; onDistribute: FigLayersProps['onDistribute']; onGroup(): void }) {
   const sel = selectionOf(block, pickedKey);
   if (!sel) return null;
-  const group = Boolean(sel.group);
+  const group = sel.many;
   const g = geometryOf(sel.layers, group, heights);
   if (!g) return null;
   const one = sel.layers[0]!;
-  const name = group ? 'Drawing' : LAYER_NAMES[one.kind];
+  const name = sel.multi ? `${sel.units.length} selected` : group ? 'Group' : LAYER_NAMES[one.kind];
   const box = (label: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => onLayers(label, withGeometry(sel.layers, group, patch, heights));
   return (
     <div class="fig-page fig-props">
       <div class="fig-page-row">
         <b>{name}</b>
+        {sel.multi && (
+          <button class="fig-text-btn" title="Make these one group  ·  ⌘G" onClick={onGroup}>
+            Group
+          </button>
+        )}
       </div>
+      {sel.multi && (
+        <div class="fig-align" role="group" aria-label="Align to each other">
+          {ALIGNS.map((a) => (
+            <button key={a.edge} class="fig-icon-btn" title={`${a.label} to each other`} aria-label={`${a.label} to each other`} onClick={() => onAlignUnits(a.edge)}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d={a.d} />
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+      {sel.multi && (
+        <div class="fig-text-row">
+          <button class="fig-chip" disabled={sel.units.length < 3} title="Even gaps across, first and last stay put. Needs three or more." onClick={() => onDistribute('x')}>
+            Distribute across
+          </button>
+          <button class="fig-chip" disabled={sel.units.length < 3} title="Even gaps down, first and last stay put. Needs three or more." onClick={() => onDistribute('y')}>
+            Distribute down
+          </button>
+        </div>
+      )}
       <div class="fig-prop-grid">
         <PropNum label="X" title="Left edge, in pixels from the page's left" value={g.x} onCommit={(v) => box('Move', { x: v })} />
         <PropNum label="Y" title="Top edge, in pixels from the page's top" value={g.y} onCommit={(v) => box('Move', { y: v })} />
@@ -1337,7 +1380,7 @@ function FigProps({ block, ds, pickedKey, heights, onLayers }: { block: Freeform
         />
         <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
       </div>
-      {!group && one.kind === 'text' && <TextProps layer={one} ds={ds} onLayers={onLayers} />}
+      {!sel.many && one.kind === 'text' && <TextProps layer={one} ds={ds} onLayers={onLayers} />}
       <div class="fig-align" role="group" aria-label="Align to page">
         {ALIGNS.map((a) => (
           <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>

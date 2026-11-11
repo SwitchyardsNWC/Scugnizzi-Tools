@@ -932,6 +932,8 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .surface-selection { pointer-events: none; }
 /* Smart guides (model/snap.ts): the line a dragged layer snapped to. Red-orange, apart from selection blue; drawn only while dragging. */
 .surface-guide { stroke: var(--fig-guide); pointer-events: none; }
+/* The selection box: the selection blue, faint, so what is inside it still reads. */
+.surface-marquee { fill: rgb(11 111 216 / 0.06); stroke: #0b6fd8; pointer-events: none; vector-effect: non-scaling-stroke; }
 .surface-selection [data-handle] { pointer-events: auto; }
 .surface-text {
   position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; border-radius: 2px; resize: none; overflow: hidden;

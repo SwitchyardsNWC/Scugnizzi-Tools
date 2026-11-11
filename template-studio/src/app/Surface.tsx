@@ -21,6 +21,7 @@ import {
   newGroupId,
   paintGroup,
   paintLayer,
+  paintOne,
   parseLayerClip,
   pasteLayers,
   removeGroup,
@@ -35,6 +36,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
 import { BRAND_PRESETS } from './features.ts';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
@@ -171,6 +173,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   /** How many times the clipboard has been pasted since it was copied, so each paste steps further out. */
   const pasteCount = useRef(0);
   const [pageDrag, setPageDrag] = useState(false);
+  /** The selection box being dragged, in page coordinates. */
+  const [marquee, setMarquee] = useState<Box | null>(null);
   const drag = useRef<Drag | null>(null);
   const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[]; snapped: QuickShape | null } | null>(null);
   const [space, setSpace] = useState(false);
@@ -457,7 +461,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       if (!sel) return;
       onSelectLayer(null);
       const gone = () =>
-        commit(sel.group ? 'Remove drawing' : 'Remove layer', sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id));
+        commit(
+          sel.multi ? 'Remove layers' : sel.group ? 'Remove drawing' : 'Remove layer',
+          sel.multi ? removeUnits(tpl(), blockId, b!, sel.units) : sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id),
+        );
       const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 100, 'forwards') : null));
       const first = anims.find(Boolean);
       if (first) first.onfinish = gone;
@@ -634,14 +641,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const b = blockRef.current;
     const sel = b ? selectionOf(b, layerRef.current) : null;
     if (!sel) return;
-    commit('Colour', sel.group ? paintGroup(tpl(), blockId, sel.group, color) : paintLayer(tpl(), blockId, sel.layers[0]!.id, color));
+    commit('Colour', sel.multi ? replaceLayers(tpl(), blockId, sel.layers.map((l) => paintOne(l, color))) : sel.group ? paintGroup(tpl(), blockId, sel.group, color) : paintLayer(tpl(), blockId, sel.layers[0]!.id, color));
   };
 
   const chooseLook = (next: string | null) => {
     setLook(next);
     const b = blockRef.current;
     const sel = b ? selectionOf(b, layerRef.current) : null;
-    const one = sel && !sel.group ? sel.layers[0] : undefined;
+    const one = sel && !sel.many ? sel.layers[0] : undefined;
     if (one?.kind === 'text') commit('Text style', updateLayer(tpl(), blockId, one.id, next ? { look: next } : { look: undefined }));
   };
 
@@ -702,6 +709,27 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     });
   }
 
+  /**
+   * The layer under the pointer, topmost first. A text layer's drawing reaches down to the foot of the page so
+   * its words can wrap, so it counts as hit only inside its measured box; under that, whatever is beneath it.
+   */
+  const layerAt = (clientX: number, clientY: number, p: Point): string | null => {
+    const b = blockRef.current;
+    if (!b) return null;
+    for (const el of document.elementsFromPoint(clientX, clientY)) {
+      const id = el.closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer');
+      if (!id) continue;
+      const l = b.layers.find((x) => x.id === id);
+      if (!l) continue;
+      if (l.kind === 'text') {
+        const box = boundsOf(l, textHeights[l.id]);
+        if (p.x < box.x || p.x > box.x + box.width || p.y < box.y || p.y > box.y + box.height) continue;
+      }
+      return id;
+    }
+    return null;
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     const b = blockRef.current;
     const svg = svgEl.current;
@@ -741,8 +769,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     }
     const sel = selectionOf(b, layerRef.current);
     if (handle && sel) {
-      const one = sel.group ? undefined : sel.layers[0]!;
-      if (sel.group) {
+      const one = sel.many ? undefined : sel.layers[0]!;
+      if (sel.many) {
         drag.current = { kind: 'resizeMany', layers: sel.layers, handle: handle as Handle, box: groupBox(sel.layers, textHeights), x: p.x, y: p.y };
       } else if (handle === 'rot' && one) {
         const box = boxOf(one);
@@ -793,7 +821,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       return;
     }
 
-    const hit = target.closest('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
+    const hit = layerAt(event.clientX, event.clientY, p);
     if (hit) {
       const l = b.layers.find((x) => x.id === hit);
       if (!l) return;
@@ -809,8 +837,24 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         event.preventDefault();
         return;
       }
-      onSelectLayer(gid ? groupKey(gid) : hit);
-      drag.current = { kind: 'move', layers: gid ? membersOf(b, gid) : [l], x: p.x, y: p.y, moved: false };
+      const unit = gid ? groupKey(gid) : hit;
+      // Shift adds the thing to what is picked, or takes it out. Pressing on something already among several
+      // picked things keeps them all picked, so the drag moves them together.
+      const before = selectionOf(b, layerRef.current);
+      let movers: FreeformLayer[] = gid ? membersOf(b, gid) : [l];
+      if (event.shiftKey) {
+        const next = toggleUnit(layerRef.current, unit);
+        onSelectLayer(next);
+        const now = next ? selectionOf(b, next) : null;
+        if (!now || !now.units.includes(unit)) {
+          event.preventDefault();
+          return;
+        }
+        movers = now.layers;
+      } else if (before?.multi && before.units.includes(unit)) {
+        movers = before.layers;
+      } else onSelectLayer(unit);
+      drag.current = { kind: 'move', layers: movers, x: p.x, y: p.y, moved: false };
       // Held still on it for a beat: the hand from here, so dragging moves the page and not the layer.
       const { clientX, clientY } = event;
       window.clearTimeout(holdPan.current);
@@ -822,8 +866,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }, settingsRef.current.holdPanMs);
     } else {
       lastPress.current = null;
-      onSelectLayer(null);
-      drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
+      if (current === 'select' && event.pointerType !== 'touch') {
+        // A selection box, as in any layout tool. The page still pans with Space, the hand, or a finger.
+        if (!event.shiftKey) onSelectLayer(null);
+        drag.current = { kind: 'marquee', from: p, base: event.shiftKey ? layerRef.current : null };
+      } else {
+        onSelectLayer(null);
+        drag.current = { kind: 'pan', x: event.clientX, y: event.clientY, view: viewRef.current, tracker: new PanTracker() };
+      }
     }
     event.preventDefault();
   };
@@ -836,7 +886,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (!state) {
       // Hover: a soft outline on whatever the pointer is over, as long as nothing is being done.
       if (toolRef.current === 'select' && phaseRef.current === 'idle' && !spaceRef.current && b) {
-        const hit = (event.target as Element).closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer') ?? null;
+        const hit = layerAt(event.clientX, event.clientY, toSurface(event.clientX, event.clientY));
         const l = hit ? b.layers.find((x) => x.id === hit) : undefined;
         const key = l?.group && !event.altKey && membersOf(b, l.group).length > 1 ? groupKey(l.group) : hit;
         if (key !== hoverRef.current) {
@@ -847,7 +897,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       return;
     }
     if (!b) return;
-    if (state.kind !== 'pan' && state.kind !== 'pen' && state.kind !== 'create' && state.kind !== 'erase') setDragging(true);
+    if (state.kind !== 'pan' && state.kind !== 'pen' && state.kind !== 'create' && state.kind !== 'erase' && state.kind !== 'marquee') setDragging(true);
     const p = toSurface(event.clientX, event.clientY);
     const key = `surface:${blockId}`;
     switch (state.kind) {
@@ -944,6 +994,16 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(1200, Math.round(state.height + (p.y - state.y)))));
         return;
       }
+      case 'marquee': {
+        const box = boxFromCorners(state.from, p);
+        setMarquee(box);
+        // What the box touches is picked as it grows, added to what was there when Shift was held.
+        const hits = box.width * viewRef.current.z > 3 || box.height * viewRef.current.z > 3 ? marqueeUnits(b, box, textHeights) : [];
+        let key = state.base;
+        for (const u of hits) if (!selectionOf(b, key)?.units.includes(u)) key = toggleUnit(key, u);
+        if (key !== layerRef.current) onSelectLayer(key);
+        return;
+      }
     }
   };
 
@@ -958,6 +1018,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     drag.current = null;
     setGhost(null);
     setGuides([]);
+    setMarquee(null);
     setPageDrag(false);
     setDragging(false);
     if (!state) return;
@@ -1130,13 +1191,24 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         return;
       }
     }
+    if (meta && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      onSelectLayer(keyOfUnits(allUnits(b)));
+      return;
+    }
     const picked = layerRef.current;
     const sel = selectionOf(b, picked);
     if (!picked || !sel) return;
+    if (meta && event.key.toLowerCase() === 'g') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (sel.group) ungroup(sel.group);
+      } else if (sel.multi) groupPicked();
+      return;
+    }
     if (meta && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      if (sel.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, sel.group), sel.layers.length);
-      else place('Duplicate layer', duplicateLayer(tpl(), blockId, picked));
+      duplicateKey(picked);
       return;
     }
     if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -1236,11 +1308,11 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
   const idle = phase === 'idle';
   const sel = idle ? selectionOf(block, layer) : null;
-  const picked = sel && !sel.group ? sel.layers[0] : undefined;
-  const pickedBox = sel ? (sel.group ? groupBox(sel.layers, textHeights) : boxOf(sel.layers[0]!)) : null;
+  const picked = sel && !sel.many ? sel.layers[0] : undefined;
+  const pickedBox = sel ? (sel.many ? groupBox(sel.layers, textHeights) : boxOf(sel.layers[0]!)) : null;
   const hoverSel = hover && hover !== layer && idle && tool === 'select' ? selectionOf(block, hover) : null;
   const hovered = hoverSel && !hoverSel.group ? hoverSel.layers[0] : undefined;
-  const hoveredBox = hoverSel ? (hoverSel.group ? groupBox(hoverSel.layers, textHeights) : boxOf(hoverSel.layers[0]!)) : null;
+  const hoveredBox = hoverSel ? (hoverSel.many ? groupBox(hoverSel.layers, textHeights) : boxOf(hoverSel.layers[0]!)) : null;
   const hs = HANDLE / view.z;
   const allHandles: Array<{ h: Handle; x: number; y: number; cursor: string }> = pickedBox
     ? [
@@ -1310,8 +1382,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const duplicateKey = (key: string) => {
     const b = blockRef.current;
     const s = b ? selectionOf(b, key) : null;
-    if (!s) return;
-    if (s.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, s.group), s.layers.length);
+    if (!s || !b) return;
+    if (s.multi) {
+      const made = duplicateUnits(tpl(), blockId, b, s.units);
+      commit('Duplicate layers', made.template);
+      onSelectLayer(made.key);
+    } else if (s.group) placeMany('Duplicate drawing', duplicateGroup(tpl(), blockId, s.group), s.layers.length);
     else place('Duplicate layer', duplicateLayer(tpl(), blockId, key));
   };
   const orderKey = (key: string, delta: number) => {
@@ -1320,6 +1396,27 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const gid = groupOfKey(key);
     const at = groupRuns(b.layers).findIndex((it) => (gid ? it.kind === 'group' && it.id === gid : it.kind === 'layer' && it.layer.id === key));
     if (at !== -1) commit('Reorder', moveItem(tpl(), blockId, key, at + delta));
+  };
+  /** The things picked made into one group, which stays picked. */
+  const groupPicked = () => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (!b || !s?.multi) return;
+    const made = groupUnits(tpl(), blockId, b, s.units);
+    if (!made) return;
+    commit('Group', made.template);
+    onSelectLayer(made.key);
+  };
+  /** The things picked lined up with each other, or spaced evenly. */
+  const alignPicked = (edge: UnitEdge) => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (b && s?.multi) commit(`Align ${edge}`, replaceLayers(tpl(), blockId, alignUnits(b, s.units, edge, textHeights)));
+  };
+  const distributePicked = (axis: 'x' | 'y') => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    if (b && s?.multi) commit(axis === 'x' ? 'Distribute across' : 'Distribute down', replaceLayers(tpl(), blockId, distributeUnits(b, s.units, axis, textHeights)));
   };
   const ungroup = (gid: string) => {
     commit('Ungroup drawing', ungroupLayers(tpl(), blockId, gid));
@@ -1406,7 +1503,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     ].map((p) => (rotation ? rotatePoint(p, centre, rotation) : p));
     const minY = Math.min(...pts.map((p) => p.y));
     const maxY = Math.max(...pts.map((p) => p.y));
-    const lift = sel.group || picked?.kind === 'line' ? 14 : 42;
+    const lift = sel.many || picked?.kind === 'line' ? 14 : 42;
     const above = view.y + minY * view.z - lift;
     const below = above < 130;
     const width = work.current?.clientWidth ?? 1200;
@@ -1507,6 +1604,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               {tool === 'eraser' && eraserAt && idle && (
                 <circle cx={eraserAt.x} cy={eraserAt.y} r={ERASER / view.z} fill="rgba(255,255,255,0.65)" stroke="#1e1c19" stroke-width={1.5 / view.z} />
               )}
+              {marquee && (
+                <rect class="surface-marquee" x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height} stroke-width={1 / view.z} />
+              )}
               {guides.map((g, i) =>
                 g.axis === 'x' ? (
                   <line key={`g${i}`} class="surface-guide" x1={g.at} y1={g.from} x2={g.at} y2={g.to} stroke-width={1 / view.z} />
@@ -1524,7 +1624,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                     fill="none"
                     stroke={ACCENT}
                     stroke-width={1.5 / view.z}
-                    stroke-dasharray={sel.group ? `${5 / view.z} ${4 / view.z}` : undefined}
+                    stroke-dasharray={sel.many ? `${5 / view.z} ${4 / view.z}` : undefined}
                   />
                   {picked?.kind === 'line' ? (
                     <>
@@ -1537,7 +1637,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                         <circle key={hd.h} data-handle={hd.h} cx={hd.x} cy={hd.y} r={hs / 2} class="surface-handle" style={{ cursor: hd.cursor }} />
                       ))}
                       {/* A drawing scales but does not turn: its strokes have no one centre to turn about. */}
-                      {!sel.group && (
+                      {!sel.many && (
                         <>
                           <line x1={centre.x} y1={pickedBox.y} x2={centre.x} y2={pickedBox.y - 24 / view.z} stroke={ACCENT} stroke-width={1.5 / view.z} />
                           <circle data-handle="rot" cx={centre.x} cy={pickedBox.y - 24 / view.z} r={hs * 0.62} class="surface-handle rot" />
@@ -1686,9 +1786,11 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onDuplicate={() => layer && duplicateKey(layer)}
           onRemove={() => layer && poof(layer)}
           onUngroup={() => sel.group && ungroup(sel.group)}
+          multi={sel.multi}
+          onGroup={groupPicked}
           onOrder={(d) => layer && orderKey(layer, d)}
           onSavePreset={!BRAND_PRESETS ? undefined : (mode, label) => {
-            const one = sel.group ? undefined : sel.layers[0];
+            const one = sel.many ? undefined : sel.layers[0];
             if (one?.kind !== 'text') return;
             const saved = savePresetFromLayer(tpl(), blockId, one, mode, label);
             if (saved) commit(mode === 'update' ? 'Update preset' : 'New preset', saved.template);
@@ -1702,9 +1804,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           ds={ds}
           picked={layer}
           hover={hover}
-          onPick={(key) => {
+          onPick={(key, add) => {
             setTool('select');
-            onSelectLayer(key);
+            onSelectLayer(add && key ? toggleUnit(layerRef.current, key) : key);
           }}
           onHover={(key) => {
             hoverRef.current = key;
@@ -1720,6 +1822,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
           heights={textHeights}
+          onAlignUnits={alignPicked}
+          onDistribute={distributePicked}
+          onGroup={groupPicked}
           onLayers={(label, next, coalesce) => commit(label, replaceLayers(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}

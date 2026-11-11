@@ -4,6 +4,7 @@
 
 import type { JSX } from 'preact';
 import { groupOfKey, membersOf, type Box } from '../model/freeform.ts';
+import { isMultiKey, unitLayers, unitsOf } from '../model/selection.ts';
 import type { QuickShape } from '../model/quick-shape.ts';
 import type { PanTracker } from './inertia.ts';
 import type { FreeformBlock, FreeformLayer } from '../model/types.ts';
@@ -31,7 +32,9 @@ export type Drag =
   /** `still` is where the pen last stopped moving and since when; `snapped` the shape it would become if lifted now. */
   | { kind: 'pen'; points: number[]; still: { x: number; y: number; since: number } | null; snapped: QuickShape | null }
   | { kind: 'erase'; last: Point; session: string }
-  | { kind: 'page'; axis: 'x' | 'y' | 'both'; width: number; height: number; x: number; y: number };
+  | { kind: 'page'; axis: 'x' | 'y' | 'both'; width: number; height: number; x: number; y: number }
+  /** A selection box from `from`; `base` is what was picked before it when Shift adds to it. */
+  | { kind: 'marquee'; from: Point; base: string | null };
 
 export const glyph = (...children: JSX.Element[]) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -92,16 +95,35 @@ export const DRAW_TOOLS = new Set<Tool>(['pen', 'eraser', 'rect', 'ellipse', 'li
 export const POP: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
 export const POOF: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
 
-/** What is picked: one layer, or a group (`group:<id>`) of more than one. */
-export function selectionOf(block: FreeformBlock, key: string | null): { layers: FreeformLayer[]; group: string | null } | null {
+export interface Selection {
+  layers: FreeformLayer[];
+  /** The drawing picked, when what is picked is one drawing. */
+  group: string | null;
+  /** Several units picked together (`multi:…`, model/selection.ts). */
+  multi: boolean;
+  /** More than one layer, whichever way: a drawing or a multi-selection. Moves, scales and deletes as one. */
+  many: boolean;
+  /** The layer ids and drawing keys picked. */
+  units: string[];
+}
+
+/** What is picked: one layer, a drawing (`group:<id>`), or several of either (`multi:…`). */
+export function selectionOf(block: FreeformBlock, key: string | null): Selection | null {
   if (!key) return null;
+  if (isMultiKey(key)) {
+    const units = unitsOf(key).filter((u) => unitLayers(block, u).length);
+    if (units.length === 0) return null;
+    if (units.length === 1) return selectionOf(block, units[0]!);
+    const ids = new Set(units.flatMap((u) => unitLayers(block, u)).map((l) => l.id));
+    return { layers: block.layers.filter((l) => ids.has(l.id)), group: null, multi: true, many: true, units };
+  }
   const gid = groupOfKey(key);
   if (gid) {
     const members = membersOf(block, gid);
-    return members.length ? { layers: members, group: gid } : null;
+    return members.length ? { layers: members, group: gid, multi: false, many: true, units: [key] } : null;
   }
   const one = block.layers.find((l) => l.id === key);
-  return one ? { layers: [one], group: null } : null;
+  return one ? { layers: [one], group: null, multi: false, many: false, units: [key] } : null;
 }
 
 export const MIN_ZOOM = 0.1;
