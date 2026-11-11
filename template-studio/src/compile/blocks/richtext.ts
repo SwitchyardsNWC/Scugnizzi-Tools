@@ -37,24 +37,35 @@ export function richTextParts(block: RichTextBlock, sec: Section, col: Column, c
   const rich = `sy-rich ${cls}`;
   const inset = hasTextInset(ctx.ds);
   const words = inset ? textInset(content.value, ctx, rich) : content.value;
-  const outerClass = (side: string | null) => (inset ? side : [rich, side].filter(Boolean).join(' ') || null);
+  const box = boxOf(col, ctx.ds);
+
+  // The class stays on the row: `.sy-rich` is what the inlined rules match against, and it has
+  // to wrap this block's markup and nothing else's.
+  const row = (padding: string) =>
+    cell(words, { ds: ctx.ds, padding, color, linkColor: sec.linkColor, ...(inset ? {} : { className: rich }), align: block.align, padded: false });
+
+  // `sy-rich` never sits above a table the compiler drew. `.sy-rich td` and `.sy-rich table` are for tables the team
+  // types, and HubSpot inlines them onto every match at send — so a box's own cell under a `sy-rich` cell came out
+  // with a grey hairline and 16px type inside the card (learnings 3.103). With a box, the words go in a row of their
+  // own inside it, the same shape a stack's row has, and the outer cell keeps only the gutter's class.
+  const inner = box && !inset ? row('0') : words;
+  const side = padClass(col, ctx);
+  const outerClass = (box || inset ? side : [rich, side].filter(Boolean).join(' ')) || null;
 
   // Bottom padding defaults to 0 because the last paragraph's own margin already provides it;
   // adding more is how a text block ends up with a double gap under it.
   return {
     declaration: content.declaration,
-    markup: cell(words, {
+    markup: cell(inner, {
       ds: ctx.ds,
       padding: paddingOf(col, ctx.ds),
       color,
       linkColor: sec.linkColor,
-      ...(outerClass(padClass(col, ctx)) ? { className: outerClass(padClass(col, ctx))! } : {}),
-      box: boxOf(col, ctx.ds),
+      ...(outerClass ? { className: outerClass } : {}),
+      box,
       align: block.align,
     }),
-    // The class stays on the row: `.sy-rich` is what the inlined rules match against, and it has
-    // to wrap this block's markup and nothing else's.
-    row: (padding) => cell(words, { ds: ctx.ds, padding, color, linkColor: sec.linkColor, ...(inset ? {} : { className: rich }), align: block.align, padded: false }),
+    row,
     collapse: content.collapse,
   };
 }

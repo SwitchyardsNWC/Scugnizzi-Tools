@@ -3262,3 +3262,21 @@ arrangement, links; asked about links, underlined by default.*
   footer's alignment, rather than sitting right of a blank.
 - **"Socials first" was ledger-only and named for one direction.** `socialsAt` is above or below on every type;
   absent is where the type puts them, and a ledger that said `socialsFirst` keeps them first until somebody chooses.
+
+### 3.103 A box inside `.sy-rich` wore the team's table rule
+
+*2026-11-11. Found in the card starter: cards 1 and 3 drew a grey hairline inside the ink border, and the copy's cell
+came out at 16px in a 13px system. Card 2 did not.*
+
+- **`.sy-rich td` matched the compiler's own cell.** The rule (`border:1px solid #d9d8d3; font-size:16px`, head.ts) is
+  for tables the team types, and it lives in `hs-inline-css`, so HubSpot inlines it onto every match at send. A Text
+  block alone in a boxed or filled column put `sy-rich` on the outer cell, and `boxed()` drew its table inside it.
+  The canvas showed it too, so it was never a HubSpot-only surprise; it was just easy to read as part of the card.
+- **Card 2 was right because it was a stack.** A stack's outer cell carries only the gutter's class, and each block
+  sits in a row of its own inside the box (3.59). The text inset already did the same with its inner cell. A boxed
+  Text block on its own now takes the stack's shape: the words in a row inside the box, `sy-rich` on that row.
+- **The rule is: `sy-rich` never sits above a table the compiler drew.** Everything under it is the team's.
+  `tests/rich-box.test.ts` loads the compiled card starter in a DOM and checks that no box table has a `.sy-rich`
+  ancestor, that the box's cell keeps its own border and size, and that a table the team typed still gets the rule.
+- **No snapshot moved.** The block snapshots render unboxed Text, which is unchanged byte for byte. A boxed Text
+  block gains one nested table, the same one a stack row already has.
