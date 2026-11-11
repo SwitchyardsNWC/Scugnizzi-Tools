@@ -237,3 +237,19 @@ describe('every option', () => {
     }
   });
 });
+
+describe('editing', () => {
+  it('sets a footer’s first own value and the system’s first footer token, though neither group exists yet', async () => {
+    const { setValue } = await import('../src/model/edit.ts');
+    const t = switchyardsTemplate();
+    const legal = legalOf(t);
+    const at = t.sections.find((s) => s.rows.some((r) => r.columns.some((c) => c.blocks.includes(legal))))!;
+    const selection = { kind: 'block' as const, sectionId: at.id, blockId: legal.id };
+    expect(legal.style).toBeUndefined();
+    expect(t.ds!.footer).toBeUndefined();
+    const own = setValue(t, selection, 'block.style.density', 'airy');
+    expect(legalOf(own).style).toEqual({ density: 'airy' });
+    const sys = setValue(t, selection, 'ds.footer.hairlines', false);
+    expect(sys.ds!.footer).toEqual({ hairlines: false });
+  });
+});

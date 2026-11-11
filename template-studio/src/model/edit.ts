@@ -177,8 +177,10 @@ function split(path: string): [string, string[]] {
 function setIn<T>(node: T, keys: string[], value: unknown): T {
   if (keys.length === 0) return value as T;
   const [head, ...rest] = keys;
-  const current = (node as Record<string, unknown>)[head!];
-  return { ...node, [head!]: setIn(current, rest, value) } as T;
+  // A parent that is not there yet is made: an optional group of settings — a footer's own `style`, the
+  // system's `footer` — is absent until its first value is set.
+  const current = node == null ? undefined : (node as Record<string, unknown>)[head!];
+  return { ...(node ?? {}), [head!]: setIn(current, rest, value) } as T;
 }
 
 function getIn(node: unknown, keys: string[]): unknown {

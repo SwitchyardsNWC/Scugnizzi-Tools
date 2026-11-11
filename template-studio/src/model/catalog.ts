@@ -680,9 +680,9 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             kind: 'select',
             path: 'block.align',
             label: 'Align',
-            // Centre first, so a footer that has never been set reads as what it draws.
+            // Unset is centre, and says so: a select whose value matches no option shows a blank.
             options: [
-              ['center', 'Center'],
+              ['', 'Center'],
               ['left', 'Left'],
               ['right', 'Right'],
             ],
@@ -694,7 +694,7 @@ export const CATALOG: Record<BlockType, BlockSpec> = {
             path: 'block.socialsAt',
             label: 'Socials',
             options: [
-              ['', 'Where the type puts them'],
+              ['', 'Type default'],
               ['above', 'Above the legal links'],
               ['below', 'Below the legal links'],
             ],
