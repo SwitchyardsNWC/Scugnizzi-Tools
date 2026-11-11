@@ -3262,3 +3262,27 @@ arrangement, links; asked about links, underlined by default.*
   footer's alignment, rather than sitting right of a blank.
 - **"Socials first" was ledger-only and named for one direction.** `socialsAt` is above or below on every type;
   absent is where the type puts them, and a ledger that said `socialsFirst` keeps them first until somebody chooses.
+
+### 3.103 Two lists of where a colour lives, and they drifted
+
+*2026-11-11. Found as a card's fill: set to `card` (#123456), then the palette entry renamed to Callout. Usage came
+back empty, the fill stayed `card`, and the export lost the card.*
+
+- **Counting and carrying were two walks.** `colorUsage` counted, `repoint` rewrote, and each knew presets, roles,
+  buttons, stripes and dividers. Neither knew a column's fill or border, a brand mark, a freeform drawing (its
+  background, every layer's paint, a run's colour), the quote bar, the rule, the image and page borders, the
+  footer's hairline and link (system and per footer), or the brand presets. So `removeColor` called a colour used
+  only by a card unused, deleted it, and the card vanished: `boxOf` draws the wrapper only when the fill resolves.
+- **One walk, two endings.** `model/color-refs.ts` is the list. Whatever it visits is counted *and* carried; a
+  field it does not visit is neither, in one place. `tests/color-refs.test.ts` puts every kind through the same
+  four questions, and a new kind without a row there is the gap this closes.
+- **Absent brand presets are the shipped ones.** The Shop sign names red whether or not a system wrote
+  `canvasType`, so the walk reads the shipped set and writes `canvasType` only when one of them changed.
+- **A rename moves no pixel.** A freeform picture's and a brand mark's hash covers their recipe, names included, so
+  a rename would have called every one stale. A picture current before a rename stays current; a replace with a
+  different hex leaves it stale, which is true.
+- **Fonts had the same hole.** `fontUsage` saw roles and the email's stack, not brand presets or a freeform layer's
+  face and runs. It takes the document now, and `removeFont` refuses while any of them names the stack.
+- **Not reached, named.** `import-system.ts`'s `colorRefs` is a third list and still lacks the footer and the
+  brand presets. A freeform block linked to a Freeform app frame takes its drawing from the frame, which is another
+  document with its own palette; repointing the block is undone on the next follow.
