@@ -37,7 +37,8 @@ const { template, warnings } = isV1 ? importV1(raw) : { template: migrate(raw), 
 for (const warning of warnings) console.error(`  import: ${warning}`);
 
 const mode = flag('preview') ? 'preview' : 'hubl';
-// --embed carries the design inside the file, as the app's Export does (compile/embed.ts, learnings 1.19).
+// --embed carries the design inside the file (compile/embed.ts, learnings 1.19). Like the rest of this tool it does not
+// read the folder's design systems, so a template that follows one compiles, and embeds, the shipped defaults.
 const result = compile(template, { mode, embedDesign: flag('embed') });
 const out = option('out');
 

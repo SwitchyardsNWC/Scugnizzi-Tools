@@ -16,10 +16,12 @@ import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compile/compile.ts';
 import { completeDesignSystem, type DesignSystem } from '../src/model/design-system.ts';
 import { materialiseFolderSystem } from '../src/model/edit.ts';
-import { planPackage } from '../src/model/export-package.ts';
+import { localSources, planPackage } from '../src/model/export-package.ts';
+import { withoutDesign } from '../src/compile/embed.ts';
 import { migrate } from '../src/model/schema.ts';
 import type { Template } from '../src/model/types.ts';
-import { buildFile, compareWithBuild, designFromFiles, designInside, fieldChanges, foldDiff, lineDiff } from '../src/desk/compare.ts';
+import { buildFile, compareWithBuild, designFromFiles, designInside, fieldChanges, foldDiff, lineDiff, packLike } from '../src/desk/compare.ts';
+import { DEFAULT_DESIGN_SYSTEM } from '../src/model/design-system.ts';
 import { createDraft, draftOperation, draftProblems, explain, listFromAddresses, listTemplates, payloadOf, pollDraft, SERVER, TOOL, type DraftRequest, type McpLike } from '../src/desk/hubspot.ts';
 
 const at = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
@@ -210,9 +212,9 @@ describe('the drift check', () => {
     if (!got.ok) throw new Error(got.reason);
     const file = buildFile(got.design, { date: '2026-11-11', by: '0.10.0' });
     expect(designInside(file)).toMatchObject({ ok: true });
-    expect(fieldChanges(source, file)).toEqual({ lost: [], added: [] });
+    expect(fieldChanges(source, file)).toEqual({ lost: [], changed: [], added: [] });
     const renamed = source.replace(/"button_link"/g, '"cta_link"').replace(/widget_data\.button_link\./g, 'widget_data.cta_link.');
-    expect(fieldChanges(renamed, file)).toEqual({ lost: ['cta_link'], added: ['button_link'] });
+    expect(fieldChanges(renamed, file)).toEqual({ lost: ['cta_link'], changed: [], added: ['button_link'] });
   });
 
   it('diffs by line and folds the long unchanged runs', () => {
@@ -227,5 +229,74 @@ describe('the drift check', () => {
     expect(folded[0]).toEqual({ k: 'gap', count: 8 });
     expect(folded.at(-1)).toEqual({ k: 'gap', count: 7 });
     expect(lineDiff('a', 'b', 0)).toBeNull();
+  });
+
+  it('names a field that keeps its name but changes kind, which loses its content too', () => {
+    const before = `{% linked_image "hero" label="Hero", src="", alt="", width="560", export_to_template_context=True %}{{ unsubscribe_link }}`;
+    const after = `{% module "hero" path="@hubspot/image_email", label="Hero", img={ "src": "", "alt": "", "width": 560 }, export_to_template_context=True %}`;
+    expect(fieldChanges(before, after)).toEqual({ lost: [], changed: ['hero'], added: [] });
+  });
+
+  it('packs the replacement as HubSpot’s copy was packed, only the pictures it shipped', () => {
+    const t = structuredClone(opened('baseline.template.json'));
+    const images = t.sections.flatMap((s) => s.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).filter((b) => b.type === 'image');
+    if (images.length < 2 || images[0]!.type !== 'image' || images[1]!.type !== 'image') throw new Error('baseline has two images');
+    images[0]!.src = 'photos/hero.png';
+    images[1]!.src = 'photos/team.png';
+    // The folder had hero.png and not team.png, so Export packed one and left the other a name.
+    const portal = planPackage(exported(t), (src) => src === 'photos/hero.png').html;
+    const inside = designInside(portal);
+    if (!inside || !inside.ok) throw new Error('no design');
+    expect(compareWithBuild(portal, inside.design, date)).toMatchObject({ same: true, packed: true });
+    const replacement = packLike(buildFile(inside.design, { date: '2026-11-11', by: '0.10.0' }), portal);
+    expect(replacement).toContain("get_asset_url('./images/hero.png')");
+    // Outside the design comment, which keeps the folder's own names, only the unshipped picture is still a name.
+    expect(localSources(withoutDesign(replacement))).toEqual(['photos/team.png']);
+  });
+
+  it('refuses two templates at once, and warns when it compares against its own copy of a folder system', () => {
+    const two = designFromFiles(
+      [
+        { name: 'a.template.json', text: read('templates/card-email.template.json') },
+        { name: 'b.template.json', text: read('templates/standard-email.template.json') },
+      ],
+      shipped,
+    );
+    expect(two).toMatchObject({ ok: false, reason: expect.stringContaining('one template at a time') });
+    const one = designFromFiles([{ name: 'card-email.template.json', text: read('templates/card-email.template.json') }], shipped);
+    expect(one.ok && one.design.warnings.join(' ')).toContain('card.system.json');
+  });
+
+  it('diffs a long file with one edit, and gives no counts it cannot stand behind', () => {
+    const long = Array.from({ length: 6000 }, (_, i) => `line ${i}`).join('\n');
+    const diff = lineDiff(long, long.replace('line 3000', 'line three thousand'));
+    expect(diff?.filter((d) => d.k !== 'same')).toHaveLength(2);
+    const t = opened('standard-email.template.json');
+    const inside = designInside(exported(t));
+    if (!inside || !inside.ok) throw new Error('no design');
+    const scrambled = Array.from({ length: 3000 }, (_, i) => `noise ${i}`).join('\n');
+    const result = compareWithBuild(scrambled, inside.design, date);
+    expect(result.same).toBe(false);
+    expect(result.diff).toBeNull();
+    expect(Number.isNaN(result.removed)).toBe(true);
+  });
+
+  it('refuses a design inside that parses but no longer compiles', () => {
+    const source = exported(opened('standard-email.template.json'));
+    const stub = source.replace(/\n\{"by"[^\n]*\n#\}/, '\n{"format":1,"template":{"name":"x"}}\n#}');
+    expect(stub).not.toBe(source);
+    expect(designInside(stub)).toMatchObject({ ok: false });
+  });
+
+  it('reopens a design in the key order it compiled with, so its dark-mode rules come out in the same order', () => {
+    const t = structuredClone(opened('baseline.template.json'));
+    const ds = structuredClone(DEFAULT_DESIGN_SYSTEM);
+    ds.type['h1'] = { ...ds.type['h1']!, color: '#d10000' };
+    ds.type['body'] = { ...ds.type['body']!, color: '#011272' };
+    t.ds = ds;
+    const source = exported(t);
+    const inside = designInside(source);
+    if (!inside || !inside.ok) throw new Error('no design');
+    expect(compareWithBuild(source, inside.design, date).same).toBe(true);
   });
 });

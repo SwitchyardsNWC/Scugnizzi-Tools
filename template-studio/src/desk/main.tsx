@@ -13,17 +13,17 @@
  * Outside claude.ai there is no connector, and the page says so and still opens an exported file from disk.
  */
 
-import { render } from 'preact';
+import { Component, render, type ComponentChildren } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import cardSystem from '../../design-systems/card.system.json';
 import switchyardsSystem from '../../design-systems/switchyards.system.json';
 import { compile } from '../compile/compile.ts';
 import { completeDesignSystem, type DesignSystem } from '../model/design-system.ts';
-import { fileSlug } from '../model/serialize.ts';
+import { fileSlug, serializeDesignSystem, serializeTemplate, systemFileName } from '../model/serialize.ts';
 import { annotationOf, boxPictures, makerOf, PLACEHOLDER_PREVIEW, renderDefaults, renderedBytes, sourceChecks, sourceFields, type SourceCheck, type SourceField } from '../model/hubl-source.ts';
 import { SUITE_VERSION } from '../version.ts';
-import { buildFile, compareWithBuild, designFromFiles, designInside, fieldChanges, foldDiff, type Comparison, type Design } from './compare.ts';
+import { buildFile, compareWithBuild, designFromFiles, designInside, fieldChanges, packLike, shownRows, type Design } from './compare.ts';
 import {
   createDraft,
   draftDetails,
@@ -188,6 +188,11 @@ function Desk() {
   const [filter, setFilter] = useState<'all' | 'studio' | 'other'>('all');
   const [toast, setToast] = useState('');
   const toastTimer = useRef<number>();
+  // Drafts live here, not in the tab, so one in flight survives a tab switch, another template, or a refresh.
+  const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
+  const sending = useRef(new Set<string>());
+  // Each listing pass has a number; a read from a pass that Refresh has replaced is dropped, and its workers stop.
+  const pass = useRef(0);
 
   const say = useCallback((text: string) => {
     setToast(text);
@@ -225,13 +230,14 @@ function Desk() {
   }, []);
 
   const fetchSource = useCallback(
-    async (mcp: McpRuntime, entry: Entry, refresh = false) => {
+    async (mcp: McpRuntime, entry: Entry, refresh = false, of = pass.current) => {
+      const current = () => of === pass.current;
       setSources((s) => ({ ...s, [entry.key]: { k: 'loading' } }));
       try {
         const got = await getTemplate(mcp, entry.path, refresh);
-        setSources((s) => ({ ...s, [entry.key]: { k: 'ok', text: got.source } }));
+        if (current()) setSources((s) => ({ ...s, [entry.key]: { k: 'ok', text: got.source } }));
       } catch (cause) {
-        setSources((s) => ({ ...s, [entry.key]: { k: 'failed', err: explain(cause) } }));
+        if (current()) setSources((s) => ({ ...s, [entry.key]: { k: 'failed', err: explain(cause) } }));
       }
     },
     [],
@@ -240,20 +246,22 @@ function Desk() {
   const load = useCallback(
     async (refresh = false) => {
       if (conn.k !== 'ready') return;
+      const of = ++pass.current;
       setListing({ k: 'loading' });
       try {
         const rows = await listTemplates(conn.mcp, refresh);
+        if (of !== pass.current) return;
         const remote = rows.map<Entry>((r) => ({ key: `hs:${r.path}`, label: labelOf(r.path, r.label), path: r.path, folder: folderOf(r.path), id: r.id || null, local: false }));
         setEntries((prev) => [...remote, ...prev.filter((e) => e.local)]);
         setListing({ k: 'ok' });
         // Every template's source, two at a time, so the rail can say who made each one.
         const queue = [...remote];
         const worker = async () => {
-          for (let next = queue.shift(); next; next = queue.shift()) await fetchSource(conn.mcp, next, refresh);
+          for (let next = queue.shift(); next && of === pass.current; next = queue.shift()) await fetchSource(conn.mcp, next, refresh, of);
         };
         await Promise.all([worker(), worker()]);
       } catch (cause) {
-        setListing({ k: 'failed', err: explain(cause) });
+        if (of === pass.current) setListing({ k: 'failed', err: explain(cause) });
       }
     },
     [conn, fetchSource],
@@ -262,6 +270,20 @@ function Desk() {
   useEffect(() => {
     if (conn.k === 'ready' && listing.k === 'idle') void load();
   }, [conn, listing, load]);
+
+  const draftOf = (entry: Entry): DraftState => drafts[entry.key] ?? freshDraft(entry);
+  const setDraft = (key: string, d: DraftState) => setDrafts((all) => ({ ...all, [key]: d }));
+  const create = (entry: Entry) => {
+    if (conn.k !== 'ready' || sending.current.has(entry.key)) return;
+    const { req } = draftOf(entry);
+    sending.current.add(entry.key);
+    store.set('fromName', req.fromName);
+    store.set('replyTo', req.replyToEmail);
+    store.set('subscriptionType', String(req.subscriptionTypeId));
+    const report = (step: Step) => setDrafts((all) => ({ ...all, [entry.key]: { req: (all[entry.key] ?? { req }).req, step } }));
+    report({ k: 'sending' });
+    void makeDraft(conn.mcp, req, report).finally(() => sending.current.delete(entry.key));
+  };
 
   const choose = (key: string) => {
     setSelected(key);
@@ -380,7 +402,7 @@ function Desk() {
         <div class="rail-head" style={{ borderTop: '1px solid var(--border-muted)', borderBottom: 0 }}>
           <label class="btn small" style={{ justifySelf: 'start' }}>
             Open a file from this computer
-            <input id="desk-open-file" type="file" accept=".html,.htm,text/html" multiple hidden onChange={(e) => void openLocal((e.target as HTMLInputElement).files)} />
+            <input id="desk-open-file" class="file-input" type="file" accept=".html,.htm,text/html" multiple onChange={(e) => void openLocal((e.target as HTMLInputElement).files)} />
           </label>
         </div>
       </nav>
@@ -388,16 +410,21 @@ function Desk() {
       <main class="main">
         <div class="main-inner">
           {current ? (
-            <TemplateView
-              key={current.key}
-              entry={current}
-              state={sources[current.key]}
-              conn={conn}
-              downloads={downloads}
-              say={say}
-              onBack={() => setOpen(false)}
-              onReload={conn.k === 'ready' && !current.local ? () => void fetchSource(conn.mcp, current, true) : undefined}
-            />
+            <Guard reset={current.key}>
+              <TemplateView
+                key={current.key}
+                entry={current}
+                state={sources[current.key]}
+                conn={conn}
+                downloads={downloads}
+                say={say}
+                draft={draftOf(current)}
+                onDraft={(d) => setDraft(current.key, d)}
+                onCreate={() => create(current)}
+                onBack={() => setOpen(false)}
+                onReload={conn.k === 'ready' && !current.local ? () => void fetchSource(conn.mcp, current, true) : undefined}
+              />
+            </Guard>
           ) : (
             <Welcome conn={conn} />
           )}
@@ -455,6 +482,9 @@ function TemplateView({
   conn,
   downloads,
   say,
+  draft,
+  onDraft,
+  onCreate,
   onBack,
   onReload,
 }: {
@@ -463,6 +493,9 @@ function TemplateView({
   conn: Conn;
   downloads: Downloads | null;
   say: (t: string) => void;
+  draft: DraftState;
+  onDraft: (d: DraftState) => void;
+  onCreate: () => void;
   onBack: () => void;
   onReload: (() => void) | undefined;
 }) {
@@ -568,7 +601,7 @@ function TemplateView({
       {tab === 'checks' ? <ChecksTab checks={info.checks} /> : null}
       {tab === 'source' ? <SourceTab source={source} entry={entry} downloads={downloads} say={say} /> : null}
       {tab === 'compare' ? <CompareTab source={source} inside={info.inside} entry={entry} downloads={downloads} say={say} /> : null}
-      {tab === 'draft' ? <DraftTab entry={entry} conn={conn} label={info.annotation?.label ?? entry.label} /> : null}
+      {tab === 'draft' ? <DraftTab entry={entry} conn={conn} label={info.annotation?.label ?? entry.label} draft={draft} onDraft={onDraft} onCreate={onCreate} /> : null}
     </>
   );
 }
@@ -576,9 +609,13 @@ function TemplateView({
 function PreviewTab({ source, design, label }: { source: string; design: Design | null; label: string }) {
   const [device, setDevice] = useState<'desktop' | 'phone'>('desktop');
   const html = useMemo(() => {
-    const drawn = design
-      ? compile(design.template, { mode: 'preview', ...(design.ds ? { ds: design.ds } : {}) }).html
-      : renderDefaults(source, { preview: PLACEHOLDER_PREVIEW, subject: label });
+    const sample = { preview: PLACEHOLDER_PREVIEW, subject: label };
+    let drawn: string;
+    try {
+      drawn = design ? compile(design.template, { mode: 'preview', ...(design.ds ? { ds: design.ds } : {}) }).html : renderDefaults(source, sample);
+    } catch {
+      drawn = renderDefaults(source, sample);
+    }
     return boxPictures(drawn);
   }, [source, design, label]);
   return (
@@ -765,27 +802,38 @@ function CompareTab({
   downloads: Downloads | null;
   say: (t: string) => void;
 }) {
-  const [attached, setAttached] = useState<Design | null>(null);
+  const [attached, setAttached] = useState<{ design: Design; files: string[] } | null>(null);
   const [problem, setProblem] = useState('');
-  const design = attached ?? (inside && inside.ok ? inside.design : null);
-  const result: Comparison | null = useMemo(() => (design ? compareWithBuild(source, design, today()) : null), [source, design]);
+  const design = attached?.design ?? (inside && inside.ok ? inside.design : null);
+  const work = useMemo(() => {
+    if (!design) return null;
+    try {
+      const result = compareWithBuild(source, design, today());
+      // The replacement is packed the way HubSpot's copy was, so pictures it shipped beside the template stay pointed at
+      // those copies (learnings 3.70).
+      const built = packLike(buildFile(design, { date: today(), by: SUITE_VERSION }), source);
+      return { ok: true as const, result, built, changes: fieldChanges(source, built) };
+    } catch (cause) {
+      return { ok: false as const, reason: cause instanceof Error ? cause.message : 'The design could not be compiled.' };
+    }
+  }, [source, design]);
 
   const attach = async (files: FileList | null) => {
     if (!files || !files.length) return;
     const read = await Promise.all(Array.from(files).map(async (f) => ({ name: f.name, text: await f.text() })));
     const got = designFromFiles(read, SHIPPED);
     if (got.ok) {
-      setAttached(got.design);
+      setAttached({ design: got.design, files: read.map((f) => f.name) });
       setProblem('');
     } else {
       setProblem(got.reason);
     }
   };
 
-  const built = useMemo(() => (design ? buildFile(design, { date: today(), by: SUITE_VERSION }) : null), [design]);
-  const changes = useMemo(() => (built ? fieldChanges(source, built) : null), [source, built]);
   const slug = (entry.path.split('/').pop() || entry.label).replace(/\.html?$/i, '');
-  const download = () => built && void saveFile(downloads, `${slug}.html`, built, say);
+  const designName = design ? fileSlug(design.template.name || slug) : slug;
+  const origin = design ? (design.origin === 'inside' ? `the design inside (${design.template.name || 'unnamed'})` : `${attached?.files.join(' + ') ?? 'the attached design'} (${design.template.name || 'unnamed'})`) : '';
+  const system = design?.template.designSystem ?? null;
 
   return (
     <div class="card">
@@ -793,37 +841,40 @@ function CompareTab({
         <span class="card-title">HubSpot’s copy against this build of Template Studio ({SUITE_VERSION})</span>
         <label class="btn small">
           {design ? 'Attach a different design' : 'Attach the design'}
-          <input id="desk-attach" type="file" accept=".json,application/json" multiple hidden onChange={(e) => void attach((e.target as HTMLInputElement).files)} />
+          <input id="desk-attach" class="file-input" type="file" accept=".json,application/json" multiple onChange={(e) => void attach((e.target as HTMLInputElement).files)} />
         </label>
       </div>
       <div class="card-body">
         {problem ? <Refusal err={{ kind: 'refused', title: 'Those files are not a design.', fix: problem, detail: '', retryable: false }} /> : null}
-        {inside && !inside.ok && !attached ? <Refusal err={{ kind: 'refused', title: 'The design inside cannot be read.', fix: inside.reason, detail: '', retryable: false }} /> : null}
+        {inside && !inside.ok && !attached ? <Refusal err={{ kind: 'refused', title: 'The design inside cannot be used.', fix: inside.reason, detail: '', retryable: false }} /> : null}
         {!design ? (
           <p class="lede">
-            This file was exported before the design travelled inside it. Attach its <span class="code">.template.json</span> from the project folder, and its{' '}
-            <span class="code">.system.json</span> if it follows a design system other than Switchyards or Card, to see whether HubSpot’s copy still matches it. The desk then offers
-            the file with the design inside, ready to upload in its place.
+            This file was exported before the design travelled inside it. Attach its <span class="code">.template.json</span> from the project folder, and the{' '}
+            <span class="code">.system.json</span> it follows if it follows one, to see whether HubSpot’s copy still matches it. The desk then offers the file with the design inside,
+            ready to upload in its place.
           </p>
         ) : null}
-        {design && result ? (
+        {design && work && !work.ok ? <Refusal err={{ kind: 'refused', title: 'The design does not compile.', fix: work.reason, detail: '', retryable: false }} /> : null}
+        {design && work && work.ok ? (
           <>
             <div class="row">
-              <span class={`chip ${result.same ? 'done' : 'risk'}`}>{result.same ? 'Matches' : 'Differs'}</span>
+              <span class={`chip ${work.result.same ? 'done' : 'risk'}`}>{work.result.same ? 'Matches' : 'Differs'}</span>
               <span>
-                {result.same
-                  ? `This build writes the same file from the ${design.origin === 'inside' ? 'design inside' : 'attached design'}.`
-                  : `${result.removed} line${result.removed === 1 ? '' : 's'} in HubSpot’s copy that this build would not write; ${result.added} it would write instead.`}
+                {work.result.same
+                  ? `This build writes the same file from ${origin}.`
+                  : work.result.diff
+                    ? `${work.result.removed} line${work.result.removed === 1 ? '' : 's'} in HubSpot’s copy that this build would not write from ${origin}; ${work.result.added} it would write instead.`
+                    : `HubSpot’s copy differs from what this build writes from ${origin}.`}
               </span>
             </div>
-            {!result.same ? (
+            {!work.result.same ? (
               <p class="note">
                 {design.origin === 'inside' && design.by === SUITE_VERSION
                   ? 'The file was written by this same version, so the difference was made after export: an edit in Design Manager, most likely.'
                   : design.origin === 'inside'
                     ? `The file was written by ${design.by ?? 'an earlier version'}. The difference may be compiler changes since then, edits made in Design Manager, or both.`
                     : 'Either the template was edited in Design Manager, the attached design is not the one it was exported from, or the compiler has changed since.'}
-                {result.packed ? ' Compared with the packed export, pictures pointing at copies HubSpot hosts.' : ''}
+                {work.result.packed ? ' Compared with the export as HubSpot holds it, its pictures pointing at the copies packed beside it.' : ''}
               </p>
             ) : null}
             {design.warnings.map((w) => (
@@ -831,46 +882,58 @@ function CompareTab({
                 ▲ {w}
               </p>
             ))}
-            {!result.same && result.diff ? (
+            {!work.result.same && work.result.diff ? (
               <div class="diff" aria-label="Line differences">
-                {foldDiff(result.diff).map((d, i) =>
+                {shownRows(work.result.diff).map((d, i) =>
                   d.k === 'gap' ? (
                     <div key={i} class="gap">
                       … {d.count} unchanged line{d.count === 1 ? '' : 's'}
                     </div>
-                  ) : d.k === 'same' ? (
-                    <div key={i}>{d.text.slice(0, 600)}</div>
                   ) : (
-                    <div key={i} class={d.k}>
-                      {d.text.slice(0, 600)}
-                      {d.text.length > 600 ? ' …' : ''}
+                    <div key={i} class={d.k === 'same' ? undefined : d.k}>
+                      {d.text}
                     </div>
                   ),
                 )}
               </div>
             ) : null}
-            {!result.same && !result.diff ? <p class="note">The files are too long to compare line by line here.</p> : null}
+            {!work.result.same && !work.result.diff ? <p class="note">The files are too long to compare line by line here.</p> : null}
+            {work.changes.lost.length || work.changes.changed.length ? (
+              <p class="note">
+                ▲ <strong>Emails already made from it lose what was typed into</strong>{' '}
+                <span class="code">{[...work.changes.lost, ...work.changes.changed].join(', ')}</span>.{' '}
+                {work.changes.lost.length ? `This build does not declare ${work.changes.lost.length === 1 ? 'that field' : 'those fields'}${work.changes.changed.length ? ', and declares the rest as a different kind of field' : ''}.` : 'This build declares them as a different kind of field.'} HubSpot keeps content only under a name and kind both versions share.
+              </p>
+            ) : (
+              <p class="note">Every field HubSpot’s copy declares is still there, as the same kind, so emails already made from it keep their content.</p>
+            )}
             <div class="row">
               {downloads ? (
-                <button class={`btn${result.same && design.origin === 'inside' ? '' : ' primary'}`} onClick={download}>
-                  Download this build, design inside
-                </button>
+                <>
+                  <button class={`btn${work.result.same && design.origin === 'inside' ? '' : ' primary'}`} onClick={() => void saveFile(downloads, `${slug}.html`, work.built, say)}>
+                    Download this build, design inside
+                  </button>
+                  <button class="btn" onClick={() => void saveFile(downloads, `${designName}.template.json`, serializeTemplate(design.template), say)}>
+                    Download the design
+                  </button>
+                  {system && design.ds ? (
+                    <button class="btn" onClick={() => void saveFile(downloads, systemFileName(system), serializeDesignSystem(design.ds!), say)}>
+                      Download its design system
+                    </button>
+                  ) : null}
+                </>
               ) : (
                 <span class="note">Downloads are not available in this view.</span>
               )}
             </div>
             <p class="note">
-              The connector cannot write a template, so it goes up by hand: in Design Manager open <span class="code">{entry.path}</span> and replace its code, or{' '}
-              <span class="code">hs cms upload {slug}.html "{entry.path}"</span>.
+              The design opens in Template Studio as a template file{system ? `, with ${systemFileName(system)} in the folder’s design-systems` : ''}. The connector cannot write a
+              template, so a new build goes up by hand: in Design Manager open <span class="code">{entry.path}</span> and replace its code, or{' '}
+              <span class="code">
+                hs cms upload "{slug}.html" "{entry.path}"
+              </span>{' '}
+              with the file under the name you saved it as.
             </p>
-            {changes && changes.lost.length ? (
-              <p class="note">
-                ▲ <strong>Emails already made from it lose what was typed into</strong> <span class="code">{changes.lost.join(', ')}</span>: this build does not declare{' '}
-                {changes.lost.length === 1 ? 'that field' : 'those fields'}, and HubSpot keeps content only under a name both versions share.
-              </p>
-            ) : changes ? (
-              <p class="note">Every field name HubSpot’s copy declares is still there, so emails already made from it keep their content.</p>
-            ) : null}
           </>
         ) : null}
       </div>
@@ -882,12 +945,14 @@ function CompareTab({
 
 type Step = { k: 'form' } | { k: 'confirm' } | { k: 'sending' } | { k: 'done'; outcome: DraftOutcome; details: Record<string, unknown> | null } | { k: 'failed'; err: DeskError; ambiguous: boolean };
 
-function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: string }) {
-  const [types, setTypes] = useState<SubscriptionType[] | null>(null);
-  const [typesErr, setTypesErr] = useState<DeskError | null>(null);
-  const [addresses, setAddresses] = useState<FromAddress[] | null>(null);
-  const [addressErr, setAddressErr] = useState<DeskError | null>(null);
-  const [req, setReq] = useState<DraftRequest>(() => ({
+/** A draft's form and where it got to. Kept by the page, not the tab, so a draft in flight survives leaving the tab. */
+interface DraftState {
+  req: DraftRequest;
+  step: Step;
+}
+
+const freshDraft = (entry: Entry): DraftState => ({
+  req: {
     name: '',
     subject: '',
     previewText: '',
@@ -896,43 +961,81 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
     subscriptionTypeId: Number(store.get('subscriptionType')) || 0,
     emailType: 'BATCH',
     templatePath: entry.path,
-  }));
-  const [step, setStep] = useState<Step>({ k: 'form' });
+  },
+  step: { k: 'form' },
+});
+
+/**
+ * Makes the draft: one CREATE, then polls while HubSpot finishes it. Never retried. A CREATE that fails says so; once
+ * CREATE has answered, the draft exists, so a poll or a read that fails afterwards still reports the draft made.
+ */
+async function makeDraft(mcp: McpLike, req: DraftRequest, report: (step: Step) => void): Promise<void> {
+  let outcome: DraftOutcome;
+  try {
+    outcome = await createDraft(mcp, req);
+  } catch (cause) {
+    const err = explain(cause);
+    // A write that timed out or was lost may still have run (mcp.d.ts): never offer a blind second try. Approval,
+    // policy and connection failures never reached HubSpot.
+    report({ k: 'failed', err, ambiguous: err.kind === 'busy' || err.kind === 'other' });
+    return;
+  }
+  try {
+    for (let tries = 0; outcome.pending && outcome.contentId && tries < 10; tries++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      outcome = await pollDraft(mcp, outcome.contentId);
+    }
+  } catch {
+    /* the draft exists; it is only not confirmed finished, and the result says so */
+  }
+  const id = outcome.objectId ?? outcome.contentId;
+  const details = id ? await draftDetails(mcp, id).catch(() => null) : null;
+  report({ k: 'done', outcome, details });
+}
+
+function DraftTab({ entry, conn, label, draft, onDraft, onCreate }: { entry: Entry; conn: Conn; label: string; draft: DraftState; onDraft: (d: DraftState) => void; onCreate: () => void }) {
+  const [types, setTypes] = useState<SubscriptionType[] | null>(null);
+  const [typesErr, setTypesErr] = useState<DeskError | null>(null);
+  const [addresses, setAddresses] = useState<FromAddress[] | null>(null);
+  const [addressErr, setAddressErr] = useState<DeskError | null>(null);
+  const [armed, setArmed] = useState(false);
+  const { req, step } = draft;
   const mcp = conn.k === 'ready' ? conn.mcp : null;
+
+  const loadTypes = useCallback(() => {
+    if (!mcp) return;
+    setTypesErr(null);
+    listSubscriptionTypes(mcp).then(setTypes, (cause) => setTypesErr(explain(cause)));
+  }, [mcp]);
+  const loadAddresses = useCallback(() => {
+    if (!mcp) return;
+    setAddressErr(null);
+    listFromAddresses(mcp).then(setAddresses, (cause) => setAddressErr(explain(cause)));
+  }, [mcp]);
 
   useEffect(() => {
     if (!mcp || entry.local) return;
-    listSubscriptionTypes(mcp).then(setTypes, (cause) => setTypesErr(explain(cause)));
-    listFromAddresses(mcp).then(setAddresses, (cause) => setAddressErr(explain(cause)));
-  }, [mcp, entry.local]);
+    loadTypes();
+    loadAddresses();
+  }, [mcp, entry.local, loadTypes, loadAddresses]);
+
+  // The confirm button lands where Review was; it waits a moment, so a double click on Review cannot also press it.
+  useEffect(() => {
+    if (step.k !== 'confirm') {
+      setArmed(false);
+      return;
+    }
+    const t = setTimeout(() => setArmed(true), 600);
+    return () => clearTimeout(t);
+  }, [step.k]);
 
   if (entry.local) return <div class="empty">A draft is made from a template in HubSpot. This one was opened from this computer; upload it first, then pick it from the list.</div>;
   if (!mcp) return <div class="empty">Drafts need the HubSpot connector, which this view does not have.</div>;
 
-  const set = <K extends keyof DraftRequest>(key: K, value: DraftRequest[K]) => setReq((r) => ({ ...r, [key]: value }));
+  const set = <K extends keyof DraftRequest>(key: K, value: DraftRequest[K]) => onDraft({ ...draft, req: { ...req, [key]: value } });
+  const toStep = (s: Step) => onDraft({ ...draft, step: s });
   const problems = draftProblems(req);
   const typeName = types?.find((t) => t.id === req.subscriptionTypeId)?.name ?? '';
-
-  const create = async () => {
-    setStep({ k: 'sending' });
-    store.set('fromName', req.fromName);
-    store.set('replyTo', req.replyToEmail);
-    store.set('subscriptionType', String(req.subscriptionTypeId));
-    try {
-      let outcome = await createDraft(mcp, req);
-      for (let tries = 0; outcome.pending && outcome.contentId && tries < 10; tries++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        outcome = await pollDraft(mcp, outcome.contentId);
-      }
-      const id = outcome.objectId ?? outcome.contentId;
-      const details = id ? await draftDetails(mcp, id).catch(() => null) : null;
-      setStep({ k: 'done', outcome, details });
-    } catch (cause) {
-      const err = explain(cause);
-      // A write that timed out may still have run (mcp.d.ts): never offer a blind second try.
-      setStep({ k: 'failed', err, ambiguous: err.kind === 'busy' || err.kind === 'other' });
-    }
-  };
 
   if (step.k === 'done') {
     const d = step.details ?? {};
@@ -945,7 +1048,7 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
         </div>
         <p class="note">
           {step.outcome.pending
-            ? 'HubSpot accepted it and is still making it. It will appear under Marketing › Email in a moment.'
+            ? 'HubSpot accepted it and had not finished making it when the desk stopped asking. It will appear under Marketing › Email; look there before making it again.'
             : `In HubSpot as a draft${step.outcome.objectId ? `, id ${step.outcome.objectId}` : ''}. Nothing is sent or scheduled. Recipients, test sends and scheduling are done in HubSpot.`}
         </p>
         {step.outcome.warnings.length ? (
@@ -963,7 +1066,7 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
           ) : (
             <span class="note">Find it under Marketing › Email › Drafts.</span>
           )}
-          <button class="btn" onClick={() => setStep({ k: 'form' })}>
+          <button class="btn" onClick={() => onDraft(freshDraft(entry))}>
             Make another
           </button>
         </div>
@@ -982,13 +1085,14 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
         </p>
         <pre>{JSON.stringify({ operation: draftOperation(req), confirmationStatus: 'CONFIRMED' }, null, 2)}</pre>
         <div class="row">
-          <button class="btn primary" onClick={() => void create()} disabled={step.k === 'sending'}>
+          <button class="btn primary" onClick={onCreate} disabled={step.k === 'sending' || !armed}>
             {step.k === 'sending' ? 'Making the draft…' : 'Make the draft'}
           </button>
-          <button class="btn" onClick={() => setStep({ k: 'form' })} disabled={step.k === 'sending'}>
+          <button class="btn" onClick={() => toStep({ k: 'form' })} disabled={step.k === 'sending'}>
             Back
           </button>
         </div>
+        {step.k === 'sending' ? <p class="note">The draft keeps going if you leave this tab.</p> : null}
       </div>
     );
   }
@@ -1009,7 +1113,7 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
           class="form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!problems.length) setStep({ k: 'confirm' });
+            if (!problems.length) toStep({ k: 'confirm' });
           }}
         >
           <div class="field">
@@ -1047,10 +1151,15 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
             <span class="hint">
               {addressErr
                 ? addressErr.kind === 'scope'
-                  ? 'The HubSpot connection cannot list verified addresses (it lacks two permissions). Type one; HubSpot refuses an address it has not verified.'
+                  ? 'The HubSpot connection cannot list verified addresses (it lacks two permissions). Type one HubSpot has verified.'
                   : `Verified addresses could not be listed: ${addressErr.title} Type one.`
-                : 'HubSpot accepts only an address it has verified.'}
+                : 'Use an address HubSpot has verified.'}
             </span>
+            {addressErr && addressErr.kind !== 'scope' ? (
+              <button type="button" class="btn small" style={{ justifySelf: 'start' }} onClick={loadAddresses}>
+                List them again
+              </button>
+            ) : null}
           </div>
           <div class="field">
             <label for="draft-type">Subscription type</label>
@@ -1062,10 +1171,12 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
                 </option>
               ))}
             </select>
-            <span class="hint">{typesErr ? typesErr.title : 'Which contacts may receive it.'}</span>
+            <span class="hint">Which contacts may receive it.</span>
           </div>
           <div class="field">
-            <label id="draft-kind-label">Kind</label>
+            <span class="field-label" id="draft-kind-label">
+              Kind
+            </span>
             <Seg
               label="Kind"
               value={req.emailType}
@@ -1077,6 +1188,11 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
             />
             <span class="hint">Fixed once the draft exists.</span>
           </div>
+          {typesErr ? (
+            <div class="field wide">
+              <Refusal err={typesErr} onRetry={loadTypes} />
+            </div>
+          ) : null}
           <div class="field wide">
             {problems.length ? (
               <ul class="problems">
@@ -1096,6 +1212,21 @@ function DraftTab({ entry, conn, label }: { entry: Entry; conn: Conn; label: str
       </div>
     </div>
   );
+}
+
+/** One template's view, kept from taking the whole page down when something in it throws. */
+class Guard extends Component<{ reset: string; children: ComponentChildren }, { error: string | null }> {
+  override state = { error: null as string | null };
+  static override getDerivedStateFromError(error: unknown) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+  override componentDidUpdate(prev: { reset: string }) {
+    if (prev.reset !== this.props.reset && this.state.error) this.setState({ error: null });
+  }
+  override render() {
+    if (!this.state.error) return this.props.children;
+    return <Refusal err={{ kind: 'other', title: 'This template could not be shown.', fix: 'Pick another template, or read this one again. The rest of the desk still works.', detail: this.state.error, retryable: false }} />;
+  }
 }
 
 const root = document.getElementById('desk');

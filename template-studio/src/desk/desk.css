@@ -192,6 +192,10 @@ a:hover { color: var(--text-primary); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .only-phone { display: none; }
 label.btn { position: relative; }
+/* A file picker stays in the tab order inside its label; the label shows its focus. */
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+label.btn:focus-within { outline: 1px solid var(--focus-ring); outline-offset: 2px; }
+.field-label { font-size: var(--t-meta); color: var(--text-secondary); }
 
 /* --- chips and state: a square glyph, a word, and a tint. Never the tint alone. --------------------------------- */
 .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 4px; padding: 3px 6px 1px; font-size: var(--t-label); line-height: 14px; white-space: nowrap; }

@@ -17,9 +17,17 @@ import type { Preview } from './types.ts';
 
 export type Token =
   | { t: 'html'; text: string }
-  | { t: 'comment'; text: string }
-  | { t: 'stmt'; text: string }
-  | { t: 'expr'; text: string };
+  | { t: 'comment'; text: string; raw: string }
+  | { t: 'stmt'; text: string; raw: string }
+  | { t: 'expr'; text: string; raw: string };
+
+/** The index of the quote that closes the string opening at `at`, honouring backslash escapes as Jinjava does. */
+function stringEnd(source: string, at: number): number {
+  const quote = source[at];
+  let j = at + 1;
+  while (j < source.length && source[j] !== quote) j += source[j] === '\\' ? 2 : 1;
+  return j < source.length ? j : -1;
+}
 
 /**
  * The end of a `{% … %}` or `{{ … }}` starting at `from`, reading quoted strings whole, so a `%}` inside
@@ -29,7 +37,7 @@ function closeOf(source: string, from: number, closer: string): number {
   for (let k = from; k < source.length; k++) {
     const ch = source[k];
     if (ch === "'" || ch === '"') {
-      const end = source.indexOf(ch, k + 1);
+      const end = stringEnd(source, k);
       if (end < 0) return -1;
       k = end;
     } else if (source.startsWith(closer, k)) {
@@ -60,8 +68,11 @@ export function tokenize(source: string): Token[] {
     html(source.slice(i, next));
     if (kind === '#') {
       const end = source.indexOf('#}', next + 2);
-      if (end < 0) return [...out, { t: 'html', text: source.slice(next) }];
-      out.push({ t: 'comment', text: source.slice(next + 2, end) });
+      if (end < 0) {
+        html(source.slice(next));
+        return out;
+      }
+      out.push({ t: 'comment', text: source.slice(next + 2, end), raw: source.slice(next, end + 2) });
       i = end + 2;
       continue;
     }
@@ -73,7 +84,8 @@ export function tokenize(source: string): Token[] {
     }
     // Whitespace control (`{%-`, `-%}`) changes nothing a reader needs, so the markers go.
     const body = source.slice(next + 2, end).replace(/^-/, '').replace(/-$/, '').trim();
-    out.push(kind === '%' ? { t: 'stmt', text: body } : { t: 'expr', text: body });
+    const raw = source.slice(next, end + 2);
+    out.push(kind === '%' ? { t: 'stmt', text: body, raw } : { t: 'expr', text: body, raw });
     i = end + 2;
   }
   html(source.slice(i));
@@ -82,10 +94,12 @@ export function tokenize(source: string): Token[] {
 
 // --- statements ----------------------------------------------------------------------------------------------------
 
-export type ArgValue = string | number | boolean | Record<string, unknown> | null;
+export type ArgValue = string | number | boolean | Record<string, unknown> | unknown[] | null;
 
 export interface Statement {
   tag: string;
+  /** The word after a `*_block` tag naming what it declares: `widget_block rich_text "intro"`. */
+  type: string | null;
   /** The first, positional, quoted argument: a field's name. */
   name: string | null;
   args: Record<string, ArgValue>;
@@ -94,43 +108,143 @@ export interface Statement {
 }
 
 const decodeAttr = (s: string) => s.replace(/&quot;/g, '"');
+const unquote = (raw: string) => raw.slice(1, raw.endsWith(raw[0]!) && raw.length > 1 ? -1 : undefined).replace(/\\(.)/g, '$1');
+
+/** One argument's text from `at`: a quoted string, a `{…}` or `[…]` literal read quote-aware, or a bare word. */
+function readValue(body: string, at: number): string {
+  const ch = body[at];
+  if (ch === '"' || ch === "'") {
+    const end = stringEnd(body, at);
+    return body.slice(at, end < 0 ? body.length : end + 1);
+  }
+  if (ch === '{' || ch === '[') {
+    let depth = 0;
+    for (let j = at; j < body.length; j++) {
+      const c = body[j];
+      if (c === '"' || c === "'") {
+        const end = stringEnd(body, j);
+        if (end < 0) return body.slice(at);
+        j = end;
+      } else if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') {
+        depth--;
+        if (depth === 0) return body.slice(at, j + 1);
+      }
+    }
+    return body.slice(at);
+  }
+  return /^[^\s,]*/.exec(body.slice(at))![0];
+}
+
+function decodeStrings(value: unknown): unknown {
+  if (typeof value === 'string') return decodeAttr(value);
+  if (Array.isArray(value)) return value.map(decodeStrings);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, decodeStrings(v)]));
+  return value;
+}
 
 function argValue(raw: string): ArgValue {
-  if (raw.startsWith('"')) return decodeAttr(raw.slice(1, -1));
-  if (raw.startsWith("'")) return raw.slice(1, -1);
+  if (raw.startsWith('"')) return decodeAttr(unquote(raw));
+  if (raw.startsWith("'")) return unquote(raw);
   if (raw === 'True' || raw === 'true') return true;
   if (raw === 'False' || raw === 'false') return false;
   if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
-  if (raw.startsWith('{')) {
-    try {
-      return JSON.parse(raw) as Record<string, unknown>;
-    } catch {
+  if (raw.startsWith('{') || raw.startsWith('[')) {
+    for (const attempt of [raw, raw.replace(/'/g, '"')]) {
       try {
-        return JSON.parse(raw.replace(/'/g, '"')) as Record<string, unknown>;
+        return decodeStrings(JSON.parse(attempt)) as Record<string, unknown>;
       } catch {
-        return raw;
+        /* try the next reading */
       }
     }
   }
   return raw;
 }
 
-const KWARG = /\s*,?\s*([A-Za-z_]\w*)\s*=\s*("[^"]*"|'[^']*'|\{[^}]*\}|-?\d+(?:\.\d+)?|[^\s,]+)/y;
-
 export function parseStatement(body: string): Statement {
-  const tag = /^[A-Za-z_]+/.exec(body)?.[0] ?? '';
+  const tag = /^[A-Za-z_]\w*/.exec(body)?.[0] ?? '';
   const rest = body.slice(tag.length).trim();
-  let at = tag.length;
+  let i = tag.length;
+  const skip = () => {
+    while (i < body.length && /[\s,]/.test(body[i]!)) i++;
+  };
+  skip();
+  let type: string | null = null;
+  if (tag.endsWith('_block')) {
+    const word = /^[A-Za-z_]\w*/.exec(body.slice(i))?.[0];
+    if (word && !/^\s*=/.test(body.slice(i + word.length))) {
+      type = word;
+      i += word.length;
+      skip();
+    }
+  }
   let name: string | null = null;
-  const positional = /^\s*,?\s*("([^"]*)"|'([^']*)')/.exec(body.slice(at));
-  if (positional) {
-    name = positional[2] ?? positional[3] ?? null;
-    at += positional[0].length;
+  if (body[i] === '"' || body[i] === "'") {
+    const raw = readValue(body, i);
+    name = unquote(raw);
+    i += raw.length;
   }
   const args: Record<string, ArgValue> = {};
-  KWARG.lastIndex = at;
-  for (let m = KWARG.exec(body); m; m = KWARG.exec(body)) args[m[1]!] = argValue(m[2]!);
-  return { tag, name, args, rest };
+  for (let guard = 0; guard < 500 && i < body.length; guard++) {
+    skip();
+    const key = /^([A-Za-z_]\w*)\s*=(?!=)\s*/.exec(body.slice(i));
+    if (!key) break;
+    i += key[0].length;
+    const raw = readValue(body, i);
+    if (!raw) break;
+    args[key[1]!] = argValue(raw);
+    i += raw.length;
+  }
+  return { tag, type, name, args, rest };
+}
+
+/** A `*_block` statement read as the field it declares: `widget_block rich_text "intro"` is a `rich_text`. */
+const effective = (st: Statement): Statement => (st.tag.endsWith('_block') && st.type ? { ...st, tag: st.type } : st);
+
+/**
+ * The source's tokens with each `{% widget_block %}` / `{% module_block %}` folded into one statement, its
+ * `{% widget_attribute "html" %}…{% end_widget_attribute %}` bodies merged into its arguments, which is where
+ * HubSpot's own generated templates keep a field's default.
+ */
+export type Item = Token | { t: 'block'; st: Statement };
+
+export function items(source: string): Item[] {
+  const out: Item[] = [];
+  let block: { st: Statement; attrs: Record<string, string>; current: string | null; buf: string } | null = null;
+  for (const token of tokenize(source)) {
+    if (!block) {
+      if (token.t === 'stmt') {
+        const st = parseStatement(token.text);
+        if (st.tag === 'widget_block' || st.tag === 'module_block') {
+          block = { st: effective(st), attrs: {}, current: null, buf: '' };
+          continue;
+        }
+      }
+      out.push(token);
+      continue;
+    }
+    if (token.t === 'stmt') {
+      const st = parseStatement(token.text);
+      if (st.tag === 'widget_attribute' || st.tag === 'module_attribute') {
+        block.current = st.name;
+        block.buf = '';
+        continue;
+      }
+      if (st.tag === 'end_widget_attribute' || st.tag === 'end_module_attribute') {
+        if (block.current) block.attrs[block.current] = block.buf;
+        block.current = null;
+        continue;
+      }
+      if (st.tag === 'end_widget_block' || st.tag === 'end_module_block') {
+        out.push({ t: 'block', st: { ...block.st, args: { ...block.st.args, ...block.attrs } } });
+        block = null;
+        continue;
+      }
+    }
+    if (block.current) block.buf += token.t === 'html' ? token.text : token.raw;
+  }
+  if (block) out.push({ t: 'block', st: { ...block.st, args: { ...block.st.args, ...block.attrs } } });
+  return out;
 }
 
 // --- fields --------------------------------------------------------------------------------------------------------
@@ -166,14 +280,28 @@ const FIELD_TAGS = new Set([
   'color',
   'number',
   'raw_html',
+  'header',
+  'section_header',
+  'logo',
+  'cta',
+  'icon',
+  'gallery',
+  'video_player',
+  'follow_me',
+  'social_sharing',
+  'rss_listing',
   'email_simple_subscription',
   'dnd_area',
 ]);
 
 const str = (v: ArgValue | undefined): string => (typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : '');
-const obj = (v: ArgValue | undefined): Record<string, unknown> => (v && typeof v === 'object' ? v : {});
+const obj = (v: ArgValue | undefined): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
-function fieldOf(st: Statement): SourceField | null {
+const RICH_PATHS = new Set(['@hubspot/rich_text', '@hubspot/email_body', '@hubspot/email_text']);
+const TEXT_PATHS = new Set(['@hubspot/text', '@hubspot/header', '@hubspot/email_header', '@hubspot/section_header']);
+
+function fieldOf(statement: Statement): SourceField | null {
+  const st = effective(statement);
   if (!st.name || !FIELD_TAGS.has(st.tag)) return null;
   const label = str(st.args['label']) || st.name;
   const exported = st.args['export_to_template_context'] === true;
@@ -192,14 +320,16 @@ function fieldOf(st: Statement): SourceField | null {
     case 'module': {
       const path = str(st.args['path']);
       const img = obj(st.args['img']);
-      if (path === '@hubspot/image_email') return { ...base, kind: 'image', path, value: typeof img['src'] === 'string' ? img['src'] : '' };
+      if (path === '@hubspot/image_email' || path === '@hubspot/image') return { ...base, kind: 'image', path, value: typeof img['src'] === 'string' ? img['src'] : str(st.args['src']) };
       if (path === '@hubspot/linked_image') return { ...base, kind: 'image', path, value: str(st.args['src']) };
-      return { ...base, kind: 'module', path, value: '' };
+      if (RICH_PATHS.has(path)) return { ...base, kind: 'rich text', path, value: str(st.args['html']) };
+      if (TEXT_PATHS.has(path)) return { ...base, kind: 'text', path, value: str(st.args['value']) || str(st.args['header']) || str(st.args['text']) };
+      return { ...base, kind: 'module', path, value: str(st.args['html']) || str(st.args['value']) };
     }
     case 'dnd_area':
       return { ...base, kind: 'drag-and-drop area', value: '' };
     default:
-      return { ...base, kind: 'other', value: str(st.args['value']) || str(st.args['default']) };
+      return { ...base, kind: 'other', value: str(st.args['value']) || str(st.args['header']) || str(st.args['html']) || str(st.args['default']) };
   }
 }
 
@@ -207,9 +337,9 @@ function fieldOf(st: Statement): SourceField | null {
 export function sourceFields(source: string): SourceField[] {
   const seen = new Set<string>();
   const out: SourceField[] = [];
-  for (const token of tokenize(withoutDesign(source))) {
-    if (token.t !== 'stmt') continue;
-    const field = fieldOf(parseStatement(token.text));
+  for (const item of items(withoutDesign(source))) {
+    const st = item.t === 'block' ? item.st : item.t === 'stmt' ? parseStatement(item.text) : null;
+    const field = st ? fieldOf(st) : null;
     if (!field || seen.has(field.name)) continue;
     seen.add(field.name);
     out.push(field);
@@ -561,7 +691,8 @@ export function evaluate(src: string, scope: Scope): unknown {
 }
 
 /** A field's value as `widget_data.<name>` holds it, from its declaration's defaults. */
-function widgetOf(st: Statement): Record<string, unknown> {
+function widgetOf(statement: Statement): Record<string, unknown> {
+  const st = effective(statement);
   const a = st.args;
   switch (st.tag) {
     case 'text':
@@ -572,80 +703,111 @@ function widgetOf(st: Statement): Record<string, unknown> {
       return { html: str(a['html']) };
     case 'module': {
       const img = obj(a['img']);
-      return { ...a, img, src: str(a['src']), alt: str(a['alt']), link: str(a['link']), width: a['width'] ?? img['width'] ?? null };
+      return { ...a, img, src: str(a['src']), alt: str(a['alt']), link: str(a['link']), html: str(a['html']), value: str(a['value']), width: a['width'] ?? img['width'] ?? null };
     }
     default:
-      return { ...a, value: str(a['value']), src: str(a['src']), alt: str(a['alt']), href: str(a['href']) };
+      return { ...a, value: str(a['value']), src: str(a['src']), alt: str(a['alt']), href: str(a['href']), html: str(a['html']) };
   }
 }
 
 /** What a field that is not exported draws where it stands (learnings 1.3). */
-function inPlace(st: Statement): string {
+function inPlace(statement: Statement): string {
+  const st = effective(statement);
   const w = widgetOf(st);
-  if (st.tag === 'rich_text' || st.tag === 'inline_rich_text') return str(w['html'] as ArgValue);
-  if (st.tag === 'text' || st.tag === 'inline_text') return esc(str(w['value'] as ArgValue));
+  const path = str(st.args['path']);
+  if (st.tag === 'rich_text' || st.tag === 'inline_rich_text' || RICH_PATHS.has(path)) return str(w['html'] as ArgValue);
+  if (st.tag === 'text' || st.tag === 'inline_text' || TEXT_PATHS.has(path)) return esc(str(w['value'] as ArgValue) || str(st.args['header']));
   const img = obj(w['img'] as ArgValue);
   const src = str((w['src'] as ArgValue) || (img['src'] as ArgValue));
   if (src) return `<img src="${escAttr(src)}" alt="${escAttr(str((w['alt'] as ArgValue) || (img['alt'] as ArgValue)))}" width="${escAttr(asText(w['width'] ?? img['width'] ?? ''))}" style="max-width:100%">`;
+  if (st.tag === 'module' && str(st.args['html'])) return str(st.args['html']);
   return '';
 }
 
 const DND_BOX = 'margin:8px auto; max-width:600px; border:1px dashed #9aa0a6; padding:12px 16px; font-family:Helvetica, Arial, sans-serif; font-size:13px; line-height:1.4; color:#6f726e; background:#fafaf9';
 
+type Frame = { kind: 'if' | 'unless' | 'for'; parent: boolean; taken: boolean; active: boolean };
+
 /**
  * The template drawn with every field at its default, the way HubSpot would draw a new email made from it before
  * anyone typed. Site settings come from `sample`; HubSpot's own links point nowhere; a drag-and-drop area is drawn
- * as its outline, because its modules are HubSpot's to render.
+ * as its outline, because its modules are HubSpot's to render. A loop draws its body once; `{% raw %}` prints as it is.
  */
 export function renderDefaults(source: string, sample: PreviewSample): string {
   const scope: Scope = { data: {}, vars: {}, sample };
-  const frames: Array<{ parent: boolean; taken: boolean; active: boolean }> = [];
+  const frames: Frame[] = [];
   const active = () => frames.every((f) => f.active);
   let out = '';
+  let raw = false;
   const inTag = () => out.lastIndexOf('<') > out.lastIndexOf('>');
+  const field = (st: Statement) => {
+    if (!st.name || !FIELD_TAGS.has(effective(st).tag) || !active()) return;
+    scope.data[st.name] = widgetOf(st);
+    if (st.args['export_to_template_context'] !== true) out += inPlace(st);
+  };
 
   // HubSpot's header is for HubSpot; the email starts after it.
   const ann = /^\s*<!--[\s\S]*?templateType[\s\S]*?-->\n?/.exec(source);
   const body = withoutDesign(ann ? source.slice(ann[0].length) : source);
-  for (const token of tokenize(body)) {
-    if (token.t === 'comment') continue;
-    if (token.t === 'html') {
-      if (active()) out += token.text;
+  for (const item of items(body)) {
+    if (raw) {
+      if (item.t === 'stmt' && parseStatement(item.text).tag === 'endraw') raw = false;
+      else if (active()) out += item.t === 'html' ? item.text : item.t === 'block' ? '' : item.raw;
       continue;
     }
-    if (token.t === 'expr') {
+    if (item.t === 'comment') continue;
+    if (item.t === 'html') {
+      if (active()) out += item.text;
+      continue;
+    }
+    if (item.t === 'block') {
+      field(item.st);
+      continue;
+    }
+    if (item.t === 'expr') {
       if (!active()) continue;
-      const value = asText(evaluate(token.text, scope));
+      const value = asText(evaluate(item.text, scope));
       // Rich text is markup and prints as it is; everything else is text, escaped as the compiler's preview does.
-      const raw = /\.html\s*$/.test(token.text) || /\|\s*safe\s*$/.test(token.text);
-      out += raw ? value : inTag() ? escAttr(value) : esc(value);
+      const markup = /\.html\s*$/.test(item.text) || /\|\s*safe\s*$/.test(item.text);
+      out += markup ? value : inTag() ? escAttr(value) : esc(value);
       continue;
     }
-    const st = parseStatement(token.text);
+    const st = parseStatement(item.text);
+    const top = frames[frames.length - 1];
     switch (st.tag) {
-      case 'if': {
+      case 'if':
+      case 'unless': {
         const parent = active();
-        const cond = parent && truthy(evaluate(st.rest, scope));
-        frames.push({ parent, taken: cond, active: cond });
+        const test = truthy(evaluate(st.rest, scope));
+        const cond = parent && (st.tag === 'if' ? test : !test);
+        frames.push({ kind: st.tag, parent, taken: cond, active: cond });
         break;
       }
       case 'elif': {
-        const f = frames[frames.length - 1];
-        if (!f) break;
-        const cond = f.parent && !f.taken && truthy(evaluate(st.rest, scope));
-        f.active = cond;
-        f.taken = f.taken || cond;
+        if (!top || top.kind === 'for') break;
+        const cond = top.parent && !top.taken && truthy(evaluate(st.rest, scope));
+        top.active = cond;
+        top.taken = top.taken || cond;
         break;
       }
       case 'else': {
-        const f = frames[frames.length - 1];
-        if (!f) break;
-        f.active = f.parent && !f.taken;
-        f.taken = true;
+        if (!top || top.kind === 'for') break;
+        top.active = top.parent && !top.taken;
+        top.taken = true;
+        break;
+      }
+      case 'for': {
+        const parent = active();
+        frames.push({ kind: 'for', parent, taken: true, active: parent });
         break;
       }
       case 'endif':
+      case 'endunless':
+      case 'endfor':
         frames.pop();
+        break;
+      case 'raw':
+        raw = true;
         break;
       case 'set': {
         if (!active()) break;
@@ -662,39 +824,57 @@ export function renderDefaults(source: string, sample: PreviewSample): string {
       case 'end_dnd_area':
         if (active()) out += '</div>';
         break;
-      default: {
-        if (!st.name || !FIELD_TAGS.has(st.tag) || !active()) break;
-        scope.data[st.name] = widgetOf(st);
-        if (st.args['export_to_template_context'] !== true) out += inPlace(st);
-      }
+      default:
+        field(st);
     }
   }
   return out;
 }
 
+/** One attribute of an HTML tag's attribute text, quoted either way or bare. */
+function attrOf(attrs: string, name: string): string | null {
+  const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
+  return m ? (m[2] ?? m[3] ?? m[4] ?? '') : null;
+}
+
+/** A length in pixels, from an attribute or from the inline style; a percentage is not a width in pixels. */
+function pixels(attrs: string, name: 'width' | 'height'): number {
+  const fromAttr = attrOf(attrs, name);
+  if (fromAttr && /^\d+(px)?$/i.test(fromAttr.trim())) return Number.parseInt(fromAttr, 10);
+  const style = attrOf(attrs, 'style') ?? '';
+  const fromStyle = new RegExp(`(?:^|[;\\s])${name}\\s*:\\s*(\\d+)px`, 'i').exec(style);
+  return fromStyle ? Number(fromStyle[1]) : 0;
+}
+
 /**
  * Every picture in previewed HTML swapped for a drawn box of the same width, labelled with its alt text. The desk's
  * frame cannot load pictures from HubSpot's servers (an artifact loads nothing from another host), and a box that
- * says what goes there reads better than a broken image.
+ * says what goes there reads better than a broken image. `srcset` goes too, or the browser would still reach out.
  */
 export function boxPictures(html: string): string {
-  return html.replace(/<img\b([^>]*)>/gi, (whole, attrs: string) => {
-    const src = /\bsrc="([^"]*)"/i.exec(attrs)?.[1] ?? '';
-    if (src.startsWith('data:')) return whole;
-    const width = Number(/\bwidth="(\d+)/i.exec(attrs)?.[1] ?? /width:\s*(\d+)px/i.exec(attrs)?.[1] ?? 560) || 560;
-    const heightAttr = Number(/\bheight="(\d+)/i.exec(attrs)?.[1] ?? 0);
-    const height = heightAttr || Math.max(24, Math.round(width * 0.5));
-    const alt = (/\balt="([^"]*)"/i.exec(attrs)?.[1] ?? '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  return html.replace(/<img\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi, (whole, attrs: string) => {
+    const src = attrOf(attrs, 'src') ?? '';
+    if (src.startsWith('data:') && !attrOf(attrs, 'srcset')) return whole;
+    const width = pixels(attrs, 'width') || 560;
+    const height = pixels(attrs, 'height') || Math.max(24, Math.round(width * 0.5));
+    const alt = (attrOf(attrs, 'alt') ?? '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
     const label = alt || (src ? src.split('?')[0]!.split('/').pop()! : 'No picture yet');
     const small = height < 48 || width < 120;
+    // By code point, so a cut never splits an emoji into a lone surrogate that encodeURIComponent refuses.
+    const shown = Array.from(label).slice(0, 60).join('');
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
       `<defs><pattern id="h" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#f0f0ef"/><line x1="0" y1="0" x2="0" y2="8" stroke="#dededc" stroke-width="2"/></pattern></defs>` +
       `<rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" fill="url(#h)" stroke="#a8aaa7"/>` +
-      (small ? '' : `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a38">${esc(label.slice(0, 60))}</text>`) +
+      (small ? '' : `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a38">${esc(shown)}</text>`) +
       `</svg>`;
-    const data = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-    const rest = attrs.replace(/\bsrc="[^"]*"/i, '');
+    let data: string;
+    try {
+      data = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    } catch {
+      data = `data:image/svg+xml,${encodeURIComponent(svg.replace(/[\uD800-\uDFFF]/g, ''))}`;
+    }
+    const rest = attrs.replace(/(^|\s)(src|srcset|sizes)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
     return `<img src="${data}"${rest}>`;
   });
 }

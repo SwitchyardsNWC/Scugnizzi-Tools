@@ -181,3 +181,92 @@ describe('pictures in the desk’s frame', () => {
     expect(out).toContain('data:image/png;base64,AA');
   });
 });
+
+describe('HubL written by hand, and by HubSpot', () => {
+  const sample = { preview: PLACEHOLDER_PREVIEW, subject: 'S' };
+
+  it('honours backslash escapes in strings, as Jinjava does', () => {
+    const src = `{% text "headline" label="Headline", value='Don\\'t miss it', export_to_template_context=True %}<p>{{ widget_data.headline.value }}</p>{{ unsubscribe_link }}`;
+    const fields = sourceFields(src);
+    expect(fields.map((f) => [f.name, f.value, f.exported])).toEqual([['headline', "Don't miss it", true]]);
+    expect(renderDefaults(src, sample)).toContain('Don&#39;t miss it');
+    const st = parseStatement(`rich_text "intro" html="<p class=\\"lead\\">Hi</p>", export_to_template_context=True`);
+    expect(st.args).toMatchObject({ html: '<p class="lead">Hi</p>', export_to_template_context: true });
+  });
+
+  it('reads the block tags HubSpot’s own templates use, their attribute bodies as defaults', () => {
+    const src =
+      `{% widget_block rich_text "intro" overrideable=True, label="Intro" %}{% widget_attribute "html" %}<p>Hello {{ x }}</p>{% end_widget_attribute %}{% end_widget_block %}` +
+      `{% module_block module "hero_text" path="@hubspot/rich_text", label="Hero text" %}{% module_attribute "html" %}<h1>Big</h1>{% end_module_attribute %}{% end_module_block %}` +
+      `{% logo "logo" %}{% cta "cta" %}`;
+    const fields = sourceFields(src);
+    expect(fields.map((f) => [f.name, f.kind])).toEqual([
+      ['intro', 'rich text'],
+      ['hero_text', 'rich text'],
+      ['logo', 'other'],
+      ['cta', 'other'],
+    ]);
+    expect(fields[0]!.value).toBe('<p>Hello {{ x }}</p>');
+    const drawn = renderDefaults(src, sample);
+    expect(drawn).toContain('<p>Hello {{ x }}</p>');
+    expect(drawn).toContain('<h1>Big</h1>');
+  });
+
+  it('reads a dict whose strings hold braces or escaped quotes, and keeps the arguments after it', () => {
+    const st = parseStatement(`module "hero" path="@hubspot/image_email", label="Hero", img={ "src": "https://x/y.png", "alt": "Members {and guests} &quot;here&quot;", "width": 560 }, link="https://y.com/", export_to_template_context=True`);
+    expect(st.args['img']).toEqual({ src: 'https://x/y.png', alt: 'Members {and guests} "here"', width: 560 });
+    expect(st.args).toMatchObject({ link: 'https://y.com/', export_to_template_context: true });
+    expect(sourceFields(`{% ${'module "hero" path="@hubspot/image_email", label="Hero", img={ "src": "https://x/y.png", "alt": "a}b", "width": 560 }, export_to_template_context=True'} %}`)[0]).toMatchObject({ value: 'https://x/y.png', exported: true });
+  });
+
+  it('draws a module that renders in place, as HubSpot’s rich text and text modules do', () => {
+    const src = `{% module "main" path="@hubspot/rich_text", label="Main body", html="<h1>Hello</h1><p>Welcome</p>" %}{% module "kicker" path="@hubspot/text", label="Kicker", value="Fall" %}`;
+    expect(sourceFields(src).map((f) => [f.name, f.kind, f.value])).toEqual([
+      ['main', 'rich text', '<h1>Hello</h1><p>Welcome</p>'],
+      ['kicker', 'text', 'Fall'],
+    ]);
+    expect(renderDefaults(src, sample)).toBe('<h1>Hello</h1><p>Welcome</p>Fall');
+  });
+
+  it('takes unless with its else, draws a loop once, and prints raw as it is', () => {
+    expect(renderDefaults('{% if true %}A{% unless false %}U{% else %}NOT{% endunless %}B{% endif %}', sample)).toBe('AUB');
+    expect(renderDefaults('{% if true %}A{% for x in items %}L{% endfor %}B{% else %}C{% endif %}', sample)).toBe('ALB');
+    expect(renderDefaults('{% raw %}{{ contact.firstname }} {% if x %}{% endraw %}!', sample)).toBe('{{ contact.firstname }} {% if x %}!');
+  });
+
+  it('never lets a hostile expression hang or throw', () => {
+    const scope = { data: {}, vars: {}, sample };
+    for (const expr of ['(((', ')))', '| | |', '~ ~', 'a.b.c[d[e]]', '"unterminated', "'", '== != <=', 'not not not', 'é.ü', 'x(1,2,', '[1,2]', '1 +', '']) {
+      expect(() => evaluate(expr, scope)).not.toThrow();
+    }
+    let seed = 7;
+    const chars = '{}%#()[]|~.,\'" abcxyz019=!<>';
+    for (let n = 0; n < 2000; n++) {
+      let s = '';
+      for (let i = 0; i < 24; i++) {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        s += chars[seed % chars.length];
+      }
+      expect(() => renderDefaults(s, sample)).not.toThrow();
+      expect(() => sourceFields(s)).not.toThrow();
+    }
+  });
+});
+
+describe('picture boxes, from odd markup', () => {
+  it('never throws on an alt cut through an emoji', () => {
+    const alt = `${'x'.repeat(59)}🎉 party`;
+    expect(() => boxPictures(`<img src="https://x/a.png" alt="${alt}" width="560">`)).not.toThrow();
+  });
+
+  it('reads single quotes and a > inside alt, drops srcset, and ignores a percentage width', () => {
+    const out = boxPictures(`<img alt="Click -> here" src='https://x/a.png' srcset="https://x/a@2x.png 2x" width="100%" height="200">`);
+    expect(out).not.toContain('https://x/');
+    expect(out).not.toContain('srcset');
+    const svg = decodeURIComponent(/src="data:image\/svg\+xml,([^"]*)"/.exec(out)?.[1] ?? '');
+    expect(svg).toContain('Click -&gt; here');
+    expect(svg).toContain('width="560"');
+    expect(svg).toContain('height="200"');
+  });
+});
+

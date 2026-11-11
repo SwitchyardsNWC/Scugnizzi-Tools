@@ -134,7 +134,9 @@ HubSpot connector: no token lives anywhere in it.
 - **Previews it.** Exactly, when the design is inside the file; otherwise drawn from its field defaults, and labelled
   as such.
 - **Compares it** with what this build writes from its design, so an edit made in Design Manager, or a compiler
-  change, shows as the lines it touched. For an older export, attach its `.template.json`.
+  change, shows as the lines it touched. For an older export, attach its `.template.json` and the `.system.json` it
+  follows. Before offering a replacement it names any field that would lose what the team typed into it, and the
+  design itself downloads as the `.template.json` the app opens.
 - **Makes a draft email from it.** One form, a confirmation that shows the exact request, one call. Nothing sends.
 
 The connector can read templates but not write one, so a template still goes up through Design Manager or

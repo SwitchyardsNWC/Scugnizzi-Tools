@@ -12,7 +12,7 @@ import { compile } from '../compile/compile.ts';
 import { readDesign, withoutDesign } from '../compile/embed.ts';
 import { completeDesignSystem, type DesignSystem } from '../model/design-system.ts';
 import { materialiseFolderSystem } from '../model/edit.ts';
-import { planPackage } from '../model/export-package.ts';
+import { packagedName, planPackage } from '../model/export-package.ts';
 import { makerOf, sourceFields } from '../model/hubl-source.ts';
 import { importV1 } from '../model/import-v1.ts';
 import { migrate } from '../model/schema.ts';
@@ -37,10 +37,15 @@ export function designInside(source: string): { ok: true; design: Design } | { o
   if (!read.ok) return read;
   try {
     const template = migrate(read.design.template);
+    if (!Array.isArray(template.sections)) return { ok: false, reason: 'The design inside has no sections. It has been edited since export.' };
     const ds = read.design.ds ? completeDesignSystem(read.design.ds) : undefined;
-    return { ok: true, design: { template: ds ? { ...template, ds } : template, ds, origin: 'inside', by: read.design.by, warnings: [] } };
+    const design: Design = { template: ds ? { ...template, ds } : template, ds, origin: 'inside', by: read.design.by, warnings: [] };
+    // A design that parses can still be one the compiler cannot draw (edited in Design Manager): find out here, once,
+    // rather than in the page's render.
+    compile(design.template, { mode: 'preview', ...(ds ? { ds } : {}) });
+    return { ok: true, design };
   } catch (cause) {
-    return { ok: false, reason: cause instanceof Error ? cause.message : 'The design inside could not be opened.' };
+    return { ok: false, reason: `The design inside could not be compiled${cause instanceof Error ? `: ${cause.message}` : ''}. It has been edited since export.` };
   }
 }
 
@@ -57,7 +62,9 @@ export interface AttachedFile {
  */
 export function designFromFiles(files: AttachedFile[], shipped: Record<string, DesignSystem>): { ok: true; design: Design } | { ok: false; reason: string } {
   const systems: Record<string, DesignSystem> = { ...shipped };
+  const attachedSystems = new Set<string>();
   let template: Template | null = null;
+  let templateFile = '';
   const warnings: string[] = [];
   for (const file of files) {
     let raw: unknown;
@@ -67,10 +74,16 @@ export function designFromFiles(files: AttachedFile[], shipped: Record<string, D
       return { ok: false, reason: `${file.name} is not JSON. Attach the .template.json the app saves, and its .system.json if it follows one.` };
     }
     if (file.name.endsWith('.system.json')) {
-      systems[file.name.slice(0, -'.system.json'.length)] = completeDesignSystem(raw);
+      const name = file.name.slice(0, -'.system.json'.length);
+      systems[name] = completeDesignSystem(raw);
+      attachedSystems.add(name);
       continue;
     }
     const r = raw as { blocks?: unknown; sections?: unknown };
+    if (template && (Array.isArray(r.blocks) || Array.isArray(r.sections))) {
+      return { ok: false, reason: `${templateFile} and ${file.name} are both templates. Attach one template at a time, with its .system.json.` };
+    }
+    templateFile = file.name;
     try {
       if (Array.isArray(r.blocks) && !r.sections) {
         const imported = importV1(raw as Parameters<typeof importV1>[0]);
@@ -88,6 +101,12 @@ export function designFromFiles(files: AttachedFile[], shipped: Record<string, D
   if (!template) return { ok: false, reason: 'No template among the files. Attach its .template.json.' };
   const opened = materialiseFolderSystem(template, systems);
   if (opened.warning) warnings.push(opened.warning);
+  const followed = template.designSystem;
+  if (followed && systems[followed] && !attachedSystems.has(followed)) {
+    // The folder's own copy is what the app compiled with, and the design panel edits it; the desk only has the one it
+    // was built with.
+    warnings.push(`Compared against the ${followed} system this desk was built with. If the folder’s ${followed}.system.json has been edited since, attach it too.`);
+  }
   const ds = template.designSystem && systems[template.designSystem] ? opened.template.ds : undefined;
   return { ok: true, design: { template: opened.template, ds, origin: 'attached', by: null, warnings } };
 }
@@ -118,8 +137,20 @@ export type DiffLine = { k: 'same' | 'add' | 'del'; text: string };
  * at most and the table stays small. Past that it gives up gracefully and reports the files as different.
  */
 export function lineDiff(a: string, b: string, limit = 2500): DiffLine[] | null {
-  const x = a.split('\n');
-  const y = b.split('\n');
+  const xs = a.split('\n');
+  const ys = b.split('\n');
+  // The lines both share at the start and the end need no table, so a long file with one edit still diffs.
+  let head = 0;
+  while (head < xs.length && head < ys.length && xs[head] === ys[head]) head++;
+  let tail = 0;
+  while (tail < xs.length - head && tail < ys.length - head && xs[xs.length - 1 - tail] === ys[ys.length - 1 - tail]) tail++;
+  const middle = lineDiffCore(xs.slice(head, xs.length - tail), ys.slice(head, ys.length - tail), limit);
+  if (!middle) return null;
+  const same = (lines: string[]) => lines.map((text) => ({ k: 'same' as const, text }));
+  return [...same(xs.slice(0, head)), ...middle, ...same(xs.slice(xs.length - tail))];
+}
+
+function lineDiffCore(x: string[], y: string[], limit: number): DiffLine[] | null {
   if (x.length > limit || y.length > limit) return null;
   const n = x.length;
   const m = y.length;
@@ -139,6 +170,24 @@ export function lineDiff(a: string, b: string, limit = 2500): DiffLine[] | null 
   while (i < n) out.push({ k: 'del', text: x[i++]! });
   while (j < m) out.push({ k: 'add', text: y[j++]! });
   return out;
+}
+
+const PACKED = /get_asset_url\(\s*'\.\/images\/([^']+)'\s*\)/g;
+
+/** The picture files a template points at with `get_asset_url('./images/…')`: what its export packed. */
+export function packedFiles(source: string): Set<string> {
+  return new Set([...source.matchAll(PACKED)].map((m) => m[1]!));
+}
+
+/**
+ * A freshly compiled file packed the way HubSpot's copy was: the pictures it shipped beside the template pointed at
+ * their copies, any it left as names left as names. Export packs only what the folder had (App.tsx), so this follows
+ * the portal's copy rather than packing everything.
+ */
+export function packLike(fresh: string, portal: string): string {
+  const shipped = packedFiles(portal);
+  if (!shipped.size) return fresh;
+  return planPackage(fresh, (src) => shipped.has(packagedName(src))).html;
 }
 
 export interface Comparison {
@@ -163,15 +212,15 @@ export function compareWithBuild(portal: string, design: Design, fallbackDate: s
   const fresh = compile(design.template, { mode: 'hubl', date, ...(design.ds ? { ds: design.ds } : {}) }).html;
   const target = normalise(portal);
   const unpacked = normalise(fresh);
-  const packed = normalise(planPackage(fresh).html);
+  const packed = normalise(packLike(fresh, portal));
   const candidates = packed === unpacked ? [{ packed: false, text: unpacked }] : [{ packed: false, text: unpacked }, { packed: true, text: packed }];
   let best: Comparison | null = null;
   for (const c of candidates) {
     if (c.text === target) return { same: true, removed: 0, added: 0, diff: [], date, packed: c.packed };
     const diff = lineDiff(target, c.text);
-    const removed = diff ? diff.filter((d) => d.k === 'del').length : target.split('\n').length;
-    const added = diff ? diff.filter((d) => d.k === 'add').length : c.text.split('\n').length;
-    if (!best || removed + added < best.removed + best.added) best = { same: false, removed, added, diff, date, packed: c.packed };
+    const removed = diff ? diff.filter((d) => d.k === 'del').length : NaN;
+    const added = diff ? diff.filter((d) => d.k === 'add').length : NaN;
+    if (!best || !(removed + added >= best.removed + best.added)) best = { same: false, removed, added, diff, date, packed: c.packed };
   }
   return best!;
 }
@@ -197,8 +246,64 @@ export function foldDiff(diff: DiffLine[], context = 2): Array<DiffLine | { k: '
  * email's content only for the field names both share; a name that goes takes what the team typed into it with it
  * (learnings 1.10). So the desk names them before it offers the file.
  */
-export function fieldChanges(portal: string, replacement: string): { lost: string[]; added: string[] } {
-  const before = sourceFields(portal).map((f) => f.name);
-  const after = sourceFields(replacement).map((f) => f.name);
-  return { lost: before.filter((n) => !after.includes(n)), added: after.filter((n) => !before.includes(n)) };
+export function fieldChanges(portal: string, replacement: string): { lost: string[]; changed: string[]; added: string[] } {
+  const before = sourceFields(portal);
+  const after = sourceFields(replacement);
+  const named = (list: typeof before, name: string) => list.find((f) => f.name === name);
+  return {
+    lost: before.filter((f) => !named(after, f.name)).map((f) => f.name),
+    // Same name, different kind of field: what HubSpot stored under it no longer fits (a picture's src under a module's img).
+    changed: before
+      .filter((f) => {
+        const g = named(after, f.name);
+        return g !== undefined && (g.tag !== f.tag || (g.path ?? '') !== (f.path ?? ''));
+      })
+      .map((f) => f.name),
+    added: after.filter((f) => !named(before, f.name)).map((f) => f.name),
+  };
+}
+
+export type ShownRow = { k: 'gap'; count: number } | { k: 'same' | 'add' | 'del'; text: string };
+
+/**
+ * The folded diff as the page shows it: each changed line cut to a window around where it first differs from its
+ * partner on the other side, because the compiler writes a block a line and an edit past the first few hundred
+ * characters would otherwise show as two rows that read the same.
+ */
+export function shownRows(diff: DiffLine[], width = 600): ShownRow[] {
+  const folded = foldDiff(diff);
+  const out: ShownRow[] = [];
+  for (let i = 0; i < folded.length; ) {
+    const row = folded[i]!;
+    if (row.k === 'gap' || row.k === 'same') {
+      out.push(row.k === 'same' ? { k: 'same', text: cut(row.text, 0, width) } : row);
+      i++;
+      continue;
+    }
+    // One hunk: the run of changed lines, the j-th removed line paired with the j-th added one.
+    const hunk: DiffLine[] = [];
+    while (i < folded.length && (folded[i]!.k === 'add' || folded[i]!.k === 'del')) hunk.push(folded[i++] as DiffLine);
+    const dels = hunk.filter((d) => d.k === 'del');
+    const adds = hunk.filter((d) => d.k === 'add');
+    for (const d of hunk) {
+      const mine = d.k === 'del' ? dels : adds;
+      const theirs = d.k === 'del' ? adds : dels;
+      const partner = theirs[mine.indexOf(d)]?.text ?? '';
+      out.push({ k: d.k, text: cut(d.text, commonPrefix(d.text, partner), width) });
+    }
+  }
+  return out;
+}
+
+function commonPrefix(a: string, b: string): number {
+  let n = 0;
+  while (n < a.length && n < b.length && a[n] === b[n]) n++;
+  return n;
+}
+
+function cut(text: string, at: number, width: number): string {
+  if (text.length <= width) return text;
+  const start = Math.max(0, Math.min(at - Math.floor(width / 3), text.length - width));
+  const end = start + width;
+  return `${start > 0 ? '… ' : ''}${text.slice(start, end)}${end < text.length ? ' …' : ''}`;
 }

@@ -82,14 +82,6 @@ export function commentSafe(json: string): string {
   return out;
 }
 
-/** Sorted keys, as the saved files have them, so the same design always writes the same comment. */
-function sortedKeys(_key: string, value: unknown): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) out[key] = (value as Record<string, unknown>)[key];
-  return out;
-}
-
 /** The template as `serializeTemplate` would write it, without the dependency on how that function spaces it. */
 function storedTemplate(template: Template): Record<string, unknown> {
   if (!template.designSystem) return template as unknown as Record<string, unknown>;
@@ -115,7 +107,10 @@ export function designComment(template: Template, ds: DesignSystem, options: { o
     system: template.designSystem ?? null,
     template: stored,
   };
-  const json = commentSafe(JSON.stringify(envelope, sortedKeys));
+  // Keys in the order the design holds them, not sorted as the saved files are: the compiler walks some objects in
+  // their own order (the type roles' dark-mode rules, colors.ts), so a design read back in another order would
+  // compile to a reordered file and read as drift. `JSON.parse` keeps the order it is given.
+  const json = commentSafe(JSON.stringify(envelope));
   return (
     `{# ${DESIGN_MARK} ${DESIGN_FORMAT}\n` +
     `   The design this file was compiled from, so Template Studio can open it again. HubSpot does not render HubL comments, so none of it reaches an inbox.\n` +

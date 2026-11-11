@@ -548,12 +548,17 @@ the email.
   that was used.
 - **It does not count toward Gmail's clip.** The size the checks hold against 102KB (2.12) leaves the comment out.
   The standard email is 30.7KB sent and 39.9KB stored; the baseline 69.5KB sent and 95.2KB stored.
-- **Recompiling it reproduces the file byte for byte** (tests/embed.test.ts), which is what the desk's drift check
-  stands on: HubSpot's copy against this build's, the export date taken from the file, the comment out of both.
+- **Recompiling it reproduces the file byte for byte, up to picture packing** (tests/embed.test.ts). The design
+  keeps the folder's own picture names; Export points the ones the folder had at copies packed beside the template
+  (3.70). The desk's drift check packs its rebuild the same way, from the `get_asset_url` names in HubSpot's copy,
+  takes the export date from the file, and leaves the comment out of both sides.
+- **Keys keep the design's own order,** not the sorted order of the saved files: the compiler walks the type roles in
+  their order for the dark-mode rules (colors.ts), so a design read back sorted compiled to a reordered file.
 
 **Two scopes the connection lacks. Verified 2026-11-11.** `LIST_FROM_ADDRESSES` fails without
 `settings.users.teams.read` and `crm.objects.owners.read`, which the HubSpot connector does not request by default.
-The desk's draft form then takes a typed reply-to address, which HubSpot checks on create. `LIST_SUBSCRIPTION_TYPES`
+The desk's draft form then takes a typed reply-to address; HubSpot is expected to refuse an unverified one on
+create, which has not been seen. `LIST_SUBSCRIPTION_TYPES`
 works (three types). The account has no brands, so a draft needs no brand.
 
 **Still to confirm in a send:**
@@ -3333,13 +3338,22 @@ asked about writes, drafts, each confirmed; asked who opens it, just him for now
   whether the design is inside); previews it; shows its source; compares it with what this build writes from its
   design; and makes a draft email from it.
 - **Two previews, labelled.** A template with its design inside is drawn by the compiler, exactly. Any other is drawn
-  from its HubL with every field at its default (`model/hubl-source.ts`); for the fixtures that is byte for byte the
-  compiler's own preview, and on hand-built HubL it degrades rather than guesses. Pictures are boxes in both, because
-  an artifact loads nothing from another host.
-- **Older exports.** A file exported before the design travelled has none inside. Attaching its `.template.json`
-  (and a `.system.json` other than the two shipped) compares it and offers the file again with the design in.
-  Before it offers a replacement it names any field the replacement no longer declares, because replacing a
-  template keeps content only under the names both versions share (1.10).
-- **Drafts.** One form, then a confirmation showing the exact operation, then one call. Never retried by the page:
-  a write that times out may have run, so the page says to look in HubSpot first.
+  from its HubL with every field at its default (`model/hubl-source.ts`); for the standard and card fixtures that is
+  byte for byte the compiler's own preview, a drag-and-drop area is drawn as its outline, and on hand-built HubL it
+  degrades rather than guesses. It reads HubSpot's own shapes too: backslash escapes as Jinjava honours them, the
+  `widget_block` / `module_block` tags with their attribute bodies, `unless`, loops drawn once, `raw`. Pictures are
+  boxes in both, because an artifact loads nothing from another host.
+- **Older exports.** A file exported before the design travelled has none inside. Attaching its `.template.json`,
+  and the `.system.json` it follows, compares it and offers the file again with the design in. Without the system
+  file it falls back to the copy of Switchyards or Card the desk was built with, and says so, because the folder's
+  copy is the one the design panel edits. Before it offers a replacement it names any field the replacement no
+  longer declares or declares as a different kind, because replacing a template keeps content only under a name and
+  kind both versions share (1.10). The replacement is packed the way HubSpot's copy was, so pictures it shipped
+  beside the template stay pointed at those copies.
+- **The design comes back out.** Download the design saves the `.template.json` (and its `.system.json`) the app
+  opens, which is what makes the comment's "so Template Studio can open it again" true.
+- **Drafts.** One form, then a confirmation showing the exact operation, then one call. The confirm button waits a
+  moment before it works, so a double click on Review cannot press it. Never retried by the page: a write that times
+  out may have run, so the page says to look in HubSpot first; once CREATE has answered, a poll that fails still
+  reports the draft made. The draft's state lives with the page, not the tab, so one in flight survives leaving it.
 
