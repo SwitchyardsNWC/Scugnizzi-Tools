@@ -1051,8 +1051,8 @@ ${ind(inner, 6)}
       folder, dest,
       // CLI 8 moved every CMS command under `hs cms`; plain `hs upload` now only asks "Did you mean hs cms upload?".
       once: [
-        { cmd: 'npm install -g @hubspot/cli@latest', note: 'Once per machine. Needs Node 20 or later.' },
-        { cmd: 'hs account auth', note: 'Once. It asks for a personal access key: in HubSpot, Development › Keys › Personal access key. Your user needs the Design tools permission.' },
+        { cmd: 'npm install -g @hubspot/cli@latest', note: 'Needs Node 20 or later.' },
+        { cmd: 'hs account auth', note: 'It asks for a personal access key: in HubSpot, Development › Keys › Personal access key. Your user needs the Design tools permission.' },
       ],
       cli: [
         { cmd: `cd ~/Downloads && unzip -o ${folder}.zip`, note: 'Wherever the zip landed. The CLI uploads a folder, not a zip.' },

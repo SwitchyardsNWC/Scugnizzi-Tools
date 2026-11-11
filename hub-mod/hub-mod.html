@@ -56,6 +56,8 @@
   button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
   button.icon{padding:2px 6px;min-width:24px;font-family:var(--mono);font-size:12px;line-height:18px}
   .seg{display:inline-flex}
+  .stack>.seg{display:flex}
+  .stack>.seg button{flex:1;padding-left:4px;padding-right:4px}
   .seg button{border-radius:0;margin-left:-1px}
   .seg button:first-child{border-radius:5px 0 0 5px;margin-left:0}
   .seg button:last-child{border-radius:0 5px 5px 0}
@@ -104,6 +106,8 @@
   main{display:flex;flex-direction:column;min-width:0;background:#0e0e0f}
   .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
   .bar .lbl{color:var(--muted);font-size:11.5px}
+  .bar.sub{padding:6px 14px;gap:8px;background:#161618}
+  .bar.sub .seg button{padding:3px 9px;font-size:12px}
   .checks-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px}
   .checks-pill .mark{font-family:var(--mono);font-weight:700}
   .stage{flex:1;overflow:auto;position:relative}
@@ -230,7 +234,9 @@
         <button data-tab="steps" title="Building it by hand in Design Manager, field by field (B)">Hand build</button>
       </div>
       <span class="grow"></span>
-      <span id="designBar" class="btnrow" style="align-items:center">
+      <button class="primary" id="btnZip" title="Download the .module folder as a zip, for hs cms upload (⌘S)">Download .zip</button>
+    </div>
+    <div class="bar sub" id="designBar">
         <span class="seg" id="device">
           <button data-device="desktop" title="Desktop width">Desktop</button>
           <button data-device="phone" title="A 375px phone; the mobile rules apply">Phone</button>
@@ -248,8 +254,6 @@
           <button data-dark="1" title="Applies this module's dark-mode layer unconditionally (K)">Dark override</button>
         </span>
         <span class="seg" id="themeSeg"></span>
-      </span>
-      <button class="primary" id="btnZip" title="Download the .module folder as a zip, for hs upload (⌘S)">Download .zip</button>
     </div>
 
     <div class="stage" id="stage">
@@ -466,7 +470,7 @@ function renderBar() {
   $('#viewSteps').hidden = ui.tab !== 'steps';
   const errs = issues.filter(i => i.level === 'error').length;
   const z = $('#btnZip'); z.disabled = errs > 0;
-  z.title = errs ? `Fix ${errs} error${errs > 1 ? 's' : ''} under Checks first: HubSpot would refuse this module, or the team would get a broken one` : 'Download the .module folder as a zip, for hs upload (⌘S)';
+  z.title = errs ? `Fix ${errs} error${errs > 1 ? 's' : ''} under Checks first: HubSpot would refuse this module, or the team would get a broken one` : 'Download the .module folder as a zip, for hs cms upload (⌘S)';
 }
 
 // ---- outline ----
@@ -887,12 +891,12 @@ function columnsInspector(p) {
   const cur = p.cols.map(c => c.w).join(',');
   return pane('Columns', `
     ${row('Count', segs('count', p.cols.length, [[2, 'Two'], [3, 'Three']], 'num'))}
-    ${row('Split', segs('split', cur, splits))}
+    <div class="stack"><label>Split</label>${segs('split', cur, splits)}</div>
     ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
     ${row('Line up', segs('valign', p.valign, [['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']]))}
-    ${chk('stack', p.stack, 'Stack on phones', 'One column under the other below 640px. Off, they stay side by side.')}
+    ${chk('stack', p.stack, 'Stack on phones', 'One under the other when the email is narrower than the design, in every client, Gmail included. Off, they stay side by side.')}
     ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
-    <p class="hint">A table with one cell per column; on phones a media query stacks the cells (learnings 3.14). Columns are layout only: their parts' fields sit in the module's list in reading order.</p>`)
+    <p class="hint">${p.stack ? 'Stacking needs no style block: each column is as wide as its share or the screen, whichever is less. Outlook on Windows gets a plain table.' : 'A plain table: the columns keep their shares at every width.'} Columns are layout only; their parts' fields sit in the module's list in reading order.</p>`)
     + pane('Swap', `<button type="button" data-swap="1" title="Reverse the column order">Swap columns</button>`);
 }
 
@@ -912,7 +916,7 @@ function repeatInspector(p) {
     ${kids.length ? row('Sort label', sel('sortField', p.sortField || '', [['', 'Automatic'], ...kids.filter(k => ['text', 'eyebrow', 'heading'].includes(k.type)).map(k => [k.id, k.label])]), 'Which field names each item in HubSpot\'s list') : ''}
   `) + pane('Layout', `
     ${row('Arrange', segs('layout', p.layout, [['list', 'List', 'One under another'], ['grid', 'Grid', 'Side by side, in rows']]))}
-    ${p.layout === 'grid' ? row('Per row', segs('perRow', p.perRow, [[2, 'Two'], [3, 'Three']], 'num')) + chk('stack', p.stack, 'One per row on phones') : ''}
+    ${p.layout === 'grid' ? row('Per row', segs('perRow', p.perRow, [[2, 'Two'], [3, 'Three']], 'num')) + chk('stack', p.stack, 'One per row on phones', 'In every client, Gmail included. Off, the rows keep their count at any width.') : ''}
     ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
     ${p.layout === 'list' ? chk('rule', p.rule, 'Rule between items', 'A hairline in the theme accent') : ''}
     ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
