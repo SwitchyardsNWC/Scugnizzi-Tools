@@ -18,6 +18,7 @@ import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import { InheritDial } from './InheritDial.tsx';
+import { hasEffects, stackSummary } from '../model/effects.ts';
 
 // The inspector, generated from the catalog.
 //
@@ -716,7 +717,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
         )}
         <span class="canvas-facts">
           {n} {n === 1 ? 'layer' : 'layers'} · {block.width} × {block.height}
-          {block.effects?.length ? ' · Riso print' : ''}
+          {hasEffects(block) ? ` · ${stackSummary(block.effects) || 'layer effects'}` : ''}
         </span>
 
         {app && (

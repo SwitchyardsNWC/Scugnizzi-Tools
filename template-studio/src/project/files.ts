@@ -18,6 +18,7 @@ import { listAssetFolders, listDocuments, listPictures, listRecipes, type DocEnt
 import { copyKeptPictures, syncFrames } from './frame-sync.ts';
 import { siteStore } from './site-store.ts';
 import type { Project } from './useProject.ts';
+import { hasEffects } from '../model/effects.ts';
 
 // --- what is in the folder ------------------------------------------------------------------------------------
 
@@ -95,7 +96,7 @@ export function printedIn(template: Template): PrintedPage[] {
     for (const r of s.rows)
       for (const c of r.columns)
         for (const b of c.blocks) {
-          if (b.type !== 'freeform' || !b.effects?.length) continue;
+          if (b.type !== 'freeform' || !hasEffects(b)) continue;
           const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
           out.push({ blockId: b.id, page: b, hash: recipeHash(b), ground, ds });
         }

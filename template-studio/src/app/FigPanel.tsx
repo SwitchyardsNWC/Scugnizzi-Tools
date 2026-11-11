@@ -10,9 +10,9 @@ import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type 
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
-import { misregister, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
+import { EFFECT_HELP, EFFECT_KINDS, EFFECT_LABELS, LOOKS, withLayerEffects, misregister, moveStep, newStep, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
 import type { MarkKey, MarkState } from '../model/rich-text.ts';
-import type { Align, EffectStep, FreeformBlock, FreeformLayer, RisoInk, TextMarks } from '../model/types.ts';
+import type { Align, EffectKind, EffectStep, FreeformBlock, FreeformLayer, RisoInk, RisoStep, TextMarks } from '../model/types.ts';
 
 // The canvas's own controls, in the canvas's own look: the layers panel docked on its right, the
 // mini menu that floats over whatever is picked, and the slash menu under text being typed.
@@ -238,7 +238,23 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
       </div>
       )}
 
-      <FigEffects effects={block.effects} onEffects={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
+      {(() => {
+        // The one layer picked has its own stack; nothing picked, or a drawing, is the page's.
+        const sel = picked ? selectionOf(block, picked) : null;
+        const layer = sel && !sel.group ? sel.layers[0] : undefined;
+        return layer ? (
+          <FigEffects
+            key={`layer:${layer.id}`}
+            steps={layer.effects}
+            scope={LAYER_NAMES[layer.kind]}
+            onSteps={(next, label, coalesce) => onLayers(label, [withLayerEffects(layer, next)], coalesce ? `fx:${layer.id}:${coalesce}` : undefined)}
+            note={null}
+            busy={Boolean(effectBusy)}
+          />
+        ) : (
+          <FigEffects key="page" steps={block.effects} scope="Page" onSteps={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
+        );
+      })()}
     </div>
   );
 }
@@ -249,7 +265,8 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
  * The presets' screens at half size. They were tuned on 900px photographs; a page of drawn lines and
  * type loses its detail in dots that coarse, and at half size it still reads as a print.
  */
-const pageScreens = (step: EffectStep): EffectStep => ({ ...step, inks: step.inks.map((k) => ({ ...k, cell: Math.max(2, Math.round(k.cell) / 2) })) });
+const pageScreens = <T extends EffectStep>(step: T): T =>
+  step.effect === 'riso' ? ({ ...step, inks: step.inks.map((k) => ({ ...k, cell: Math.max(2, Math.round(k.cell) / 2) })) } as T) : step;
 
 const PAPERS: Array<[string, string]> = [
   ['Natural', '#f6f2e8'],
@@ -258,14 +275,234 @@ const PAPERS: Array<[string, string]> = [
   ['Grey', '#dfe6e9'],
 ];
 
+/** A step's switch and strength, carried over when its settings are replaced by a look. */
+const keepBase = (s: EffectStep) => ({ ...(s.off ? { off: true } : {}), ...(s.strength !== undefined ? { strength: s.strength } : {}) });
+
+/** A colour field with its hex beside it, so a colour is never told by its swatch alone. */
+function HexField({ label, value, onInput }: { label: string; value: string; onInput(v: string): void }) {
+  return (
+    <label class="fig-hex" title={`${label}: ${value}`}>
+      <span class="fig-slide-label">{label}</span>
+      <input type="color" value={value} onInput={(e) => onInput((e.target as HTMLInputElement).value.toLowerCase())} />
+      <code>{value.toUpperCase()}</code>
+    </label>
+  );
+}
+
+function Seg<T extends string>({ label, value, options, onPick }: { label: string; value: T; options: readonly T[]; onPick(v: T): void }) {
+  return (
+    <div class="fig-page-row">
+      <span class="fig-slide-label">{label}</span>
+      <span class="fig-seg" role="group" aria-label={label}>
+        {options.map((o) => (
+          <button key={o} class={value === o ? 'on' : ''} aria-pressed={value === o} onClick={() => onPick(o)}>
+            {o.replace('-', ' ')}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** One step's own dials. Riso has its own set. */
+function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: EffectStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
+  const name = EFFECT_LABELS[step.effect];
+  const dial = (label: string, unit: string, min: number, max: number, value: number, patch: (v: number) => Partial<EffectStep>, stepBy = 1) => (
+    <Slide label={label} unit={unit} min={min} max={max} step={stepBy} value={value} onInput={(v) => set({ ...step, ...patch(v) } as EffectStep, `${name} ${label.toLowerCase()}`, `fx-${step.effect}-${label}`)} />
+  );
+  switch (step.effect) {
+    case 'riso':
+      return <RisoDials step={step} set={set} onOpenRiso={onOpenRiso} />;
+    case 'adjust':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Brightness', '', -100, 100, step.brightness, (v) => ({ brightness: v }))}
+          {dial('Contrast', '', -100, 100, step.contrast, (v) => ({ contrast: v }))}
+          {dial('Saturation', '', -100, 100, step.saturation, (v) => ({ saturation: v }))}
+        </div>
+      );
+    case 'duotone':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <HexField label="Shadows" value={step.shadow} onInput={(v) => set({ ...step, shadow: v }, 'Duotone shadows', 'fx-duo-sh')} />
+          <HexField label="Highlights" value={step.highlight} onInput={(v) => set({ ...step, highlight: v }, 'Duotone highlights', 'fx-duo-hi')} />
+        </div>
+      );
+    case 'posterize':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Levels', '', 2, 12, step.levels, (v) => ({ levels: v }))}
+          {dial('Gamma', '', 1, 10, step.gamma, (v) => ({ gamma: v }), 0.5)}
+        </div>
+      );
+    case 'halftone':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <Seg label="Dot" value={step.shape} options={['circle', 'square', 'diamond', 'line', 'ellipse'] as const} onPick={(v) => set({ ...step, shape: v }, 'Halftone dot')} />
+          {dial('Screen', 'px', 2, 40, step.spacing, (v) => ({ spacing: v }), 0.5)}
+          {dial('Angle', '°', 0, 180, step.angle, (v) => ({ angle: v }))}
+          {dial('Contrast', '', 1, 10, step.contrast, (v) => ({ contrast: v }), 0.5)}
+          <HexField label="Ink" value={step.ink} onInput={(v) => set({ ...step, ink: v }, 'Halftone ink', 'fx-ht-ink')} />
+          <HexField label="Paper" value={step.paper} onInput={(v) => set({ ...step, paper: v }, 'Halftone paper', 'fx-ht-paper')} />
+        </div>
+      );
+    case 'grain':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Mono', '%', 0, 100, step.mono, (v) => ({ mono: v }))}
+          <button class="fig-reset" title="A new roll of the same grain" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle grain')}>
+            Reshuffle
+          </button>
+        </div>
+      );
+    case 'texture':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <Seg label="Surface" value={step.kind} options={['paper', 'canvas', 'fibers', 'concrete', 'crosshatch'] as const} onPick={(v) => set({ ...step, kind: v }, 'Texture surface')} />
+          <Seg label="Blend" value={step.blend} options={['multiply', 'overlay', 'screen', 'soft-light'] as const} onPick={(v) => set({ ...step, blend: v }, 'Texture blend')} />
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Scale', '', 5, 100, step.scale, (v) => ({ scale: v }))}
+        </div>
+      );
+    case 'blur':
+      return <div class="fig-sliders fig-step-body">{dial('Radius', 'px', 0, 40, step.radius, (v) => ({ radius: v }), 0.5)}</div>;
+    case 'vignette':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Spread', '%', 5, 100, step.spread, (v) => ({ spread: v }))}
+        </div>
+      );
+  }
+}
+
+const eyeOn = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />, <circle key="b" cx="12" cy="12" r="2.8" />);
+const eyeOff = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />, <path key="b" d="M4 20L20 4" />);
+
 /**
- * The page printed through the Riso press: a preset to start from, the few dials worth having on the
- * canvas, and every other dial one click away in the Riso tool itself.
+ * Effects as a stack, on the page or on the one layer picked. Each step can be switched off, turned down,
+ * moved up or down and removed, and opens to its own dials. Looks put a whole stack on at once.
  */
-function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: EffectStep[] | undefined; onEffects: FigLayersProps['onEffects']; onOpenRiso(): void; note: string | null; busy: boolean }) {
+function FigEffects({ steps, scope, onSteps, onOpenRiso, note, busy }: { steps: EffectStep[] | undefined; scope: string; onSteps(next: EffectStep[] | undefined, label: string, coalesce?: string): void; onOpenRiso?: () => void; note: string | null; busy: boolean }) {
+  const list = steps ?? [];
+  const [open, setOpen] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [looks, setLooks] = useState(false);
+  const replace = (i: number, next: EffectStep, label: string, coalesce?: string) => onSteps(list.map((s, j) => (j === i ? next : s)), label, coalesce);
+  const add = (kind: EffectKind) => {
+    const seed = 1 + Math.floor(Math.random() * 99999);
+    const made = kind === 'riso' && scope === 'Page' ? pageScreens(risoStep(0, seed)) : newStep(kind, seed);
+    onSteps([...list, made], `Add ${EFFECT_LABELS[kind].toLowerCase()}`);
+    setOpen(list.length);
+    setAdding(false);
+  };
+  const looksGrid = (
+    <div class="fig-fx-chips" role="group" aria-label="Looks">
+      {LOOKS.map((look) => (
+        <button
+          key={look.name}
+          class="fig-fx-chip"
+          title={`${look.name}: ${look.desc}. Replaces the effects here.`}
+          onClick={() => {
+            onSteps(look.steps().map((s) => (s.effect === 'riso' && scope === 'Page' ? pageScreens(s) : s)), `Look · ${look.name}`);
+            setOpen(null);
+            setLooks(false);
+          }}
+        >
+          {look.name}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div class="fig-effects">
+      <div class="fig-page-row">
+        <b>Effects</b>
+        <span class="fig-fx-scope" title={scope === 'Page' ? 'On the whole page, after every layer is drawn.' : 'On this layer alone, inside its own shape.'}>
+          {scope}
+        </span>
+        <span class="grow" />
+        {busy && <span class="fig-fx-busy">Rendering</span>}
+        <button class={`fig-text-btn ${looks ? 'on' : ''}`} title="Whole stacks, ready made" aria-expanded={looks} onClick={() => setLooks((v) => !v)}>
+          Looks
+        </button>
+        <button class={`fig-icon-btn ${adding ? 'on' : ''}`} title="Add an effect" aria-label="Add an effect" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+          {icon(<path key="a" d="M12 5v14M5 12h14" />)}
+        </button>
+      </div>
+      {adding && (
+        <ul class="fig-fx-menu" role="menu">
+          {EFFECT_KINDS.map((k) => (
+            <li key={k}>
+              <button role="menuitem" title={EFFECT_HELP[k]} onClick={() => add(k)}>
+                <b>{EFFECT_LABELS[k]}</b>
+                <span>{EFFECT_HELP[k]}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {looks && looksGrid}
+      {list.length === 0 && !adding && !looks && (
+        <p class="fig-fx-hint">
+          {scope === 'Page' ? 'Nothing on the page. Add an effect, or pick a look. Pick a layer to give it effects of its own.' : 'Nothing on this layer. Add an effect, or pick a look.'}
+        </p>
+      )}
+      {list.length > 0 && (
+        <ol class="fig-fx-stack">
+          {list.map((step, i) => {
+            const strength = Math.round((step.strength ?? 1) * 100);
+            const expanded = open === i;
+            return (
+              <li key={i} class={`fig-fx-step ${step.off ? 'off' : ''} ${expanded ? 'open' : ''}`}>
+                <div class="fig-fx-row">
+                  <button class="fig-icon-btn" title={step.off ? 'Off. Click to switch it on.' : 'On. Click to switch it off.'} aria-label={step.off ? `Switch ${EFFECT_LABELS[step.effect]} on` : `Switch ${EFFECT_LABELS[step.effect]} off`} aria-pressed={!step.off} onClick={() => replace(i, step.off ? (({ off: _o, ...rest }) => (void _o, rest as EffectStep))(step) : { ...step, off: true }, step.off ? 'Effect on' : 'Effect off')}>
+                    {step.off ? eyeOff() : eyeOn()}
+                  </button>
+                  <button class="fig-fx-name-btn" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : i)}>
+                    <span class="fig-fx-num">{i + 1}</span>
+                    {EFFECT_LABELS[step.effect]}
+                    <span class="caret">{expanded ? '▾' : '▸'}</span>
+                  </button>
+                  <span class="fig-fx-strength" title="Strength: how much of this step shows">
+                    <input type="range" min={0} max={100} value={strength} aria-label={`${EFFECT_LABELS[step.effect]} strength`} onInput={(e) => replace(i, { ...step, strength: Number((e.target as HTMLInputElement).value) / 100 }, 'Strength', `fx-strength-${i}`)} />
+                    <span>{strength}%</span>
+                  </span>
+                </div>
+                {expanded && (
+                  <>
+                    <StepDials step={step} set={(next, label, coalesce) => replace(i, next, label, coalesce)} onOpenRiso={scope === 'Page' ? onOpenRiso : undefined} />
+                    <div class="fig-fx-actions">
+                      <button class="fig-chip" disabled={i === 0} title="Run this step earlier" onClick={() => { onSteps(moveStep(list, i, i - 1), 'Move effect up'); setOpen(i - 1); }}>
+                        Up
+                      </button>
+                      <button class="fig-chip" disabled={i === list.length - 1} title="Run this step later" onClick={() => { onSteps(moveStep(list, i, i + 1), 'Move effect down'); setOpen(i + 1); }}>
+                        Down
+                      </button>
+                      <button class="fig-chip danger" title="Take this step off. Everything else stays." onClick={() => { onSteps(list.filter((_, j) => j !== i), 'Remove effect'); setOpen(null); }}>
+                        Remove
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {note && <p class="fig-fx-hint">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * A Riso step's settings: the inks, the screen, the few dials worth having on the canvas, the paper, the
+ * project's saved looks, and every other dial one click away in the Riso tool itself (page only).
+ */
+function RisoDials({ step, set, onOpenRiso }: { step: RisoStep; set(next: RisoStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
   const [ink, setInk] = useState<number | null>(null);
-  const step = effects?.find((e) => e.effect === 'riso');
-  const set = (next: EffectStep, label: string, coalesce?: string) => onEffects([next], label, coalesce);
   // The project's saved looks, kept current when one is saved in the Riso tab.
   const [saved, setSaved] = useState<SavedRisoPreset[]>(readSaved);
   const [naming, setNaming] = useState<string | null>(null);
@@ -277,7 +514,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const saveLook = () => {
-    if (!step || naming === null) return;
+    if (naming === null) return;
     try {
       localStorage.setItem(RISO_PROJECT_PRESETS, withSavedRisoPreset(localStorage.getItem(RISO_PROJECT_PRESETS), naming, step, `p${Date.now().toString(36)}`));
       setSaved(readSaved());
@@ -286,47 +523,6 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
     }
     setNaming(null);
   };
-
-  if (!step) {
-    return (
-      <div class="fig-effects">
-        <div class="fig-page-row">
-          <b>Effects</b>
-        </div>
-        <div class="fig-fx-presets">
-          {RISO_PRESETS.map((p, i) => (
-            <button key={p.name} class="fig-fx-preset" title={`Riso: ${p.desc}`} onClick={() => onEffects([pageScreens(risoStep(i, 1))], 'Riso print')}>
-              <span class="fig-fx-inks" aria-hidden="true">
-                {p.apply.inks.map((k, j) => (
-                  <i key={j} style={{ background: k.color }} />
-                ))}
-              </span>
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {saved.length > 0 && (
-          <>
-            <div class="fig-fx-sub">Saved in this project</div>
-            <div class="fig-fx-presets">
-              {saved.map((p) => (
-                <button key={p.id} class="fig-fx-preset" title={`${p.name}: a saved look`} onClick={() => onEffects([p.step], `Riso · ${p.name}`)}>
-                  <span class="fig-fx-inks" aria-hidden="true">
-                    {p.step.inks.map((k, j) => (
-                      <i key={j} style={{ background: k.color }} />
-                    ))}
-                  </span>
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        <p class="fig-fx-hint">{note ?? 'Print the page through the Riso press. The layers stay editable underneath.'}</p>
-      </div>
-    );
-  }
-
   const first = step.inks[0];
   const screen = first?.screen ?? 'dot';
   const addInk = () => {
@@ -339,18 +535,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
   };
 
   return (
-    <div class="fig-effects">
-      <div class="fig-page-row">
-        <b>Riso print</b>
-        {busy && <span class="fig-fx-busy">inking…</span>}
-        <button class="fig-text-btn" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
-          Save look
-        </button>
-        <button class="fig-icon-btn danger" title="Take the print off. The layers are untouched." aria-label="Remove effect" onClick={() => onEffects(undefined, 'Remove effect')}>
-          {icon(<path key="a" d="M6 6l12 12M18 6L6 18" />)}
-        </button>
-      </div>
-
+    <div class="fig-step-body">
       <div class="fig-page-row">
         {step.inks.map((k, i) => (
           <button key={i} class={`fig-dot ${ink === i ? 'on' : ''}`} style={{ background: k.color }} title={`Ink ${i + 1}: ${Riso.inkName(k.color)}. Click to change it.`} aria-label={`Ink ${i + 1}`} onClick={() => setInk(ink === i ? null : i)} />
@@ -429,7 +614,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
 
       <div class="fig-fx-chips" role="group" aria-label="Looks">
         {RISO_PRESETS.map((p, i) => (
-          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set(pageScreens(risoStep(i, step.seed)), `Riso · ${p.name}`)}>
+          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set({ ...pageScreens(risoStep(i, step.seed)), ...keepBase(step) }, `Riso · ${p.name}`)}>
             <span class="fig-fx-inks" aria-hidden="true">
               {p.apply.inks.map((k, j) => (
                 <i key={j} style={{ background: k.color }} />
@@ -439,7 +624,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
           </button>
         ))}
         {saved.map((p) => (
-          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set(p.step, `Riso · ${p.name}`)}>
+          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set({ ...p.step, ...keepBase(step) }, `Riso · ${p.name}`)}>
             <span class="fig-fx-inks" aria-hidden="true">
               {p.step.inks.map((k, j) => (
                 <i key={j} style={{ background: k.color }} />
@@ -458,14 +643,19 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
         >
           Reshuffle
         </button>
-        <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
-          Open in Riso ↗
+        <button class="fig-chip" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
+          Save look
         </button>
+        {onOpenRiso && (
+          <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
+            Open in Riso ↗
+          </button>
+        )}
       </div>
-      {note && <p class="fig-fx-hint">{note}</p>}
     </div>
   );
 }
+
 
 const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : lo);
 

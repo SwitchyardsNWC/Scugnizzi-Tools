@@ -417,6 +417,8 @@ interface LayerBase {
   group?: string;
   /** 0 to 1, from the properties panel. Absent is opaque. An image carries its own, required. */
   opacity?: number;
+  /** Effects on this layer alone, run on it before it is laid over the layers below. */
+  effects?: EffectStep[];
 }
 
 /**
@@ -628,8 +630,30 @@ export interface RisoPress {
   misreg: number;
 }
 
+/** What every step carries: switched off without being removed, and how much of it shows. */
+export interface StepBase {
+  /** Kept in the stack but not run. */
+  off?: boolean;
+  /** 0 to 1: the result mixed back with what came in. Absent is 1. */
+  strength?: number;
+}
+
 /**
- * A step run on a freeform page's picture after it is drawn. Every setting and the seed are stored,
- * so the same recipe prints the same picture on every export.
+ * A step run on a freeform picture, or on one layer of it, after it is drawn. Steps run in order, top
+ * first. Every setting and every seed is stored, so the same recipe makes the same picture on every
+ * export. Riso is the press in `effects/riso.js`; the rest are the image effects in `effects/image.js`.
  */
-export type EffectStep = { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number };
+export type EffectStep = StepBase &
+  (
+    | { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number }
+    | { effect: 'adjust'; brightness: number; contrast: number; saturation: number }
+    | { effect: 'duotone'; shadow: string; highlight: string }
+    | { effect: 'posterize'; levels: number; gamma: number }
+    | { effect: 'halftone'; spacing: number; angle: number; shape: 'circle' | 'square' | 'diamond' | 'line' | 'ellipse'; contrast: number; ink: string; paper: string }
+    | { effect: 'grain'; amount: number; mono: number; seed: number }
+    | { effect: 'texture'; kind: 'paper' | 'canvas' | 'fibers' | 'concrete' | 'crosshatch'; amount: number; scale: number; blend: 'multiply' | 'overlay' | 'screen' | 'soft-light' }
+    | { effect: 'blur'; radius: number }
+    | { effect: 'vignette'; amount: number; spread: number }
+  );
+export type EffectKind = EffectStep['effect'];
+export type RisoStep = Extract<EffectStep, { effect: 'riso' }>;

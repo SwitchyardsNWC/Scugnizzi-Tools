@@ -12,6 +12,7 @@
 import { freeformSvg } from '../compile/freeform.ts';
 import { DEFAULT_DESIGN_SYSTEM } from '../model/design-system.ts';
 import type { Template } from '../model/types.ts';
+import { hasEffects } from '../model/effects.ts';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -25,7 +26,7 @@ export function withPrints(html: string, template: Template, prints: Record<stri
     for (const row of section.rows)
       for (const column of row.columns)
         for (const block of column.blocks) {
-          if (block.type !== 'freeform' || !block.effects?.length) continue;
+          if (block.type !== 'freeform' || !hasEffects(block)) continue;
           const print = prints[block.id];
           if (!print) continue;
           // `data-sy-freeform` stays, so the canvas still flies from and back to this spot.

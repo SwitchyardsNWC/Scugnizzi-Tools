@@ -312,5 +312,36 @@ named for use: Kicker, Outline display, Shadow display, Tag, Marked line, Seal.
   › Drawing › Smart guides turns it off (`model/snap.ts`).
 - Arrow keys already nudged 1px, or 10px with Shift.
 
-**Next.** The brand library replacing Stamp. Then effects on a single layer. Then per-layer effects, with the Image Effects tool's
+**The effects stack** *(2026-11-11)*. Jared: "Rework the effects system." Agreed the day before:
+"Love the idea of layer effects versus whole image effects."
+
+- **A stack, not one effect.** A page, or any one layer, carries `effects: EffectStep[]`, run top
+  first. Each step can be switched off without being removed, has a strength from 0 to 100% (the
+  result mixed back with what came in), moves up or down, and is removed on its own. The panel
+  shows the stack of whatever is picked: one layer's, or the page's when nothing or a drawing is
+  picked. Each row has an eye toggle; an off row is struck through and dimmed, so the state reads
+  without colour.
+- **The steps.** Adjust (brightness, contrast, saturation), Duotone, Halftone, Posterize, Grain,
+  Texture, Blur, Vignette, and Riso. All but Riso and Adjust are the Image Effects tool's filters,
+  moved into `effects/image.js` at the repo root beside `effects/riso.js` and typed by
+  `src/effects/image.ts`. Two changes on the way: grain was `Math.random` and is now seeded, and
+  halftone was drawn with canvas paths and is now computed per pixel. Both changes make the same
+  recipe give the same bytes everywhere. Spatial settings are in page pixels at any render scale.
+- **Per layer.** A layer with effects is drawn alone on a clear sheet, run through its stack, and
+  laid over the layers below it. Every step but Blur keeps the layer's own transparency, so an
+  effect stays inside its shape; Blur softens the edges too. The page's stack runs last, on
+  everything (`app/picture.ts`). A layer's effects are part of its recipe, so a change makes the
+  picture stale like any other edit. Everywhere that asked whether a page had effects now asks
+  `hasEffects`, which counts layers and ignores steps that are off or at 0%.
+- **Looks** replace a stack in one click: Film noir, Newsprint, Dirty 35mm, Screen print (the
+  Image Effects tool's presets, as it tuned them), and the three Riso presets.
+- **Riso** is one step among the rest. Its row opens to the controls it had: inks, screen,
+  misprint, soak, grain, paper, saved looks, and Open in Riso on the page. Riso is now handed the
+  picture as it stands just before its step, and its settings come back into that step, keeping
+  where it sits, its strength, and every other step.
+- **Not yet:** the Image Effects tool still runs its own copy of the filters; moving it onto
+  `effects/image.js` is the next step for "one code path". Looks have no thumbnails yet. Effects
+  on a drawing (a group) go on the page, not on the group.
+
+**Next.** The brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
 effects moved into `effects/` beside Riso.

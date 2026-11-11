@@ -14,6 +14,7 @@ import { colorOf, DEFAULT_DESIGN_SYSTEM } from './design-system.ts';
 import { FREEFORM_APP_FRAME, FRAMES_INDEX, readFrameIndex } from './frame-store.ts';
 import { recipeHash, withFreeform } from './freeform.ts';
 import type { Block, FreeformBlock, Template } from './types.ts';
+import { hasEffects } from './effects.ts';
 
 /** Where the Freeform app kept its one frame, and now its first frame's key. The misspelt prefix is every tool's, kept on purpose. */
 export { FREEFORM_APP_FRAME };
@@ -37,7 +38,7 @@ export interface AppFrame {
  */
 function followed(frame: Pick<AppFrame, 'page' | 'ground'>): FreeformBlock {
   const page = frame.page;
-  return { ...page, background: page.background ?? (page.effects?.length ? frame.ground : null) };
+  return { ...page, background: page.background ?? (hasEffects(page) ? frame.ground : null) };
 }
 
 /** The frame the Freeform app is keeping, or null when there is none or it cannot be read. */

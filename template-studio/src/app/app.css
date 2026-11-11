@@ -1983,7 +1983,7 @@ button.phone-row { cursor: pointer; }
 .fig-brush.on { background: var(--fig-accent-soft); box-shadow: inset 0 0 0 2px var(--fig-accent); color: var(--fig-accent); }
 
 /* Effects on the page (FigPanel.tsx › FigEffects). */
-.fig-effects { display: grid; gap: 9px; padding: 10px 14px 14px; border-top: 1px solid var(--fig-line); max-height: 52%; overflow-y: auto; }
+.fig-effects { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; padding: 10px 14px 14px; border-top: 1px solid var(--fig-line); max-height: 60%; overflow-y: auto; align-content: start; }
 .fig-effects .fig-page-row .grow { flex: 1; }
 .fig-effects .fig-sliders { width: auto; padding: 0; }
 .fig-fx-presets { display: grid; gap: 6px; }
@@ -2056,6 +2056,44 @@ button.phone-row { cursor: pointer; }
   font: inherit; font-size: 12.5px; color: var(--fig-ink);
 }
 .fig-fx-name input:focus { outline: 2px solid var(--fig-accent); }
+
+/* The effects stack (FigPanel › FigEffects): page or one layer, each step a row that opens to its dials. */
+.fig-fx-scope { padding: 1px 6px; border-radius: 4px; background: var(--fig-hover); font-size: 11px; font-weight: 600; color: var(--fig-muted); }
+.fig-text-btn.on { background: var(--fig-accent-soft); }
+.fig-fx-menu { display: grid; gap: 1px; margin: 0; padding: 4px; list-style: none; border-radius: 8px; background: var(--fig-surface); box-shadow: var(--fig-shadow-sm); }
+.fig-fx-menu button { display: grid; gap: 1px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; font: inherit; text-align: left; color: var(--fig-ink); cursor: pointer; }
+.fig-fx-menu button:hover { background: var(--fig-hover); }
+.fig-fx-menu b { font-size: 12.5px; font-weight: 600; }
+.fig-fx-menu span { font-size: 11px; color: var(--fig-faint); }
+.fig-fx-stack { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.fig-fx-step { border-radius: 6px; background: var(--fig-hover); }
+.fig-fx-step.open { box-shadow: inset 0 0 0 1px var(--fig-line); background: var(--fig-surface); }
+/* Off: struck through and dimmed, so the state reads without colour. */
+.fig-fx-step.off .fig-fx-name-btn { text-decoration: line-through; color: var(--fig-faint); }
+.fig-fx-row { display: flex; align-items: center; gap: 2px; padding: 2px 6px 2px 2px; }
+.fig-fx-name-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fig-ink); text-align: left; cursor: pointer; }
+.fig-fx-name-btn .caret { font-size: 9px; color: var(--fig-faint); }
+.fig-fx-num { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--fig-surface); font-size: 10px; font-weight: 700; color: var(--fig-muted); font-variant-numeric: tabular-nums; }
+.fig-fx-strength { display: flex; align-items: center; gap: 4px; flex: none; }
+.fig-fx-strength input { width: 64px; accent-color: var(--fig-accent); }
+.fig-fx-strength span { width: 34px; font-size: 11px; color: var(--fig-faint); text-align: right; font-variant-numeric: tabular-nums; }
+.fig-step-body { display: grid; gap: 8px; padding: 6px 8px 8px; width: auto; }
+.fig-fx-step .fig-fx-actions { padding: 0 8px 8px; }
+.fig-chip.danger:hover { background: var(--fig-danger-soft); color: var(--fig-danger); }
+.fig-chip:disabled { opacity: 0.4; cursor: default; }
+.fig-hex { display: grid; grid-template-columns: 96px 28px 1fr; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fig-ink-2); }
+.fig-hex input[type="color"] { width: 28px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; cursor: pointer; }
+.fig-hex code { font-family: var(--mono); font-size: 11px; color: var(--fig-muted); }
+.fig-step-body .fig-page-row { flex-wrap: wrap; gap: 4px 8px; }
+.fig-step-body .fig-seg { flex-wrap: wrap; }
+.fig-step-body .fig-seg button { text-transform: capitalize; }
+.fig-step-body .fig-slide { grid-template-columns: 64px minmax(0, 1fr) 40px; }
+.fig-step-body .fig-slide-label, .fig-hex .fig-slide-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fig-hex { grid-template-columns: 64px 28px minmax(0, 1fr); }
+.fig-hex input[type="color"] { box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-fx-stack, .fig-fx-step { min-width: 0; }
+.fig-effects .fig-step-body, .fig-effects .fig-sliders.fig-step-body { padding: 4px 10px 10px; }
+.fig-fx-step .fig-fx-actions { padding: 0 10px 10px; }
 
 /* A freeform block following a frame in the Freeform app (Inspector › LayersField). */
 .canvas-link { display: grid; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }

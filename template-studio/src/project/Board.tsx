@@ -100,6 +100,7 @@ import { TrashCan, TrashPanel, useTrash } from '../app/Trash.tsx';
 import { LinkForm, ProjectMenu } from './menus.tsx';
 import { NoteCard } from './notes.tsx';
 import { ArrowLeft, FitAll, FitOne, Minus, Plus } from './glyphs.tsx';
+import { hasEffects } from '../model/effects.ts';
 
 // --- the board ------------------------------------------------------------------------------------------------
 
@@ -312,7 +313,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
     const wanted: PrintedPage[] = [];
     for (const f of files.frames) {
       const fr = f.frame;
-      if (fr?.page.effects?.length) wanted.push({ page: fr.page, hash: fr.hash, ground: fr.ground, ds: f.template.ds ?? DEFAULT_DESIGN_SYSTEM });
+      if (fr && hasEffects(fr.page)) wanted.push({ page: fr.page, hash: fr.hash, ground: fr.ground, ds: f.template.ds ?? DEFAULT_DESIGN_SYSTEM });
     }
     for (const e of files.emails) if (e.template) wanted.push(...printedIn(e.template));
     return wanted;
@@ -343,7 +344,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
       cancelled = true;
     };
   }, [printedPages, assetSignature]);
-  const printOf = (f: FrameItem) => (f.frame?.page.effects?.length ? prints[printId(f.frame.hash, f.frame.ground, assetSignature.length)] : undefined);
+  const printOf = (f: FrameItem) => (f.frame && hasEffects(f.frame.page) ? prints[printId(f.frame.hash, f.frame.ground, assetSignature.length)] : undefined);
   /** For each email, the prints of its pages with effects by block id: what its card shows in the drawings' place. */
   const emailPrints = useMemo(() => {
     const out = new Map<string, Record<string, { url: string }>>();
@@ -1929,7 +1930,7 @@ export function Board({ project, notify, onCreateProject }: BoardProps) {
             const meta = email
               ? 'email'
               : frame
-                ? `frame${frame.frame ? ` · ${frame.frame.page.width}×${frame.frame.page.height}` : ''}${frame.frame?.page.effects?.length ? ' · riso' : ''}`
+                ? `frame${frame.frame ? ` · ${frame.frame.page.width}×${frame.frame.page.height}` : ''}${frame.frame && hasEffects(frame.frame.page) ? ' · effects' : ''}`
                 : picture
                   ? `${madeBy ? `${RECIPE_TOOLS[madeBy.tool].name.toLowerCase()} · ` : ''}${sizeOf(picture.size)}`
                   : doc

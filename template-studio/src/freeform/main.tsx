@@ -53,6 +53,7 @@ import { useProject, type Project } from '../project/useProject.ts';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
+import { hasEffects } from '../model/effects.ts';
 
 startTheme();
 
@@ -635,7 +636,7 @@ function FreeformTool() {
   // What the page sits on. A plain export keeps a transparent page; a print needs paper under it.
   const section = editor.template.sections.find((s) => s.id === found.sectionId);
   const ground = colorOf(ds, block.background) ?? section?.containerColor ?? section?.bandColor ?? '#ffffff';
-  const printed = Boolean(block.effects?.length);
+  const printed = hasEffects(block);
   const fileBase = slug(activeEntry.name);
   const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
   const exportPng = async () => {

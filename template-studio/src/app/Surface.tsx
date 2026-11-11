@@ -41,11 +41,11 @@ import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/qui
 import { useCanvasSettings } from './canvas-settings.ts';
 import { TouchGestures } from './gestures.ts';
 import { glide, PanTracker } from './inertia.ts';
-import { HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects } from '../model/effects.ts';
+import { hasEffects, HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects, withRisoStep } from '../model/effects.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
 import { MARKS } from '../model/marks.ts';
-import type { Brush, FreeformBlock, FreeformLayer, StyleRange, Template, TextMarks } from '../model/types.ts';
+import type { Brush, FreeformBlock, FreeformLayer, RisoStep, StyleRange, Template, TextMarks } from '../model/types.ts';
 import { FigBar, FigFormat, FigLayers, FigSlash, type FormatState } from './FigPanel.tsx';
 import { editableHtml, keepEnd, readEditable, selectionOffsets, setSelectionOffsets } from './rich-editing.ts';
 import { applyMarks, clearMarks, markState, spliceText, toggleMark, type MarkKey } from '../model/rich-text.ts';
@@ -493,7 +493,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   assetsRef.current = assets;
   const dsRef = useRef(ds);
   dsRef.current = ds;
-  const fxKey = block?.type === 'freeform' && block.effects?.length ? recipeHash(block) : null;
+  const fxKey = block?.type === 'freeform' && hasEffects(block) ? recipeHash(block) : null;
   /** What the page sits on. A print needs an opaque ground: it reads a transparent pixel as black ink. */
   const groundOf = useCallback(
     (b: FreeformBlock) => {
@@ -532,11 +532,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const b = blockRef.current;
     if (!b) return;
     try {
-      const canvas = await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b), effects: false });
+      // Riso gets the picture as it stands just before the Riso step: layer effects and earlier page steps on.
+      const at = b.effects?.findIndex((e) => e.effect === 'riso') ?? -1;
+      const canvas = await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b), pageEffects: at < 0 ? b.effects : b.effects!.slice(0, at) });
       let image = canvas.toDataURL('image/png');
       if (image.length > 3_500_000) image = canvas.toDataURL('image/jpeg', 0.92);
       const session = `${blockId}:${Date.now().toString(36)}`;
-      const step = b.effects?.find((e) => e.effect === 'riso') ?? risoStep(0);
+      const step = b.effects?.find((e): e is RisoStep => e.effect === 'riso') ?? risoStep(0);
       // `returnUrl`: where Riso goes back to when it opened in this same tab rather than a new one.
       localStorage.setItem(HANDOFF_RISO, JSON.stringify({ session, blockId, title: b.alt || 'Freeform', image, unit: 2, step, returnUrl: window.location.href, zoom: viewRef.current.z }));
       const tab = window.open(new URL(`../../riso/riso.html?handoff=${encodeURIComponent(session)}`, window.location.href).href, '_blank');
@@ -568,7 +570,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }
       if (!step) return;
       const ed = editorRef.current;
-      const next = setEffects(ed.template, blockId, [step]);
+      const page = ed.template.sections.flatMap((x) => x.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((x) => x.id === blockId);
+      const next = setEffects(ed.template, blockId, withRisoStep(page?.type === 'freeform' ? page.effects : undefined, step));
       if (next !== ed.template) ed.commit('Riso, from the tool', next);
       setFxNote('Back from Riso.');
     };
@@ -1716,7 +1719,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
           heights={textHeights}
-          onLayers={(label, next) => commit(label, replaceLayers(tpl(), blockId, next))}
+          onLayers={(label, next, coalesce) => commit(label, replaceLayers(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}
           effectNote={fxNote}
