@@ -596,6 +596,23 @@ and registers that color. At the end it walks the registry and writes matching
 `prefers-color-scheme` and `[data-ogsc]` rules. No color can be used without gaining an
 override. **Keep this design in v2.**
 
+### 2.6a Two colour classes on one path tie, and registration order breaks the tie
+
+*2026-11-11.* Every dark rule is `!important` at one class of specificity. Put a `sy-link-111111`
+cell around a `td.sy-btn` that wears `sy-link-ffffff`, and both `.sy-link-x a strong` rules match
+the label equally; the one emitted later wins, and emission order is wherever each colour first
+appeared in the email. The card email's second card was a stack whose outer cell wore the
+section's ink. Add a button section above it and white registered first, so the label went ink on
+an ink fill in dark mode. Any stacked button in any template was one reorder away from it.
+
+The fix removes the nesting rather than adding a specificity ladder: a stack's outer cell carries
+no text or link colour, because every row that shows text already carries its own. The
+alternative, scoping rules by depth, also has to keep links beating text and type roles beating
+both at every depth, which is more CSS to get wrong. `tests/dark.test.ts` compiles both orders
+and resolves the cascade, and fails any starter whose tree puts one text or link scope inside a
+different one. A wrapper around several blocks wears no colour; a block's colour goes on its own
+cell.
+
 ### 2.7 Gmail and Apple auto-link addresses and phone numbers
 
 They restyle the result as a blue underlined link. Two defenses, both used in v1:
