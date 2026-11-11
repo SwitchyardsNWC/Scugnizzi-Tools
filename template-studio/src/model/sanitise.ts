@@ -107,7 +107,10 @@ function hrefOf(attrs: string): string | null {
   // `javascript:` and `data:` in a template that ends up in someone's inbox is not a link, and an
   // allowlist of schemes is the only version of this check that stays correct.
   if (!/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(raw)) return null;
-  return raw.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  // An ampersand that already starts an entity is left alone. A browser's `innerHTML` always writes `&` in an
+  // attribute as `&amp;`, so escaping every `&` turned `?a=1&amp;b=2` into `&amp;amp;` on every inline edit, and a
+  // tracking link's query string grew another `amp;` each time until it stopped working.
+  return raw.replace(/&(?!#?[a-zA-Z0-9]+;)/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 const escapeText = (s: string) =>
