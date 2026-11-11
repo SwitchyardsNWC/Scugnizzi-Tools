@@ -41,6 +41,7 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238f8c86' stroke-width='1.5'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 8px center}
   input:focus,select:focus,textarea:focus{border-color:#55555c;outline:none}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--text);outline-offset:1px}
   input[type=checkbox]{accent-color:var(--accent);margin:0}
   .check{display:flex;align-items:flex-start;gap:8px;margin:7px 0;cursor:pointer}
   .check input{margin-top:2px}
@@ -101,6 +102,7 @@
   .orow.dragging{opacity:.4}
   .orow.drop-before{box-shadow:inset 0 2px 0 var(--text)}
   .orow.drop-after{box-shadow:inset 0 -2px 0 var(--text)}
+  .oempty.drop-in{outline:2px dashed var(--text);outline-offset:-2px;color:var(--text)}
 
   /* ---- Centre ---- */
   main{display:flex;flex-direction:column;min-width:0;background:#0e0e0f}
@@ -181,7 +183,8 @@
   /* Menus and toasts */
   .menu{position:fixed;z-index:200;min-width:220px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
   .menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:transparent;border-color:transparent;padding:6px 8px}
-  .menu button:hover,.menu button:focus{background:var(--panel2);outline:none}
+  .menu button:hover{background:var(--panel2)}
+  .menu button:focus{background:var(--panel2);outline:2px solid var(--text);outline-offset:-2px}
   .menu button .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
   .menu button small{display:block;color:var(--muted);font-size:11px}
   .menu .sep{border-top:1px solid var(--line);margin:4px 0}
@@ -295,17 +298,17 @@ let SYS = H.normalizeSystem(H.SWITCHYARDS);
 let sysSource = 'built-in copy of switchyards.system.json';
 const state = { library: {}, order: [], openId: null };
 const ui = { tab: 'design', device: 'desktop', empty: false, dark: false, gmail: false, theme: null, file: 'module.html', sel: null, done: {} };
-try { Object.assign(ui, ToolKit.loadAux('ui', true) || {}); } catch (e) {}
-ui.sel = null;
 const saveUi = () => ToolKit.saveAux('ui', { tab: ui.tab, device: ui.device, empty: ui.empty, dark: ui.dark, gmail: ui.gmail, file: ui.file, done: ui.done });
 
 const doc = () => state.library[state.openId] || null;
 function defaults() {
   const st = { library: {}, order: [], openId: null };
-  for (const s of H.STARTERS.filter(s => s.id !== 'blank')) { const d = s.make(SYS); st.library[d.id] = d; st.order.push(d.id); }
+  // Fixed ids, so what is keyed by a module (the hand-build ticks) still finds it after a reload.
+  for (const s of H.STARTERS.filter(s => s.id !== 'blank')) { const d = s.make(SYS); d.id = `m_starter_${s.id}`; st.library[d.id] = d; st.order.push(d.id); }
   st.openId = st.order[0];
   return st;
 }
+// A structural edit (add, delete, move, drop, duplicate) first records whatever is pending, so it undoes on its own.
 function touch() { const d = doc(); if (d) d.updated = new Date().toISOString(); ToolKit.commit(); }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -342,13 +345,16 @@ function allParts(parts = doc().parts, out = []) {
 // ---------------------------------------------------------------------------------------------------------------
 
 function addPart(type, list, index) {
+  ToolKit.flush();
   const d = doc(), p = H.makePart(type, SYS);
   list.splice(index == null ? list.length : index, 0, p);
-  H.claimNames(d, p);
+  settle(p);
+  if (p.type === 'image') p.width = Math.min(p.width, H.slotWidth(d, SYS, p.id));
   ui.sel = p.id; touch(); refresh({ inspector: true });
   ToolKit.toast(`${H.TYPES[type].label} added`);
 }
 function removePart(id) {
+  ToolKit.flush();
   const r = locate(id); if (!r) return;
   r.list.splice(r.index, 1);
   ui.sel = r.list[Math.min(r.index, r.list.length - 1)]?.id || (r.owner ? r.owner.id : null);
@@ -356,28 +362,36 @@ function removePart(id) {
   ToolKit.toast('Deleted. ⌘Z brings it back');
 }
 function movePart(id, dir) {
+  ToolKit.flush();
   const r = locate(id); if (!r) return;
   const j = r.index + dir; if (j < 0 || j >= r.list.length) return;
   r.list.splice(r.index, 1); r.list.splice(j, 0, r.part);
   touch(); refresh({});
 }
 function duplicatePart(id) {
+  ToolKit.flush();
   const r = locate(id); if (!r) return;
   const copy = H.reid(clone(r.part));
   r.list.splice(r.index + 1, 0, copy);
-  H.claimNames(doc(), copy);
+  settle(copy);
   ui.sel = copy.id; touch(); refresh({ inspector: true });
 }
 /** Drag and drop in the outline: move a part into another list at an index, if the grammar allows it. */
 function dropPart(id, targetList, targetIndex, targetOwner) {
+  ToolKit.flush();
   const r = locate(id); if (!r) return;
   if (!H.canHold(targetOwner, r.part)) { ToolKit.toast(H.whyNot(targetOwner, r.part)); return; }
   if (allParts([r.part]).some(p => (p.cols && p.cols.some(c => c.parts === targetList)) || (p.type === 'repeat' && p.parts === targetList))) { ToolKit.toast('A part cannot go inside itself'); return; }
   r.list.splice(r.index, 1);
   if (r.list === targetList && r.index < targetIndex) targetIndex--;
   targetList.splice(targetIndex, 0, r.part);
-  if (r.list !== targetList) H.claimNames(doc(), r.part);
+  if (r.list !== targetList) settle(r.part);
   ui.sel = r.part.id; touch(); refresh({ inspector: true });
+}
+/** After a part lands: unique names in its new scope, and no "switch it off" inside a group, where it means nothing. */
+function settle(p) {
+  H.claimNames(doc(), p);
+  if (repeatOf(p.id)) allParts([p]).forEach(q => { q.toggle = false; });
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -403,6 +417,7 @@ function duplicateModule() {
   state.library[c.id] = c; state.order.splice(state.order.indexOf(d.id) + 1, 0, c.id); openModule(c.id);
 }
 function deleteModule() {
+  ToolKit.flush();
   const d = doc(); if (!d) return;
   const i = state.order.indexOf(d.id); state.order.splice(i, 1); delete state.library[d.id];
   if (!state.order.length) { const n = H.STARTERS.find(s => s.id === 'blank').make(SYS); state.library[n.id] = n; state.order.push(n.id); }
@@ -417,10 +432,16 @@ function saveFile() {
 async function openFile(file) {
   try {
     const o = JSON.parse(await file.text());
-    const m = H.migrate(o.module || o);
-    if (!m || !Array.isArray(m.parts)) throw new Error('not a HUB-MOD design');
-    if (state.library[m.id]) m.id = H.uid('m');
-    m.name = uniqueName(m.name || 'Opened module');
+    const src = o && typeof o === 'object' && !Array.isArray(o) ? (o.module || o) : null;
+    // fields.json and meta.json from an export are JSON too; a design has parts.
+    if (!src || typeof src !== 'object' || !Array.isArray(src.parts)) throw new Error('no parts in it; a .hubmod.json from Save file is');
+    const m = H.migrate(src);
+    // The same module, opened again, replaces itself: its name and folder are what HubSpot knows it by.
+    if (m.id && state.library[m.id]) {
+      state.library[m.id] = m; openModule(m.id); touch();
+      ToolKit.toast(`${m.name} replaced by the opened file. ⌘Z brings the old one back`); return;
+    }
+    if (!m.id) m.id = H.uid('m');
     state.library[m.id] = m; state.order.unshift(m.id); openModule(m.id);
     ToolKit.toast(`Opened ${m.name}`);
   } catch (e) { ToolKit.toast(`That file is not a HUB-MOD design (${e.message})`); }
@@ -437,8 +458,14 @@ function refresh(opts = {}) {
   const d = doc(); if (!d) return;
   if (ui.sel && !locate(ui.sel)) ui.sel = null;
   if (!ui.theme || !d.themes.includes(ui.theme)) ui.theme = d.themes[0];
-  built = H.build(d, SYS);
-  issues = H.check(d, SYS, built);
+  try { built = H.build(d, SYS); issues = H.check(d, SYS, built); }
+  catch (e) {
+    // Never leave the last module's build in place: Download would zip it under this one's name.
+    built = null; issues = [{ level: 'error', msg: `This module does not build: ${e.message}`, partId: null }];
+    try { issues = H.check(d, SYS, null).concat(issues); } catch (x) { /* the message above says enough */ }
+  }
+  const twin = state.order.find(id => id !== d.id && state.library[id].slug === d.slug);
+  if (twin) issues.push({ level: 'warning', msg: `“${state.library[twin].name}” uses the same folder, ${d.slug}. Upload both and one replaces the other in HubSpot.`, partId: null });
   renderLibrary(); renderOutline(); renderIssues(); renderBar();
   if (opts.inspector) renderInspector(); else syncInspectorHead();
   schedulePreview();
@@ -463,7 +490,7 @@ function renderBar() {
   const d = doc();
   const ts = $('#themeSeg');
   ts.hidden = d.themes.length < 2;
-  ts.innerHTML = d.themes.map(t => `<button data-theme="${t}" class="${t === ui.theme ? 'on' : ''}" title="Preview the ${esc(SYS.themes[t]?.label || t)} theme the team can pick"><span class="swatch" style="background:${SYS.themes[t]?.bg}"></span>${esc(SYS.themes[t]?.label || t)}</button>`).join('');
+  ts.innerHTML = d.themes.filter(t => SYS.themes[t]).map(t => `<button data-theme="${t}" class="${t === ui.theme ? 'on' : ''}" title="Preview the ${esc(SYS.themes[t].label)} theme the team can pick"><span class="swatch" style="background:${SYS.themes[t].bg}"></span>${esc(SYS.themes[t].label)}</button>`).join('');
   $('#designBar').hidden = ui.tab !== 'design';
   $('#viewDesign').hidden = ui.tab !== 'design';
   $('#viewCode').hidden = ui.tab !== 'code';
@@ -484,7 +511,12 @@ function renderOutline() {
 function outlineList(list, owner, col) {
   const wrap = document.createElement('div'); wrap.className = owner ? 'nest' : '';
   wrap._list = list; wrap._owner = owner;
-  if (!list.length) wrap.insertAdjacentHTML('beforeend', `<div class="oempty">${owner ? 'Empty. Add a part.' : 'No parts yet.'}</div>`);
+  if (!list.length) {
+    const empty = document.createElement('div'); empty.className = 'oempty';
+    empty.textContent = owner ? 'Empty. Add a part, or drag one here.' : 'No parts yet.';
+    empty._list = list; empty._owner = owner;
+    wrap.appendChild(empty);
+  }
   list.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = `orow${p.id === ui.sel ? ' on' : ''}`; row.dataset.id = p.id; row.draggable = true;
@@ -534,7 +566,7 @@ function menu(anchor, html, pick) {
     const bs = $$('button', menuEl), i = bs.indexOf(document.activeElement);
     if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
     if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
-    if (e.key === 'Escape') closeMenu();
+    if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); }
   });
   setTimeout(() => document.addEventListener('pointerdown', outside), 0);
 }
@@ -550,8 +582,10 @@ $('#outline').addEventListener('click', e => {
 });
 let dragId = null;
 $('#outline').addEventListener('dragstart', e => { const row = e.target.closest('.orow'); if (!row) return; dragId = row.dataset.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
-$('#outline').addEventListener('dragend', () => { dragId = null; $$('.orow').forEach(r => r.classList.remove('dragging', 'drop-before', 'drop-after')); });
+$('#outline').addEventListener('dragend', () => { dragId = null; $$('.orow, .oempty').forEach(r => r.classList.remove('dragging', 'drop-before', 'drop-after', 'drop-in')); });
 $('#outline').addEventListener('dragover', e => {
+  const empty = e.target.closest('.oempty');
+  if (empty && dragId) { e.preventDefault(); $$('.orow, .oempty').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-in')); empty.classList.add('drop-in'); return; }
   const row = e.target.closest('.orow'); if (!row || !dragId || row.dataset.id === dragId) return;
   e.preventDefault();
   const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
@@ -559,6 +593,8 @@ $('#outline').addEventListener('dragover', e => {
   row.classList.add(after ? 'drop-after' : 'drop-before');
 });
 $('#outline').addEventListener('drop', e => {
+  const empty = e.target.closest('.oempty');
+  if (empty && dragId) { e.preventDefault(); dropPart(dragId, empty._list, 0, empty._owner); return; }
   const row = e.target.closest('.orow'); if (!row || !dragId) return;
   e.preventDefault();
   const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
@@ -629,24 +665,39 @@ function paintPreview() {
   const d = doc(), fd = frame.contentDocument; if (!fd || !d) return;
   const phone = ui.device === 'phone';
   $('#deviceBox').style.width = `${phone ? PHONE : Math.max(d.width + 80, 720)}px`;
-  const html = H.render(d, SYS, { mode: 'preview', theme: ui.theme, empty: ui.empty });
+  let html;
+  try { html = H.render(d, SYS, { mode: 'preview', theme: ui.theme, empty: ui.empty }); }
+  catch (e) { html = `<p style="font:13px Helvetica,Arial,sans-serif;color:#7a3a3a;padding:16px">This module does not build: ${esc(e.message)}. See Checks.</p>`; }
   const email = fd.getElementById('email');
   email.style.width = phone ? '100%' : `${d.width}px`;
   email.style.padding = phone ? '0' : '24px 0';
   email.innerHTML = html;
-  // The inline block always applies: HubSpot inlines it before any client sees the email. The sheet is a <style> in
-  // the body, which Gmail strips, so the Gmail view leaves it out.
-  fd.getElementById('mod').textContent = `${built.styles.inline}\n${ui.gmail ? '' : built.styles.sheet}`;
-  fd.getElementById('dark').textContent = ui.dark && !ui.gmail ? H.darkRules(built.styles.sheet) : '';
+  const styles = built ? built.styles : { inline: '', sheet: '' };
+  // The rich text block is inlined by HubSpot at send (expected, from one community report; see learnings 1.18), so
+  // it is applied here the same way: each rule's declarations put in front of the element's own style. A rule in a
+  // stylesheet would lose to an inline !important that the real send has, and the preview would lie about spacing.
+  inlineRules(fd, styles.inline);
+  // The sheet is a <style> in the body, which Gmail strips, so the Gmail view leaves it out.
+  fd.getElementById('mod').textContent = ui.gmail ? '' : styles.sheet;
+  fd.getElementById('dark').textContent = ui.dark && !ui.gmail ? H.darkRules(styles.sheet) : '';
   fd.body.classList.toggle('dark', ui.dark);
   const note = $('#darkNote');
   note.hidden = !(ui.dark || ui.gmail);
   note.innerHTML = ui.gmail
-    ? `Gmail view: the module's style block is gone, as Gmail strips it. Everything inline holds, and columns still stack on a phone. ${ui.dark ? 'Gmail’s apps ignore every dark-mode rule and invert as they like; nothing can preview that.' : 'No phone font sizes, no dark-mode rules.'}`
+    ? `Gmail view: the module's style block is gone, as Gmail strips it. Everything inline holds, and columns still stack on a phone. Rich text keeps its rules on the expectation that HubSpot inlines them at send, which one test send has to confirm. ${ui.dark ? 'Gmail’s apps ignore every dark-mode rule and invert as they like; nothing can preview that.' : 'No phone font sizes, no dark-mode rules.'}`
     : 'Dark override: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. It is not what Gmail’s apps do; they invert as they like and nothing can preview that.';
   const t = SYS.themes[ui.theme];
   $('#deviceNote').textContent = `${phone ? `${PHONE}px phone${ui.gmail ? '' : ' · phone rules on'}` : `${d.width}px ${d.width === 600 ? 'email body' : 'column'}`} · ${t ? t.label : ''} theme · ${ui.empty ? 'optional fields empty' : 'defaults filled in'}`;
   paintSelection(); fit();
+}
+/** HubSpot's inliner, imitated: matched declarations go in front of the element's own (learnings 1.9). */
+function inlineRules(fd, css) {
+  for (const m of String(css || '').matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const decls = m[2].trim().replace(/;?$/, ';');
+    let els = [];
+    try { els = fd.querySelectorAll(m[1].trim()); } catch (e) { continue; }
+    els.forEach(el => el.setAttribute('style', `${decls} ${el.getAttribute('style') || ''}`.trim()));
+  }
 }
 function fit() {
   const fd = frame.contentDocument; if (!fd) return;
@@ -676,6 +727,7 @@ function paintSelection() {
 // ---------------------------------------------------------------------------------------------------------------
 
 function renderCode() {
+  if (!built) { $('#fileList').innerHTML = ''; $('#codePath').textContent = ''; $('#codeSrc').textContent = 'This module does not build. See Checks.'; $('#btnCopy').disabled = true; return; }
   const d = doc(), files = built.files;
   if (!files.some(f => f.path === ui.file)) ui.file = 'module.html';
   $('#fileList').innerHTML = files.map(f => `<button data-file="${esc(f.path)}" class="${f.path === ui.file ? 'on' : ''}" title="${esc(f.note || '')}"><span>${esc(f.path)}</span><span class="sz">${H.size(f.text)}</span></button>`).join('')
@@ -696,17 +748,19 @@ function highlight(text, path) {
 }
 $('#fileList').addEventListener('click', e => { const b = e.target.closest('button[data-file]'); if (!b) return; ui.file = b.dataset.file; saveUi(); renderCode(); });
 $('#btnCopy').addEventListener('click', async () => {
-  const f = built.files.find(x => x.path === ui.file);
+  const f = built && built.files.find(x => x.path === ui.file); if (!f) return;
   try { await navigator.clipboard.writeText(f.text); ToolKit.toast(`Copied ${f.path}`); }
   catch (e) { const r = document.createRange(); r.selectNodeContents($('#codeSrc')); getSelection().removeAllRanges(); getSelection().addRange(r); ToolKit.toast('Selected. Press ⌘C'); }
 });
 
 function downloadZip() {
   const d = doc();
-  if (issues.some(i => i.level === 'error')) { ToolKit.toast('Fix the errors under Checks first'); return; }
-  const data = H.zip(built.files.map(f => ({ path: `${d.slug}.module/${f.path}`, text: f.text })));
+  if (!built || issues.some(i => i.level === 'error')) { ToolKit.toast('Fix the errors under Checks first'); return; }
+  // Built again from the open module, not taken from the last refresh: what downloads is what is on screen.
+  const fresh = H.build(d, SYS);
+  const data = H.zip(fresh.files.map(f => ({ path: `${d.slug}.module/${f.path}`, text: f.text })));
   download(new Blob([data], { type: 'application/zip' }), `${d.slug}.module.zip`);
-  d.exported = { at: new Date().toISOString(), names: H.fieldNames(d) };
+  d.exported = { at: new Date().toISOString(), names: H.fieldNames(d), themes: d.themes.slice() };
   touch(); refresh({});
   ToolKit.toast(`${d.slug}.module.zip downloaded`);
 }
@@ -716,6 +770,7 @@ function downloadZip() {
 // ---------------------------------------------------------------------------------------------------------------
 
 function renderSteps() {
+  if (!built) { $('#viewSteps').innerHTML = '<p>This module does not build. See Checks.</p>'; return; }
   const d = doc(), s = built.steps;
   const done = ui.done[d.id] || {};
   const row = (f, i) => {
@@ -762,9 +817,12 @@ function renderInspector() {
   syncInspectorHead();
 }
 function syncInspectorHead() {
-  const r = ui.sel ? locate(ui.sel) : null; if (!r) return;
+  const r = ui.sel ? locate(ui.sel) : null;
+  if (!r) { const d = doc(); const sh = $('#slugHead', insp); if (sh && d) sh.textContent = `${d.slug}.module`; const cw = $('#cwHint', insp); if (cw && d) cw.textContent = `${H.contentWidth(d, SYS)}px`; return; }
   const s = $('.insp-head .t span', insp); if (s) s.textContent = H.isEditable(r.part) ? H.fieldPath(doc(), r.part) : (H.TYPES[r.part.type].container ? H.TYPES[r.part.type].blurb : 'fixed: the team cannot change it');
   const nm = $('[data-k="name"]', insp); if (nm && document.activeElement !== nm) nm.value = r.part.name || '';
+  const ph = $('#pathHint', insp);
+  if (ph) { const p = r.part; ph.textContent = p.type === 'repeat' ? `{% for item in ${H.fieldPath(doc(), p)} %}` : `${H.fieldPath(doc(), p)}${H.hasLink(p) ? `, ${H.fieldPath(doc(), p, '_link')}` : ''}`; }
   const au = $('#nameAuto', insp); if (au) au.hidden = !r.part.nameAuto;
 }
 
@@ -782,7 +840,7 @@ const alignSeg = (v, k = 'align') => segs(k, v, [['left', 'Left'], ['center', 'C
 function moduleInspector(d) {
   const themes = Object.entries(SYS.themes);
   const spaceOpts = [['0', 'None · 0'], ...Object.entries(SYS.space).map(([k, v]) => [k, `${k.toUpperCase()} · ${v}px`])];
-  return `<div class="insp-head"><span class="glyph">▣</span><span class="t"><b>Module</b><span>${esc(d.slug)}.module</span></span></div>
+  return `<div class="insp-head"><span class="glyph">▣</span><span class="t"><b>Module</b><span id="slugHead">${esc(d.slug)}.module</span></span></div>
   ${pane('Module', `
     <div class="stack"><label>Name in HubSpot</label>${txt('m.name', d.name)}</div>
     <div class="stack" title="The folder name, and so the module's path in Design Manager. Lower case, digits and hyphens."><label>Folder</label><div class="namefield">${txt('m.slug', d.slug)}<span class="auto" id="slugAuto"${d.slugAuto ? '' : ' hidden'}>auto</span></div></div>
@@ -790,20 +848,21 @@ function moduleInspector(d) {
   ${pane('Themes', `
     <p class="hint" style="margin-top:0">The Switchyards themes this module can wear. Tick more than one and the team gets a choice in HubSpot; the first ticked is the default.</p>
     ${themes.map(([k, t]) => `<label class="check"><input type="checkbox" data-theme-allow="${k}" ${d.themes.includes(k) ? 'checked' : ''}><span><span class="swatch" style="background:${t.bg}"></span>${esc(t.label)}<small>${esc(`${SYS.colorNames[t.bgToken] || t.bgToken} ground, ${SYS.colorNames[t.textToken] || t.textToken} text, ${t.button} button`)}</small></span></label>`).join('')}
-    ${d.themes.length > 1 ? row('Default', sel('m.themeDefault', d.themes[0], d.themes.map(t => [t, SYS.themes[t].label])), 'What a new copy of the module starts as') : ''}`)}
+    ${d.themes.length > 1 ? row('Default', sel('m.themeDefault', d.themes[0], d.themes.map(t => [t, (SYS.themes[t] || { label: `${t} (missing)` }).label])), 'What a new copy of the module starts as') : ''}
+    ${d.themes.filter(t => !SYS.themes[t]).map(t => `<label class="check"><input type="checkbox" data-theme-allow="${esc(t)}" checked><span>${esc(t)}<small>Not in the design system any more. Untick it.</small></span></label>`).join('')}`)}
   ${pane('Space', `
     ${row('Top', sel('m.pad.top', d.pad.top, spaceOpts))}
     ${row('Bottom', sel('m.pad.bottom', d.pad.bottom, spaceOpts))}
     ${row('Sides', sel('m.pad.side', d.pad.side, spaceOpts), 'Inside the module, left and right. The phone rules keep it.')}
     ${row('Made for', sel('m.width', d.width, [[600, 'Full width · 600px'], [300, 'Half column · 300px']], 'num'), 'A drag-and-drop email is 600px wide. Images size against this; dropped somewhere narrower, everything shrinks to fit.')}
-    <p class="hint">Content width <span class="mono">${H.contentWidth(d, SYS)}px</span>. The module is fluid: in a narrower column it shrinks, and its columns stack.</p>`)}
+    <p class="hint">Content width <span class="mono" id="cwHint">${H.contentWidth(d, SYS)}px</span>. The module is fluid: in a narrower column it shrinks, and its columns stack.</p>`)}
   ${pane('Style blocks', `
     <p class="hint" style="margin-top:0">Everything that has to hold is inline. These two blocks add what cannot be: HubSpot's editor warns about style tags in the body, and the email still saves and sends.</p>
-    ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links inside rich text. HubSpot inlines this block at send.')}
+    ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links inside rich text. HubSpot is expected to inline this block at send; one test send has to confirm it.')}
     ${chk('m.css.sheet', d.css.sheet, 'Phone and dark-mode rules', 'Phone font sizes and the dark layers. Apple Mail and Outlook.com read them; Gmail strips them.')}`)}
   ${pane('In HubSpot', `
     <p class="hint" style="margin-top:0">Select a part to set what the team can edit. Parts tagged <span class="tag field" style="font-family:var(--mono);font-size:10px;padding:0 4px">field</span> become fields in the editor sidebar, in this order:</p>
-    <ol class="hint" style="padding-left:18px">${built.steps.fields.filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
+    <ol class="hint" style="padding-left:18px">${(built ? built.steps.fields : []).filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
 }
 
 function partInspector(d, r) {
@@ -849,8 +908,8 @@ function fieldPane(p, rep) {
     ${on ? `
       <div class="stack"><label>Label the team reads</label>${txt('label', p.label)}<span class="hint">The label is the whole interface. Write it like microcopy.</span></div>
       <div class="stack" title="The name module.html reads it by. Renaming it after the module is in use loses what the team typed into the old one."><label>HubL name</label><div class="namefield">${txt('name', p.name)}<span class="auto" id="nameAuto"${p.nameAuto ? '' : ' hidden'}>auto</span></div>
-        <span class="hint mono">${esc(H.fieldPath(doc(), p))}${two ? `, ${esc(H.fieldPath(doc(), p, '_link'))}` : ''}</span></div>
-      <div class="stack"><label>Help text</label>${txt('help', p.help, 'Optional: shown under the field')}</div>
+        <span class="hint mono" id="pathHint">${esc(H.fieldPath(doc(), p))}${two ? `, ${esc(H.fieldPath(doc(), p, '_link'))}` : ''}</span></div>
+      <div class="stack"><label>Help text</label>${txt('help', p.help, 'Optional: shown under the field in HubSpot')}<span class="hint">HubSpot's inline help text, 400 characters at most.</span></div>
       ${chk('required', p.required, 'Required', 'HubSpot will not publish an email with it blank')}
       ${H.TYPES[p.type].collapses ? chk('optional', p.optional, 'Hide when empty', 'A blank field removes the part and its space, not just the words') : ''}
       ${p.type === 'image' ? '<p class="hint">With no picture picked, the part and its space go: an empty image is never drawn.</p>' : ''}
@@ -874,8 +933,8 @@ function stylePane(p, rep) {
         + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint" style="margin:0">px · square in Outlook</span>')
         + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break; }
     case 'button':
-      b = row('Variant', segs('variant', p.variant, Object.entries(SYS.buttons).map(([k, v]) => [k, v.label, `${SYS.colorNames[v.fillToken] || v.fillToken} fill, ${SYS.colorNames[v.inkToken] || v.inkToken} label, ${v.radius}px corners`])))
-        + row('Follow theme', chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does'), '')
+      b = row('Follow theme', chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does'), '')
+        + (p.themed ? '' : row('Variant', segs('variant', p.variant, Object.entries(SYS.buttons).map(([k, v]) => [k, v.label, `${SYS.colorNames[v.fillToken] || v.fillToken} fill, ${SYS.colorNames[v.inkToken] || v.inkToken} label, ${v.radius}px corners`]))))
         + row('Align', alignSeg(p.align)) + chk('full', p.full, 'Full width', 'The button spans its column') + chk('phoneFull', p.phoneFull, 'Full width on phones')
         + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
     case 'divider':
@@ -909,7 +968,7 @@ function repeatInspector(p) {
     </div>`).join('');
   return pane('Repeating group', `
     <div class="stack"><label>Group label</label>${txt('label', p.label)}</div>
-    <div class="stack" title="The name module.html loops over. Renaming it after use loses every item the team made."><label>HubL name</label><div class="namefield">${txt('name', p.name)}<span class="auto" id="nameAuto"${p.nameAuto ? '' : ' hidden'}>auto</span></div><span class="hint mono">{% for item in ${esc(H.fieldPath(doc(), p))} %}</span></div>
+    <div class="stack" title="The name module.html loops over. Renaming it after use loses every item the team made."><label>HubL name</label><div class="namefield">${txt('name', p.name)}<span class="auto" id="nameAuto"${p.nameAuto ? '' : ' hidden'}>auto</span></div><span class="hint mono" id="pathHint">{% for item in ${esc(H.fieldPath(doc(), p))} %}</span></div>
     <div class="stack"><label>One of them is called</label>${txt('itemLabel', p.itemLabel, 'Event')}</div>
     ${row('Min', num('min', p.min, 0, 50))}
     ${row('Max', num('max', p.max, 1, 50))}
@@ -951,7 +1010,7 @@ function onInspector(e, final) {
   }
   if (!k) return;
   let v = el.dataset.t === 'bool' ? el.checked : el.value;
-  if (el.dataset.t === 'num') { if (!final && el.value === '') return; v = Number(el.value); if (!Number.isFinite(v)) return; if (final) { v = Math.max(+el.min || -Infinity, Math.min(+el.max || Infinity, v)); el.value = v; } }
+  if (el.dataset.t === 'num') { if (!final && el.value === '') return; v = Number(el.value); if (!Number.isFinite(v)) return; if (final) { const lo = el.min === '' ? -Infinity : +el.min, hi = el.max === '' ? Infinity : +el.max; v = Math.max(lo, Math.min(hi, v)); el.value = v; } }
   if (k.startsWith('m.')) return moduleInput(d, k.slice(2), v, el, final);
   const r = locate(ui.sel); if (!r) return;
   const p = r.part;
@@ -963,12 +1022,12 @@ function onInspector(e, final) {
   else p[k] = v;
   if (k === 'required' && v) p.optional = false;
   if (k === 'optional' && v) p.required = false;
-  if (k === 'min' && p.items) { p.max = Math.max(p.max, v); }
+  if (k === 'min' && p.items && final) { p.max = Math.max(p.max, v); }
   if (k === 'max' && p.items && final) { p.min = Math.min(p.min, v); }
   touch();
   // Some settings change which controls exist; rebuild for those, never for typing.
   const restructure = ['editable', 'link', 'layout', 'required', 'optional', 'min', 'max'].includes(k);
-  refresh({ inspector: restructure && final || ['editable', 'link', 'required', 'optional'].includes(k) });
+  refresh({ inspector: restructure && final || ['editable', 'link', 'required', 'optional', 'themed'].includes(k) });
   if (k === 'label' || k === 'name') syncInspectorHead();
 }
 function moduleInput(d, k, v, el, final) {
@@ -1041,15 +1100,24 @@ ToolKit.init({
   tool: 'hub-mod', version: 1,
   getState: () => clone(state),
   setState: s => {
-    const next = s && s.library && s.order && s.order.length ? s : defaults();
-    for (const id of Object.keys(next.library)) next.library[id] = H.migrate(next.library[id]);
-    next.order = next.order.filter(id => next.library[id]);
+    let next = s && typeof s === 'object' && s.library && typeof s.library === 'object' && Array.isArray(s.order) ? s : defaults();
+    for (const id of Object.keys(next.library)) {
+      const m = next.library[id];
+      if (!m || typeof m !== 'object' || Array.isArray(m) || !Array.isArray(m.parts)) delete next.library[id];
+      else next.library[id] = H.migrate(m);
+    }
+    next.order = next.order.filter(id => typeof id === 'string' && next.library[id]);
+    if (!next.order.length) next = defaults();
     if (!next.library[next.openId]) next.openId = next.order[0];
-    Object.assign(state, clone(next));
+    // Every key set outright: a missing openId must not leave the previous one standing.
+    const c = clone(next); state.library = c.library; state.order = c.order; state.openId = next.openId;
     refresh({ inspector: true });
   },
   defaults,
 });
+// The toolkit's storage is namespaced by the tool it was given, so the view settings come back only after init.
+try { Object.assign(ui, ToolKit.loadAux('ui', true) || {}); } catch (e) {}
+ui.sel = null;
 ToolKit.register('d', 'Design view', () => setTab('design'), { group: 'View' });
 ToolKit.register('c', 'Code view', () => setTab('code'), { group: 'View' });
 ToolKit.register('b', 'Hand-build steps', () => setTab('steps'), { group: 'View' });

@@ -202,7 +202,9 @@
   // Names that read as HubL or HubSpot's own, which a field should not shadow.
   // HubSpot publishes no list; these are the module tag's own parameters, a dict's methods, and HubL's names.
   const RESERVED = new Set(['module', 'name', 'type', 'label', 'path', 'id', 'no_wrapper', 'extra_classes', 'export_to_template_context', 'items', 'keys', 'values',
-    'css', 'style', 'widget_data', 'content', 'request', 'site_settings', 'loop', 'item', 'true', 'false', 'none', 'null', 'theme_settings', 'theme', 'hubspot']);
+    'css', 'style', 'widget_data', 'content', 'request', 'site_settings', 'loop', 'item', 'true', 'false', 'none', 'null', 'theme_settings', 'theme', 'hubspot',
+    // HubL's expression keywords: `module.empty|trim` does not parse.
+    'and', 'or', 'not', 'in', 'is', 'if', 'else', 'div', 'mod', 'empty', 'eq', 'ne', 'lt', 'gt', 'le', 'ge', 'instanceof']);
 
   function fieldNameFrom(label, type, raw) {
     let n = String(label || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -414,6 +416,7 @@
     const root = `hm-${d.slug}`;
     return {
       d, sys, mode, theme, choice, root, empty: !!opts.empty, ids: mode === 'preview' && opts.ids !== false,
+      richRules: !d.css || d.css.rich !== false,
       widths: slotWidths(d, sys), font: sys.fontStack.replace(/"/g, "'"),
       used: { tokens: new Set(), roles: new Set(['bg']), styles: new Set(), phoneFull: false, spacers: [], btnFull: false, buttonsThemed: false, buttonVariants: new Set(), columns: [], grids: [], rich: [] },
     };
@@ -484,28 +487,55 @@
     const f = `${sc.item ? 'item' : 'module'}.${p.name}_link`;
     return `{% set hm_href = ${f}.url.href %}{% if ${f}.url.type == "EMAIL_ADDRESS" and hm_href %}{% set hm_href = "mailto:" ~ hm_href %}{% endif %}`;
   }
-  /** Whether a part shows: its toggle, and if it hides when empty, its content. In HubL, the condition. */
+  /** Whether a leaf part shows. `expr` is the HubL condition (null: always), `on` the same test on the preview's
+   *  values. Both are always computed, because a part's neighbours need its condition to place their own spacing. */
   function shows(cx, p, sc) {
-    if (!isEditable(p)) return { hubl: null, on: true };
+    if (!isEditable(p)) return { expr: null, on: true };
     const base = `${sc.item ? 'item' : 'module'}.${p.name}`;
     const conds = [];
     if (p.toggle && !sc.item) conds.push(`module.show_${p.name}`);
-    // A picture with no address is never drawn, hide-when-empty or not: <img src=""> is a broken image.
+    // A picture with no address is never drawn, hide-when-empty or not: <img src=""> is a broken image. Nor is a
+    // button with no link: it would be a button that goes nowhere.
     if (p.type === 'image') conds.push(`${base}.src`);
     else if (p.optional && !p.required) {
-      if (p.type === 'richtext') conds.push(`${base}|striptags|replace("&nbsp;", "")|trim`);   // a cleared field leaves <p>&nbsp;</p>
-      else conds.push(`${base}|trim`);   // whitespace is not content (learnings 1.10)
+      // Test the value before filtering it: Jinjava's trim turns a missing value into the string "null", which
+      // would count as content (an item made before the field existed has no value at all).
+      if (p.type === 'richtext') conds.push(`${base} and ${base}|striptags|replace("&nbsp;", "")|trim`);   // a cleared field leaves <p>&nbsp;</p>
+      else conds.push(`${base} and ${base}|trim`);   // whitespace is not content (learnings 1.10)
     }
-    if (cx.mode === 'hubl') return { hubl: conds.length ? conds.join(' and ') : null, on: true };
+    if (p.type === 'button') conds.push(`${base}_link.url.href`);
+    const expr = conds.length ? conds.join(' and ') : null;
+    if (cx.mode === 'hubl') return { expr, on: true };
     const v = previewValue(cx, p, sc);
     let on = true;
     if (p.type === 'image') on = !!v.src || !cx.empty;   // while designing, an empty picture shows as a placeholder
     else if (p.optional && !p.required) {
-      const s = p.type === 'richtext' ? String(v).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '') : words(v);
-      on = String(s || '').trim() !== '';
+      const t = p.type === 'richtext' ? String(v).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '') : words(v);
+      on = String(t || '').trim() !== '';
     }
-    return { hubl: null, on };
+    if (p.type === 'button' && !String(v.href || '').trim()) on = false;
+    return { expr, on };
   }
+  /** Any part's condition: a leaf's own, a group's item count, a set of columns' "any column shows". */
+  function partCond(cx, p, sc) {
+    if (p.type === 'repeat') return { expr: `module.${p.name}|length`, on: cx.mode === 'hubl' || previewItems(cx, p).length > 0 };
+    if (p.type === 'columns') {
+      const cs = p.cols.map(c => stackCond(cx, c.parts, sc));
+      return { expr: anyOf(cs), on: cs.some(c => c.on) };
+    }
+    return shows(cx, p, sc);
+  }
+  /** A stack shows if any of its parts does. An empty stack counts as always there: it holds its place. */
+  function stackCond(cx, parts, sc) {
+    if (!parts.length) return { expr: null, on: true };
+    const cs = parts.map(q => partCond(cx, q, sc));
+    return { expr: anyOf(cs), on: cs.some(c => c.on) };
+  }
+  /** "Any of these": null as soon as one of them always shows. */
+  function anyOf(cs) { return cs.some(c => !c.expr) ? null : cs.map(c => `(${c.expr})`).join(' or '); }
+  /** A number of pixels, or the HubL that picks it from a condition. */
+  const pick = (cx, expr, on, a, b) => (cx.mode === 'hubl' ? `{% if ${expr} %}${a}{% else %}${b}{% endif %}` : on ? a : b);
+  const nn = v => Math.max(0, v | 0);
   function wrapIf(cx, cond, inner) { return cond ? `{% if ${cond} %}\n${inner}\n{% endif %}` : inner; }
 
   const tdAttr = (cx, p) => (cx.ids ? ` data-hm="${p.id}"` : '');
@@ -514,9 +544,18 @@
   /** A vertical stack of parts: one table, one row per part, each row carrying its part's space below. */
   function renderStack(cx, parts, sc, W) {
     const rows = [];
+    const cs = parts.map(p => partCond(cx, p, sc));
     parts.forEach((p, i) => {
-      const last = i === parts.length - 1;
-      const r = renderPart(cx, p, sc, last);
+      // The space below a part belongs to what follows it. When everything after it can collapse, so can the
+      // space; when one later part always shows, it is fixed.
+      const later = cs.slice(i + 1);
+      const want = gapOf(cx, p);
+      let gap = 0;
+      if (later.length && want) {
+        const expr = anyOf(later);
+        gap = expr ? pick(cx, expr, later.some(c => c.on), want, 0) : want;
+      }
+      const r = renderPart(cx, p, sc, gap, cs[i]);
       if (r) rows.push(r);
     });
     if (!parts.length) return cx.mode === 'preview' && cx.ids ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:12px;font:12px Helvetica,Arial,sans-serif;color:#9a968e;text-align:center;border:1px dashed #c9c5bd;">Empty: add a part</td></tr></table>` : '';
@@ -524,7 +563,7 @@
   }
 
   function rowTd(cx, p, inner, gap, align, extraClass) {
-    const pad = gap ? `padding:0 0 ${gap}px 0;` : 'padding:0;';
+    const pad = `padding:0 0 ${gap}px 0;`;   // one form, whether the gap is a number or HubL that picks one
     return `<tr>\n  <td${tdAttr(cx, p)}${align ? ` align="${align}"` : ''}${extraClass ? ` class="${extraClass}"` : ''} style="${pad}${align ? `text-align:${align};` : ''}">\n${ind(inner, 4)}\n  </td>\n</tr>`;
   }
 
@@ -534,10 +573,17 @@
     return `margin:0;font-family:${cx.font};font-size:${t.size}px;line-height:${t.lineHeight}%;font-weight:${t.weight};color:${color};text-align:${align};mso-line-height-rule:exactly;${t.uppercase ? 'text-transform:uppercase;' : ''}${t.letterSpacing ? `letter-spacing:${t.letterSpacing}px;` : ''}`;
   }
 
-  function renderPart(cx, p, sc, last) {
-    const s = shows(cx, p, sc);
+  /** The space a part asks for below it. Rich text's last paragraph brings its own margin, which HubSpot inlines
+   *  with !important where nothing can take it off again, so the part asks for that much less. */
+  function gapOf(cx, p) {
+    const g = nn(p.type === 'columns' || p.type === 'repeat' ? p.gapBelow : p.gap);
+    if (p.type === 'richtext' && cx.richRules) return Math.max(0, g - (cx.sys.text[p.style] || cx.sys.text.body).marginBottom);
+    return g;
+  }
+
+  function renderPart(cx, p, sc, gap, s) {
+    s = s || partCond(cx, p, sc);
     if (!s.on) return '';
-    const gap = last ? 0 : (p.type === 'columns' || p.type === 'repeat' ? p.gapBelow : p.gap) | 0;
     let out = '';
     switch (p.type) {
       case 'eyebrow': case 'heading': case 'text': {
@@ -560,20 +606,20 @@
       case 'button': out = renderButton(cx, p, sc, gap); break;
       case 'divider': {
         const c = col(cx, p.color);
-        const t = Math.max(1, p.thickness | 0);
+        const t = Math.max(1, nn(p.thickness));
         out = rowTd(cx, p, `<table role="presentation" width="${p.length}%" align="${p.align === 'right' ? 'right' : p.align === 'center' ? 'center' : 'left'}" cellpadding="0" cellspacing="0" border="0" style="width:${p.length}%;">\n  <tr><td class="${colClass(p.color, 'bg')}" height="${t}" bgcolor="${c}" style="height:${t}px;background-color:${c};font-size:1px;line-height:${t}px;mso-line-height-rule:exactly;">&nbsp;</td></tr>\n</table>`, gap, p.align);
         break;
       }
       case 'spacer': {
-        const h = Math.max(1, p.height | 0);
-        if (p.phoneHeight) cx.used.spacers.push(p);
-        out = `<tr>\n  <td${tdAttr(cx, p)}${p.phoneHeight ? ` class="hm-sp-${sid(p)}"` : ''} height="${h}" style="height:${h}px;font-size:1px;line-height:${h}px;mso-line-height-rule:exactly;">&nbsp;</td>\n</tr>`;
+        const h = Math.max(1, nn(p.height));
+        if (nn(p.phoneHeight)) cx.used.spacers.push(p);
+        out = `<tr>\n  <td${tdAttr(cx, p)}${nn(p.phoneHeight) ? ` class="hm-sp-${sid(p)}"` : ''} height="${h}" style="height:${h}px;font-size:1px;line-height:${h}px;mso-line-height-rule:exactly;">&nbsp;</td>\n</tr>`;
         break;
       }
       case 'columns': out = renderColumns(cx, p, sc, gap); break;
-      case 'repeat': out = renderRepeat(cx, p, gap); break;
+      case 'repeat': return renderRepeat(cx, p, gap);   // wraps itself in its item count
     }
-    return wrapIf(cx, s.hubl, out);
+    return wrapIf(cx, cx.mode === 'hubl' && p.type !== 'columns' ? s.expr : null, out);
   }
 
   function renderImage(cx, p, sc, gap) {
@@ -581,7 +627,7 @@
     const w = Math.max(1, Math.min(p.width | 0, W));
     if (p.phoneFull) cx.used.phoneFull = true;
     const margin = p.align === 'center' ? 'margin:0 auto;' : p.align === 'right' ? 'margin:0 0 0 auto;' : '';
-    const radius = p.radius ? `border-radius:${p.radius | 0}px;` : '';
+    const radius = nn(p.radius) ? `border-radius:${nn(p.radius)}px;` : '';
     const src = val(cx, p, sc, 'src');
     const alt = val(cx, p, sc, 'alt');
     const cls = `hm-img${p.phoneFull ? ' hm-phone-full' : ''}`;
@@ -626,8 +672,7 @@
 
   const pctOf = (x, W) => Math.floor((x / W) * 10000) / 100;
   const breakpoint = W => Math.round(W * 0.8);
-  function fluidBox(cls, w, W, valign, inner) {
-    const pct = pctOf(w, W);
+  function fluidBox(cls, pct, W, valign, inner) {
     return `<div class="${cls}" style="display:inline-block;vertical-align:${valign};width:${pct}%;min-width:${pct}%;max-width:100%;width:calc((${breakpoint(W)}px - 100%) * 1000);">\n${ind(inner, 2)}\n</div>`;
   }
   /** A gutter on a desktop, the space between two stacked boxes on a phone. Outlook gets a table cell instead. */
@@ -640,32 +685,49 @@
   function fluidRow(cx, p, inner, gap) {
     return `<tr>\n  <td${tdAttr(cx, p)} class="hm-fluid" style="padding:0 0 ${gap}px 0;font-size:0;line-height:0;text-align:left;">\n${ind(inner, 4)}\n  </td>\n</tr>`;
   }
+  /** HubL `{% if %}` around some markup, or in the preview, the markup or nothing. */
+  const when = (cx, c, inner) => (cx.mode === 'hubl' ? (c.expr ? `{% if ${c.expr} %}\n${inner}\n{% endif %}` : inner) : (c.on ? inner : ''));
+  const both = (a, b) => ({ expr: a.expr && b.expr ? `(${a.expr}) and (${b.expr})` : a.expr || b.expr, on: a.on && b.on });
 
   function renderColumns(cx, p, sc, gap) {
     const W = cx.widths[p.id] || contentWidth(cx.d, cx.sys);
-    const ws = columnWidths(p, W), g = p.gap | 0, va = p.valign;
+    const ws = columnWidths(p, W), g = nn(p.gap), va = p.valign;
+    const self = partCond(cx, p, sc);
     if (p.stack) {
       cx.used.fluid = true;
-      const parts = [`<!--[if mso]><table role="presentation" width="${W}" cellpadding="0" cellspacing="0" border="0" style="width:${W}px;"><tr><td width="${ws[0]}" valign="${va}" style="width:${ws[0]}px;"><![endif]-->`];
+      // Each column shows when any of its parts does. A gutter shows when its column and one before it both do.
+      const cs = p.cols.map(c => stackCond(cx, c.parts, sc));
+      const parts = [`<!--[if mso]><table role="presentation" width="${W}" cellpadding="0" cellspacing="0" border="0" style="width:${W}px;"><tr><![endif]-->`];
       p.cols.forEach((c, i) => {
-        if (i > 0) parts.push(`<!--[if mso]></td>${g ? msoGap(g) : ''}<td width="${ws[i]}" valign="${va}" style="width:${ws[i]}px;"><![endif]-->`, ...(g ? [fluidGap(g, W)] : []));
-        parts.push(fluidBox(`hm-fcol hm-fcol-${sid(p)}`, ws[i], W, va, renderStack(cx, c.parts, sc, ws[i])));
+        if (i > 0 && g) {
+          const gapCond = both(cs[i], { expr: anyOf(cs.slice(0, i)), on: cs.slice(0, i).some(x => x.on) });
+          parts.push(when(cx, gapCond, `<!--[if mso]>${msoGap(g)}<![endif]-->\n${fluidGap(g, W)}`));
+        }
+        // Two columns: when one goes, the other takes the whole width. Three keep their shares.
+        const other = p.cols.length === 2 ? cs[1 - i] : null;
+        const full = !!(other && other.expr);
+        const pct = full ? pick(cx, other.expr, other.on, pctOf(ws[i], W), 100) : pctOf(ws[i], W);
+        const px = full ? pick(cx, other.expr, other.on, ws[i], W) : ws[i];
+        const box = `<!--[if mso]><td width="${px}" valign="${va}" style="width:${px}px;"><![endif]-->\n${fluidBox(`hm-fcol hm-fcol-${sid(p)}`, pct, W, va, renderStack(cx, c.parts, sc, ws[i]))}\n<!--[if mso]></td><![endif]-->`;
+        parts.push(when(cx, cs[i], box));
       });
-      parts.push('<!--[if mso]></td></tr></table><![endif]-->');
-      return fluidRow(cx, p, parts.join('\n'), gap);
+      parts.push('<!--[if mso]></tr></table><![endif]-->');
+      return when(cx, self, fluidRow(cx, p, parts.join('\n'), gap));
     }
+    // Not stacking: a table that keeps its shares at every width. Percentages in the style, so it shrinks with the
+    // email; pixels in the attribute, which is what Outlook reads.
     const cells = [];
     p.cols.forEach((c, i) => {
       if (i > 0 && g) cells.push(msoGap(g));
-      cells.push(`<td width="${ws[i]}" valign="${va}" style="width:${ws[i]}px;vertical-align:${va};">\n${ind(renderStack(cx, c.parts, sc, ws[i]), 2)}\n</td>`);
+      cells.push(`<td width="${ws[i]}" valign="${va}" style="width:${pctOf(ws[i], W)}%;vertical-align:${va};">\n${ind(renderStack(cx, c.parts, sc, ws[i]), 2)}\n</td>`);
     });
     const table = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">\n  <tr>\n${ind(cells.join('\n'), 4)}\n  </tr>\n</table>`;
-    return rowTd(cx, p, table, gap, '');
+    return when(cx, self, rowTd(cx, p, table, gap, ''));
   }
 
   /** The item list for a preview: the defaults, or the minimum when "empty" is on. */
   function previewItems(cx, p) {
-    if (cx.empty) return p.items.slice(0, Math.max(0, p.min | 0)).map(() => ({ __empty: true }));
+    if (cx.empty) return p.items.slice(0, nn(p.min)).map(it => Object.assign({}, it, { __empty: true }));
     return p.items;
   }
 
@@ -676,19 +738,19 @@
     const scFor = item => ({ item: item || {}, rep: p });
     // In preview, an item flagged __empty behaves as "every optional field blank".
     const stackFor = item => {
-      if (cx.mode === 'preview' && item && item.__empty) { const was = cx.empty; cx.empty = true; const s = renderStack(cx, p.parts, scFor({}), 0); cx.empty = was; return s; }
+      if (cx.mode === 'preview' && item && item.__empty) { const was = cx.empty; cx.empty = true; const s = renderStack(cx, p.parts, scFor(item), 0); cx.empty = was; return s; }
       const was = cx.empty; if (cx.mode === 'preview') cx.empty = false; const s = renderStack(cx, p.parts, scFor(item), 0); cx.empty = was; return s;
     };
     let body;
     if (p.layout === 'grid') {
-      const n = Math.max(2, Math.min(3, p.perRow | 0)), g = p.gap | 0, c = cellWidth(p, W);
+      const n = Math.max(2, Math.min(3, p.perRow | 0)), g = nn(p.gap), c = cellWidth(p, W);
       const span = 2 * n - 1;
       const msoRowGap = `</tr><tr><td colspan="${span}" height="${g}" style="height:${g}px;font-size:1px;line-height:1px;">&nbsp;</td></tr><tr>`;
       if (p.stack) {
         // Fluid: cells wrap by width, and on a phone each takes the full width. A row break is a full-width spacer.
         cx.used.fluid = true;
         const rowGap = `<!--[if !mso]><!--><div class="hm-frow" style="display:block;width:100%;height:${g}px;font-size:1px;line-height:1px;">&nbsp;</div><!--<![endif]-->`;
-        const cell = inner => `<!--[if mso]><td width="${c}" valign="top" style="width:${c}px;"><![endif]-->\n${fluidBox(`hm-fcell hm-fcell-${id6}`, c, W, 'top', inner)}\n<!--[if mso]></td><![endif]-->`;
+        const cell = inner => `<!--[if mso]><td width="${c}" valign="top" style="width:${c}px;"><![endif]-->\n${fluidBox(`hm-fcell hm-fcell-${id6}`, pctOf(c, W), W, 'top', inner)}\n<!--[if mso]></td><![endif]-->`;
         const between = (rowEnd) => (rowEnd ? `<!--[if mso]>${msoRowGap}<![endif]-->\n${rowGap}` : `${g ? `<!--[if mso]>${msoGap(g)}<![endif]-->\n${fluidGap(g, W)}` : ''}`);
         const open = `<!--[if mso]><table role="presentation" width="${W}" cellpadding="0" cellspacing="0" border="0" style="width:${W}px;"><tr><![endif]-->`;
         const close = '<!--[if mso]></tr></table><![endif]-->';
@@ -714,8 +776,8 @@ ${close}`;
         return groupRow(cx, p, list, body, gap, true);
       }
       // Fixed: a table that keeps its columns on a phone. Gaps are cells; a short last row is filled out.
-      const td = inner => `<td width="${c}" valign="top" style="width:${c}px;vertical-align:top;">\n${ind(inner, 2)}\n</td>`;
-      const filler = `<td width="${c}" style="width:${c}px;font-size:1px;line-height:1px;">&nbsp;</td>`;
+      const td = inner => `<td width="${c}" valign="top" style="width:${pctOf(c, W)}%;vertical-align:top;">\n${ind(inner, 2)}\n</td>`;
+      const filler = `<td width="${c}" style="width:${pctOf(c, W)}%;font-size:1px;line-height:1px;">&nbsp;</td>`;
       if (cx.mode === 'hubl') {
         body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
   <tr>
@@ -740,7 +802,7 @@ ${ind(td(stackFor(null)), 4)}
         body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">\n  <tr>\n${ind(cells.filter(Boolean).join('\n'), 4)}\n  </tr>\n</table>`;
       }
     } else {
-      const g = p.gap | 0;
+      const g = nn(p.gap);
       const rule = p.rule ? col(cx, 'accent') : null;
       const cell = (inner, last, hubl) => {
         const padBottom = hubl ? `{% if not loop.last %}${g}{% else %}0{% endif %}` : (last ? 0 : g);
@@ -807,7 +869,8 @@ ${ind(inner, 6)}
         }
         return out.join('\n');
       };
-      lines.push(`{% set hm_theme = module.theme_choice or ${hublStr(first)} %}`);
+      // A theme dropped since an email chose it falls back to the first, so the colours and the class agree.
+      lines.push(`{% set hm_theme = module.theme_choice if module.theme_choice in [${d.themes.map(hublStr).join(', ')}] else ${hublStr(first)} %}`);
       lines.push(set(first));
       for (const t of d.themes.slice(1)) lines.push(`{% if hm_theme == ${hublStr(t)} %}\n${ind(set(t), 2)}\n{% endif %}`);
     }
@@ -838,7 +901,7 @@ ${ind(inner, 6)}
       const sel = `${R} .hm-rt-${sid(p)}`;
       const t = sys.text[p.style] || body;
       inline.push(`${sel} p { margin:0 0 ${t.marginBottom}px 0 !important; line-height:${t.lineHeight}% !important; }`);
-      for (const h of ['h1', 'h2', 'h3', 'h4']) { const s = sys.text[h]; inline.push(`${sel} ${h} { margin:0 0 ${s.marginBottom}px 0 !important; font-size:${s.size}px !important; line-height:${s.lineHeight}% !important; font-weight:${s.weight}; }`); }
+      for (const h of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) { const s = sys.text[h]; if (!s) continue; inline.push(`${sel} ${h} { margin:0 0 ${s.marginBottom}px 0 !important; font-size:${s.size}px !important; line-height:${s.lineHeight}% !important; font-weight:${s.weight};${s.uppercase ? ' text-transform:uppercase;' : ''}${s.letterSpacing ? ` letter-spacing:${s.letterSpacing}px;` : ''} }`); }
       inline.push(`${sel} ul, ${sel} ol { margin:0 0 ${t.marginBottom}px ${rt.listIndent}px !important; padding:0 !important; line-height:${rt.listLineHeight}% !important; }`);
       inline.push(`${sel} li { margin:0 0 ${rt.listGap}px 0 !important; }`);
       inline.push(`${sel} blockquote { margin:0 0 ${t.marginBottom}px 0 !important; padding:4px 0 4px ${rt.quoteInset}px; border-left:${rt.quoteBar}px solid ${sys.hex(rt.quoteColor)}; ${rt.quoteItalic ? 'font-style:italic; ' : ''}}`);
@@ -846,7 +909,6 @@ ${ind(inner, 6)}
       // Link colour: per theme when it follows the theme, so a navy module's links stay legible.
       if (p.linkColor === 'text' || p.linkColor === 'accent') for (const th of d.themes) inline.push(`${R}.hm-t-${th} .hm-rt-${sid(p)} a { color:${palette(sys, th)[p.linkColor]} !important; text-decoration:underline; }`);
       else inline.push(`${sel} a { color:${sys.hex(p.linkColor)} !important; text-decoration:underline; }`);
-      sheet.push(`${sel} > :last-child { margin-bottom:0 !important; }`);
     }
     sheet.push(`${R} a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; font-size:inherit !important; font-family:inherit !important; font-weight:inherit !important; line-height:inherit !important; }`);
 
@@ -855,7 +917,9 @@ ${ind(inner, 6)}
     for (const s of cx.used.styles) { const t = sys.text[s]; if (t && t.mobileSize && t.mobileSize !== t.size) m.push(`${R} .hm-s-${s} { font-size:${t.mobileSize}px !important; }`); }
     if (cx.used.phoneFull) m.push(`${R} .hm-phone-full { width:100% !important; max-width:100% !important; height:auto !important; }`);
     if (cx.used.btnFull) m.push(`${R} .hm-btn-phone-full { width:100% !important; }`);
-    for (const p of cx.used.spacers) m.push(`${R} .hm-sp-${sid(p)} { height:${p.phoneHeight | 0}px !important; line-height:${p.phoneHeight | 0}px !important; }`);
+    for (const p of cx.used.spacers) m.push(`${R} .hm-sp-${sid(p)} { height:${nn(p.phoneHeight)}px !important; line-height:${nn(p.phoneHeight)}px !important; }`);
+    // For a client that reads this block but has no calc() (the Outlook apps, Yahoo): stack here instead.
+    if (cx.used.fluid) m.push(`${R} .hm-fcol, ${R} .hm-fcell, ${R} .hm-fgap { width:100% !important; min-width:100% !important; max-width:100% !important; }`);
     if (m.length) sheet.push(`@media only screen and (max-width:${sys.mobileBreakpoint}px) {`, ...m.map(x => `  ${x}`), '}');
 
     // Dark mode, layers 2 and 3 (learnings 2.5, 2.6): re-assert every colour the module uses, so a client that
@@ -919,9 +983,10 @@ ${ind(inner, 6)}
   // The width goes in for the editor's sake; module.html never reads it back (learnings 1.6a).
   function imageDefault(v, w) { return { src: v.src || '', alt: v.alt || '', width: w, height: null, size_type: 'auto', loading: 'disabled' }; }
 
+  /** inline_help_text shows under the label, where the team reads it while typing; help_text is a hover tooltip. */
   function base(p, name, label, type, help) {
     const f = { name, label, type, required: !!p.required, locked: false };
-    if (help) f.help_text = help;
+    if (help) f.inline_help_text = help;
     return f;
   }
   /** The field objects for one part, given the value its default should hold. */
@@ -937,13 +1002,13 @@ ${ind(inner, 6)}
         out.push(Object.assign(base(p, p.name, p.label, 'richtext', help), { default: cleanRich(v) })); break;
       case 'image': {
         const w = Math.min(p.width | 0, widths[p.id] || contentWidth(d, sys));
-        out.push(Object.assign(base(p, p.name, p.label, 'image', help), { inline_help_text: `Shown ${w}px wide.`, responsive: false, resizable: false, show_loading: false, default: imageDefault(v, w) }));
+        out.push(Object.assign(base(p, p.name, p.label, 'image', ''), { inline_help_text: [`Shown ${w}px wide.`, help].filter(Boolean).join(' '), responsive: false, resizable: false, show_loading: false, default: imageDefault(v, w) }));
         if (p.link) out.push(Object.assign(base({ required: false }, `${p.name}_link`, `${p.label} link`, 'link', 'Where the picture goes when it is clicked. Leave empty for no link.'), { supported_types: LINK_TYPES, show_advanced_rel_options: false, default: linkDefault(v.href) }));
         break;
       }
       case 'button':
         out.push(Object.assign(base(p, p.name, `${p.label} text`, 'text', help), { validation_regex: '', allow_new_line: false, show_emoji_picker: false, default: v.value }));
-        out.push(Object.assign(base({ required: !!p.required }, `${p.name}_link`, `${p.label} link`, 'link', ''), { supported_types: LINK_TYPES, show_advanced_rel_options: false, default: linkDefault(v.href) }));
+        out.push(Object.assign(base({ required: !!p.required }, `${p.name}_link`, `${p.label} link`, 'link', 'Leave it empty and the button does not show.'), { supported_types: LINK_TYPES, show_advanced_rel_options: false, default: linkDefault(v.href) }));
         break;
     }
     return out;
@@ -953,7 +1018,7 @@ ${ind(inner, 6)}
     const fields = [];
     if (d.themes.length > 1) {
       fields.push({ name: 'theme_choice', label: 'Theme', type: 'choice', required: true, locked: false, display: 'select', multiple: false, reordering_enabled: false,
-        help_text: 'The Switchyards colours this block wears.', choices: d.themes.map(t => [t, sys.themes[t].label]), default: d.themes[0] });
+        inline_help_text: 'The Switchyards colours this block wears.', choices: d.themes.map(t => [t, (sys.themes[t] || { label: t }).label]), default: d.themes[0] });
     }
     const visit = (parts) => {
       for (const p of parts) {
@@ -980,7 +1045,7 @@ ${ind(inner, 6)}
       return o;
     });
     const g = { name: p.name, label: p.label, type: 'group', required: false, locked: false, expanded: false,
-      occurrence: { min: p.min | 0, max: p.max | 0, default: p.items.length }, children, default: def };
+      occurrence: { min: nn(p.min), max: Math.max(1, nn(p.max)), default: p.items.length }, children, default: def };
     if (sortKid) g.occurrence.sorting_label_field = `${p.name}.${sortKid.name}`;
     return g;
   }
@@ -1035,7 +1100,7 @@ ${ind(inner, 6)}
     if (f.type === 'boolean') s.push('Display: toggle', 'Default: on');
     if (f.type === 'choice') s.push(`Options: ${f.choices.map(c => `${c[1]} (${c[0]})`).join(', ')}`, `Default: ${f.default}`);
     if (f.type === 'group') s.push(`Repeater: on`, `Min ${f.occurrence.min}, max ${f.occurrence.max}, starts with ${f.occurrence.default}`);
-    if (f.help_text && f.type !== 'image') s.push(`Help: ${f.help_text}`);
+    if (f.inline_help_text && f.type !== 'image') s.push(`Inline help text: ${f.inline_help_text}`);
     return s.filter(Boolean);
   }
   function steps(d, sys, fields) {
@@ -1055,7 +1120,7 @@ ${ind(inner, 6)}
         { cmd: 'hs account auth', note: 'It opens HubSpot in the browser to make a personal access key and waits for it. Your user needs the Design tools permission.' },
       ],
       cli: [
-        { cmd: `cd ~/Downloads && unzip -o ${folder}.zip`, note: 'Wherever the zip landed. The CLI uploads a folder, not a zip.' },
+        { cmd: `cd ~/Downloads && unzip -o "$(ls -t ${folder}*.zip | head -1)"`, note: 'Unzips the newest download, so a second export saved as "(1).zip" is the one that goes up. The CLI uploads a folder, not a zip. Safari unzips on its own: use the newest folder it made.' },
         { cmd: `hs cms lint ${folder}`, note: 'Optional: HubSpot checks the HubL before anything goes up.' },
         { cmd: `hs cms upload ${folder} "${dest}"`, note: 'Goes live straight away. A module folder has no draft upload: CLI 8.18 ignores -m draft for a folder.' },
       ],
@@ -1099,6 +1164,12 @@ ${ind(inner, 6)}
     if (!String(d.name || '').trim()) err('The module needs a name: it is what the team picks it by.');
     if (!/^[a-z0-9][a-z0-9-]*$/.test(d.slug || '')) err('The folder name can hold lower-case letters, digits and hyphens, and starts with a letter or digit.');
     if (!d.parts.length) err('The module is empty. Add a part.');
+    const lost = d.themes.filter(t => !sys.themes[t]);
+    if (lost.length) err(`The design system has no theme called ${lost.join(', ')}. Untick it under Themes, or put it back in the system file.`);
+    if (d.exported && Array.isArray(d.exported.themes) && d.themes.length > 0) {
+      const dropped = d.exported.themes.filter(t => !d.themes.includes(t));
+      if (dropped.length) warn(`Theme${dropped.length > 1 ? 's' : ''} ${dropped.join(', ')} dropped since the last export. Emails that picked ${dropped.length > 1 ? 'them' : 'it'} turn ${d.themes[0]} on the next upload.`);
+    }
 
     // Names: valid, unique within their scope, not HubSpot's.
     const scopes = new Map();
@@ -1120,6 +1191,7 @@ ${ind(inner, 6)}
         const kids = []; walk(q.parts, k => { if (isEditable(k)) kids.push(k); });
         if (!q.parts.length) err(`“${q.label}” has nothing in it.`, q.id);
         else if (!kids.length) err(`Nothing in “${q.label}” is editable, so every ${q.itemLabel || 'item'} would be identical.`, q.id);
+        if (q.min < 0 || q.max < 1) err(`“${q.label}”: the minimum starts at 0 and the maximum at 1.`, q.id);
         if (q.min > q.max) err(`“${q.label}”: the minimum is above the maximum.`, q.id);
         if (q.items.length < q.min || q.items.length > q.max) err(`“${q.label}” starts with ${q.items.length}; it has to be between ${q.min} and ${q.max}.`, q.id);
       }
@@ -1141,12 +1213,14 @@ ${ind(inner, 6)}
         for (const v of vals) if (v.href && !/^(https?:\/\/|mailto:|tel:)/i.test(v.href)) err(`The ${what} link “${excerpt(v.href, 30)}” is not a web, mail or phone link.`, q.id);
         if (!isEditable(q) && !partDefault(q).href) err(`A fixed ${what} link needs its address: the team cannot set one.`, q.id);
         if (q.type === 'button' && String(q.value || '').length > 28) warn('A button label over 28 characters wraps on phones and reads as broken.', q.id);
+        if (q.type === 'button' && isEditable(q) && !String(partDefault(q).href || '').trim()) warn('The button starts with no link, so it does not show until the team sets one.', q.id);
       }
       if (isEditable(q) && q.required && !String(q.type === 'image' ? q.src : q.value || '').trim() && q.type !== 'button') warn(`“${q.label}” is required and starts empty, so every new email opens with an error to fix.`, q.id);
+      if (String(q.help || '').length > 400) warn(`The help text for “${q.label}” is ${q.help.length} characters; HubSpot takes 400.`, q.id);
       if (q.toggle && scopeOf(d, q)) warn('“Team can switch it off” does nothing inside a repeating group; the team removes the item instead.', q.id);
       // Contrast, for every theme the part can wear (WCAG: 4.5 for body, 3 for large or bold headings).
       if (['eyebrow', 'heading', 'text', 'richtext'].includes(q.type)) {
-        for (const th of d.themes) {
+        for (const th of d.themes.filter(t => sys.themes[t])) {
           const pl = palette(sys, th);
           const fg = q.color === 'text' || q.color === 'accent' ? pl[q.color] : sys.hex(q.color);
           const t = sys.text[q.style] || sys.text.body;

@@ -53,7 +53,23 @@ function kitchenSink() {
   return d;
 }
 
-const DOCS = [...H.STARTERS.filter(s => s.id !== 'blank').map(s => [s.name, () => s.make(SYS)]), ['Kitchen sink', kitchenSink]];
+/** Columns where one side can empty out, a button with no link, and a group item whose required value was edited. */
+function edgeCases() {
+  const P = (type, props) => Object.assign(H.makePart(type, SYS), props || {});
+  const d = H.newDoc('Edge cases', [], { themes: ['cream', 'navy'] });
+  const two = P('columns', { stack: true, gap: 24 });
+  two.cols[0].parts = [P('eyebrow', { name: 'left_note', label: 'Left note', value: '' })];   // empty by default: the column goes
+  two.cols[1].parts = [P('heading', { name: 'right_head', label: 'Right heading', value: 'Takes the full width' })];
+  const three = P('columns', { stack: true, gap: 12 });
+  three.cols = [{ w: 33, parts: [P('text', { name: 'a', label: 'A', value: 'A' })] }, { w: 34, parts: [P('text', { name: 'b', label: 'B', value: '' })] }, { w: 33, parts: [P('text', { name: 'c', label: 'C', value: 'C' })] }];
+  const group = P('repeat', { name: 'rows', label: 'Rows', itemLabel: 'Row', layout: 'list', rule: false, min: 2, max: 4 });
+  group.parts = [P('text', { name: 'code', label: 'Code', value: 'X', optional: false, required: true }), P('text', { name: 'note', label: 'Note', value: 'note' })];
+  group.items = [{ [group.parts[0].id]: 'Y' }, { [group.parts[0].id]: 'Z', [group.parts[1].id]: '' }, {}];
+  d.parts = [two, three, group, P('button', { name: 'nowhere', label: 'Nowhere', value: 'Goes nowhere', href: '' }), P('text', { name: 'tail', label: 'Tail', value: '' })];
+  return d;
+}
+
+const DOCS = [...H.STARTERS.filter(s => s.id !== 'blank').map(s => [s.name, () => s.make(SYS)]), ['Kitchen sink', kitchenSink], ['Edge cases', edgeCases]];
 
 /** Every picture gets an address, so the preview draws an <img> where the export would. */
 function withPictures(d) {
@@ -181,6 +197,40 @@ test('the checks catch what HubSpot or the team would trip on', () => {
   assert.match(msgs, /Two fields are called “dupe”/);
   const r = H.newDoc('Reserved', [Object.assign(H.makePart('text', SYS), { name: 'items' })]);
   assert.match(H.check(r, SYS).map(i => i.msg).join('\n'), /HubL already uses/);
+});
+
+test('a HubL keyword is never a field name', () => {
+  for (const word of ['empty', 'in', 'or', 'not', 'div', 'mod', 'if']) {
+    const d = H.newDoc('Keywords', [Object.assign(H.makePart('text', SYS), { label: word, name: word })]);
+    assert.match(H.check(d, SYS).filter(i => i.level === 'error').map(i => i.msg).join('\n'), /HubL already uses/, word);
+    const p = Object.assign(H.makePart('text', SYS), { label: word, name: '' });
+    d.parts.push(p); H.claimNames(d, p);
+    assert.notEqual(p.name, word, `${word} is suffixed when it is claimed`);
+  }
+});
+
+test('a button with no link, and an edge-case module, behave', () => {
+  const d = edgeCases();
+  const html = H.render(d, SYS, { mode: 'preview', ids: false });
+  assert.ok(!html.includes('Goes nowhere'), 'a button with no address is not drawn');
+  assert.ok(html.includes('width:100%;min-width:100%'), 'the column left alone takes the full width');
+  assert.match(H.check(d, SYS).map(i => i.msg).join('\n'), /no link/);
+  const empty = H.render(d, SYS, { mode: 'preview', ids: false, empty: true });
+  assert.ok(empty.includes('>Y<') && empty.includes('>Z<'), 'empty keeps each item\'s own required value');
+});
+
+test('a missing value is not content, and a dropped theme falls back', { skip: !nunjucks && 'nunjucks not installed' }, () => {
+  const d = H.STARTERS.find(s => s.id === 'events').make(SYS);
+  d.themes = ['cream', 'navy'];
+  const b = H.build(d, SYS);
+  const env = new nunjucks.Environment(null, { autoescape: false });
+  env.addFilter('escape_html', escHtml); env.addFilter('escape_attr', escHtml); env.addFilter('escape_url', escHtml);
+  const ctx = context(JSON.parse(b.files[1].text), false);
+  const blank = JSON.parse(JSON.stringify(ctx)); blank.module.events[0].where = '';
+  const missing = JSON.parse(JSON.stringify(ctx)); delete missing.module.events[0].where;
+  assert.equal(norm(env.renderString(b.html, missing)), norm(env.renderString(b.html, blank)), 'an item made before a field existed collapses like an empty one');
+  const gone = JSON.parse(JSON.stringify(ctx)); gone.module.theme_choice = 'offwhite';
+  assert.match(env.renderString(b.html, gone), /hm-t-cream/, 'a theme the module no longer offers falls back to the first');
 });
 
 test('a zip holds the folder', () => {

@@ -10,6 +10,7 @@
 //     onReset: () => { ... },            // optional: clear anything kept outside the snapshot
 //   });
 //   ToolKit.commit()                     // call after any change (debounced, deduped, saved)
+//   ToolKit.flush()                      // record a pending change now: before a structural edit, so it undoes alone
 //   ToolKit.register('mod+s', 'Download PNG', fn, { group: 'Export' })
 //   ToolKit.saveAux(name, value) / ToolKit.loadAux(name)   // bigger blobs kept beside the state
 //
@@ -31,19 +32,24 @@
 
   // ---- history ----
   function snapshot() { return JSON.stringify(cfg.getState()); }
+  let pending = false;
+  function record() {
+    const s = snapshot();
+    if (hist[idx] === s) return;
+    hist = hist.slice(0, idx + 1); hist.push(s); if (hist.length > 100) hist.shift();
+    idx = hist.length - 1; save(s); updateButtons();
+  }
   function commit() {
     if (!cfg || !cfg.getState || applying) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      const s = snapshot();
-      if (hist[idx] === s) return;
-      hist = hist.slice(0, idx + 1); hist.push(s); if (hist.length > 100) hist.shift();
-      idx = hist.length - 1; save(s); updateButtons();
-    }, 350);
+    clearTimeout(timer); pending = true;
+    timer = setTimeout(() => { pending = false; record(); }, 350);
   }
+  // A change still inside its debounce is recorded before undo or redo steps, so ⌘Z straight after a delete brings
+  // the part back instead of saying there is nothing to undo, and never takes two steps at once.
+  function flush() { if (!pending) return; clearTimeout(timer); pending = false; record(); }
   function apply(s) { applying = true; try { cfg.setState(JSON.parse(s)); } finally { applying = false; } save(s); updateButtons(); }
-  function undo() { clearTimeout(timer); if (idx <= 0) return toast('Nothing to undo'); idx--; apply(hist[idx]); toast('Undo'); }
-  function redo() { clearTimeout(timer); if (idx >= hist.length - 1) return toast('Nothing to redo'); idx++; apply(hist[idx]); toast('Redo'); }
+  function undo() { flush(); if (idx <= 0) return toast('Nothing to undo'); idx--; apply(hist[idx]); toast('Undo'); }
+  function redo() { flush(); if (idx >= hist.length - 1) return toast('Nothing to redo'); idx++; apply(hist[idx]); toast('Redo'); }
   function reset() {
     if (!cfg) return;
     if (!confirm('Reset this tool to its defaults? Saved work in this browser is cleared.')) return;
@@ -197,5 +203,5 @@
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
   }
-  window.ToolKit = { init, commit, undo, redo, reset, register, saveAux, loadAux, help: toggleHelp, toast, showGif, hideGif, get canUndo() { return idx > 0; }, get canRedo() { return idx < hist.length - 1; } };
+  window.ToolKit = { init, commit, flush, undo, redo, reset, register, saveAux, loadAux, help: toggleHelp, toast, showGif, hideGif, get canUndo() { return idx > 0; }, get canRedo() { return idx < hist.length - 1; } };
 })();

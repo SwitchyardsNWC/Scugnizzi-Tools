@@ -135,8 +135,8 @@ ones the team may edit, and exports the module.
   fields.json and checks it is the preview, byte for byte after whitespace.
 - **Three files, no CSS file.** HubSpot refuses module.css and module.js on an email module, so the folder is
   module.html, fields.json and meta.json. Everything that has to hold is inline; module.html carries two small
-  style blocks for what cannot be (rich text rules, which HubSpot inlines at send, and the phone and dark rules,
-  which Gmail strips). Columns and grids stack on a phone without any of it.
+  style blocks for what cannot be (rich text rules, which HubSpot is expected to inline at send, and the phone
+  and dark rules, which Gmail strips). Columns and grids stack on a phone without any of it.
 - **Two ways in.** The zip goes up with `hs cms upload` (HubSpot CLI 8; `hs upload` is gone). Or the Hand build
   tab walks Design Manager field by field, with the code to paste.
 - **The Switchyards system** is read from `template-studio/design-systems/switchyards.system.json` when served,
@@ -146,7 +146,7 @@ ones the team may edit, and exports the module.
   warn on the rest, contrast included.
 
 ```bash
-node --test hub-mod/test.mjs                      # structure: 33 checks, nothing to install
+node --test hub-mod/test.mjs                      # structure and behaviour, nothing to install
 npm i --no-save nunjucks && node --test hub-mod/test.mjs   # adds the render-equals-preview checks
 ```
 

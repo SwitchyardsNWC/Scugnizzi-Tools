@@ -434,7 +434,8 @@ no `icon`, which is a path to a file a standalone module does not have.
 two body `<style>` blocks for what cannot be:
 
 1. `<style data-hse-inline-css="true">` for the rich text scale. One community Ideas post says HubSpot inlines
-   such a block in a module at send and removes it; the editor still warns about style tags.
+   such a block in a module at send and removes it; the editor still warns about style tags. Another community
+   report says it did not carry over, so this is expected, not known.
 2. A plain `<style>` for phone sizes and the dark layers (2.5). Apple Mail, iOS Mail and Outlook.com read it;
    **Gmail strips a `<style>` in the body**, which is why nothing structural may depend on it.
 
@@ -446,6 +447,28 @@ Four" width, `width:calc((breakpoint - 100%) * 1000)` between `min-width:<share>
 stacks by container width with no stylesheet at all, and an MSO ghost table for Outlook. The gutter is its own
 element, so on a phone it becomes the space between the stacked boxes. **Unverified in a send**, as is
 whether MSO conditionals in module.html reach Outlook intact (they do in a coded template, 2.2).
+
+**What a review of the first build found, and the rules it left.** Each of these was reproduced, several of them
+by running module.html through Jinjava 2.7.4, the engine HubL runs on:
+
+- **An inlined `!important` cannot be undone from a stylesheet.** If HubSpot inlines the rich text block, every
+  paragraph carries `margin:0 0 16px 0 !important` in its own style, and a `:last-child { margin-bottom:0 !important }`
+  in the body sheet loses to it. So the last paragraph's margin is part of the design: the rich text part asks for
+  that much less space below it, and the preview inlines the block onto the elements the way HubSpot does, rather
+  than adding it as a stylesheet, so the spacing on screen is the spacing sent.
+- **`|trim` on a missing value is the string "null".** Jinjava's trim runs `Objects.toString` first, so
+  `{% if item.where|trim %}` is true for an item made before the field existed. Test the value, then filter it:
+  `{% if item.where and item.where|trim %}`.
+- **HubL's operator words do not parse as field names.** `module.empty|trim`, `module.in`, `module.div` and the
+  rest of `and or not in is if else div mod empty eq ne lt gt le ge instanceof` are syntax errors.
+- **A button with no link is not drawn**, as a picture with no address is not: either one would ship broken.
+- **Space below a part belongs to what follows it.** When everything after a part can collapse, its gap carries the
+  same condition, so an emptied ending does not leave the bottom padding taller than the top (2.11). A column whose
+  parts all collapse goes with its gutter, and in a pair the other column takes the width.
+- **Columns that do not stack still shrink**: percentages in the style, pixels only in the `width` attribute, which
+  is what Outlook reads. A pixel width in the style holds a module at 600 on a 375 phone.
+- **A client with a style block and no `calc()`** (the Outlook apps, Yahoo) gets the stacking from the module's
+  phone rule instead.
 
 **Fields, by type. Documented, and from HubSpot's field types.** Read in module.html as `module.<name>`, and as
 `item.<name>` inside `{% for item in module.<group> %}`:
