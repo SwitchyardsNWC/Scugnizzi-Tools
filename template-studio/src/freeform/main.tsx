@@ -56,7 +56,12 @@ import '../app/app.css';
 import './freeform.css';
 import { hasEffects } from '../model/effects.ts';
 import { starterOf, type FrameSize } from '../model/frame-sizes.ts';
-import { withFreeform } from '../model/freeform.ts';
+import { recipeHash, withFreeform } from '../model/freeform.ts';
+import { placeOnBoard, type Placed } from '../model/board.ts';
+import { placeFrames } from '../model/frame-store.ts';
+import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
+import type { BoardFrameView, SurfaceBoard } from '../app/Surface.tsx';
+import type { View } from '../app/surface-tools.tsx';
 
 startTheme();
 
@@ -206,6 +211,14 @@ function FreeformTool() {
   const picker = useRef<HTMLInputElement | null>(null);
   // Remount the surface whenever a different drawing is on it, so it fits that page.
   const [session, setSession] = useState(0);
+  /** The view the next frame opens at, when a click on the board brought it up; otherwise it fits. */
+  const [startView, setStartView] = useState<View | null>(null);
+  /** A frame being dragged by its name: which (null for the one edited) and how far. */
+  const [moving, setMoving] = useState<{ key: string; dx: number; dy: number } | null>(null);
+  /** Frames' drawings as last read from the store, and their printed pictures, so the board is not rebuilt each frame. */
+  const docCache = useRef(new Map<string, { raw: string | null; doc: Template; svg?: string; svgFor?: unknown }>());
+  const printCache = useRef(new Map<string, string>());
+  const [, setPrinted] = useState(0);
 
   // --- the project -----------------------------------------------------------------------------------------
 
@@ -536,13 +549,15 @@ function FreeformTool() {
   const pushLater = (key: string) => {
     if (projectRef.current.writable) void run(() => pushKey(key));
   };
-  const openKey = (key: string) => {
+  const openKey = (key: string, view: View | null = null) => {
     if (key === frames.active) return;
     const next = openFrame(store, frames, key);
     const entry = next.frames.find((f) => f.key === key);
+    setStartView(view);
     if (entry) show(next, frameDoc(entry.key, entry.name));
   };
   const newFrame = (size?: FrameSize, starter?: string) => {
+    setStartView(null);
     const id = newFrameId();
     const name = frameName(listed, size ? size.label : 'Frame');
     const doc = makeFrame(name, id, size, starter);
@@ -695,6 +710,96 @@ function FreeformTool() {
     }
   };
 
+  // --- the board --------------------------------------------------------------------------------------------
+
+  /** A frame's drawing, read again only when its stored copy changed. The one being edited is the editor's. */
+  const boardDoc = (key: string, name: string): Template => {
+    if (key === frames.active) return editor.template;
+    const raw = store.getItem(key);
+    const hit = docCache.current.get(key);
+    if (hit && hit.raw === raw) return hit.doc;
+    const doc = frameDoc(key, name);
+    docCache.current.set(key, { raw, doc });
+    return doc;
+  };
+  const sizes = listed.frames.map((f) => {
+    const page = blockOf(boardDoc(f.key, f.name))?.block;
+    return { key: f.key, x: f.x, y: f.y, width: page?.width ?? 560, height: page?.height ?? 280 };
+  });
+  const placed = placeOnBoard(sizes);
+  const placeOf = (key: string): Placed => {
+    const at = placed.find((f) => f.key === key)!;
+    return moving?.key === key ? { ...at, x: at.x + moving.dx, y: at.y + moving.dy } : at;
+  };
+  const here = placeOf(frames.active);
+  const boardFrames: BoardFrameView[] = listed.frames
+    .filter((f) => f.key !== frames.active)
+    .map((f) => {
+      const doc = boardDoc(f.key, f.name);
+      const found2 = blockOf(doc);
+      const at = placeOf(f.key);
+      if (!found2) return null;
+      const fds = designSystemOf(doc);
+      const fsection = doc.sections.find((s2) => s2.id === found2.sectionId);
+      const entry = docCache.current.get(f.key);
+      let svg = entry?.svg;
+      if (!entry || entry.svgFor !== allAssets) {
+        // Its ids made its own, so a clip or a text path in one frame never answers for another's on the same page.
+        const tag = `b${f.key.split('.').pop()}-`;
+        svg = withoutMissingPictures(withLocalAssets(freeformSvg(found2.block, fds), allAssets))
+          .replace(/\bid="/g, `id="${tag}`)
+          .replace(/url\(#/g, `url(#${tag}`)
+          .replace(/href="#/g, `href="#${tag}`)
+          .replace(/\sdata-sy-layer="[^"]*"/g, '');
+        if (entry) Object.assign(entry, { svg, svgFor: allAssets });
+      }
+      // A frame with effects shows its print, made once per recipe at page size.
+      let print: string | null = null;
+      if (hasEffects(found2.block)) {
+        const hash = recipeHash(found2.block);
+        print = printCache.current.get(hash) ?? null;
+        if (print === null && !printCache.current.has(`busy:${hash}`)) {
+          printCache.current.set(`busy:${hash}`, '');
+          const ground2 = colorOf(fds, found2.block.background) ?? fsection?.containerColor ?? fsection?.bandColor ?? '#ffffff';
+          void freeformCanvas(found2.block, fds, { assets: allAssets, scale: 1, ground: ground2 })
+            .then((c) => canvasBlob(c))
+            .then((blob) => {
+              printCache.current.set(hash, URL.createObjectURL(blob));
+              setPrinted((n) => n + 1);
+            })
+            .catch(() => undefined);
+        }
+      }
+      return {
+        key: f.key,
+        name: f.name,
+        x: at.x - here.x,
+        y: at.y - here.y,
+        width: at.width,
+        height: at.height,
+        svg: svg ?? '',
+        print,
+        ground: colorOf(fds, found2.block.background) ?? fsection?.containerColor ?? fsection?.bandColor ?? '#ffffff',
+      };
+    })
+    .filter((f): f is BoardFrameView => f !== null);
+  const board: SurfaceBoard = {
+    frames: boardFrames,
+    name: activeEntry.name,
+    startView,
+    onPick: (key, view) => openKey(key, view),
+    onMove: (key, dx, dy, done) => {
+      const k = key ?? frames.active;
+      if (!done) return setMoving({ key: k, dx, dy });
+      setMoving(null);
+      // Every frame's place is written down once one moves, so those set by the row stay where they are seen.
+      const places = Object.fromEntries(placed.map((f) => [f.key, f.key === k ? { x: f.x + dx, y: f.y + dy } : { x: f.x, y: f.y }]));
+      const next = placeFrames(store, frames, places);
+      framesRef.current = next;
+      setFrames(next);
+    },
+  };
+
   return (
     <div class="app ff-app">
       <main
@@ -716,6 +821,7 @@ function FreeformTool() {
           onDone={() => setLayer(null)}
           api={api}
           onImage={() => picker.current?.click()}
+          board={board}
           standalone={{
             left: (
               <>

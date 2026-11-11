@@ -25,6 +25,9 @@ export interface FrameEntry {
   updatedAt: number;
   /** The project whose folder has this frame's file. Absent for a frame that has never been in one. */
   project?: string;
+  /** Where the frame's top-left corner sits on the board, in page pixels. Absent until placed (model/board.ts). */
+  x?: number;
+  y?: number;
 }
 
 export interface FrameIndex {
@@ -56,6 +59,10 @@ export function readFrameIndex(raw: string | null): FrameIndex | null {
     seen.add(e.key);
     const entry: FrameEntry = { key: e.key, name: (typeof e.name === 'string' ? e.name.trim().slice(0, 60) : '') || 'Frame', updatedAt: typeof e.updatedAt === 'number' ? e.updatedAt : 0 };
     if (typeof e.project === 'string' && e.project) entry.project = e.project;
+    if (typeof e.x === 'number' && Number.isFinite(e.x) && typeof e.y === 'number' && Number.isFinite(e.y)) {
+      entry.x = Math.round(e.x);
+      entry.y = Math.round(e.y);
+    }
     frames.push(entry);
   }
   if (frames.length === 0) return null;
@@ -115,6 +122,18 @@ export function addFrame(store: KeyValue, index: FrameIndex, name: string, doc: 
   const key = FRAME_PREFIX + id;
   store.setItem(key, JSON.stringify(doc));
   return writeIndex(store, { ...index, active: key, frames: [...index.frames, { key, name, updatedAt: now }] });
+}
+
+/** Frames moved on the board. Moving a frame is not an edit of its drawing, so its date stays. */
+export function placeFrames(store: KeyValue, index: FrameIndex, places: Record<string, { x: number; y: number }>): FrameIndex {
+  let changed = false;
+  const frames = index.frames.map((f) => {
+    const at = places[f.key];
+    if (!at || (f.x === Math.round(at.x) && f.y === Math.round(at.y))) return f;
+    changed = true;
+    return { ...f, x: Math.round(at.x), y: Math.round(at.y) };
+  });
+  return changed ? writeIndex(store, { ...index, frames }) : index;
 }
 
 export function openFrame(store: KeyValue, index: FrameIndex, key: string): FrameIndex {
@@ -211,7 +230,11 @@ export function applyPulls(store: KeyValue, index: FrameIndex | null, files: Fra
     const entry: FrameEntry = { key: file.key, name: file.name, updatedAt: file.savedAt, project };
     const at = frames.findIndex((f) => f.key === file.key);
     if (at === -1) frames.push(entry);
-    else frames[at] = entry;
+    else {
+      // Where it sits on the board is this browser's, not the file's: a newer drawing keeps its place.
+      const old = frames[at]!;
+      frames[at] = old.x !== undefined && old.y !== undefined ? { ...entry, x: old.x, y: old.y } : entry;
+    }
   }
   const active = index && frames.some((f) => f.key === index.active) ? index.active : frames[0]!.key;
   return writeIndex(store, { version: 1, active, frames });

@@ -2430,3 +2430,14 @@ button.phone-row { cursor: pointer; }
 .fig-menu button[disabled] { color: var(--fig-faint); cursor: default; }
 .fig-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--fig-line); }
 .fig-draft { font-weight: 500; }
+
+/* Frame names on the Freeform board. */
+.fig-frame-label {
+  position: absolute; z-index: 2; height: 20px; padding: 0 4px; border: 0; border-radius: 4px; background: none;
+  color: var(--fig-muted); font: 500 12px/20px inherit; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: grab; touch-action: none; text-align: left;
+}
+.fig-frame-label:hover { color: var(--fig-ink); background: var(--fig-hover); }
+.fig-frame-label.on { color: var(--fig-ink); font-weight: 700; }
+.fig-frame-label:active { cursor: grabbing; }
+.surface-other { pointer-events: none; }
