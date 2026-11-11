@@ -411,6 +411,107 @@ What the compiler adds to HubSpot's shape, as vendor practice rather than anythi
    survives the send untouched.
 4. The line in Gmail, Apple Mail on an iPhone, and Outlook on Windows — with preview text and without.
 
+### 1.18 Custom email modules (HUB-MOD)
+
+Added 2026-11-11, building HUB-MOD (`hub-mod/`), which designs the blocks the team drags into a drag-and-drop
+email. A module is a different object from a coded template, and most of what follows was found by reading
+HubSpot's own CLI and docs, not by a send. The research session could not fetch HubSpot's doc hosts directly;
+"documented" here means search excerpts of those pages agreed with the CLI source.
+
+**The folder is three files. Documented, and verified in HubSpot's CLI source.** `<slug>.module/` holds
+`module.html`, `fields.json` and `meta.json`. Email modules do not support `module.css` or `module.js`: Design
+Manager hides both panes once Emails is ticked, `hs cms module create` deletes both files when the content types
+include EMAIL (`@hubspot/local-dev-lib` `lib/cms/modules`), and a community report has an upload failing with
+"CSS and Javascript are not allowed on email modules". Ship neither, not even empty.
+
+**meta.json is the CLI's key set.** `content_types: ["EMAIL"]` replaced `host_template_types` in January 2024;
+`is_available_for_new_content` must be `true` or the module is missing from the editor (HubSpot's own sample
+ships it `false`); `global: false`, so each email keeps its own content; no `module_id`, which HubSpot assigns;
+no `icon`, which is a path to a file a standalone module does not have.
+
+**Styles live in module.html. Partly community, unverified here.** A module has no way into the email's head
+(`require_css` and `require_head` are page features). So everything that must hold is inline, and HUB-MOD adds
+two body `<style>` blocks for what cannot be:
+
+1. `<style data-hse-inline-css="true">` for the rich text scale. One community Ideas post says HubSpot inlines
+   such a block in a module at send and removes it; the editor still warns about style tags. Another community
+   report says it did not carry over, so this is expected, not known.
+2. A plain `<style>` for phone sizes and the dark layers (2.5). Apple Mail, iOS Mail and Outlook.com read it;
+   **Gmail strips a `<style>` in the body**, which is why nothing structural may depend on it.
+
+The editor's warning ("You're using style tags in the body of your email") does not stop a save or a send.
+
+**Columns cannot wait for a media query.** Since Gmail never sees the module's stylesheet, a table that stacks by
+media query (3.14) would not stack there. HUB-MOD's stacking columns and grids are inline-blocks with the "Fab
+Four" width, `width:calc((breakpoint - 100%) * 1000)` between `min-width:<share>%` and `max-width:100%`, which
+stacks by container width with no stylesheet at all, and an MSO ghost table for Outlook. The gutter is its own
+element, so on a phone it becomes the space between the stacked boxes. **Unverified in a send**, as is
+whether MSO conditionals in module.html reach Outlook intact (they do in a coded template, 2.2).
+
+**What a review of the first build found, and the rules it left.** Each of these was reproduced, several of them
+by running module.html through Jinjava 2.7.4, the engine HubL runs on:
+
+- **An inlined `!important` cannot be undone from a stylesheet.** If HubSpot inlines the rich text block, every
+  paragraph carries `margin:0 0 16px 0 !important` in its own style, and a `:last-child { margin-bottom:0 !important }`
+  in the body sheet loses to it. So the last paragraph's margin is part of the design: the rich text part asks for
+  that much less space below it, and the preview inlines the block onto the elements the way HubSpot does, rather
+  than adding it as a stylesheet, so the spacing on screen is the spacing sent.
+- **`|trim` on a missing value is the string "null".** Jinjava's trim runs `Objects.toString` first, so
+  `{% if item.where|trim %}` is true for an item made before the field existed. Test the value, then filter it:
+  `{% if item.where and item.where|trim %}`.
+- **HubL's operator words do not parse as field names.** `module.empty|trim`, `module.in`, `module.div` and the
+  rest of `and or not in is if else div mod empty eq ne lt gt le ge instanceof` are syntax errors.
+- **A button with no link is not drawn**, as a picture with no address is not: either one would ship broken.
+- **Space below a part belongs to what follows it.** When everything after a part can collapse, its gap carries the
+  same condition, so an emptied ending does not leave the bottom padding taller than the top (2.11). A column whose
+  parts all collapse goes with its gutter, and in a pair the other column takes the width.
+- **Columns that do not stack still shrink**: percentages in the style, pixels only in the `width` attribute, which
+  is what Outlook reads. A pixel width in the style holds a module at 600 on a 375 phone.
+- **A client with a style block and no `calc()`** (the Outlook apps, Yahoo) gets the stacking from the module's
+  phone rule instead.
+
+**Fields, by type. Documented, and from HubSpot's field types.** Read in module.html as `module.<name>`, and as
+`item.<name>` inside `{% for item in module.<group> %}`:
+
+| Field | Default | Read as |
+| --- | --- | --- |
+| `text` | a string | `{{ module.x|escape_html }}` |
+| `richtext` | an HTML string | `{{ module.x }}`, raw |
+| `image` | `{src, alt, width, height, size_type, loading}` | `.src`, `.alt`; never `.width` (1.6a) |
+| `link` | `{url: {type, href, content_id}, open_in_new_tab, no_follow}` | `.url.href`; when `.url.type` is `EMAIL_ADDRESS` the href is a bare address and `mailto:` is the module's job |
+| `boolean` | `true` / `false` | `{% if module.x %}` |
+| `choice` | one of `choices`, which are `[value, label]` pairs | the value string |
+| `group` + `occurrence` | an **array** of item objects, as long as `occurrence.default` | a list; `sorting_label_field` is `"group.child"` |
+
+Names: `^[a-z][a-z0-9_]*$` (a hyphen reads as subtraction), unique among siblings. HubSpot publishes no reserved
+list; HUB-MOD avoids the module tag's own parameters (`label`, `path`, `no_wrapper`, `extra_classes`), a dict's
+methods (`items`, `keys`, `values`) and HubL's names. Renaming a field orphans what the team typed, as in 1.10.
+
+**Getting it in.** HubSpot CLI 8 moved every CMS command under `hs cms`: `hs upload` now only prints "Did you mean
+hs cms upload?". `hs account auth` (a personal access key, which it fetches through the browser) replaced `hs init`. `hs cms upload x.module
+"Folder/x.module"` needs both paths to end in `.module`, publishes immediately (8.18 ignores `-m draft` for a
+folder; it reaches only single files and `hs cms watch`), and overwrites in place; `--clean` deletes the folder first and must never touch a module emails already use. Design
+Manager cannot take a zip or a folder, and has nowhere to paste fields.json: by hand, every field is added with
+Add field, named in "HubL variable name", and module.html is pasted into the HTML + HubL pane. Custom modules in
+email need Marketing Hub Professional or Enterprise; on another plan a CLI upload succeeds and the module never
+appears in the editor (community).
+
+**Still to confirm in the first send of a HUB-MOD module:**
+
+1. That the upload takes the three files without complaint, and the module appears in the email editor's module
+   list under its label.
+2. Whether HubSpot pads a custom module in a drag-and-drop email (a community answer says 10px 20px, and 20px on
+   phones via `hs_padded`). If it does, it stacks on the module's own side padding and insets a coloured theme;
+   set Sides to None in HUB-MOD, or the module's spacing to 0 in the editor.
+3. Whether the `data-hse-inline-css` block is inlined and removed at send, and whether the plain block reaches
+   Apple Mail.
+4. Columns and a grid stacking in Gmail on a phone with no stylesheet, and the ghost table in Outlook on Windows.
+5. What a custom image field's served `src` carries: 1.6a saw `?width=<declared>` at 1x for the stock image
+   module, so "upload at 2x" may be downsampled.
+6. That `|striptags|trim` collapses a rich text field the team cleared (`<p>&nbsp;</p>`). Reading Jinjava's
+   source, `striptags` already treats a non-breaking space as whitespace; HUB-MOD also replaces `&nbsp;` to be
+   sure. Either way, rich text holding only an image or a rule counts as empty.
+
 ## 2. Email client rendering
 
 ### 2.1 Structure
