@@ -6,6 +6,8 @@ import { colorOf, type ColorRef } from '../model/design-system.ts';
 import type { BlockType } from '../model/types.ts';
 import { backToText, designSystemOf, isStack, RATIOS, readValue, resolve, shareSpans, hubspotFields, siteOf } from '../model/edit.ts';
 import { FOOTER_TYPES, footerTypeOf } from '../model/footer-types.ts';
+import { FOOTER_PARTS, type FooterStyle } from '../model/footer-style.ts';
+import { FooterStyleFields } from './FooterStyleFields.tsx';
 import { addLayer, groupOfKey, groupRuns, isRendered, membersOf, paintGroup, removeGroup, removeLayer, reorderLayer, ungroupLayers, updateLayer, updateMembers, type LayerKind } from '../model/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import { canvasTypeOf } from '../model/design-system.ts';
@@ -147,7 +149,7 @@ export function Inspector({ editor, onRasterise, rasterising, patternInfo, multi
       <p class="summary">{spec.summary}</p>
 
       {/* A freeform block's canvas details show only inside the canvas, and its email settings only outside it. */}
-      {spec.groups.filter((group) => !group.when || (group.when === 'canvas') === Boolean(freeform?.open)).map((group) => (
+      {spec.groups.filter((group) => (!group.when || (group.when === 'canvas') === Boolean(freeform?.open)) && (!group.show || group.show(block))).map((group) => (
         <GroupPanel
           key={`${block.id}-${group.name}`}
           group={group}
@@ -184,7 +186,10 @@ function GroupPanel({
   const inStack = (found.column?.blocks.length ?? 0) > 1;
   // A control that only means something in a group stays out of the panel otherwise — a dial
   // wired to nothing is worse than no dial.
-  const controls = group.controls.filter((c) => !c.when || (c.when === 'stack' && inStack) || (c.when === 'canvas' && Boolean(freeform?.open)));
+  const controls = group.controls
+    .filter((c) => !c.when || (c.when === 'stack' && inStack) || (c.when === 'canvas' && Boolean(freeform?.open)))
+    // A control one variant of the block ignores stays out for that variant (catalog.ts, `show`).
+    .filter((c) => !c.show || (found.block !== undefined && c.show(found.block)));
   // The Spacing panel drives the overlay on the canvas: while the pointer is over it or a dial in
   // it has focus, the numbers being changed are drawn on the block they belong to.
   const live = group.name === 'Spacing' && onSpacingHot;
@@ -256,6 +261,17 @@ function ControlField({
   if (control.kind === 'preset') return <PresetField control={control} editor={editor} />;
   if (control.kind === 'variant') return <VariantField control={control} editor={editor} />;
   if (control.kind === 'footer-type') return <FooterTypeField control={control} editor={editor} />;
+  if (control.kind === 'footer-parts') return <FooterPartsField control={control} editor={editor} />;
+  if (control.kind === 'footer-style') {
+    return (
+      <FooterStyleFields
+        ds={designSystemOf(editor.template)}
+        mode="footer"
+        own={(value as Partial<FooterStyle> | undefined) ?? {}}
+        onSet={(key, v) => editor.set(`block.style.${key}`, v)}
+      />
+    );
+  }
   if (control.kind === 'border') return <BorderField control={control} editor={editor} />;
   // A palette colour by name — the same slot the design panel uses, so the list cannot go stale
   // (learnings 3.48). `zero` names what an empty reference falls back to.
@@ -1530,6 +1546,45 @@ function setColumnFlag(editor: Editor, columnId: string, hideOnPhone: boolean) {
 
 /** Everything the team will see in HubSpot, in the order the Contents panel lists it. */
 /** The button variants, read from the design system so the list cannot go stale. */
+/**
+ * Which of a footer's parts it shows, as a row of switches that each say whether they are on in words as well as
+ * in colour. The classic footer draws only a logo and a note, so it offers only those two.
+ */
+function FooterPartsField({ control, editor }: { control: Control; editor: Editor }) {
+  const { selection } = editor;
+  const block = selection.kind === 'block' ? siteOf(editor.template, selection.blockId)?.column.blocks.find((b) => b.id === selection.blockId) : undefined;
+  if (block?.type !== 'legal') return null;
+  const classic = footerTypeOf(block) === 'classic';
+  const hidden = block.hide ?? [];
+  const parts = FOOTER_PARTS.filter((p) => !classic || p.id === 'logo' || p.id === 'note');
+  return (
+    <div class="field wide" title={control.help}>
+      <label>{control.label}</label>
+      <div class="footer-types" role="group" aria-label="Footer parts">
+        {parts.map((p) => {
+          const on = !hidden.includes(p.id);
+          return (
+            <button
+              key={p.id}
+              class={`footer-type ${on ? 'on' : ''}`}
+              aria-pressed={on}
+              title={p.help}
+              onClick={() => {
+                const next = on ? [...hidden, p.id] : hidden.filter((h) => h !== p.id);
+                editor.set(control.path, next.length ? next : undefined);
+              }}
+            >
+              {on ? '✓ ' : ''}
+              {p.name}
+              {on ? '' : ' · off'}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * A footer's type, as the five of them side by side rather than a select: it is the first decision about a footer
  * and the one it was dropped to make. Each says what it is for on hover. Choosing one rebuilds the footer.

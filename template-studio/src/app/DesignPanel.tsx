@@ -24,6 +24,8 @@ import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { InheritDial } from './InheritDial.tsx';
+import { FooterStyleFields } from './FooterStyleFields.tsx';
+import { DENSITY, systemFooterStyle } from '../model/footer-style.ts';
 
 // The design system editor.
 //
@@ -173,6 +175,8 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
       <PresetPanel editor={editor} ds={ds} />
       <ButtonPanel editor={editor} ds={ds} phone={phone} />
       <ImagePanel editor={editor} ds={ds} />
+      {/* The footer's look, for every footer on this system. A footer can depart from any of it in its own panel. */}
+      <FooterPanel editor={editor} ds={ds} />
       {/* Playful type for the freeform canvas, last and on its own: it follows none of the email's rules above. */}
       {BRAND_PRESETS && <BrandPresetsPanel editor={editor} ds={ds} />}
 
@@ -979,6 +983,19 @@ function ImagePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
       </div>
 
       <PresetSlot ds={ds} label="Border" value={img.borderColor} onChange={(v) => editor.set(at('borderColor'), v)} help="Only visible once the border has a width." />
+    </Panel>
+  );
+}
+
+function FooterPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
+  const st = systemFooterStyle(ds);
+  return (
+    <Panel
+      name="Footer"
+      summary={`${st.smallSize}px · ${st.hairlines ? `${st.hairlineWidth}px hairlines` : 'no hairlines'} · ${DENSITY[st.density].name.toLowerCase()}${st.linkUnderline ? ' · underlined' : ''}`}
+      help="Sizes, hairlines, density and links for the masthead, ledger, stub and letterhead footers. A footer can depart from any of these in its own Footer style panel. The classic footer is drawn as it always was and reads none of them."
+    >
+      <FooterStyleFields ds={ds} mode="system" onSet={(key, v) => editor.set(`ds.footer.${key}`, v)} />
     </Panel>
   );
 }

@@ -8,7 +8,10 @@ import type { BlockParts } from './fields.ts';
 
 export function spacerParts(block: SpacerBlock, ctx: BuildContext): BlockParts {
   void ctx;
-  const markup = spacerRow(block.height || 20);
+  // Zero is a height somebody chose — it is how a stack loses its gap — so only a missing or broken number falls
+  // back to 20. `|| 20` read 0 as unset, and the outline said "Spacer · 0px" over 20px of space.
+  const height = Number.isFinite(block.height) ? Math.max(0, block.height) : 20;
+  const markup = spacerRow(height);
   // In a stack the spacer *is* the space: the row builder puts no gap on either side of it, so the
   // number on the block is the number on the page.
   return { declaration: frag([]), markup, row: () => markup, collapse: (inner) => inner };

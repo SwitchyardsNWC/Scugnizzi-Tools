@@ -294,11 +294,18 @@ export function useEditor({ initial, workspace, notify, fileNames = [], onCreate
       const before = template;
       const beforeSelection = selection;
       commit(label, next, select ? { select } : {});
+      // The toast's Undo, which stays up for seconds after the operation. It only acts while the operation is still
+      // the last thing in the history — the entry on top holds the template from before it. Otherwise something
+      // came after (an edit, or a Cmd+Z that already took the operation back) and popping the top would throw away
+      // that instead: an edit lost with no redo, or a step of history skipped.
       return () => {
-        setTemplate(before);
-        setSelection(beforeSelection);
-        setPast((stack) => stack.slice(0, -1));
-        setSave('dirty');
+        setPast((stack) => {
+          if (stack.at(-1)?.template !== before) return stack;
+          setTemplate(before);
+          setSelection(beforeSelection);
+          setSave('dirty');
+          return stack.slice(0, -1);
+        });
       };
     },
     [template, selection, commit],

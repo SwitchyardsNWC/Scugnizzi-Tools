@@ -6,6 +6,7 @@
 // v1's own `section(cell(...))` was already a section wrapping a padded cell.
 
 import type { ButtonStyle, ColorRef, DesignSystem, HeadingLevel } from './design-system.ts';
+import type { FooterPart, FooterStyle } from './footer-style.ts';
 
 export type Align = 'left' | 'center' | 'right';
 
@@ -568,6 +569,20 @@ export interface LegalBlock extends BlockBase {
    * to publish a template without it (lint.ts, learnings 1.8), so it is not a choice to offer.
    */
   hidePreferences?: boolean;
+  /**
+   * Where the masthead and the letterhead set their parts. Absent is centred, which is what both always were. The
+   * ledger and the stub are arranged by their type and ignore it; the classic footer reads its column's alignment.
+   */
+  align?: Align;
+  /** Parts left out of this footer (model/footer-style.ts). Absent shows everything, as every footer did. */
+  hide?: FooterPart[];
+  /**
+   * The socials above or below the legal links. Absent is where the type puts them: above in the masthead, below
+   * everywhere else, and above in a ledger that says `socialsFirst`.
+   */
+  socialsAt?: 'above' | 'below';
+  /** This footer's departures from Design › Footer. Absent keys follow the system. */
+  style?: Partial<FooterStyle>;
 }
 
 // ---------------------------------------------------------------------------------------------

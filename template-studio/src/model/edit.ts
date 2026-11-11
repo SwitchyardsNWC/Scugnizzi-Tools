@@ -71,6 +71,10 @@ export function takenFieldNames(template: Template): Set<string> {
   const taken = new Set<string>();
   for (const block of allBlocks(template)) {
     for (const lock of locksOf(block)) if (lock.field) taken.add(lock.field);
+    // The drag and drop area's name is an identifier in the same template as every field, and HubSpot does not
+    // care which of the two a collision is between. Left out, a Text block added after an area took its
+    // `email_body`, and the template declared it twice.
+    if (block.type === 'dndarea' && block.name) taken.add(block.name);
   }
   return taken;
 }
@@ -173,8 +177,10 @@ function split(path: string): [string, string[]] {
 function setIn<T>(node: T, keys: string[], value: unknown): T {
   if (keys.length === 0) return value as T;
   const [head, ...rest] = keys;
-  const current = (node as Record<string, unknown>)[head!];
-  return { ...node, [head!]: setIn(current, rest, value) } as T;
+  // A parent that is not there yet is made: an optional group of settings — a footer's own `style`, the
+  // system's `footer` — is absent until its first value is set.
+  const current = node == null ? undefined : (node as Record<string, unknown>)[head!];
+  return { ...(node ?? {}), [head!]: setIn(current, rest, value) } as T;
 }
 
 function getIn(node: unknown, keys: string[]): unknown {
@@ -720,13 +726,11 @@ export function duplicateSection(template: Template, sectionId: string): Templat
       column.id = nextId();
       for (const block of column.blocks) {
         block.id = nextId();
-        for (const lock of locksOf(block)) {
-          // Derived from the original's *name*, not its label, so a copy of `button_text` becomes
-          // `button_text_2` rather than something reconstructed from "Button text (blank to hide)".
-          // Nothing is orphaned either way — a duplicate is a new field — but the team reads these
-          // in error messages, and a name that relates to the original is worth the one line.
-          if (lock.editable) lock.field = fieldName(lock.field || lock.label, taken);
-        }
+        // Derived from the original's *name*, not its label, so a copy of `button_text` becomes
+        // `button_text_2` rather than something reconstructed from "Button text (blank to hide)".
+        // Nothing is orphaned either way — a duplicate is a new field — but the team reads these
+        // in error messages, and a name that relates to the original is worth the one line.
+        remintFields(block, taken);
       }
     }
   }
@@ -817,8 +821,12 @@ export function moveBlockToSection(template: Template, blockId: string, index: n
 
   // The new section inherits the one it came from, so a block dragged out of a navy row does not
   // land on cream and look broken for reasons nobody asked for.
+  // Not its pattern marker, though: the new section holds one block of what the pattern holds, and a marker left
+  // on it would let Push changes overwrite the shared pattern with that one block. Group and Ungroup already drop it.
+  const { pattern: _dropped, ...shell } = site.section;
+  void _dropped;
   const carrier: Section = {
-    ...site.section,
+    ...shell,
     id: nextId(),
     rows: [{ id: nextId(), mobile: 'stack', columns: [{ ...site.column, id: nextId(), span: 12, blocks: [block] }] }],
   };
@@ -839,6 +847,44 @@ export function addSection(template: Template, type: BlockType, afterSectionId: 
 }
 
 // --- copies of things that carry field names -------------------------------------------------------
+
+/**
+ * Gives a copied block HubSpot field names of its own, in place. Every copy path goes through here.
+ *
+ * An open field gets a new name derived from the original's (`button_text` → `button_text_2`), or the name `keep`
+ * holds for its label when nothing else has it — how a pattern update keeps the names emails are bound to.
+ *
+ * A locked field's name is inert while it is locked, but it comes straight back the moment somebody unlocks it,
+ * and so does a picture of text's when it goes back to words (`wasText`). Copying those names verbatim meant a
+ * duplicated locked heading, unlocked, declared `headline` twice, and HubSpot refuses the upload. So a locked name
+ * is kept when it is free and re-minted when it is not, and a picture's `wasText` follows its own lock's new name,
+ * since the two are one field.
+ */
+function remintFields(block: Block, taken: Set<string>, keep?: Map<string, string>): void {
+  const was = block.type === 'image' ? block.lock.field : '';
+  for (const lock of locksOf(block)) {
+    if (lock.editable) {
+      const kept = keep?.get(lock.label);
+      if (kept && !taken.has(kept)) {
+        taken.add(kept);
+        lock.field = kept;
+      } else {
+        lock.field = fieldName(lock.field || lock.label, taken);
+      }
+    } else if (lock.field) {
+      if (taken.has(lock.field)) lock.field = fieldName(lock.field, taken);
+      else taken.add(lock.field);
+    }
+  }
+  if (block.type === 'image' && block.wasText) {
+    for (const lock of locksOf(block.wasText)) {
+      if (!lock.field) continue;
+      if (lock.field === was) lock.field = block.lock.field;
+      else if (taken.has(lock.field)) lock.field = fieldName(lock.field, taken);
+      else taken.add(lock.field);
+    }
+  }
+}
 
 /**
  * A copy of a section with new ids and freshly minted field names.
@@ -862,16 +908,7 @@ export function cloneSection(
       column.id = nextId();
       for (const block of column.blocks) {
         block.id = nextId();
-        for (const lock of locksOf(block)) {
-          if (!lock.editable) continue;
-          const kept = keep.get(lock.label);
-          if (kept && !taken.has(kept)) {
-            taken.add(kept);
-            lock.field = kept;
-          } else {
-            lock.field = fieldName(lock.field || lock.label, taken);
-          }
-        }
+        remintFields(block, taken, keep);
       }
     }
   }
@@ -882,7 +919,7 @@ export function cloneSection(
 export function cloneBlock(block: Block, nextId: () => string, taken: Set<string>): Block {
   const clone = structuredClone(block);
   clone.id = nextId();
-  for (const lock of locksOf(clone)) if (lock.editable) lock.field = fieldName(lock.field || lock.label, taken);
+  remintFields(clone, taken);
   return clone;
 }
 
@@ -1015,8 +1052,12 @@ export function setRowColumns(template: Template, rowId: string, spans: number[]
           const existing = row.columns[i];
           if (existing) return { ...existing, span };
           // A new column inherits the first one's padding and alignment, so a row does not become
-          // ragged the moment it is split.
-          return { ...first, id: nextId(), span, blocks: [] };
+          // ragged the moment it is split — and only those. Spreading the whole column also copied its
+          // Hide on phones, its box and its fill, so a block dropped into the new column vanished on phones.
+          const fresh: Column = { id: nextId(), span, padTop: first.padTop, padBottom: first.padBottom, align: first.align, blocks: [] };
+          if (first.padLeft !== undefined) fresh.padLeft = first.padLeft;
+          if (first.padRight !== undefined) fresh.padRight = first.padRight;
+          return fresh;
         });
 
         // Anything beyond the new count moves into the last surviving column rather than vanishing.
@@ -1271,9 +1312,7 @@ export function duplicateBlock(template: Template, blockId: string): Template {
 
   const clone = structuredClone(site.column.blocks[site.index]!);
   clone.id = nextId();
-  for (const lock of locksOf(clone)) {
-    if (lock.editable) lock.field = fieldName(lock.field || lock.label, taken);
-  }
+  remintFields(clone, taken);
 
   return mapColumn(template, site.column.id, (column) => {
     const blocks = [...column.blocks];

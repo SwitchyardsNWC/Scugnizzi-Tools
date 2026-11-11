@@ -708,6 +708,7 @@ function applySystemJson(raw: Record<string, unknown>, ds: DesignSystem, warning
   keep('buttons', (v) => isObject(v) && Object.keys(v).length > 0, 'a set of button variants');
   keep('richText', isObject, 'list and quote values');
   keep('image', isObject, 'image values');
+  keep('footer', isObject, 'footer values');
   keep('fonts', isObject, 'a set of font stacks');
   keep('fontStack', (v) => typeof v === 'string' && v.trim().length > 0, 'a font stack');
   keep('pageBackground', (v) => typeof v === 'string', 'a colour');

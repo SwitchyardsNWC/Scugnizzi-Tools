@@ -51,7 +51,23 @@ export function footerExtent(template: Template, sectionId: string): { from: num
 }
 
 /** The settings a footer carries from one type to the next, when they are not the old type's defaults. */
-const CARRIED = ['logoSrc', 'logoWidth', 'note', 'mark', 'instagram', 'youtube', 'linkedin', 'socialIcons', 'socialsFirst', 'hidePreferences'] as const;
+const CARRIED = [
+  'logoSrc',
+  'logoWidth',
+  'note',
+  'mark',
+  'instagram',
+  'youtube',
+  'linkedin',
+  'socialIcons',
+  'socialsFirst',
+  'hidePreferences',
+  // Arrangement and this footer's own style: what somebody chose for it, whichever type it is (footer-style.ts).
+  'align',
+  'hide',
+  'socialsAt',
+  'style',
+] as const;
 
 /** Blank, absent and off are the same thing for a footer setting. */
 const settled = (value: unknown): unknown => (value === undefined || value === null || value === false || value === '' ? '' : value);

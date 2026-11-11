@@ -409,7 +409,10 @@ export function columnsRow(cells: ColumnCell[], { ds, stack }: ColumnsOptions): 
 /** The phone rules a row of columns needs. Emitted once, and only when a template has one. */
 export const COLUMN_PHONE_CSS = [
   '  .sy-row-stack .sy-col { display:block !important; width:100% !important; max-width:100% !important; box-sizing:border-box !important }',
-  '  .sy-col-hide { display:none !important }',
+  // Three classes, not one. Both rules are `!important`, so specificity decides, and `.sy-col-hide` alone (0,1,0)
+  // lost to the stacking rule above (0,2,0): a column marked Hide on phones in a stacking row — the default —
+  // stayed on screen.
+  '  .sy-row .sy-col.sy-col-hide { display:none !important }',
 ];
 
 /** Fixed vertical space that every client honours. Outlook ignores heights on empty divs. */
