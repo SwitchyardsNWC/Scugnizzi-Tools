@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HUB-MOD</title>
+<style>
+  /* The mini tools' shared dark palette (riso.html), so this sits beside the others without a seam. */
+  :root{
+    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30; --line2:#3a3a40;
+    --text:#e8e5df; --muted:#8f8c86; --faint:#5e5d59; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .app{display:grid;grid-template-columns:288px minmax(0,1fr) 320px;height:calc(100vh - var(--tool-banner,0px))}
+  aside{background:var(--panel);overflow-y:auto;min-width:0}
+  aside.left{border-right:1px solid var(--line)}
+  aside.right{border-left:1px solid var(--line)}
+  .mono{font-family:var(--mono)}
+
+  /* Panels and rows, as in riso.html */
+  .pane{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .pane-head{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+  .pane-head .t{flex:1}
+  .pane-head .n{font-family:var(--mono);font-weight:400;letter-spacing:0;text-transform:none}
+  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
+  .sub{margin:0;color:var(--muted)}
+  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .row>label,.row>.lab{flex:0 0 92px;color:var(--muted)}
+  .row>.ctl{flex:1;min-width:0;display:flex;gap:6px;align-items:center}
+  .stack{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+  .stack>label{color:var(--muted)}
+  input[type=text],input[type=url],input[type=number],select,textarea{width:100%;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px/1.4 inherit;font-family:inherit}
+  input[type=number]{width:72px;flex:0 0 72px}
+  textarea{resize:vertical;min-height:64px;font-family:var(--mono);font-size:12px}
+  select{appearance:none;-webkit-appearance:none;padding-right:22px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238f8c86' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 8px center}
+  input:focus,select:focus,textarea:focus{border-color:#55555c;outline:none}
+  input[type=checkbox]{accent-color:var(--accent);margin:0}
+  .check{display:flex;align-items:flex-start;gap:8px;margin:7px 0;cursor:pointer}
+  .check input{margin-top:2px}
+  .check span{flex:1}
+  .check small{display:block;color:var(--muted);font-size:11.5px}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:#55555c}
+  button:disabled{opacity:.45;cursor:not-allowed;border-color:var(--line)}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.06)}
+  button.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  button.ghost:hover{color:var(--text);border-color:var(--line)}
+  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
+  button.icon{padding:2px 6px;min-width:24px;font-family:var(--mono);font-size:12px;line-height:18px}
+  .seg{display:inline-flex}
+  .seg button{border-radius:0;margin-left:-1px}
+  .seg button:first-child{border-radius:5px 0 0 5px;margin-left:0}
+  .seg button:last-child{border-radius:0 5px 5px 0}
+  /* "On" is carried by weight, an inset rule and a fill — never colour alone. */
+  .seg button.on{background:#3a3a40;color:#fff;font-weight:600;box-shadow:inset 0 -2px 0 var(--text)}
+  .grow{flex:1}
+
+  /* ---- Library ---- */
+  .lib{display:flex;flex-direction:column;gap:2px;margin:0 0 8px}
+  .lib button.item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border-color:transparent;padding:5px 8px}
+  .lib button.item:hover{background:var(--panel2)}
+  .lib button.item.on{background:var(--panel2);border-color:var(--line2);font-weight:600}
+  .lib button.item.on::before{content:"▸";color:var(--text)}
+  .lib button.item:not(.on)::before{content:"";width:7px}
+  .lib .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .lib .ct{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+
+  /* ---- Outline ---- */
+  .outline{display:flex;flex-direction:column}
+  .orow{display:flex;align-items:center;gap:6px;min-height:30px;padding:3px 6px;border:1px solid transparent;border-radius:5px;cursor:pointer;position:relative}
+  .orow:hover{background:var(--panel2)}
+  .orow.on{background:#26272c;border-color:var(--sel)}
+  .orow.on .ttl{font-weight:600}
+  .orow .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .orow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .orow .tag{font-family:var(--mono);font-size:10px;letter-spacing:.3px;padding:0 5px;border-radius:3px;line-height:16px;white-space:nowrap}
+  .tag.field{border:1px solid var(--text);color:var(--text)}
+  .tag.fixed{border:1px dashed var(--faint);color:var(--muted)}
+  .orow .acts{display:none;gap:2px}
+  .orow:hover .acts,.orow.on .acts{display:inline-flex}
+  .orow:hover .tag,.orow.on .tag{display:none}
+  .orow .acts button{padding:0 5px;min-width:20px;line-height:18px;font-size:11px;background:transparent;border-color:transparent;color:var(--muted)}
+  .orow .acts button:hover{color:var(--text);border-color:var(--line2)}
+  .ohead{display:flex;align-items:center;gap:6px;padding:6px 6px 2px;font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .ohead .grow{border-top:1px dotted var(--line2)}
+  .oadd{align-self:flex-start;margin:2px 0 4px;padding:2px 8px;font-size:12px;color:var(--muted);background:transparent;border:1px dashed var(--line2)}
+  .oadd:hover{color:var(--text);border-color:var(--muted)}
+  .oempty{padding:6px 8px;color:var(--faint);font-size:12px;font-style:italic}
+  .nest{margin-left:14px;padding-left:8px;border-left:1px solid var(--line2);display:flex;flex-direction:column}
+  .orow.dragging{opacity:.4}
+  .orow.drop-before{box-shadow:inset 0 2px 0 var(--text)}
+  .orow.drop-after{box-shadow:inset 0 -2px 0 var(--text)}
+
+  /* ---- Centre ---- */
+  main{display:flex;flex-direction:column;min-width:0;background:#0e0e0f}
+  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .bar .lbl{color:var(--muted);font-size:11.5px}
+  .checks-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+  .checks-pill .mark{font-family:var(--mono);font-weight:700}
+  .stage{flex:1;overflow:auto;position:relative}
+  .canvas{display:flex;justify-content:center;padding:28px 24px 64px}
+  .device{background:#fff;box-shadow:0 0 0 1px var(--line2);transition:width .18s}
+  .device iframe{display:block;border:0;width:100%;height:200px}
+  .device-note{text-align:center;color:var(--muted);font-size:11.5px;margin:10px 0 0;font-family:var(--mono)}
+  .dark-note{max-width:620px;margin:0 auto 12px;padding:8px 12px;border:1px dashed var(--line2);color:var(--muted);font-size:12px;text-align:center}
+
+  /* Code */
+  .code{display:grid;grid-template-columns:200px minmax(0,1fr);height:100%}
+  .files{border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px;background:var(--panel)}
+  .files button{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;border-color:transparent;font-family:var(--mono);font-size:12px}
+  .files button.on{background:var(--panel2);border-color:var(--line2);font-weight:700}
+  .files button.on::after{content:"◂"}
+  .files .sz{color:var(--muted);font-weight:400}
+  .files .sep{border-top:1px solid var(--line);margin:8px 4px}
+  .codepane{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .codehead{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+  .codehead .path{flex:1;font-family:var(--mono);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  pre.src{margin:0;padding:12px 16px 40px;overflow:auto;flex:1;font:12px/1.55 var(--mono);color:#d6d3cc;white-space:pre;tab-size:2;counter-reset:ln}
+  pre.src .ln{display:block}
+  pre.src .ln::before{counter-increment:ln;content:counter(ln);display:inline-block;width:34px;margin-right:12px;text-align:right;color:var(--faint);user-select:none}
+  .hubl{color:#e7c37f}
+  .cmt{color:#7f8a80;font-style:italic}
+
+  /* Steps (Design Manager by hand) */
+  .steps{max-width:860px;margin:0 auto;padding:24px 28px 80px}
+  .steps h2{font-size:15px;font-weight:600;margin:28px 0 8px}
+  .steps h2:first-child{margin-top:0}
+  .steps p{color:#cfcbc4;margin:6px 0;max-width:72ch}
+  .steps ol{padding-left:20px;margin:8px 0}
+  .steps li{margin:4px 0}
+  .steps code{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+  .ftable{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.5px}
+  .ftable th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--line2);padding:6px 8px}
+  .ftable td{border-bottom:1px solid var(--line);padding:7px 8px;vertical-align:top}
+  .ftable td.ck{width:28px}
+  .ftable tr.child td:nth-child(2){padding-left:26px}
+  .ftable tr.child td:nth-child(2)::before{content:"↳ ";color:var(--muted)}
+  .ftable tr.done td{color:var(--faint);text-decoration:line-through}
+  .ftable tr.done td.ck{text-decoration:none}
+  .cmd{display:flex;align-items:center;gap:8px;margin:6px 0;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:6px 6px 6px 10px}
+  .cmd code{flex:1;background:none;border:0;padding:0;white-space:pre-wrap;word-break:break-all}
+
+  /* Inspector */
+  .insp-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+  .insp-head .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .insp-head .t{flex:1;min-width:0}
+  .insp-head .t b{display:block;font-size:13px}
+  .insp-head .t span{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .insp-head .acts{display:flex;gap:2px}
+  .namefield{display:flex;gap:6px;align-items:center}
+  .namefield input{font-family:var(--mono)}
+  .auto{font-size:10.5px;font-family:var(--mono);color:var(--muted);border:1px dashed var(--faint);border-radius:3px;padding:0 4px;white-space:nowrap}
+  .items{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+  .itemcard{border:1px solid var(--line2);border-radius:6px;padding:8px 10px;background:var(--panel2)}
+  .itemcard .ih{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+  .itemcard input,.itemcard textarea{background:var(--bg)}
+  .issues{display:flex;flex-direction:column;gap:6px}
+  .issue{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border:1px solid var(--line2);border-radius:5px;font-size:12px;cursor:pointer}
+  .issue:hover{background:var(--panel2)}
+  .issue .lv{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:0 5px;border-radius:3px;line-height:16px;margin-top:1px}
+  .issue.error{border-style:solid;border-color:#7a3a3a}
+  .issue.error .lv{background:#f0b0b0;color:#2a0f0f}
+  .issue.warning{border-style:dashed}
+  .issue.warning .lv{border:1px solid var(--accent);color:var(--accent)}
+  .ok{color:var(--muted);font-size:12px}
+  .swatch{display:inline-block;width:12px;height:12px;border:1px solid var(--line2);vertical-align:-2px;margin-right:4px}
+
+  /* Menus and toasts */
+  .menu{position:fixed;z-index:200;min-width:220px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+  .menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:transparent;border-color:transparent;padding:6px 8px}
+  .menu button:hover,.menu button:focus{background:var(--panel2);outline:none}
+  .menu button .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .menu button small{display:block;color:var(--muted);font-size:11px}
+  .menu .sep{border-top:1px solid var(--line);margin:4px 0}
+  .menu .mh{padding:6px 8px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .sys{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  @media (max-width:1180px){ .app{grid-template-columns:260px minmax(0,1fr) 290px} }
+</style>
+</head>
+<body>
+<script src="../tool-banner.js" data-tool="HUB-MOD"></script>
+<script src="../tool-kit.js"></script>
+<script src="compile.js"></script>
+
+<div class="app">
+  <aside class="left">
+    <div class="pane">
+      <h1>HUB-MOD</h1>
+      <p class="sub">HubSpot custom email modules on the Switchyards system.</p>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><span class="t">Modules</span><span class="n" id="libCount"></span></div>
+      <div class="lib" id="lib"></div>
+      <div class="btnrow">
+        <button id="btnNew" title="Start a module from a Switchyards starter or a blank one (N)">New…</button>
+        <button id="btnDup" title="Copy this module">Duplicate</button>
+        <button id="btnDel" class="danger" title="Delete this module. ⌘Z brings it back.">Delete</button>
+      </div>
+      <div class="btnrow" style="margin-top:6px">
+        <button class="ghost" id="btnOpenFile" title="Open a .hubmod.json design file someone sent you">Open file…</button>
+        <button class="ghost" id="btnSaveFile" title="Save this module's design as a .hubmod.json file to share or keep">Save file</button>
+        <input type="file" id="fileIn" accept=".json,.hubmod.json,application/json" hidden>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><span class="t">Parts</span><span class="n" id="fieldCount"></span></div>
+      <div class="outline" id="outline"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><span class="t">Checks</span><span class="n" id="checkCount"></span></div>
+      <div class="issues" id="issues"></div>
+    </div>
+    <div class="pane"><div class="sys" id="sysNote"></div></div>
+  </aside>
+
+  <main>
+    <div class="bar">
+      <div class="seg" id="tabs">
+        <button data-tab="design" title="The module as the email shows it (D)">Design</button>
+        <button data-tab="code" title="The files HubSpot gets (C)">Code</button>
+        <button data-tab="steps" title="Building it by hand in Design Manager, field by field (B)">Hand build</button>
+      </div>
+      <span class="grow"></span>
+      <span id="designBar" class="btnrow" style="align-items:center">
+        <span class="seg" id="device">
+          <button data-device="desktop" title="Desktop width">Desktop</button>
+          <button data-device="phone" title="A 375px phone; the mobile rules apply">Phone</button>
+        </span>
+        <span class="seg" id="content">
+          <button data-content="filled" title="Every field holds its default">Filled</button>
+          <button data-content="empty" title="Fields that hide when empty are blank, so you can see what collapses (E)">Empty</button>
+        </span>
+        <span class="seg" id="clientSeg">
+          <button data-client="all" title="A client that keeps the module's style block: Apple Mail, iOS Mail, Outlook.com">Style block on</button>
+          <button data-client="gmail" title="Gmail strips a style block in the body. What is inline still holds (G)">Gmail</button>
+        </span>
+        <span class="seg" id="darkSeg">
+          <button data-dark="0" title="Light">Light</button>
+          <button data-dark="1" title="Applies this module's dark-mode layer unconditionally (K)">Dark override</button>
+        </span>
+        <span class="seg" id="themeSeg"></span>
+      </span>
+      <button class="primary" id="btnZip" title="Download the .module folder as a zip, for hs upload (⌘S)">Download .zip</button>
+    </div>
+
+    <div class="stage" id="stage">
+      <div id="viewDesign">
+        <div class="canvas"><div>
+          <div class="dark-note" id="darkNote" hidden></div>
+          <div class="device" id="deviceBox"><iframe id="frame" title="Module preview" scrolling="no"></iframe></div>
+          <div class="device-note" id="deviceNote"></div>
+        </div></div>
+      </div>
+      <div id="viewCode" class="code" hidden>
+        <div class="files" id="fileList"></div>
+        <div class="codepane">
+          <div class="codehead"><span class="path" id="codePath"></span><button id="btnCopy" title="Copy this file">Copy</button></div>
+          <pre class="src" id="codeSrc"></pre>
+        </div>
+      </div>
+      <div id="viewSteps" class="steps" hidden></div>
+    </div>
+  </main>
+
+  <aside class="right" id="inspector"></aside>
+</div>
+
+<script>
+'use strict';
+const H = window.HubMod;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// ---------------------------------------------------------------------------------------------------------------
+// State. `state` is what undo covers and what the browser keeps: the library of modules and which one is open.
+// `ui` is how you are looking at it, kept separately so ⌘Z never flips a tab.
+// ---------------------------------------------------------------------------------------------------------------
+
+let SYS = H.normalizeSystem(H.SWITCHYARDS);
+let sysSource = 'built-in copy of switchyards.system.json';
+const state = { library: {}, order: [], openId: null };
+const ui = { tab: 'design', device: 'desktop', empty: false, dark: false, gmail: false, theme: null, file: 'module.html', sel: null, done: {} };
+try { Object.assign(ui, ToolKit.loadAux('ui', true) || {}); } catch (e) {}
+ui.sel = null;
+const saveUi = () => ToolKit.saveAux('ui', { tab: ui.tab, device: ui.device, empty: ui.empty, dark: ui.dark, gmail: ui.gmail, file: ui.file, done: ui.done });
+
+const doc = () => state.library[state.openId] || null;
+function defaults() {
+  const st = { library: {}, order: [], openId: null };
+  for (const s of H.STARTERS.filter(s => s.id !== 'blank')) { const d = s.make(SYS); st.library[d.id] = d; st.order.push(d.id); }
+  st.openId = st.order[0];
+  return st;
+}
+function touch() { const d = doc(); if (d) d.updated = new Date().toISOString(); ToolKit.commit(); }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Tree helpers
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Where a part lives: the array holding it, its index, the container part (columns or repeat) and the column. */
+function locate(id, parts = doc().parts, owner = null, col = null) {
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.id === id) return { part: p, list: parts, index: i, owner, col };
+    if (p.type === 'columns') for (const c of p.cols) { const r = locate(id, c.parts, p, c); if (r) return r; }
+    if (p.type === 'repeat') { const r = locate(id, p.parts, p, null); if (r) return r; }
+  }
+  return null;
+}
+/** The repeat a part sits inside, if any: its fields belong to that group, not the module. */
+function repeatOf(id) {
+  let r = locate(id);
+  while (r && r.owner) { if (r.owner.type === 'repeat') return r.owner; r = locate(r.owner.id); }
+  return null;
+}
+function allParts(parts = doc().parts, out = []) {
+  for (const p of parts) {
+    out.push(p);
+    if (p.type === 'columns') for (const c of p.cols) allParts(c.parts, out);
+    if (p.type === 'repeat') allParts(p.parts, out);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Operations. Every one ends in touch() so it lands in undo and in storage.
+// ---------------------------------------------------------------------------------------------------------------
+
+function addPart(type, list, index) {
+  const d = doc(), p = H.makePart(type, SYS);
+  list.splice(index == null ? list.length : index, 0, p);
+  H.claimNames(d, p);
+  ui.sel = p.id; touch(); refresh({ inspector: true });
+  ToolKit.toast(`${H.TYPES[type].label} added`);
+}
+function removePart(id) {
+  const r = locate(id); if (!r) return;
+  r.list.splice(r.index, 1);
+  ui.sel = r.list[Math.min(r.index, r.list.length - 1)]?.id || (r.owner ? r.owner.id : null);
+  touch(); refresh({ inspector: true });
+  ToolKit.toast('Deleted. ⌘Z brings it back');
+}
+function movePart(id, dir) {
+  const r = locate(id); if (!r) return;
+  const j = r.index + dir; if (j < 0 || j >= r.list.length) return;
+  r.list.splice(r.index, 1); r.list.splice(j, 0, r.part);
+  touch(); refresh({});
+}
+function duplicatePart(id) {
+  const r = locate(id); if (!r) return;
+  const copy = H.reid(clone(r.part));
+  r.list.splice(r.index + 1, 0, copy);
+  H.claimNames(doc(), copy);
+  ui.sel = copy.id; touch(); refresh({ inspector: true });
+}
+/** Drag and drop in the outline: move a part into another list at an index, if the grammar allows it. */
+function dropPart(id, targetList, targetIndex, targetOwner) {
+  const r = locate(id); if (!r) return;
+  if (!H.canHold(targetOwner, r.part)) { ToolKit.toast(H.whyNot(targetOwner, r.part)); return; }
+  if (allParts([r.part]).some(p => (p.cols && p.cols.some(c => c.parts === targetList)) || (p.type === 'repeat' && p.parts === targetList))) { ToolKit.toast('A part cannot go inside itself'); return; }
+  r.list.splice(r.index, 1);
+  if (r.list === targetList && r.index < targetIndex) targetIndex--;
+  targetList.splice(targetIndex, 0, r.part);
+  if (r.list !== targetList) H.claimNames(doc(), r.part);
+  ui.sel = r.part.id; touch(); refresh({ inspector: true });
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Library
+// ---------------------------------------------------------------------------------------------------------------
+
+function openModule(id) { state.openId = id; ui.sel = null; ui.theme = null; ToolKit.commit(); refresh({ inspector: true }); }
+function newModule(starterId) {
+  const s = H.STARTERS.find(x => x.id === starterId) || H.STARTERS[0];
+  const d = s.make(SYS);
+  d.name = uniqueName(d.name); H.syncSlug(d);
+  state.library[d.id] = d; state.order.unshift(d.id); openModule(d.id);
+  ToolKit.toast(`${d.name} created`);
+}
+function uniqueName(base) {
+  const names = new Set(state.order.map(id => state.library[id].name));
+  if (!names.has(base)) return base;
+  for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`;
+}
+function duplicateModule() {
+  const d = doc(); if (!d) return;
+  const c = H.reid(clone(d)); c.id = H.uid('m'); c.name = uniqueName(`${d.name} copy`); c.exported = null; H.syncSlug(c, true);
+  state.library[c.id] = c; state.order.splice(state.order.indexOf(d.id) + 1, 0, c.id); openModule(c.id);
+}
+function deleteModule() {
+  const d = doc(); if (!d) return;
+  const i = state.order.indexOf(d.id); state.order.splice(i, 1); delete state.library[d.id];
+  if (!state.order.length) { const n = H.STARTERS.find(s => s.id === 'blank').make(SYS); state.library[n.id] = n; state.order.push(n.id); }
+  state.openId = state.order[Math.min(i, state.order.length - 1)]; ui.sel = null;
+  touch(); refresh({ inspector: true });
+  ToolKit.toast(`Deleted ${d.name}. ⌘Z brings it back`);
+}
+function saveFile() {
+  const d = doc(); if (!d) return;
+  download(new Blob([JSON.stringify({ hubmod: 1, module: d }, null, 2)], { type: 'application/json' }), `${d.slug}.hubmod.json`);
+}
+async function openFile(file) {
+  try {
+    const o = JSON.parse(await file.text());
+    const m = H.migrate(o.module || o);
+    if (!m || !Array.isArray(m.parts)) throw new Error('not a HUB-MOD design');
+    if (state.library[m.id]) m.id = H.uid('m');
+    m.name = uniqueName(m.name || 'Opened module');
+    state.library[m.id] = m; state.order.unshift(m.id); openModule(m.id);
+    ToolKit.toast(`Opened ${m.name}`);
+  } catch (e) { ToolKit.toast(`That file is not a HUB-MOD design (${e.message})`); }
+}
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Rendering the app. refresh() is the one way in; it rebuilds the inspector only when asked, because rebuilding it
+// while someone types steals their caret (learnings 3.3).
+// ---------------------------------------------------------------------------------------------------------------
+
+let built = null, issues = [];
+function refresh(opts = {}) {
+  const d = doc(); if (!d) return;
+  if (ui.sel && !locate(ui.sel)) ui.sel = null;
+  if (!ui.theme || !d.themes.includes(ui.theme)) ui.theme = d.themes[0];
+  built = H.build(d, SYS);
+  issues = H.check(d, SYS, built);
+  renderLibrary(); renderOutline(); renderIssues(); renderBar();
+  if (opts.inspector) renderInspector(); else syncInspectorHead();
+  schedulePreview();
+  if (ui.tab === 'code') renderCode();
+  if (ui.tab === 'steps') renderSteps();
+}
+
+function renderLibrary() {
+  $('#libCount').textContent = String(state.order.length);
+  $('#lib').innerHTML = state.order.map(id => {
+    const m = state.library[id];
+    return `<button class="item${id === state.openId ? ' on' : ''}" data-id="${esc(id)}" title="${esc(m.description || m.name)}"><span class="nm">${esc(m.name)}</span><span class="ct">${H.countFields(m)}f</span></button>`;
+  }).join('');
+}
+
+function renderBar() {
+  $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  $$('#device button').forEach(b => b.classList.toggle('on', b.dataset.device === ui.device));
+  $$('#content button').forEach(b => b.classList.toggle('on', (b.dataset.content === 'empty') === ui.empty));
+  $$('#darkSeg button').forEach(b => b.classList.toggle('on', (b.dataset.dark === '1') === ui.dark));
+  $$('#clientSeg button').forEach(b => b.classList.toggle('on', (b.dataset.client === 'gmail') === ui.gmail));
+  const d = doc();
+  const ts = $('#themeSeg');
+  ts.hidden = d.themes.length < 2;
+  ts.innerHTML = d.themes.map(t => `<button data-theme="${t}" class="${t === ui.theme ? 'on' : ''}" title="Preview the ${esc(SYS.themes[t]?.label || t)} theme the team can pick"><span class="swatch" style="background:${SYS.themes[t]?.bg}"></span>${esc(SYS.themes[t]?.label || t)}</button>`).join('');
+  $('#designBar').hidden = ui.tab !== 'design';
+  $('#viewDesign').hidden = ui.tab !== 'design';
+  $('#viewCode').hidden = ui.tab !== 'code';
+  $('#viewSteps').hidden = ui.tab !== 'steps';
+  const errs = issues.filter(i => i.level === 'error').length;
+  const z = $('#btnZip'); z.disabled = errs > 0;
+  z.title = errs ? `Fix ${errs} error${errs > 1 ? 's' : ''} under Checks first: HubSpot would refuse this module, or the team would get a broken one` : 'Download the .module folder as a zip, for hs upload (⌘S)';
+}
+
+// ---- outline ----
+function renderOutline() {
+  const d = doc();
+  $('#fieldCount').textContent = `${H.countFields(d)} fields`;
+  const box = $('#outline');
+  box.innerHTML = '';
+  box.appendChild(outlineList(d.parts, null, null));
+}
+function outlineList(list, owner, col) {
+  const wrap = document.createElement('div'); wrap.className = owner ? 'nest' : '';
+  wrap._list = list; wrap._owner = owner;
+  if (!list.length) wrap.insertAdjacentHTML('beforeend', `<div class="oempty">${owner ? 'Empty. Add a part.' : 'No parts yet.'}</div>`);
+  list.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = `orow${p.id === ui.sel ? ' on' : ''}`; row.dataset.id = p.id; row.draggable = true;
+    row._list = list; row._index = i; row._owner = owner;
+    const t = H.TYPES[p.type];
+    const tag = t.container ? '' : H.isEditable(p) ? `<span class="tag field" title="The team edits this in HubSpot">field</span>` : `<span class="tag fixed" title="Fixed: the team cannot change it">fixed</span>`;
+    row.innerHTML = `<span class="glyph">${esc(H.glyph(p))}</span><span class="ttl" title="${esc(H.title(p))}">${esc(H.title(p))}</span>${tag}
+      <span class="acts"><button data-a="up" title="Move up (⌥↑)">↑</button><button data-a="down" title="Move down (⌥↓)">↓</button><button data-a="dup" title="Duplicate (⌘D)">⧉</button><button data-a="del" title="Delete (⌫)">✕</button></span>`;
+    wrap.appendChild(row);
+    if (p.type === 'columns') {
+      const n = document.createElement('div'); n.className = 'nest';
+      p.cols.forEach((c, ci) => {
+        n.insertAdjacentHTML('beforeend', `<div class="ohead"><span>Column ${ci + 1} · ${c.w}%</span><span class="grow"></span></div>`);
+        n.appendChild(outlineList(c.parts, p, c));
+      });
+      wrap.appendChild(n);
+    }
+    if (p.type === 'repeat') wrap.appendChild(outlineList(p.parts, p, null));
+  });
+  const add = document.createElement('button'); add.className = 'oadd'; add.textContent = owner ? '+ Add part' : '+ Add part';
+  add.title = owner ? (owner.type === 'repeat' ? `Add a part to each ${owner.itemLabel || 'item'}` : 'Add a part to this column') : 'Add a part to the module';
+  add.addEventListener('click', e => { e.stopPropagation(); addMenu(e.currentTarget, list, owner); });
+  wrap.appendChild(add);
+  return wrap;
+}
+
+function addMenu(anchor, list, owner, index) {
+  const types = Object.entries(H.TYPES).filter(([k]) => H.canHold(owner, { type: k }));
+  const leaf = types.filter(([, t]) => !t.container), cont = types.filter(([, t]) => t.container);
+  const item = ([k, t]) => `<button data-type="${k}"><span class="glyph">${esc(t.glyph)}</span><span>${esc(t.label)}<small>${esc(t.blurb)}</small></span></button>`;
+  menu(anchor, `${leaf.map(item).join('')}${cont.length ? `<div class="sep"></div>${cont.map(item).join('')}` : ''}`, b => addPart(b.dataset.type, list, index));
+}
+function starterMenu(anchor) {
+  menu(anchor, `<div class="mh">Start from</div>${H.STARTERS.map(s => `<button data-id="${s.id}"><span>${esc(s.name)}<small>${esc(s.blurb)}</small></span></button>`).join('')}`, b => newModule(b.dataset.id));
+}
+let menuEl = null;
+function menu(anchor, html, pick) {
+  closeMenu();
+  menuEl = document.createElement('div'); menuEl.className = 'menu'; menuEl.innerHTML = html;
+  document.body.appendChild(menuEl);
+  const r = anchor.getBoundingClientRect(), mh = menuEl.offsetHeight;
+  menuEl.style.left = `${Math.min(r.left, innerWidth - menuEl.offsetWidth - 8)}px`;
+  menuEl.style.top = `${r.bottom + 4 + mh > innerHeight ? Math.max(8, r.top - mh - 4) : r.bottom + 4}px`;
+  menuEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; closeMenu(); pick(b); });
+  menuEl.querySelector('button')?.focus();
+  menuEl.addEventListener('keydown', e => {
+    const bs = $$('button', menuEl), i = bs.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+    if (e.key === 'Escape') closeMenu();
+  });
+  setTimeout(() => document.addEventListener('pointerdown', outside), 0);
+}
+function outside(e) { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }
+function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('pointerdown', outside); } }
+
+// Outline clicks and drags
+$('#outline').addEventListener('click', e => {
+  const row = e.target.closest('.orow'); if (!row) return;
+  const a = e.target.closest('button[data-a]');
+  if (a) { e.stopPropagation(); ({ up: () => movePart(row.dataset.id, -1), down: () => movePart(row.dataset.id, 1), dup: () => duplicatePart(row.dataset.id), del: () => removePart(row.dataset.id) })[a.dataset.a](); return; }
+  select(row.dataset.id);
+});
+let dragId = null;
+$('#outline').addEventListener('dragstart', e => { const row = e.target.closest('.orow'); if (!row) return; dragId = row.dataset.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
+$('#outline').addEventListener('dragend', () => { dragId = null; $$('.orow').forEach(r => r.classList.remove('dragging', 'drop-before', 'drop-after')); });
+$('#outline').addEventListener('dragover', e => {
+  const row = e.target.closest('.orow'); if (!row || !dragId || row.dataset.id === dragId) return;
+  e.preventDefault();
+  const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+  $$('.orow').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+  row.classList.add(after ? 'drop-after' : 'drop-before');
+});
+$('#outline').addEventListener('drop', e => {
+  const row = e.target.closest('.orow'); if (!row || !dragId) return;
+  e.preventDefault();
+  const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+  dropPart(dragId, row._list, row._index + (after ? 1 : 0), row._owner);
+});
+
+function select(id) {
+  ui.sel = id; renderOutline(); renderInspector(); paintSelection();
+}
+
+// ---- checks ----
+function renderIssues() {
+  const errs = issues.filter(i => i.level === 'error').length, warns = issues.length - errs;
+  $('#checkCount').textContent = issues.length ? `${errs} error${errs === 1 ? '' : 's'} · ${warns} warning${warns === 1 ? '' : 's'}` : 'clear';
+  $('#issues').innerHTML = issues.length
+    ? issues.map((x, i) => `<div class="issue ${x.level}" data-i="${i}" title="${x.partId ? 'Select the part' : ''}"><span class="lv">${x.level === 'error' ? '✕ ERROR' : '! WARN'}</span><span>${esc(x.msg)}</span></div>`).join('')
+    : `<p class="ok">✓ Nothing to fix. This module is ready for HubSpot.</p>`;
+}
+$('#issues').addEventListener('click', e => { const el = e.target.closest('.issue'); if (!el) return; const x = issues[+el.dataset.i]; if (x && x.partId) { ui.tab = 'design'; saveUi(); renderBar(); select(x.partId); } else if (x) { ui.sel = null; renderOutline(); renderInspector(); paintSelection(); } });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Preview. The frame is loaded once; each change patches its body and its stylesheet, so the scroll and the
+// selection stay where they were (learnings 3.4 and 3.61). The markup is the compiler's own preview mode: the same
+// function that writes module.html, with the defaults in place of the HubL (learnings 3.1).
+// ---------------------------------------------------------------------------------------------------------------
+
+const frame = $('#frame');
+let frameReady = false, previewQueued = false;
+const PHONE = 375;
+function shell() {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style id="base">
+  html,body{margin:0;padding:0}
+  body{background:#e9e7e2;-webkit-text-size-adjust:100%;font-family:Helvetica,Arial,sans-serif}
+  body.dark{background:#1c1c1e}
+  table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}
+  img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none}
+  .email{margin:0 auto;padding:24px 0}
+  [data-hm]{cursor:pointer}
+  [data-hm]:hover{outline:1px dashed rgba(59,130,246,.75);outline-offset:-1px}
+  [data-hm].hm-sel{outline:2px solid #3b82f6 !important;outline-offset:-2px}
+  #hmtag{position:absolute;z-index:9;pointer-events:none;font:600 10px/16px "IBM Plex Mono",Menlo,monospace;color:#fff;background:#1d4ed8;padding:0 6px;border-radius:0 0 3px 0;white-space:nowrap}
+  .hm-ph{display:block;background:#d9d6cf;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 8px,transparent 8px 16px);color:#6b6862;font:12px/1.3 "IBM Plex Mono",Menlo,monospace;text-align:center}
+</style>
+<style id="mod"></style><style id="dark"></style></head>
+<body><div class="email" id="email"></div><div id="hmtag" hidden></div></body></html>`;
+}
+frame.addEventListener('load', () => {
+  frameReady = true;
+  const fd = frame.contentDocument;
+  fd.addEventListener('click', e => { const el = e.target.closest('[data-hm]'); e.preventDefault(); if (el) select(el.dataset.hm); else { ui.sel = null; renderOutline(); renderInspector(); paintSelection(); } });
+  // The frame is its own document, so keys pressed in it never reach the toolkit. Hand them up (learnings 3.13).
+  fd.addEventListener('keydown', e => {
+    const k = new KeyboardEvent('keydown', { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, bubbles: true, cancelable: true });
+    document.dispatchEvent(k); if (k.defaultPrevented) e.preventDefault();
+  });
+  new ResizeObserver(fit).observe(fd.getElementById('email'));
+  paintPreview();
+});
+frame.srcdoc = shell();
+
+function schedulePreview() {
+  if (previewQueued) return; previewQueued = true;
+  requestAnimationFrame(() => { previewQueued = false; paintPreview(); });
+}
+function paintPreview() {
+  if (!frameReady || ui.tab !== 'design') return;
+  const d = doc(), fd = frame.contentDocument; if (!fd || !d) return;
+  const phone = ui.device === 'phone';
+  $('#deviceBox').style.width = `${phone ? PHONE : Math.max(d.width + 80, 720)}px`;
+  const html = H.render(d, SYS, { mode: 'preview', theme: ui.theme, empty: ui.empty });
+  const email = fd.getElementById('email');
+  email.style.width = phone ? '100%' : `${d.width}px`;
+  email.style.padding = phone ? '0' : '24px 0';
+  email.innerHTML = html;
+  // The inline block always applies: HubSpot inlines it before any client sees the email. The sheet is a <style> in
+  // the body, which Gmail strips, so the Gmail view leaves it out.
+  fd.getElementById('mod').textContent = `${built.styles.inline}\n${ui.gmail ? '' : built.styles.sheet}`;
+  fd.getElementById('dark').textContent = ui.dark && !ui.gmail ? H.darkRules(built.styles.sheet) : '';
+  fd.body.classList.toggle('dark', ui.dark);
+  const note = $('#darkNote');
+  note.hidden = !(ui.dark || ui.gmail);
+  note.innerHTML = ui.gmail
+    ? `Gmail view: the module's style block is gone, as Gmail strips it. Everything inline holds, and columns still stack on a phone. ${ui.dark ? 'Gmail’s apps ignore every dark-mode rule and invert as they like; nothing can preview that.' : 'No phone font sizes, no dark-mode rules.'}`
+    : 'Dark override: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. It is not what Gmail’s apps do; they invert as they like and nothing can preview that.';
+  const t = SYS.themes[ui.theme];
+  $('#deviceNote').textContent = `${phone ? `${PHONE}px phone${ui.gmail ? '' : ' · phone rules on'}` : `${d.width}px ${d.width === 600 ? 'email body' : 'column'}`} · ${t ? t.label : ''} theme · ${ui.empty ? 'optional fields empty' : 'defaults filled in'}`;
+  paintSelection(); fit();
+}
+function fit() {
+  const fd = frame.contentDocument; if (!fd) return;
+  const h = Math.ceil(fd.documentElement.getBoundingClientRect().height);
+  if (h > 20) frame.style.height = `${h}px`;   // keep the last good height through a mid-update collapse (learnings 3.4)
+  requestAnimationFrame(paintSelection);
+}
+function paintSelection() {
+  const fd = frame.contentDocument; if (!fd || !frameReady) return;
+  fd.querySelectorAll('.hm-sel').forEach(el => el.classList.remove('hm-sel'));
+  const tag = fd.getElementById('hmtag'); tag.hidden = true;
+  if (!ui.sel) return;
+  const el = fd.querySelector(`[data-hm="${CSS.escape(ui.sel)}"]`); if (!el) return;
+  el.classList.add('hm-sel');
+  const p = locate(ui.sel)?.part; if (!p) return;
+  const r = el.getBoundingClientRect(), sx = fd.defaultView.scrollX, sy = fd.defaultView.scrollY;
+  tag.textContent = `${H.TYPES[p.type].label}${H.isEditable(p) ? ` · ${H.fieldPath(doc(), p)}` : ' · fixed'}`;
+  tag.hidden = false;
+  const above = r.top + sy - tag.offsetHeight;
+  tag.style.left = `${Math.max(0, r.left + sx)}px`;
+  tag.style.top = `${above >= 0 ? above : r.top + sy}px`;
+  tag.style.borderRadius = above >= 0 ? '3px 3px 0 0' : '0 0 3px 0';
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Code
+// ---------------------------------------------------------------------------------------------------------------
+
+function renderCode() {
+  const d = doc(), files = built.files;
+  if (!files.some(f => f.path === ui.file)) ui.file = 'module.html';
+  $('#fileList').innerHTML = files.map(f => `<button data-file="${esc(f.path)}" class="${f.path === ui.file ? 'on' : ''}" title="${esc(f.note || '')}"><span>${esc(f.path)}</span><span class="sz">${H.size(f.text)}</span></button>`).join('')
+    + `<div class="sep"></div><div class="hint" style="padding:0 6px">Folder <span class="mono">${esc(d.slug)}.module/</span><br>${files.length} files · ${H.size(files.map(f => f.text).join(''))}<br><br>No module.css or module.js: HubSpot refuses both on an email module, so the styles live inside module.html.</div>`;
+  const f = files.find(x => x.path === ui.file);
+  $('#codePath').textContent = `${d.slug}.module/${f.path}`;
+  $('#codeSrc').innerHTML = highlight(f.text, f.path);
+  const errs = issues.filter(i => i.level === 'error').length;
+  $('#btnCopy').disabled = errs > 0;
+  $('#btnCopy').title = errs ? 'Fix the errors under Checks first' : `Copy ${f.path}`;
+}
+function highlight(text, path) {
+  const lines = esc(text).split('\n');
+  const hl = path.endsWith('.html')
+    ? l => l.replace(/(\{#.*?#\})/g, '<span class="cmt">$1</span>').replace(/(\{%.*?%\}|\{\{.*?\}\})/g, '<span class="hubl">$1</span>')
+    : path.endsWith('.css') ? l => l.replace(/(\/\*.*?\*\/)/g, '<span class="cmt">$1</span>') : l => l;
+  return lines.map(l => `<span class="ln">${hl(l) || ' '}</span>`).join('');
+}
+$('#fileList').addEventListener('click', e => { const b = e.target.closest('button[data-file]'); if (!b) return; ui.file = b.dataset.file; saveUi(); renderCode(); });
+$('#btnCopy').addEventListener('click', async () => {
+  const f = built.files.find(x => x.path === ui.file);
+  try { await navigator.clipboard.writeText(f.text); ToolKit.toast(`Copied ${f.path}`); }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($('#codeSrc')); getSelection().removeAllRanges(); getSelection().addRange(r); ToolKit.toast('Selected. Press ⌘C'); }
+});
+
+function downloadZip() {
+  const d = doc();
+  if (issues.some(i => i.level === 'error')) { ToolKit.toast('Fix the errors under Checks first'); return; }
+  const data = H.zip(built.files.map(f => ({ path: `${d.slug}.module/${f.path}`, text: f.text })));
+  download(new Blob([data], { type: 'application/zip' }), `${d.slug}.module.zip`);
+  d.exported = { at: new Date().toISOString(), names: H.fieldNames(d) };
+  touch(); refresh({});
+  ToolKit.toast(`${d.slug}.module.zip downloaded`);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Hand build: the Design Manager route, as a checklist you tick through.
+// ---------------------------------------------------------------------------------------------------------------
+
+function renderSteps() {
+  const d = doc(), s = built.steps;
+  const done = ui.done[d.id] || {};
+  const row = (f, i) => {
+    const key = f.path;
+    return `<tr class="${f.child ? 'child' : ''}${done[key] ? ' done' : ''}"><td class="ck"><input type="checkbox" data-k="${esc(key)}" ${done[key] ? 'checked' : ''} aria-label="Done: ${esc(f.label)}"></td>
+      <td>${esc(f.label)}</td><td>${esc(f.uiType)}</td><td><code>${esc(f.name)}</code></td><td>${f.settings.map(esc).join('<br>')}</td></tr>`;
+  };
+  const cmd = c => `<div class="cmd"><code>${esc(c.cmd)}</code><button data-copy="${esc(c.cmd)}" title="Copy the command">Copy</button></div><p class="hint" style="margin:0 0 10px">${esc(c.note)}</p>`;
+  $('#viewSteps').innerHTML = `
+    <h2>Route A · HubSpot CLI (exact, fastest)</h2>
+    <p>Download the zip, unzip it, and upload the folder. The fields arrive exactly as designed, defaults and all. The zip cannot go through Design Manager's own upload: that takes single files, not a module.</p>
+    <p class="hint"><b>Once per machine</b></p>${s.once.map(cmd).join('')}
+    <p class="hint"><b>Each time</b></p>${s.cli.map(cmd).join('')}
+    ${s.cliNotes.map(n => `<p class="hint">${esc(n)}</p>`).join('')}
+    <h2>Route B · Design Manager by hand</h2>
+    <ol>${s.manual.map(x => `<li>${x}</li>`).join('')}</ol>
+    <h2>Fields, in this order</h2>
+    <p>Add each in the module editor's sidebar. The <b>HubL name</b> has to match exactly, or module.html reads nothing. Tick them off as you go.</p>
+    <table class="ftable"><thead><tr><th></th><th>Label</th><th>Field type</th><th>HubL name</th><th>Settings</th></tr></thead>
+      <tbody>${s.fields.length ? s.fields.map(row).join('') : '<tr><td></td><td colspan="4" class="hint">No fields: every part is fixed.</td></tr>'}</tbody></table>
+    <h2>Then the code</h2>
+    <ol>${s.code.map(x => `<li>${x}</li>`).join('')}</ol>`;
+}
+$('#viewSteps').addEventListener('change', e => {
+  const c = e.target.closest('input[data-k]'); if (!c) return;
+  const d = doc(); (ui.done[d.id] = ui.done[d.id] || {})[c.dataset.k] = c.checked; saveUi();
+  c.closest('tr').classList.toggle('done', c.checked);
+});
+$('#viewSteps').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-copy]'); if (b) { try { await navigator.clipboard.writeText(b.dataset.copy); ToolKit.toast('Copied'); } catch (x) { ToolKit.toast('Copy blocked: select the line instead'); } return; }
+  const t = e.target.closest('[data-goto]'); if (t) { ui.tab = 'code'; ui.file = t.dataset.goto; saveUi(); renderBar(); renderCode(); }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Inspector. Built once per selection; inputs write straight into the part and repaint the preview, the outline
+// row and the code, but never rebuild themselves.
+// ---------------------------------------------------------------------------------------------------------------
+
+const insp = $('#inspector');
+function renderInspector() {
+  const d = doc(); if (!d) return;
+  const r = ui.sel ? locate(ui.sel) : null;
+  insp.innerHTML = r ? partInspector(d, r) : moduleInspector(d);
+  syncInspectorHead();
+}
+function syncInspectorHead() {
+  const r = ui.sel ? locate(ui.sel) : null; if (!r) return;
+  const s = $('.insp-head .t span', insp); if (s) s.textContent = H.isEditable(r.part) ? H.fieldPath(doc(), r.part) : (H.TYPES[r.part.type].container ? H.TYPES[r.part.type].blurb : 'fixed: the team cannot change it');
+  const nm = $('[data-k="name"]', insp); if (nm && document.activeElement !== nm) nm.value = r.part.name || '';
+  const au = $('#nameAuto', insp); if (au) au.hidden = !r.part.nameAuto;
+}
+
+// Small builders. Every control carries data-k (the property) and data-t (how to read it).
+const row = (label, ctl, title = '') => `<div class="row"${title ? ` title="${esc(title)}"` : ''}><label>${esc(label)}</label><div class="ctl">${ctl}</div></div>`;
+const txt = (k, v, ph = '') => `<input type="text" data-k="${k}" value="${esc(v)}" placeholder="${esc(ph)}">`;
+const num = (k, v, min, max, step = 1) => `<input type="number" data-k="${k}" data-t="num" value="${esc(v)}" min="${min}" max="${max}" step="${step}">`;
+const sel = (k, v, opts, t = '') => `<select data-k="${k}"${t ? ` data-t="${t}"` : ''}>${opts.map(([val, lab]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(lab)}</option>`).join('')}</select>`;
+const chk = (k, v, label, help = '') => `<label class="check"><input type="checkbox" data-k="${k}" data-t="bool" ${v ? 'checked' : ''}><span>${esc(label)}${help ? `<small>${esc(help)}</small>` : ''}</span></label>`;
+const segs = (k, v, opts, t = '') => `<span class="seg">${opts.map(([val, lab, title]) => `<button type="button" data-seg="${k}"${t ? ` data-t="${t}"` : ''} data-v="${esc(val)}" class="${String(val) === String(v) ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${esc(lab)}</button>`).join('')}</span>`;
+const pane = (title, body, n = '') => `<div class="pane"><div class="pane-head"><span class="t">${esc(title)}</span>${n ? `<span class="n">${esc(n)}</span>` : ''}</div>${body}</div>`;
+const colorOpts = () => [['text', 'Theme text'], ['accent', 'Theme accent'], ...Object.entries(SYS.colors).map(([k, v]) => [k, `${SYS.colorNames[k] || k} · ${v}`])];
+const alignSeg = (v, k = 'align') => segs(k, v, [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']]);
+
+function moduleInspector(d) {
+  const themes = Object.entries(SYS.themes);
+  const spaceOpts = [['0', 'None · 0'], ...Object.entries(SYS.space).map(([k, v]) => [k, `${k.toUpperCase()} · ${v}px`])];
+  return `<div class="insp-head"><span class="glyph">▣</span><span class="t"><b>Module</b><span>${esc(d.slug)}.module</span></span></div>
+  ${pane('Module', `
+    <div class="stack"><label>Name in HubSpot</label>${txt('m.name', d.name)}</div>
+    <div class="stack" title="The folder name, and so the module's path in Design Manager. Lower case, digits and hyphens."><label>Folder</label><div class="namefield">${txt('m.slug', d.slug)}<span class="auto" id="slugAuto"${d.slugAuto ? '' : ' hidden'}>auto</span></div></div>
+    <div class="stack"><label>Note for the library</label>${txt('m.description', d.description, 'What it is for, in a line')}</div>`)}
+  ${pane('Themes', `
+    <p class="hint" style="margin-top:0">The Switchyards themes this module can wear. Tick more than one and the team gets a choice in HubSpot; the first ticked is the default.</p>
+    ${themes.map(([k, t]) => `<label class="check"><input type="checkbox" data-theme-allow="${k}" ${d.themes.includes(k) ? 'checked' : ''}><span><span class="swatch" style="background:${t.bg}"></span>${esc(t.label)}<small>${esc(`${SYS.colorNames[t.bgToken] || t.bgToken} ground, ${SYS.colorNames[t.textToken] || t.textToken} text, ${t.button} button`)}</small></span></label>`).join('')}
+    ${d.themes.length > 1 ? row('Default', sel('m.themeDefault', d.themes[0], d.themes.map(t => [t, SYS.themes[t].label])), 'What a new copy of the module starts as') : ''}`)}
+  ${pane('Space', `
+    ${row('Top', sel('m.pad.top', d.pad.top, spaceOpts))}
+    ${row('Bottom', sel('m.pad.bottom', d.pad.bottom, spaceOpts))}
+    ${row('Sides', sel('m.pad.side', d.pad.side, spaceOpts), 'Inside the module, left and right. The phone rules keep it.')}
+    ${row('Made for', sel('m.width', d.width, [[600, 'Full width · 600px'], [300, 'Half column · 300px']], 'num'), 'A drag-and-drop email is 600px wide. Images size against this; dropped somewhere narrower, everything shrinks to fit.')}
+    <p class="hint">Content width <span class="mono">${H.contentWidth(d, SYS)}px</span>. The module is fluid: in a narrower column it shrinks, and its columns stack.</p>`)}
+  ${pane('Style blocks', `
+    <p class="hint" style="margin-top:0">Everything that has to hold is inline. These two blocks add what cannot be: HubSpot's editor warns about style tags in the body, and the email still saves and sends.</p>
+    ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links inside rich text. HubSpot inlines this block at send.')}
+    ${chk('m.css.sheet', d.css.sheet, 'Phone and dark-mode rules', 'Phone font sizes and the dark layers. Apple Mail and Outlook.com read them; Gmail strips them.')}`)}
+  ${pane('In HubSpot', `
+    <p class="hint" style="margin-top:0">Select a part to set what the team can edit. Parts tagged <span class="tag field" style="font-family:var(--mono);font-size:10px;padding:0 4px">field</span> become fields in the editor sidebar, in this order:</p>
+    <ol class="hint" style="padding-left:18px">${built.steps.fields.filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
+}
+
+function partInspector(d, r) {
+  const p = r.part, T = H.TYPES[p.type], rep = repeatOf(p.id);
+  const head = `<div class="insp-head"><span class="glyph">${esc(H.glyph(p))}</span><span class="t"><b>${esc(T.label)}${rep ? ` <span style="display:inline;font-weight:400;color:var(--muted)">in ${esc(rep.label)}</span>` : ''}</b><span></span></span>
+    <span class="acts"><button class="icon" data-act="up" title="Move up (⌥↑)">↑</button><button class="icon" data-act="down" title="Move down (⌥↓)">↓</button><button class="icon" data-act="dup" title="Duplicate (⌘D)">⧉</button><button class="icon danger" data-act="del" title="Delete (⌫)">✕</button><button class="icon" data-act="close" title="Back to the module (Esc)">↰</button></span></div>`;
+  let body = '';
+  if (p.type === 'columns') body = columnsInspector(p);
+  else if (p.type === 'repeat') body = repeatInspector(p);
+  else body = contentPane(p, rep) + (T.field ? fieldPane(p, rep) : '') + stylePane(p, rep);
+  return head + body;
+}
+
+function contentPane(p, rep) {
+  const editable = H.isEditable(p);
+  const title = editable ? (rep ? `Default for new ${rep.itemLabel || 'item'}s` : 'Default content') : 'Content';
+  const hint = editable ? `<p class="hint" style="margin-top:0">What the field holds when the team drops the module in. They replace it.${rep ? ` Each ${esc(rep.itemLabel || 'item')}'s own copy is under ${esc(rep.label)}.` : ''}</p>` : '';
+  let b = '';
+  switch (p.type) {
+    case 'eyebrow': case 'heading': case 'text':
+      b = `<div class="stack">${txt('value', p.value)}<span class="hint">One line: HubSpot's text field has no line breaks.</span></div>
+        ${chk('link', p.link, 'Linked', editable ? 'The words are a link; the team sets where it goes' : 'The words are a link')}
+        ${p.link ? `<div class="stack"><label>Link</label><input type="url" data-k="href" value="${esc(p.href)}" placeholder="https://"></div>` : ''}`; break;
+    case 'richtext':
+      b = `<div class="stack"><textarea data-k="value" rows="6">${esc(p.value)}</textarea><span class="hint">HTML. Paragraphs, <span class="mono">strong em a ul ol li h3 h4 blockquote</span>. Styled by the module's rich text rules.</span></div>`; break;
+    case 'image':
+      b = `<div class="stack"><label>Image URL</label><input type="url" data-k="src" value="${esc(p.src)}" placeholder="https://… hosted in HubSpot Files"><span class="hint">Leave empty to start blank. A hosted https address only: a file on your machine is not a picture anyone else can load.</span></div>
+        <div class="stack"><label>Alt text</label>${txt('alt', p.alt, 'Says what the picture shows')}</div>
+        ${chk('link', p.link, 'Linked', 'The picture is a link; the team sets where it goes')}
+        ${p.link ? `<div class="stack"><label>Link</label><input type="url" data-k="href" value="${esc(p.href)}" placeholder="https://"></div>` : ''}`; break;
+    case 'button':
+      b = `<div class="stack"><label>Label</label>${txt('value', p.value)}</div><div class="stack"><label>Link</label><input type="url" data-k="href" value="${esc(p.href)}" placeholder="https://"></div>`; break;
+    case 'divider': b = ''; break;
+    case 'spacer': b = ''; break;
+  }
+  return b ? pane(title, hint + b) : '';
+}
+
+function fieldPane(p, rep) {
+  const on = H.isEditable(p);
+  const two = H.hasLink(p);
+  const body = `${chk('editable', p.editable, 'Editable in HubSpot', on ? 'The team fills this in.' : 'Fixed: it ships as designed and a re-upload changes every email.')}
+    ${on ? `
+      <div class="stack"><label>Label the team reads</label>${txt('label', p.label)}<span class="hint">The label is the whole interface. Write it like microcopy.</span></div>
+      <div class="stack" title="The name module.html reads it by. Renaming it after the module is in use loses what the team typed into the old one."><label>HubL name</label><div class="namefield">${txt('name', p.name)}<span class="auto" id="nameAuto"${p.nameAuto ? '' : ' hidden'}>auto</span></div>
+        <span class="hint mono">${esc(H.fieldPath(doc(), p))}${two ? `, ${esc(H.fieldPath(doc(), p, '_link'))}` : ''}</span></div>
+      <div class="stack"><label>Help text</label>${txt('help', p.help, 'Optional: shown under the field')}</div>
+      ${chk('required', p.required, 'Required', 'HubSpot will not publish an email with it blank')}
+      ${H.TYPES[p.type].collapses ? chk('optional', p.optional, 'Hide when empty', 'A blank field removes the part and its space, not just the words') : ''}
+      ${p.type === 'image' ? '<p class="hint">With no picture picked, the part and its space go: an empty image is never drawn.</p>' : ''}
+      ${rep ? '' : chk('toggle', p.toggle, 'Team can switch it off', 'Adds a Show checkbox above the field')}` : ''}`;
+  return pane('Field', body, on ? 'field' : 'fixed');
+}
+
+function stylePane(p, rep) {
+  const styleOpts = Object.entries(SYS.text).map(([k, s]) => [k, `${s.label} · ${s.size}px${s.weight === 'bold' ? ' bold' : ''}${s.uppercase ? ' caps' : ''}`]);
+  let b = '';
+  switch (p.type) {
+    case 'eyebrow': case 'heading': case 'text':
+      b = row('Style', sel('style', p.style, styleOpts)) + row('Colour', sel('color', p.color, colorOpts()), 'Theme colours follow the theme the team picks; a named colour stays put') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+    case 'richtext':
+      b = row('Size', sel('style', p.style, styleOpts.filter(([k]) => ['body', 'small'].includes(k)))) + row('Colour', sel('color', p.color, colorOpts())) + row('Links', sel('linkColor', p.linkColor, colorOpts())) + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+    case 'image': {
+      const max = H.slotWidth(doc(), SYS, p.id);
+      b = row('Width', num('width', p.width, 40, max) + `<span class="hint" style="margin:0">px of ${max}</span>`, 'The display width. HubSpot reports the uploaded file\'s own width; the module never uses it (learnings 1.6a).')
+        + `<div class="row"><label></label><div class="ctl"><button type="button" data-fill="1" title="As wide as its column">Fill ${max}px</button></div></div>`
+        + row('Align', alignSeg(p.align)) + chk('phoneFull', p.phoneFull, 'Full width on phones', 'Stretches to the screen on a phone')
+        + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint" style="margin:0">px · square in Outlook</span>')
+        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break; }
+    case 'button':
+      b = row('Variant', segs('variant', p.variant, Object.entries(SYS.buttons).map(([k, v]) => [k, v.label, `${SYS.colorNames[v.fillToken] || v.fillToken} fill, ${SYS.colorNames[v.inkToken] || v.inkToken} label, ${v.radius}px corners`])))
+        + row('Follow theme', chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does'), '')
+        + row('Align', alignSeg(p.align)) + chk('full', p.full, 'Full width', 'The button spans its column') + chk('phoneFull', p.phoneFull, 'Full width on phones')
+        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+    case 'divider':
+      b = row('Colour', sel('color', p.color, colorOpts())) + row('Thickness', num('thickness', p.thickness, 1, 12) + '<span class="hint" style="margin:0">px</span>') + row('Length', num('length', p.length, 5, 100) + '<span class="hint" style="margin:0">%</span>') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+    case 'spacer':
+      b = row('Height', num('height', p.height, 4, 200) + '<span class="hint" style="margin:0">px</span>') + row('On phones', num('phoneHeight', p.phoneHeight, 0, 200) + '<span class="hint" style="margin:0">px · 0 = same</span>'); break;
+  }
+  return pane('Style', b);
+}
+
+function columnsInspector(p) {
+  const splits = p.cols.length === 2 ? [['50,50', '½ ½'], ['33,67', '⅓ ⅔'], ['67,33', '⅔ ⅓'], ['40,60', '40 60'], ['60,40', '60 40']] : [['33,34,33', '⅓ ⅓ ⅓'], ['25,50,25', '¼ ½ ¼'], ['50,25,25', '½ ¼ ¼']];
+  const cur = p.cols.map(c => c.w).join(',');
+  return pane('Columns', `
+    ${row('Count', segs('count', p.cols.length, [[2, 'Two'], [3, 'Three']], 'num'))}
+    ${row('Split', segs('split', cur, splits))}
+    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
+    ${row('Line up', segs('valign', p.valign, [['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']]))}
+    ${chk('stack', p.stack, 'Stack on phones', 'One column under the other below 640px. Off, they stay side by side.')}
+    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
+    <p class="hint">A table with one cell per column; on phones a media query stacks the cells (learnings 3.14). Columns are layout only: their parts' fields sit in the module's list in reading order.</p>`)
+    + pane('Swap', `<button type="button" data-swap="1" title="Reverse the column order">Swap columns</button>`);
+}
+
+function repeatInspector(p) {
+  const kids = allParts(p.parts).filter(H.isEditable);
+  const items = p.items.map((it, i) => `<div class="itemcard" data-item="${i}">
+      <div class="ih"><span>${esc(p.itemLabel || 'Item')} ${i + 1}</span><span class="grow"></span>
+        <button class="icon" data-item-act="up" data-i="${i}" title="Move up">↑</button><button class="icon" data-item-act="down" data-i="${i}" title="Move down">↓</button><button class="icon danger" data-item-act="del" data-i="${i}" title="Remove">✕</button></div>
+      ${kids.map(k => itemControl(p, it, i, k)).join('') || '<span class="hint">No editable parts inside yet.</span>'}
+    </div>`).join('');
+  return pane('Repeating group', `
+    <div class="stack"><label>Group label</label>${txt('label', p.label)}</div>
+    <div class="stack" title="The name module.html loops over. Renaming it after use loses every item the team made."><label>HubL name</label><div class="namefield">${txt('name', p.name)}<span class="auto" id="nameAuto"${p.nameAuto ? '' : ' hidden'}>auto</span></div><span class="hint mono">{% for item in ${esc(H.fieldPath(doc(), p))} %}</span></div>
+    <div class="stack"><label>One of them is called</label>${txt('itemLabel', p.itemLabel, 'Event')}</div>
+    ${row('Min', num('min', p.min, 0, 50))}
+    ${row('Max', num('max', p.max, 1, 50))}
+    ${kids.length ? row('Sort label', sel('sortField', p.sortField || '', [['', 'Automatic'], ...kids.filter(k => ['text', 'eyebrow', 'heading'].includes(k.type)).map(k => [k.id, k.label])]), 'Which field names each item in HubSpot\'s list') : ''}
+  `) + pane('Layout', `
+    ${row('Arrange', segs('layout', p.layout, [['list', 'List', 'One under another'], ['grid', 'Grid', 'Side by side, in rows']]))}
+    ${p.layout === 'grid' ? row('Per row', segs('perRow', p.perRow, [[2, 'Two'], [3, 'Three']], 'num')) + chk('stack', p.stack, 'One per row on phones') : ''}
+    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
+    ${p.layout === 'list' ? chk('rule', p.rule, 'Rule between items', 'A hairline in the theme accent') : ''}
+    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
+  `) + pane(`${p.itemLabel || 'Item'}s it starts with`, `<p class="hint" style="margin-top:0">The defaults a new copy of the module holds. The team adds and removes their own, ${p.min}–${p.max}.</p><div class="items">${items}</div>
+    <button type="button" data-item-act="add" ${p.items.length >= p.max ? 'disabled' : ''}>+ Add ${esc((p.itemLabel || 'item').toLowerCase())}</button>`, String(p.items.length));
+}
+function itemControl(rep, it, i, k) {
+  const v = H.itemValue(rep, it, k);
+  const key = `item:${i}:${k.id}`;
+  switch (k.type) {
+    case 'richtext': return `<div class="stack"><label>${esc(k.label)}</label><textarea data-k="${key}" rows="3">${esc(v)}</textarea></div>`;
+    case 'image': return `<div class="stack"><label>${esc(k.label)} URL</label><input type="url" data-k="${key}:src" value="${esc(v.src)}" placeholder="https://"></div><div class="stack"><label>${esc(k.label)} alt</label><input type="text" data-k="${key}:alt" value="${esc(v.alt)}"></div>${k.link ? `<div class="stack"><label>${esc(k.label)} link</label><input type="url" data-k="${key}:href" value="${esc(v.href)}"></div>` : ''}`;
+    case 'button': return `<div class="stack"><label>${esc(k.label)} label</label><input type="text" data-k="${key}:value" value="${esc(v.value)}"></div><div class="stack"><label>${esc(k.label)} link</label><input type="url" data-k="${key}:href" value="${esc(v.href)}"></div>`;
+    default: return H.hasLink(k)
+      ? `<div class="stack"><label>${esc(k.label)}</label><input type="text" data-k="${key}:value" value="${esc(v.value)}"></div><div class="stack"><label>${esc(k.label)} link</label><input type="url" data-k="${key}:href" value="${esc(v.href)}"></div>`
+      : `<div class="stack"><label>${esc(k.label)}</label><input type="text" data-k="${key}" value="${esc(v)}"></div>`;
+  }
+}
+
+// Inspector input: one listener for every control.
+insp.addEventListener('input', e => onInspector(e, false));
+insp.addEventListener('change', e => onInspector(e, true));
+function onInspector(e, final) {
+  const el = e.target; const k = el.dataset.k;
+  const d = doc();
+  if (el.dataset.themeAllow) {
+    if (!final) return;
+    const t = el.dataset.themeAllow;
+    if (el.checked) { if (!d.themes.includes(t)) d.themes.push(t); }
+    else if (d.themes.length > 1) d.themes = d.themes.filter(x => x !== t); else { el.checked = true; ToolKit.toast('A module wears at least one theme'); return; }
+    touch(); refresh({ inspector: true }); return;
+  }
+  if (!k) return;
+  let v = el.dataset.t === 'bool' ? el.checked : el.value;
+  if (el.dataset.t === 'num') { if (!final && el.value === '') return; v = Number(el.value); if (!Number.isFinite(v)) return; if (final) { v = Math.max(+el.min || -Infinity, Math.min(+el.max || Infinity, v)); el.value = v; } }
+  if (k.startsWith('m.')) return moduleInput(d, k.slice(2), v, el, final);
+  const r = locate(ui.sel); if (!r) return;
+  const p = r.part;
+  if (k.startsWith('item:')) { const [, i, id, sub] = k.split(':'); H.setItemValue(p, +i, id, sub, v); touch(); refresh({}); return; }
+  if (k === 'gap2') p.gapBelow = v;
+  else if (k === 'label') { p.label = v; if (p.nameAuto) { p.name = H.uniqueFieldName(d, p, H.fieldNameFrom(v, p.type)); } }
+  else if (k === 'name') { p.name = H.fieldNameFrom(v, p.type, true); p.nameAuto = false; if (final) el.value = p.name; }
+  else if (k === 'sortField') p.sortField = v || null;
+  else p[k] = v;
+  if (k === 'required' && v) p.optional = false;
+  if (k === 'optional' && v) p.required = false;
+  if (k === 'min' && p.items) { p.max = Math.max(p.max, v); }
+  if (k === 'max' && p.items && final) { p.min = Math.min(p.min, v); }
+  touch();
+  // Some settings change which controls exist; rebuild for those, never for typing.
+  const restructure = ['editable', 'link', 'layout', 'required', 'optional', 'min', 'max'].includes(k);
+  refresh({ inspector: restructure && final || ['editable', 'link', 'required', 'optional'].includes(k) });
+  if (k === 'label' || k === 'name') syncInspectorHead();
+}
+function moduleInput(d, k, v, el, final) {
+  if (k === 'name') { d.name = v; if (d.slugAuto) H.syncSlug(d); const s = $('[data-k="m.slug"]', insp); if (s && d.slugAuto) s.value = d.slug; }
+  else if (k === 'slug') { d.slug = H.slugFrom(v, true); d.slugAuto = false; $('#slugAuto').hidden = true; if (final) el.value = d.slug; }
+  else if (k === 'description') d.description = v;
+  else if (k === 'themeDefault') { d.themes = [v, ...d.themes.filter(t => t !== v)]; ui.theme = v; }
+  else if (k.startsWith('pad.')) d.pad[k.slice(4)] = v;
+  else if (k.startsWith('css.')) d.css[k.slice(4)] = v;
+  else if (k === 'width') d.width = v;
+  touch(); refresh({ inspector: final && ['themeDefault', 'width'].includes(k) });
+}
+insp.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const d = doc(), r = ui.sel ? locate(ui.sel) : null;
+  if (b.dataset.act) {
+    const id = ui.sel;
+    ({ up: () => movePart(id, -1), down: () => movePart(id, 1), dup: () => duplicatePart(id), del: () => removePart(id), close: () => select(null) })[b.dataset.act]();
+    return;
+  }
+  if (!r) return;
+  const p = r.part;
+  if (b.dataset.seg) {
+    const k = b.dataset.seg; let v = b.dataset.v; if (b.dataset.t === 'num') v = Number(v);
+    if (k === 'count') H.setColumnCount(p, v);
+    else if (k === 'split') v.split(',').forEach((w, i) => { if (p.cols[i]) p.cols[i].w = Number(w); });
+    else p[k] = v;
+    touch(); refresh({ inspector: true }); return;
+  }
+  if (b.dataset.fill) { p.width = H.slotWidth(d, SYS, p.id); touch(); refresh({ inspector: true }); return; }
+  if (b.dataset.swap) { p.cols.reverse(); touch(); refresh({ inspector: true }); return; }
+  if (b.dataset.itemAct) {
+    const i = +b.dataset.i;
+    if (b.dataset.itemAct === 'add') { if (p.items.length < p.max) p.items.push(H.newItem(p)); }
+    if (b.dataset.itemAct === 'del') { if (p.items.length > p.min) p.items.splice(i, 1); else { ToolKit.toast(`The group starts with at least ${p.min}`); return; } }
+    if (b.dataset.itemAct === 'up' && i > 0) p.items.splice(i - 1, 0, p.items.splice(i, 1)[0]);
+    if (b.dataset.itemAct === 'down' && i < p.items.length - 1) p.items.splice(i + 1, 0, p.items.splice(i, 1)[0]);
+    touch(); refresh({ inspector: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Bar, library and file wiring
+// ---------------------------------------------------------------------------------------------------------------
+
+function setTab(t) { ui.tab = t; saveUi(); renderBar(); if (t === 'design') paintPreview(); if (t === 'code') renderCode(); if (t === 'steps') renderSteps(); }
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
+$('#device').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.device = b.dataset.device; saveUi(); renderBar(); paintPreview(); });
+$('#content').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.empty = b.dataset.content === 'empty'; saveUi(); renderBar(); paintPreview(); });
+$('#darkSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.dark = b.dataset.dark === '1'; saveUi(); renderBar(); paintPreview(); });
+$('#clientSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.gmail = b.dataset.client === 'gmail'; saveUi(); renderBar(); paintPreview(); });
+$('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.theme = b.dataset.theme; renderBar(); paintPreview(); });
+$('#lib').addEventListener('click', e => { const b = e.target.closest('button.item'); if (b && b.dataset.id !== state.openId) openModule(b.dataset.id); });
+$('#btnNew').addEventListener('click', e => starterMenu(e.currentTarget));
+$('#btnDup').addEventListener('click', duplicateModule);
+$('#btnDel').addEventListener('click', deleteModule);
+$('#btnSaveFile').addEventListener('click', saveFile);
+$('#btnOpenFile').addEventListener('click', () => $('#fileIn').click());
+$('#fileIn').addEventListener('change', e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ''; });
+$('#btnZip').addEventListener('click', downloadZip);
+document.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', e => { const f = e.dataTransfer?.files?.[0]; if (f && /\.json$/i.test(f.name)) { e.preventDefault(); openFile(f); } });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Keys. The toolkit owns ⌘Z, ?, Esc and reset; these are this tool's own.
+// ---------------------------------------------------------------------------------------------------------------
+
+Object.assign(state, defaults());   // the starters, until the toolkit finds saved work and replaces them
+ToolKit.init({
+  tool: 'hub-mod', version: 1,
+  getState: () => clone(state),
+  setState: s => {
+    const next = s && s.library && s.order && s.order.length ? s : defaults();
+    for (const id of Object.keys(next.library)) next.library[id] = H.migrate(next.library[id]);
+    next.order = next.order.filter(id => next.library[id]);
+    if (!next.library[next.openId]) next.openId = next.order[0];
+    Object.assign(state, clone(next));
+    refresh({ inspector: true });
+  },
+  defaults,
+});
+ToolKit.register('d', 'Design view', () => setTab('design'), { group: 'View' });
+ToolKit.register('c', 'Code view', () => setTab('code'), { group: 'View' });
+ToolKit.register('b', 'Hand-build steps', () => setTab('steps'), { group: 'View' });
+ToolKit.register('p', 'Desktop or phone', () => { ui.device = ui.device === 'phone' ? 'desktop' : 'phone'; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
+ToolKit.register('e', 'Filled or empty fields', () => { ui.empty = !ui.empty; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
+ToolKit.register('k', 'Dark override', () => { ui.dark = !ui.dark; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
+ToolKit.register('g', 'Gmail view: no style block', () => { ui.gmail = !ui.gmail; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
+ToolKit.register('n', 'New module', () => starterMenu($('#btnNew')), { group: 'Module' });
+ToolKit.register('a', 'Add a part', () => { const r = ui.sel && locate(ui.sel); if (r) addMenu($('.orow.on') || $('#outline .oadd'), r.list, r.owner, r.index + 1); else addMenu($('#outline > div > .oadd'), doc().parts, null); }, { group: 'Parts' });
+ToolKit.register('alt+up', 'Move part up', () => ui.sel && movePart(ui.sel, -1), { group: 'Parts' });
+ToolKit.register('alt+down', 'Move part down', () => ui.sel && movePart(ui.sel, 1), { group: 'Parts' });
+ToolKit.register('mod+d', 'Duplicate part', () => ui.sel && duplicatePart(ui.sel), { group: 'Parts' });
+ToolKit.register('backspace', 'Delete part', () => ui.sel && removePart(ui.sel), { group: 'Parts' });
+ToolKit.register('delete', 'Delete part', () => ui.sel && removePart(ui.sel), { group: 'Parts', hidden: true });
+ToolKit.register('up', 'Previous part', () => stepSel(-1), { group: 'Parts' });
+ToolKit.register('down', 'Next part', () => stepSel(1), { group: 'Parts' });
+ToolKit.register('mod+s', 'Download .zip', () => downloadZip(), { group: 'Export' });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menuEl && ui.sel && !e.target.closest?.('input,textarea,select')) select(null); if (e.key === 'Escape') closeMenu(); });
+function stepSel(dir) {
+  const flat = allParts(); if (!flat.length) return;
+  const i = flat.findIndex(p => p.id === ui.sel);
+  select(flat[i < 0 ? 0 : Math.max(0, Math.min(flat.length - 1, i + dir))].id);
+}
+
+// The design system: read the live file when served, so a change in Template Studio's Switchyards system reaches
+// here without a second copy to keep in step (learnings 3.48). The built-in copy covers a double-clicked file.
+fetch('../template-studio/design-systems/switchyards.system.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+  SYS = H.normalizeSystem(j); sysSource = 'template-studio/design-systems/switchyards.system.json';
+}).catch(() => {}).finally(() => { $('#sysNote').textContent = `Design system: ${sysSource}`; refresh({ inspector: true }); });
+refresh({ inspector: true });
+</script>
+</body>
+</html>
