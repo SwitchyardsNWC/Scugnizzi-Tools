@@ -231,7 +231,7 @@ export function addImageLayerAt(template: Template, blockId: string, src: string
     const centre = at ?? { x: block.width / 2, y: block.height / 2 };
     return {
       ...block,
-      layers: [...block.layers, { kind: 'image', id: newLayerId(block), src, x: Math.round(centre.x - width / 2), y: Math.round(centre.y - height / 2), width, height, opacity: 1 }],
+      layers: [...block.layers, { kind: 'image', id: newLayerId(block), src, x: Math.round(centre.x - width / 2), y: Math.round(centre.y - height / 2), width, height, opacity: 1, natural: { width: natural.width, height: natural.height } }],
     };
   });
 }

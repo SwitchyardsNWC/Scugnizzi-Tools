@@ -34,7 +34,9 @@ export type Drag =
   | { kind: 'erase'; last: Point; session: string }
   | { kind: 'page'; axis: 'x' | 'y' | 'both'; width: number; height: number; x: number; y: number }
   /** A selection box from `from`; `base` is what was picked before it when Shift adds to it. */
-  | { kind: 'marquee'; from: Point; base: string | null };
+  | { kind: 'marquee'; from: Point; base: string | null }
+  /** A picture dragged inside its own frame, as a crop: the focal point it started from. */
+  | { kind: 'crop'; layer: FreeformLayer; focus: Point; x: number; y: number };
 
 export const glyph = (...children: JSX.Element[]) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

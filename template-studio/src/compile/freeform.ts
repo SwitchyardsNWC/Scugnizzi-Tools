@@ -11,6 +11,7 @@
 
 import { canvasTypeOf, colorOf, firstPreset, theme, typeOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { textStyleOf } from '../model/canvas-text.ts';
+import { imagePlacement, isPlainImage, type ImageLayer } from '../model/image-layer.ts';
 import { marksPerChar, runsOf } from '../model/rich-text.ts';
 import { BRUSHES, layerBox } from '../model/freeform.ts';
 import { markOf } from '../model/marks.ts';
@@ -93,6 +94,36 @@ function rotationOf(layer: FreeformLayer): string {
   return ` transform="rotate(${num(angle)} ${num(box.x + box.width / 2)} ${num(box.y + box.height / 2)})"`;
 }
 
+/**
+ * A picture in its frame. One placed the old way, with nothing set, draws exactly as it always did. Otherwise
+ * the whole picture is placed from `imagePlacement` and clipped by the frame: its rectangle, rounded, or an
+ * ellipse. The clip's id carries the frame's geometry, so two pages on one email cannot share a wrong one.
+ */
+function imageSvg(layer: ImageLayer, mark: string): string {
+  const fade = layer.opacity < 1 ? ` opacity="${num(layer.opacity)}"` : '';
+  const place = imagePlacement(layer);
+  const shaped = Boolean(layer.radius) || layer.mask === 'ellipse';
+  if (!place && !shaped && isPlainImage(layer)) {
+    return `<image ${mark} href="${esc(layer.src)}" x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" preserveAspectRatio="xMidYMid slice"${fade}/>`;
+  }
+  const { x, y, width: w, height: h } = layer;
+  const id = `sy-clip-${esc(layer.id)}-${Math.round(x)}-${Math.round(y)}-${Math.round(w)}-${Math.round(h)}`;
+  const clip =
+    layer.mask === 'ellipse'
+      ? `<ellipse cx="${num(x + w / 2)}" cy="${num(y + h / 2)}" rx="${num(w / 2)}" ry="${num(h / 2)}"/>`
+      : `<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}"${layer.radius ? ` rx="${num(Math.min(layer.radius, w / 2, h / 2))}"` : ''}/>`;
+  // Without its own size, the frame's aspect does the cropping, as before, with the focus as an alignment.
+  const picture = place
+    ? `<image href="${esc(layer.src)}" x="${num(place.x)}" y="${num(place.y)}" width="${num(place.width)}" height="${num(place.height)}" preserveAspectRatio="none"${fade}/>`
+    : `<image href="${esc(layer.src)}" x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" preserveAspectRatio="${layer.fit === 'stretch' ? 'none' : `xMidYMid ${layer.fit === 'fit' ? 'meet' : 'slice'}`}"${fade}/>`;
+  // The empty rect takes the pointer across the whole frame, even where a fitted picture leaves it bare.
+  return (
+    `<g ${mark}><defs><clipPath id="${id}">${clip}</clipPath></defs>` +
+    `<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" fill="none" pointer-events="all"/>` +
+    `<g clip-path="url(#${id})">${picture}</g></g>`
+  );
+}
+
 function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number): string {
   // An image draws its own opacity on the picture; every other kind takes it on the layer's element.
   const fade = layer.kind !== 'image' && typeof layer.opacity === 'number' && layer.opacity < 1 ? ` opacity="${num(Math.max(0, layer.opacity))}"` : '';
@@ -134,10 +165,7 @@ function layerSvg(layer: FreeformLayer, ds: DesignSystem, surfaceHeight: number)
         // Nothing picked yet: a dashed frame at the size it will be, so it can be found and sized.
         return `<rect ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" fill="none" stroke="#9aa0a6" stroke-width="2" stroke-dasharray="7 5"/>`;
       }
-      return (
-        `<image ${mark} href="${esc(layer.src)}" x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}" ` +
-        `preserveAspectRatio="xMidYMid slice"${layer.opacity < 1 ? ` opacity="${num(layer.opacity)}"` : ''}/>`
-      );
+      return imageSvg(layer, mark);
     case 'rect':
       return (
         `<rect ${mark} x="${num(layer.x)}" y="${num(layer.y)}" width="${num(layer.width)}" height="${num(layer.height)}"` +

@@ -36,6 +36,8 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
+import { measureImage, shownImageHref } from './picture-size.ts';
 import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
 import { BRAND_PRESETS } from './features.ts';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
@@ -175,6 +177,9 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const [pageDrag, setPageDrag] = useState(false);
   /** The selection box being dragged, in page coordinates. */
   const [marquee, setMarquee] = useState<Box | null>(null);
+  /** The picture being cropped: double-click one, then drag it inside its frame. Escape or a click elsewhere ends it. */
+  const [cropping, setCropping] = useState<string | null>(null);
+  const [cropHref, setCropHref] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const [ghost, setGhost] = useState<{ kind: 'create'; tool: 'rect' | 'ellipse' | 'line'; from: Point; to: Point } | { kind: 'pen'; points: number[]; snapped: QuickShape | null } | null>(null);
   const [space, setSpace] = useState(false);
@@ -730,6 +735,20 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     return null;
   };
 
+  /**
+   * Into crop: the picture's own size is needed to know how far it overflows, so a picture placed before that
+   * was kept is measured first, from the address the canvas is showing it at.
+   */
+  const startCrop = async (l: Extract<FreeformLayer, { kind: 'image' }>) => {
+    if (!l.natural) {
+      const natural = await measureImage(l.id);
+      if (!natural) return;
+      commit('Crop', updateLayer(tpl(), blockId, l.id, { natural, fit: l.fit ?? 'fill' }));
+    }
+    setCropHref(shownImageHref(l.id));
+    setCropping(l.id);
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     const b = blockRef.current;
     const svg = svgEl.current;
@@ -837,6 +856,18 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         event.preventDefault();
         return;
       }
+      if (!gid && again && l.kind === 'image' && l.src.trim()) {
+        onSelectLayer(hit);
+        void startCrop(l);
+        event.preventDefault();
+        return;
+      }
+      if (cropping === hit && l.kind === 'image') {
+        drag.current = { kind: 'crop', layer: l, focus: { x: l.focusX ?? 0.5, y: l.focusY ?? 0.5 }, x: p.x, y: p.y };
+        event.preventDefault();
+        return;
+      }
+      if (cropping) setCropping(null);
       const unit = gid ? groupKey(gid) : hit;
       // Shift adds the thing to what is picked, or takes it out. Pressing on something already among several
       // picked things keeps them all picked, so the drag moves them together.
@@ -866,6 +897,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }, settingsRef.current.holdPanMs);
     } else {
       lastPress.current = null;
+      if (cropping) setCropping(null);
       if (current === 'select' && event.pointerType !== 'touch') {
         // A selection box, as in any layout tool. The page still pans with Space, the hand, or a finger.
         if (!event.shiftKey) onSelectLayer(null);
@@ -992,6 +1024,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         const at = { kind: 'block' as const, sectionId: s.section.id, blockId };
         if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(700, Math.round(state.width + (p.x - state.x)))));
         if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(1200, Math.round(state.height + (p.y - state.y)))));
+        return;
+      }
+      case 'crop': {
+        if (state.layer.kind !== 'image') return;
+        const f = focusAfterDrag(state.layer, state.focus, p.x - state.x, p.y - state.y);
+        commit('Crop', updateLayer(tpl(), blockId, state.layer.id, f), `${key}:crop:${state.layer.id}`);
         return;
       }
       case 'marquee': {
@@ -1168,6 +1206,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (event.key === 'Escape') {
       event.preventDefault();
       if (editingText) setEditingText(null);
+      else if (cropping) setCropping(null);
       else if (toolRef.current !== 'select') setTool('select');
       else if (layerRef.current) onSelectLayer(null);
       else leave();
@@ -1604,6 +1643,18 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
               {tool === 'eraser' && eraserAt && idle && (
                 <circle cx={eraserAt.x} cy={eraserAt.y} r={ERASER / view.z} fill="rgba(255,255,255,0.65)" stroke="#1e1c19" stroke-width={1.5 / view.z} />
               )}
+              {(() => {
+                // Cropping: the whole picture shows faintly past its frame, so you can see what you are moving.
+                const c = cropping ? block.layers.find((l) => l.id === cropping) : undefined;
+                const place = c?.kind === 'image' ? imagePlacement(c) : null;
+                if (!c || !place || !cropHref) return null;
+                return (
+                  <g pointer-events="none" transform={rotateAbout(c, boxOf(c))}>
+                    <image href={cropHref} x={place.x} y={place.y} width={place.width} height={place.height} preserveAspectRatio="none" opacity={0.3} />
+                    <rect x={place.x} y={place.y} width={place.width} height={place.height} fill="none" stroke={ACCENT} stroke-width={1 / view.z} stroke-dasharray={`${4 / view.z} ${3 / view.z}`} />
+                  </g>
+                );
+              })()}
               {marquee && (
                 <rect class="surface-marquee" x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height} stroke-width={1 / view.z} />
               )}

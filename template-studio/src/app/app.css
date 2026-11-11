@@ -1920,6 +1920,11 @@ button.phone-row { cursor: pointer; }
 .fig-text-row .fig-seg svg { width: 16px; height: 16px; }
 .fig-text-colour { display: grid; gap: 6px; }
 .fig-text-colour .fig-hex { grid-template-columns: 52px 28px minmax(0, 1fr); }
+/* The focal point picker (FigPanel › ImageProps): the whole picture, and a ring where the crop holds it. */
+.fig-focus { display: grid; place-items: center; width: 100%; padding: 6px; border: 0; border-radius: 6px; background: var(--fig-hover); cursor: crosshair; }
+.fig-focus-frame { position: relative; display: inline-block; line-height: 0; }
+.fig-focus img { display: block; max-width: 100%; max-height: 120px; border-radius: 3px; }
+.fig-focus i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 999px; border: 2px solid #ffffff; box-shadow: 0 0 0 1.5px #0b6fd8, 0 1px 4px rgb(0 0 0 / 0.4); pointer-events: none; }
 .fig-dot.clear, .fig-swatch-btn span.empty { background: repeating-conic-gradient(var(--fig-check) 0 25%, var(--fig-surface) 0 50%) 0 0 / 8px 8px; }
 
 /* The mini menu over what is picked. Above it, the pop opens upward; below it, downward. */

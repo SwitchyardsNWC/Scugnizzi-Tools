@@ -9,6 +9,8 @@ import { hasTweaks } from '../model/brand-presets.ts';
 import { BRAND_PRESETS } from './features.ts';
 import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
 import { unitsOf } from '../model/selection.ts';
+import { frameToPicture, imagePlacement, MAX_ZOOM, type ImageLayer } from '../model/image-layer.ts';
+import { measureImage, shownImageHref } from './picture-size.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
@@ -1381,6 +1383,7 @@ function FigProps({ block, ds, pickedKey, heights, onLayers, onAlignUnits, onDis
         <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
       </div>
       {!sel.many && one.kind === 'text' && <TextProps layer={one} ds={ds} onLayers={onLayers} />}
+      {!sel.many && one.kind === 'image' && one.src.trim() && <ImageProps layer={one} onLayers={onLayers} />}
       <div class="fig-align" role="group" aria-label="Align to page">
         {ALIGNS.map((a) => (
           <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>
@@ -1483,6 +1486,84 @@ function TextProps({ layer, ds, onLayers }: { layer: Extract<FreeformLayer, { ki
         </div>
         <HexField label="Colour" value={hex.slice(0, 7).toLowerCase()} onInput={(v) => set('Colour', { color: v }, 'colour')} />
       </div>
+    </div>
+  );
+}
+
+// --- pictures ---------------------------------------------------------------------------------------------
+
+/**
+ * A picture in its frame: fill, fit or stretch, how far in, the point kept in view, round corners or an
+ * ellipse. Jared: "crop and mask inside a shape, fill or fit, rounded corners, focal point." Click the
+ * small picture to set the focal point; double-click the picture on the canvas to drag it inside its frame.
+ */
+function ImageProps({ layer, onLayers }: { layer: ImageLayer; onLayers: FigLayersProps['onLayers'] }) {
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => setHref(shownImageHref(layer.id)), [layer.id, layer.src]);
+  /** Changes that need the picture's own size measure it first, once, for a picture placed before it was kept. */
+  const set = async (label: string, patch: Partial<ImageLayer>, coalesce?: string) => {
+    const natural = layer.natural ?? (await measureImage(layer.id)) ?? undefined;
+    onLayers(label, [{ ...layer, ...(natural ? { natural } : {}), ...patch } as FreeformLayer], coalesce ? `image:${layer.id}:${coalesce}` : undefined);
+  };
+  const fit = layer.fit ?? 'fill';
+  const fx = layer.focusX ?? 0.5;
+  const fy = layer.focusY ?? 0.5;
+  const crops = fit !== 'stretch' && (imagePlacement(layer)?.width ?? Infinity) >= layer.width - 0.5;
+  return (
+    <div class="fig-text-props">
+      <div class="fig-page-row">
+        <b>Picture</b>
+        <button class="fig-text-btn" title="Back to the whole picture, centred, filling the frame" onClick={() => void set('Reset crop', { fit: 'fill', zoom: undefined, focusX: undefined, focusY: undefined })}>
+          Reset
+        </button>
+      </div>
+      <div class="fig-text-row">
+        <span class="fig-seg" role="group" aria-label="How the picture sits in its frame">
+          {(['fill', 'fit', 'stretch'] as const).map((f) => (
+            <button key={f} class={fit === f ? 'on' : ''} aria-pressed={fit === f} title={f === 'fill' ? 'Cover the frame, cropping the overflow' : f === 'fit' ? 'Show the whole picture inside the frame' : 'Stretch to the frame'} onClick={() => void set(`Picture ${f}`, { fit: f })}>
+              {f}
+            </button>
+          ))}
+        </span>
+        <span class="fig-seg" role="group" aria-label="Shape">
+          <button class={layer.mask !== 'ellipse' ? 'on' : ''} aria-pressed={layer.mask !== 'ellipse'} title="Rectangle" aria-label="Rectangle mask" onClick={() => void set('Rectangle', { mask: undefined })}>
+            ▭
+          </button>
+          <button class={layer.mask === 'ellipse' ? 'on' : ''} aria-pressed={layer.mask === 'ellipse'} title="Ellipse" aria-label="Ellipse mask" onClick={() => void set('Ellipse', { mask: 'ellipse' })}>
+            ◯
+          </button>
+        </span>
+      </div>
+      <div class="fig-prop-grid">
+        <PropNum label="Zm" title={`Zoom, 100 to ${MAX_ZOOM * 100}%`} value={Math.round((layer.zoom ?? 1) * 100)} min={100} max={MAX_ZOOM * 100} step={5} suffix="%" disabled={fit === 'stretch'} onCommit={(v) => void set('Zoom', { zoom: v / 100 })} />
+        <PropNum label="Rd" title="Corner radius, in pixels" value={layer.radius ?? 0} min={0} max={1000} disabled={layer.mask === 'ellipse'} onCommit={(v) => void set('Corners', { radius: v || undefined })} />
+      </div>
+      {href && crops && (
+        <button
+          class="fig-focus"
+          title="Click the part of the picture to keep in view"
+          aria-label="Set the focal point"
+          onClick={(e) => {
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const img = (e.currentTarget as HTMLElement).querySelector('img');
+            const ir = img?.getBoundingClientRect() ?? r;
+            const x = Math.max(0, Math.min(1, (e.clientX - ir.left) / ir.width));
+            const y = Math.max(0, Math.min(1, (e.clientY - ir.top) / ir.height));
+            void set('Focal point', { focusX: Math.round(x * 1000) / 1000, focusY: Math.round(y * 1000) / 1000 });
+          }}
+        >
+          <span class="fig-focus-frame">
+            <img src={href} alt="" />
+            <i style={{ left: `${fx * 100}%`, top: `${fy * 100}%` }} aria-hidden="true" />
+          </span>
+        </button>
+      )}
+      <div class="fig-text-row">
+        <button class="fig-chip" disabled={!layer.natural} title="Make the frame the picture's own shape, at this width" onClick={() => onLayers('Frame to picture', [frameToPicture(layer)])}>
+          Frame to picture
+        </button>
+      </div>
+      <p class="fig-fx-hint">Double-click the picture on the canvas to drag it inside its frame.</p>
     </div>
   );
 }
