@@ -252,12 +252,14 @@ function stackOf(
     rows.push(annotate ? tag(markup, block.id, sec.id) : markup);
   });
 
+  // No colour on the outer cell. Every row that shows text — heading, rich text, top bar, button —
+  // carries its own, and an outer `sy-text-*` / `sy-link-*` would sit around the button's own pair at
+  // the same specificity, so dark mode handed the label whichever colour was registered last. Card
+  // two's button went ink on ink the day a button section was added above it (learnings 2.6a).
   const side = padClass(column, ctx);
   const outer = cell(frag(rows), {
     ds: ctx.ds,
     padding: paddingOf(column, ctx.ds),
-    color: sec.textColor,
-    linkColor: sec.linkColor,
     ...(side ? { className: side } : {}),
     box: boxOf(column, ctx.ds),
   });
