@@ -85,10 +85,11 @@ export function applyPattern(template: Template, sectionId: string, pattern: Pat
     for (const column of row.columns) {
       for (const block of column.blocks) {
         for (const lock of locksOf(block)) {
-          if (lock.editable && lock.field) {
-            keep.set(lock.label, lock.field);
-            own.add(lock.field);
-          }
+          if (!lock.field) continue;
+          // Locked names are released too: a copy keeps a locked field's name when it is free and re-mints it when
+          // it is not (edit.ts, `remintFields`), and the instance being replaced is not a reason for it to look taken.
+          own.add(lock.field);
+          if (lock.editable) keep.set(lock.label, lock.field);
         }
       }
     }
