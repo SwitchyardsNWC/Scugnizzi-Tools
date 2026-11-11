@@ -9,6 +9,7 @@ import { hasTweaks } from '../model/brand-presets.ts';
 import { BRAND_PRESETS } from './features.ts';
 import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
 import { unitsOf } from '../model/selection.ts';
+import { FRAME_SIZES, sizeOf } from '../model/frame-sizes.ts';
 import { frameToPicture, imagePlacement, MAX_ZOOM, type ImageLayer } from '../model/image-layer.ts';
 import { measureImage, shownImageHref } from './picture-size.ts';
 import { selectionOf } from './surface-tools.tsx';
@@ -86,12 +87,14 @@ export interface FigLayersProps {
   /** Swaps in changed layers from the properties panel. `coalesce` makes a run of edits one undo step. */
   onLayers(label: string, next: FreeformLayer[], coalesce?: string): void;
   /** Several things picked: line them up with each other, space them, make them a group. */
+  /** The largest page this canvas allows: an email block's, or a Freeform frame's. */
+  pageMax: { width: number; height: number };
   onAlignUnits(edge: AlignEdge): void;
   onDistribute(axis: 'x' | 'y'): void;
   onGroup(): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, pageMax }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const pickedUnits = unitsOf(picked);
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -234,13 +237,30 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           <b>Page</b>
           <label title="Width of the picture, in pixels">
             W
-            <input type="number" min={40} max={700} value={block.width} onChange={(e) => onPage({ width: clamp(Number((e.target as HTMLInputElement).value), 40, 700) })} />
+            <input type="number" min={40} max={pageMax.width} value={block.width} onChange={(e) => onPage({ width: clamp(Number((e.target as HTMLInputElement).value), 40, pageMax.width) })} />
           </label>
           <label title="Height of the picture, in pixels">
             H
-            <input type="number" min={20} max={1200} value={block.height} onChange={(e) => onPage({ height: clamp(Number((e.target as HTMLInputElement).value), 20, 1200) })} />
+            <input type="number" min={20} max={pageMax.height} value={block.height} onChange={(e) => onPage({ height: clamp(Number((e.target as HTMLInputElement).value), 20, pageMax.height) })} />
           </label>
         </div>
+        <label class="fig-prop wide" title="A standard size. The layers stay where they are.">
+          <span class="fig-prop-label">Size</span>
+          <select
+            value={sizeOf(block.width, block.height)?.key ?? ''}
+            onChange={(e) => {
+              const s = FRAME_SIZES.find((x) => x.key === (e.target as HTMLSelectElement).value);
+              if (s) onPage({ width: s.width, height: s.height });
+            }}
+          >
+            <option value="">Custom</option>
+            {FRAME_SIZES.filter((s) => s.width <= pageMax.width && s.height <= pageMax.height).map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label} · {s.width} × {s.height}
+              </option>
+            ))}
+          </select>
+        </label>
         <div class="fig-page-row dots" role="group" aria-label="Page background">
           <button class={`fig-dot clear ${block.background === null ? 'on' : ''}`} title="No background: the email shows through" aria-label="No background" onClick={() => onPage({ background: null })} />
           {palette.map((name) => (

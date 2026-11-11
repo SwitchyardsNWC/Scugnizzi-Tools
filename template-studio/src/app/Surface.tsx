@@ -36,6 +36,7 @@ import {
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { EMAIL_MAX, FRAME_MAX } from '../model/frame-sizes.ts';
 import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
 import { measureImage, shownImageHref } from './picture-size.ts';
 import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
@@ -123,6 +124,8 @@ export interface SurfaceApi {
 }
 
 export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone }: SurfaceProps) {
+  /** In the Freeform app a page can be a poster; in an email it is a block, which a column limits. */
+  const pageMax = standalone ? FRAME_MAX : EMAIL_MAX;
   const site = siteOf(editor.template, blockId);
   const block = site?.column.blocks[site.index];
   const ds = designSystemOf(editor.template);
@@ -1022,8 +1025,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         const s = siteOf(tpl(), blockId);
         if (!s) return;
         const at = { kind: 'block' as const, sectionId: s.section.id, blockId };
-        if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(700, Math.round(state.width + (p.x - state.x)))));
-        if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(1200, Math.round(state.height + (p.y - state.y)))));
+        if (state.axis !== 'y') editorRef.current.setAt(at, 'block.width', Math.max(40, Math.min(pageMax.width, Math.round(state.width + (p.x - state.x)))));
+        if (state.axis !== 'x') editorRef.current.setAt(at, 'block.height', Math.max(20, Math.min(pageMax.height, Math.round(state.height + (p.y - state.y)))));
         return;
       }
       case 'crop': {
@@ -1873,6 +1876,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
           heights={textHeights}
+          pageMax={pageMax}
           onAlignUnits={alignPicked}
           onDistribute={distributePicked}
           onGroup={groupPicked}

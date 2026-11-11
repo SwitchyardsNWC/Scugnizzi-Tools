@@ -54,17 +54,29 @@ import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
 import { hasEffects } from '../model/effects.ts';
+import { starterOf, type FrameSize } from '../model/frame-sizes.ts';
+import { withFreeform } from '../model/freeform.ts';
 
 startTheme();
 
 const store = siteStore();
 
-/** An empty frame. Its ids start with the frame's own, so no two frames' blocks share one. */
-function makeFrame(name: string, id: string): Template {
+/**
+ * A new frame. Its ids start with the frame's own, so no two frames' blocks share one. A size and a starter
+ * make it that shape with that layout; without them it is the email header it always was.
+ */
+function makeFrame(name: string, id: string, size?: FrameSize, starter?: string): Template {
   const base = blankTemplate();
   let n = 0;
   const section = createSection('freeform', { id: () => `${id}-${(n += 1)}`, taken: new Set() }, DEFAULT_DESIGN_SYSTEM);
-  return { ...base, name, hubspotLabel: name, sections: [section] };
+  const doc: Template = { ...base, name, hubspotLabel: name, sections: [section] };
+  if (!size && !starter) return doc;
+  const found = blockOf(doc);
+  if (!found) return doc;
+  const width = size?.width ?? found.block.width;
+  const height = size?.height ?? found.block.height;
+  const layers = starter ? starterOf(starter).layers(width, height, DEFAULT_DESIGN_SYSTEM) : found.block.layers;
+  return withFreeform(doc, found.block.id, (b) => ({ ...b, width, height, layers }));
 }
 
 function blockOf(t: Template): { block: FreeformBlock; sectionId: string } | null {
@@ -517,10 +529,10 @@ function FreeformTool() {
     const entry = next.frames.find((f) => f.key === key);
     if (entry) show(next, frameDoc(entry.key, entry.name));
   };
-  const newFrame = () => {
+  const newFrame = (size?: FrameSize, starter?: string) => {
     const id = newFrameId();
-    const name = frameName(listed);
-    const doc = makeFrame(name, id);
+    const name = frameName(listed, size ? size.label : 'Frame');
+    const doc = makeFrame(name, id, size, starter);
     show(born(addFrame(store, frames, name, doc, id), FRAME_PREFIX + id), doc);
     pushLater(FRAME_PREFIX + id);
   };

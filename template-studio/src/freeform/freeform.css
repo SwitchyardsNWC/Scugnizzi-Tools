@@ -58,3 +58,15 @@ html, body, #app { height: 100%; margin: 0; }
 .ff-app .ff-project { gap: 8px; }
 .ff-project-name { max-width: 180px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .fig-studio-dot.warn { background: #e2a33b; box-shadow: 0 0 0 3px rgb(226 163 59 / 0.22); }
+
+/* New frame: a size and a starter (FramesMenu.tsx). Each size shows its shape, so a story reads tall at a glance. */
+.ff-new { display: grid; gap: 8px; margin-top: 6px; padding: 8px; border-radius: 8px; background: var(--fig-hover); }
+.ff-sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.ff-size { display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border: 0; border-radius: 6px; background: var(--fig-surface); font: inherit; color: var(--fig-ink); cursor: pointer; }
+.ff-size.on { box-shadow: inset 0 0 0 2px var(--fig-accent); }
+.ff-size-shape { display: block; }
+.ff-size-shape rect { fill: none; stroke: var(--fig-muted); stroke-width: 1.5; }
+.ff-size.on .ff-size-shape rect { stroke: var(--fig-accent); }
+.ff-size b { font-size: 11px; font-weight: 600; line-height: 1.2; text-align: center; }
+.ff-size small { font-size: 10px; color: var(--fig-faint); font-variant-numeric: tabular-nums; }
+.fig-fx-chip.on { box-shadow: inset 0 0 0 2px var(--fig-accent); }

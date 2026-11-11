@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { freeformSvg } from '../compile/freeform.ts';
 import type { DesignSystem } from '../model/design-system.ts';
 import type { FrameIndex } from '../model/frame-store.ts';
+import { FRAME_SIZES, STARTERS, type FrameSize } from '../model/frame-sizes.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
@@ -26,7 +27,8 @@ export interface FramesMenuProps {
   /** Frames an open Template Studio's email follows. */
   linkedKeys: string[];
   onOpen(key: string): void;
-  onNew(): void;
+  /** A new frame of a size, begun from a starter. */
+  onNew(size?: FrameSize, starter?: string): void;
   onDuplicate(key: string): void;
   onRename(key: string, name: string): void;
   onRemove(key: string): void;
@@ -35,6 +37,8 @@ export interface FramesMenuProps {
 export function FramesMenu({ frames, ds, assets, activeDoc, docOf, linkedKeys, onOpen, onNew, onDuplicate, onRename, onRemove }: FramesMenuProps) {
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState<{ key: string; value: string } | null>(null);
+  /** The new-frame picker: a size and a starter, then Create. */
+  const [making, setMaking] = useState<{ size: string; starter: string } | null>(null);
   const active = frames.frames.find((f) => f.key === frames.active);
 
   useEffect(() => {
@@ -150,15 +154,58 @@ export function FramesMenu({ frames, ds, assets, activeDoc, docOf, linkedKeys, o
               );
             })}
           </ul>
-          <button
-            class="ff-frames-new"
-            onClick={() => {
-              onNew();
-              setOpen(false);
-            }}
-          >
-            + New frame
-          </button>
+          {making ? (
+            <div class="ff-new">
+              {(['Email', 'Social', 'Print'] as const).map((g) => (
+                <div key={g} class="ff-new-group">
+                  <div class="fig-fx-sub">{g}</div>
+                  <div class="ff-sizes">
+                    {FRAME_SIZES.filter((s) => s.group === g).map((s) => {
+                      const k = 34 / Math.max(s.width, s.height);
+                      return (
+                        <button key={s.key} class={`ff-size ${making.size === s.key ? 'on' : ''}`} aria-pressed={making.size === s.key} title={`${s.label}, ${s.width} × ${s.height}`} onClick={() => setMaking({ ...making, size: s.key })}>
+                          <svg class="ff-size-shape" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+                            <rect x={20 - (s.width * k) / 2} y={20 - (s.height * k) / 2} width={s.width * k} height={s.height * k} rx="2" />
+                          </svg>
+                          <b>{s.label}</b>
+                          <small>
+                            {s.width} × {s.height}
+                          </small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div class="fig-fx-sub">Start from</div>
+              <div class="fig-fx-chips" role="group" aria-label="Starter">
+                {STARTERS.map((st) => (
+                  <button key={st.key} class={`fig-fx-chip ${making.starter === st.key ? 'on' : ''}`} aria-pressed={making.starter === st.key} title={st.help} onClick={() => setMaking({ ...making, starter: st.key })}>
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+              <div class="fig-fx-actions">
+                <button class="fig-chip" onClick={() => setMaking(null)}>
+                  Cancel
+                </button>
+                <button
+                  class="fig-chip primary"
+                  onClick={() => {
+                    onNew(FRAME_SIZES.find((s) => s.key === making.size), making.starter);
+                    setMaking(null);
+                    setOpen(false);
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button class="ff-frames-new" onClick={() => setMaking({ size: 'email-header', starter: 'blank' })}>
+              + New frame
+            </button>
+          )}
         </div>
       )}
     </div>

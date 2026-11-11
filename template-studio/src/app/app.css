@@ -1896,7 +1896,7 @@ button.phone-row { cursor: pointer; }
 .fig-page-row b { flex: 1; font-size: 12px; color: var(--fig-faint); }
 .fig-page label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--fig-faint); }
 .fig-page input {
-  width: 58px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover);
+  width: 64px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover);
   font: inherit; font-size: 12.5px; color: var(--fig-ink); font-variant-numeric: tabular-nums;
 }
 .fig-page input:focus { outline: 2px solid var(--fig-accent); }
