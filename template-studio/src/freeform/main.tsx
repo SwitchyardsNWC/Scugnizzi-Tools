@@ -50,12 +50,18 @@ import { forgetTrashed } from '../workspace/trash.ts';
 import type { TrashRecord } from '../model/trash.ts';
 import { siteStore } from '../project/site-store.ts';
 import { useProject, type Project } from '../project/useProject.ts';
+import { ExportMenu } from './ExportMenu.tsx';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
 import { hasEffects } from '../model/effects.ts';
 import { starterOf, type FrameSize } from '../model/frame-sizes.ts';
-import { withFreeform } from '../model/freeform.ts';
+import { recipeHash, withFreeform } from '../model/freeform.ts';
+import { placeOnBoard, type Placed } from '../model/board.ts';
+import { placeFrames } from '../model/frame-store.ts';
+import { withLocalAssets, withoutMissingPictures } from '../app/local-assets.ts';
+import type { BoardFrameView, SurfaceBoard } from '../app/Surface.tsx';
+import type { View } from '../app/surface-tools.tsx';
 
 startTheme();
 
@@ -190,9 +196,29 @@ function FreeformTool() {
   const [layer, setLayer] = useState<string | null>(null);
   const [assets, setAssets] = useState<AssetFile[]>([]);
   const api = useRef<SurfaceApi | null>(null);
+  /** ⇧⌘E: the newest export, read through a ref so the key is bound once. */
+  const exportRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyE') {
+        e.preventDefault();
+        exportRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const picker = useRef<HTMLInputElement | null>(null);
   // Remount the surface whenever a different drawing is on it, so it fits that page.
   const [session, setSession] = useState(0);
+  /** The view the next frame opens at, when a click on the board brought it up; otherwise it fits. */
+  const [startView, setStartView] = useState<View | null>(null);
+  /** A frame being dragged by its name: which (null for the one edited) and how far. */
+  const [moving, setMoving] = useState<{ key: string; dx: number; dy: number } | null>(null);
+  /** Frames' drawings as last read from the store, and their printed pictures, so the board is not rebuilt each frame. */
+  const docCache = useRef(new Map<string, { raw: string | null; doc: Template; svg?: string; svgFor?: unknown }>());
+  const printCache = useRef(new Map<string, string>());
+  const [, setPrinted] = useState(0);
 
   // --- the project -----------------------------------------------------------------------------------------
 
@@ -523,13 +549,15 @@ function FreeformTool() {
   const pushLater = (key: string) => {
     if (projectRef.current.writable) void run(() => pushKey(key));
   };
-  const openKey = (key: string) => {
+  const openKey = (key: string, view: View | null = null) => {
     if (key === frames.active) return;
     const next = openFrame(store, frames, key);
     const entry = next.frames.find((f) => f.key === key);
+    setStartView(view);
     if (entry) show(next, frameDoc(entry.key, entry.name));
   };
   const newFrame = (size?: FrameSize, starter?: string) => {
+    setStartView(null);
     const id = newFrameId();
     const name = frameName(listed, size ? size.label : 'Frame');
     const doc = makeFrame(name, id, size, starter);
@@ -651,14 +679,25 @@ function FreeformTool() {
   const printed = hasEffects(block);
   const fileBase = slug(activeEntry.name);
   const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
-  const exportPng = async () => {
+  const pngCanvas = (scale: number) => freeformCanvas(block, ds, { assets: allAssets, scale, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
+  const exportPng = async (scale: 1 | 2 = 2) => {
     try {
-      const canvas = await freeformCanvas(block, ds, { assets: allAssets, scale: 2, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
-      download(`${fileBase}@2x.png`, await canvasBlob(canvas));
+      download(`${fileBase}${scale === 2 ? '@2x' : ''}.png`, await canvasBlob(await pngCanvas(scale)));
     } catch (cause) {
       failed(cause);
     }
   };
+  /** The frame on the clipboard as a picture, for pasting into Slack, a deck or an email draft. */
+  const copyPng = async () => {
+    try {
+      const blob = canvasBlob(await pngCanvas(2));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      notify(`Copied ${activeEntry.name} as a PNG.`);
+    } catch (cause) {
+      failed(cause instanceof Error && cause.name === 'NotAllowedError' ? new Error('The browser would not let the picture onto the clipboard. Export PNG instead.') : cause);
+    }
+  };
+  exportRef.current = () => void exportPng(2);
   const exportSvg = async () => {
     if (!printed) return download(`${fileBase}.svg`, new Blob([freeformSvg(block, ds)], { type: 'image/svg+xml' }));
     // A print is pixels, which SVG cannot describe: the printed picture goes inside it as an image.
@@ -669,6 +708,96 @@ function FreeformTool() {
     } catch (cause) {
       failed(cause);
     }
+  };
+
+  // --- the board --------------------------------------------------------------------------------------------
+
+  /** A frame's drawing, read again only when its stored copy changed. The one being edited is the editor's. */
+  const boardDoc = (key: string, name: string): Template => {
+    if (key === frames.active) return editor.template;
+    const raw = store.getItem(key);
+    const hit = docCache.current.get(key);
+    if (hit && hit.raw === raw) return hit.doc;
+    const doc = frameDoc(key, name);
+    docCache.current.set(key, { raw, doc });
+    return doc;
+  };
+  const sizes = listed.frames.map((f) => {
+    const page = blockOf(boardDoc(f.key, f.name))?.block;
+    return { key: f.key, x: f.x, y: f.y, width: page?.width ?? 560, height: page?.height ?? 280 };
+  });
+  const placed = placeOnBoard(sizes);
+  const placeOf = (key: string): Placed => {
+    const at = placed.find((f) => f.key === key)!;
+    return moving?.key === key ? { ...at, x: at.x + moving.dx, y: at.y + moving.dy } : at;
+  };
+  const here = placeOf(frames.active);
+  const boardFrames: BoardFrameView[] = listed.frames
+    .filter((f) => f.key !== frames.active)
+    .map((f) => {
+      const doc = boardDoc(f.key, f.name);
+      const found2 = blockOf(doc);
+      const at = placeOf(f.key);
+      if (!found2) return null;
+      const fds = designSystemOf(doc);
+      const fsection = doc.sections.find((s2) => s2.id === found2.sectionId);
+      const entry = docCache.current.get(f.key);
+      let svg = entry?.svg;
+      if (!entry || entry.svgFor !== allAssets) {
+        // Its ids made its own, so a clip or a text path in one frame never answers for another's on the same page.
+        const tag = `b${f.key.split('.').pop()}-`;
+        svg = withoutMissingPictures(withLocalAssets(freeformSvg(found2.block, fds), allAssets))
+          .replace(/\bid="/g, `id="${tag}`)
+          .replace(/url\(#/g, `url(#${tag}`)
+          .replace(/href="#/g, `href="#${tag}`)
+          .replace(/\sdata-sy-layer="[^"]*"/g, '');
+        if (entry) Object.assign(entry, { svg, svgFor: allAssets });
+      }
+      // A frame with effects shows its print, made once per recipe at page size.
+      let print: string | null = null;
+      if (hasEffects(found2.block)) {
+        const hash = recipeHash(found2.block);
+        print = printCache.current.get(hash) ?? null;
+        if (print === null && !printCache.current.has(`busy:${hash}`)) {
+          printCache.current.set(`busy:${hash}`, '');
+          const ground2 = colorOf(fds, found2.block.background) ?? fsection?.containerColor ?? fsection?.bandColor ?? '#ffffff';
+          void freeformCanvas(found2.block, fds, { assets: allAssets, scale: 1, ground: ground2 })
+            .then((c) => canvasBlob(c))
+            .then((blob) => {
+              printCache.current.set(hash, URL.createObjectURL(blob));
+              setPrinted((n) => n + 1);
+            })
+            .catch(() => undefined);
+        }
+      }
+      return {
+        key: f.key,
+        name: f.name,
+        x: at.x - here.x,
+        y: at.y - here.y,
+        width: at.width,
+        height: at.height,
+        svg: svg ?? '',
+        print,
+        ground: colorOf(fds, found2.block.background) ?? fsection?.containerColor ?? fsection?.bandColor ?? '#ffffff',
+      };
+    })
+    .filter((f): f is BoardFrameView => f !== null);
+  const board: SurfaceBoard = {
+    frames: boardFrames,
+    name: activeEntry.name,
+    startView,
+    onPick: (key, view) => openKey(key, view),
+    onMove: (key, dx, dy, done) => {
+      const k = key ?? frames.active;
+      if (!done) return setMoving({ key: k, dx, dy });
+      setMoving(null);
+      // Every frame's place is written down once one moves, so those set by the row stay where they are seen.
+      const places = Object.fromEntries(placed.map((f) => [f.key, f.key === k ? { x: f.x + dx, y: f.y + dy } : { x: f.x, y: f.y }]));
+      const next = placeFrames(store, frames, places);
+      framesRef.current = next;
+      setFrames(next);
+    },
   };
 
   return (
@@ -691,6 +820,8 @@ function FreeformTool() {
           onSelectLayer={setLayer}
           onDone={() => setLayer(null)}
           api={api}
+          onImage={() => picker.current?.click()}
+          board={board}
           standalone={{
             left: (
               <>
@@ -711,35 +842,19 @@ function FreeformTool() {
                   onRename={renameKey}
                   onRemove={removeKey}
                 />
-                <button
-                  class="fig-pill fig-studio"
-                  title={
-                    studio
-                      ? inEmail
-                        ? `Template Studio has ${activeEntry.name} in ${studio.email}. Go to it.`
-                        : `Template Studio is open with ${studio.email}. Add ${activeEntry.name} to it, above the footer.`
-                      : `Open Template Studio with ${activeEntry.name} in the email, above the footer. It follows the frame from then on.`
-                  }
-                  onClick={toStudio}
-                >
-                  <span class={`fig-studio-dot ${studio ? 'live' : ''}`} aria-hidden="true" />
-                  {studio ? (inEmail ? `In ${studio.email}` : `Send to ${studio.email}`) : 'Use in Template Studio'}
-                  <span aria-hidden="true">↗</span>
-                </button>
               </>
             ),
             right: (
               <>
-                <CanvasMenu pill />
-                <button class="fig-pill" title="Add a picture from your computer. Dropping one on the canvas works too." onClick={() => picker.current?.click()}>
-                  Image
-                </button>
-                <button class="fig-pill" title="Download this frame as SVG" onClick={() => void exportSvg()}>
-                  SVG
-                </button>
-                <button class="fig-pill fig-done" title="Download this frame as a PNG at 2×, printed through its effects" onClick={() => void exportPng()}>
-                  Export PNG
-                </button>
+                <CanvasMenu pill gear />
+                <ExportMenu
+                  name={activeEntry.name}
+                  onPng={(scale) => void exportPng(scale)}
+                  onSvg={() => void exportSvg()}
+                  onCopy={() => void copyPng()}
+                  studio={{ label: studio ? (inEmail ? `In ${studio.email}` : `Send to ${studio.email}`) : 'Use in Template Studio', live: Boolean(studio) }}
+                  onStudio={toStudio}
+                />
               </>
             ),
           }}

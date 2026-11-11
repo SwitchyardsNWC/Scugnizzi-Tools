@@ -1,12 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+import { suiteDefine } from './suite-version.ts';
+
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
 export default defineConfig({
   // Relative asset paths, so the built app runs from a file:// path or any subfolder of a static
   // server without being told where it lives.
   base: './',
+  define: suiteDefine,
   esbuild: { jsx: 'automatic', jsxImportSource: 'preact' },
   build: {
     outDir: 'dist',

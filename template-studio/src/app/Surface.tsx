@@ -43,6 +43,7 @@ import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
 import { measureImage, shownImageHref } from './picture-size.ts';
 import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
 import { BRAND_PRESETS } from './features.ts';
+import { boardBounds, frameAt, viewAcross } from '../model/board.ts';
 import { arrangeUnits, canArrange, copyInPlace, flipLayers, styleOf, toggleFlag, withStyle, type Arrange, type LayerStyle } from '../model/arrange.ts';
 import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
@@ -53,6 +54,7 @@ import { TouchGestures } from './gestures.ts';
 import { glide, PanTracker } from './inertia.ts';
 import { hasEffects, HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects, withRisoStep } from '../model/effects.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
+import { printPasses, sharpScale } from './effects-preview.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import type { Brush, FreeformBlock, FreeformLayer, RisoStep, StyleRange, Template, TextMarks } from '../model/types.ts';
@@ -120,6 +122,36 @@ export interface SurfaceProps {
   api?: { current: SurfaceApi | null };
   /** The Freeform tool on its own: no email to fly back to, so its own pills replace Email and Done. */
   standalone?: { left: ComponentChildren; right: ComponentChildren };
+  /** Add a picture from the computer: a button in the dock beside the brand library. */
+  onImage?(): void;
+  /** The Freeform app's other frames, drawn around this one on the same board (model/board.ts). */
+  board?: SurfaceBoard;
+}
+
+export interface BoardFrameView {
+  key: string;
+  name: string;
+  /** Where it sits relative to this frame's top-left, in page pixels. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Its drawing, and its printed picture when it has effects. */
+  svg: string;
+  print: string | null;
+  ground: string;
+}
+
+export interface SurfaceBoard {
+  frames: BoardFrameView[];
+  /** This frame's name, shown above it. */
+  name: string;
+  /** Edit another frame; `view` keeps the board where it is on screen. */
+  onPick(key: string, view: View): void;
+  /** A frame dragged by its name, this far from where the drag began; null is this frame. `done` on letting go. */
+  onMove(key: string | null, dx: number, dy: number, done: boolean): void;
+  /** The view to open at, when a click on the board brought this frame up. */
+  startView?: View | null;
 }
 
 export interface SurfaceApi {
@@ -127,7 +159,7 @@ export interface SurfaceApi {
   dropAsset(asset: AssetFile, at: { x: number; y: number } | null): void;
 }
 
-export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone }: SurfaceProps) {
+export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone, onImage, board }: SurfaceProps) {
   /** In the Freeform app a page can be a poster; in an email it is a block, which a column limits. */
   const pageMax = standalone ? FRAME_MAX : EMAIL_MAX;
   const site = siteOf(editor.template, blockId);
@@ -151,6 +183,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const viewRef = useRef(view);
   /** Somebody has panned or zoomed. Until then a change of size keeps the page fitted. */
   const viewTouched = useRef(false);
+  const boardRef = useRef(board);
+  boardRef.current = board;
   const setView = useCallback((next: View) => {
     viewRef.current = next;
     setViewState(next);
@@ -314,6 +348,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     // paste from here on arrives in this document and nowhere near the block around the canvas.
     (document.activeElement as HTMLElement | null)?.blur?.();
     work.current?.focus({ preventScroll: true });
+    // Brought up by a click on the board: open exactly where it already is on screen.
+    const start = boardRef.current?.startView;
+    if (start) {
+      viewTouched.current = true;
+      setView(start);
+      setPhase('idle');
+      return undefined;
+    }
     const fit = fitView();
     const from = reduced ? null : blockView();
     if (!fit || !from) {
@@ -512,7 +554,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   // --- effects: the page printed through them, and the round trip to the Riso tool ---------------------
 
   /** The page printed through its effects, laid over the drawing. The drawing stays underneath to be picked. */
-  const [fx, setFx] = useState<{ key: string; url: string } | null>(null);
+  const [fx, setFx] = useState<{ key: string; url: string; draft: boolean } | null>(null);
+  /** What the print on screen is of, and whether it is a draft; and how long the last sharp print took. */
+  const fxShown = useRef<{ key: string; draft: boolean } | null>(null);
+  const lastSharpMs = useRef<number | null>(null);
   const fxUrl = useRef<string | null>(null);
   const [fxNote, setFxNote] = useState<string | null>(null);
   const assetsRef = useRef(assets);
@@ -529,31 +574,39 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     [blockId],
   );
 
-  // Printed again once a change settles — never mid-drag or mid-word, which would stutter.
+  // Printed again once a change settles — never mid-drag or mid-word, which would stutter. Slow effects get a
+  // quick draft at the page's own size first, then the sharp print once the work pauses (effects-preview.ts).
+  const previewMode = settings.effectsPreview;
   useEffect(() => {
     if (!fxKey || dragging || editingText) return;
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const b = blockRef.current;
-      if (!b) return;
-      try {
-        // Printed at the resolution the screen shows it, up to 4×, so a zoomed-in print is sharp rather than
-        // stretched. The export stays at 2×, and every distance in the press is in page pixels at any scale.
-        const scale = Math.min(4, Math.max(2, Math.ceil(viewRef.current.z * (window.devicePixelRatio || 1))));
-        const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale, ground: groundOf(b) }));
-        if (cancelled) return;
-        if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
-        fxUrl.current = URL.createObjectURL(blob);
-        setFx({ key: fxKey, url: fxUrl.current });
-      } catch {
-        // The plain drawing stays on screen.
-      }
-    }, 120);
+    // Printed at the resolution the screen shows it, up to 4×, so a zoomed-in print is sharp rather than
+    // stretched. The export stays at 2×, and every distance in the press is in page pixels at any scale.
+    const sharp = sharpScale(viewRef.current.z, window.devicePixelRatio || 1);
+    const timers = printPasses(previewMode, lastSharpMs.current, sharp).map((pass) =>
+      window.setTimeout(async () => {
+        const b = blockRef.current;
+        if (!b || cancelled) return;
+        try {
+          const started = performance.now();
+          const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: pass.scale, ground: groundOf(b) }));
+          if (!pass.draft) lastSharpMs.current = performance.now() - started;
+          // A draft never replaces a sharper print of the same page.
+          if (cancelled || (pass.draft && fxShown.current?.key === fxKey && !fxShown.current.draft)) return;
+          if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
+          fxUrl.current = URL.createObjectURL(blob);
+          fxShown.current = { key: fxKey, draft: pass.draft };
+          setFx({ key: fxKey, url: fxUrl.current, draft: pass.draft });
+        } catch {
+          // The plain drawing stays on screen.
+        }
+      }, pass.delay),
+    );
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      timers.forEach((t) => window.clearTimeout(t));
     };
-  }, [fxKey, dragging, editingText, assets, groundOf]);
+  }, [fxKey, dragging, editingText, assets, groundOf, previewMode]);
   useEffect(() => () => void (fxUrl.current && URL.revokeObjectURL(fxUrl.current)), []);
 
   /** The plain page and its settings, left for the Riso tool, which opens in a tab of its own. */
@@ -820,6 +873,16 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       return;
     }
 
+    // A press on another frame of the board, not on anything of this one's: that frame is the one edited now.
+    if (board && !(p.x >= 0 && p.y >= 0 && p.x <= b.width && p.y <= b.height) && !layerAt(event.clientX, event.clientY, p)) {
+      const other = frameAt(board.frames, p);
+      if (other) {
+        release(svg as unknown as HTMLElement, event.pointerId);
+        board.onPick(other.key, viewAcross(viewRef.current, { x: 0, y: 0 }, other));
+        event.preventDefault();
+        return;
+      }
+    }
     if (current === 'pen') {
       drag.current = { kind: 'pen', points: [p.x, p.y], still: { x: event.clientX, y: event.clientY, since: performance.now() }, snapped: null };
       setGhost({ kind: 'pen', points: [p.x, p.y], snapped: null });
@@ -1263,7 +1326,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     // Shift-1 fits the page, Shift-2 the picked things. By the key's place, so it works on any keyboard layout.
     if (event.shiftKey && !meta && !event.altKey && (event.code === 'Digit1' || event.code === 'Digit2')) {
       event.preventDefault();
-      if (event.code === 'Digit1') fitSmooth();
+      if (event.code === 'Digit1') fitBoard();
       else zoomToPicked();
       return;
     }
@@ -1590,12 +1653,51 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const s = b ? selectionOf(b, layerRef.current) : null;
     const w = work.current?.getBoundingClientRect();
     if (!s || !w) return fitSmooth();
-    const box = groupBox(s.layers, textHeights);
+    fitBox(groupBox(s.layers, textHeights));
+  };
+  const fitBox = (box: Box) => {
+    const w = work.current?.getBoundingClientRect();
+    if (!w) return;
     const room = w.width - (panelRef.current ? PANEL_ROOM : 0);
     const z = clampZoom(Math.min(4, (room - 160) / Math.max(8, box.width), (w.height - 240) / Math.max(8, box.height)));
     const v = { z, x: room / 2 - (box.x + box.width / 2) * z, y: w.height / 2 - (box.y + box.height / 2) * z };
     if (reduced) setView(v);
     else animateView(v, 240, easeOutCubic);
+  };
+  /**
+   * A frame dragged by its name. This frame moves by moving the view, since it is drawn at the origin: the
+   * others then sit still while it goes. A press that does not move on another frame's name edits that frame.
+   */
+  const dragFrame = (event: PointerEvent, f: BoardFrameView | null) => {
+    if (!board || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const start = { x: event.clientX, y: event.clientY };
+    const v0 = viewRef.current;
+    let moved = false;
+    const move = (e: PointerEvent) => {
+      const dx = (e.clientX - start.x) / v0.z;
+      const dy = (e.clientY - start.y) / v0.z;
+      if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+      moved = true;
+      if (!f) setView({ ...v0, x: v0.x + dx * v0.z, y: v0.y + dy * v0.z });
+      board.onMove(f ? f.key : null, Math.round(dx), Math.round(dy), false);
+    };
+    const up = (e: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (moved) board.onMove(f ? f.key : null, Math.round((e.clientX - start.x) / v0.z), Math.round((e.clientY - start.y) / v0.z), true);
+      else if (f) board.onPick(f.key, viewAcross(viewRef.current, { x: 0, y: 0 }, f));
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  /** Every frame on the board in view: ⇧1, as in a design tool. Without a board, the page. */
+  const fitBoard = () => {
+    if (!board?.frames.length || !blockRef.current) return fitSmooth();
+    const b = blockRef.current;
+    const all = boardBounds([{ key: '', x: 0, y: 0, width: b.width, height: b.height }, ...board.frames])!;
+    fitBox(all);
   };
   /** Layers off the system clipboard, for the menu's Paste; the keys use the paste event. */
   const pasteFromMenu = async () => {
@@ -1823,6 +1925,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           </defs>
 
           <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
+            {board?.frames.map((f) => (
+              <g key={f.key} class="surface-other" transform={`translate(${f.x} ${f.y})`} aria-hidden="true">
+                <rect class="surface-page-shadow" x={0} y={0} width={f.width} height={f.height} fill={f.ground} filter="url(#fig-shadow)" />
+                {f.print ? <image href={f.print} x={0} y={0} width={f.width} height={f.height} preserveAspectRatio="none" /> : <g dangerouslySetInnerHTML={{ __html: f.svg }} />}
+              </g>
+            ))}
             <rect class="surface-page-shadow" x={0} y={0} width={block.width} height={block.height} fill={pageFill} filter="url(#fig-shadow)" />
             <rect x={0} y={0} width={block.width} height={block.height} fill={pageFill} />
             {/* Under a print the drawing is invisible but still there, so a click still finds its layer. */}
@@ -1928,11 +2036,26 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           </g>
         </svg>
 
+        {board && idle && (
+          <>
+            <FrameLabel name={board.name} active left={view.x} top={view.y} width={block.width * view.z} onPress={(e) => dragFrame(e, null)} />
+            {board.frames.map((f) => (
+              <FrameLabel key={f.key} name={f.name} left={view.x + f.x * view.z} top={view.y + f.y * view.z} width={f.width * view.z} onPress={(e) => dragFrame(e, f)} />
+            ))}
+          </>
+        )}
+
         {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
 
         {idle && (
           <div class={`fig-size ${pageDrag ? 'on' : ''}`} style={{ left: `${view.x + block.width * view.z}px`, top: `${view.y + block.height * view.z + 12}px` }}>
             {block.width} × {block.height}
+            {/* Said in words, not by a softer picture alone: a draft is on screen, and whether it will sharpen. */}
+            {showFx && fx?.draft && (
+              <span class="fig-draft" title={previewMode === 'fast' ? 'Fast preview: effects drawn at page size while you work. Export is full quality. Change it in Canvas settings.' : 'A quick draft of the effects; the sharp print follows when you pause.'}>
+                {previewMode === 'fast' ? ' · Fast preview' : ' · Draft, sharpening'}
+              </span>
+            )}
           </div>
         )}
 
@@ -2139,12 +2262,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             <span aria-hidden="true">←</span> Email
           </button>
         )}
-        <span class="fig-pill fig-title">
-          <b>Freeform</b>
-          <span>
-            {count} {count === 1 ? 'layer' : 'layers'}
+        {!standalone && (
+          <span class="fig-pill fig-title">
+            <b>Freeform</b>
+            <span>
+              {count} {count === 1 ? 'layer' : 'layers'}
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div class="fig-chrome fig-top fig-top-right">
         <div class="fig-pill fig-zoom">
@@ -2250,6 +2375,15 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             <circle cx="17" cy="17" r="3.5" />
           </svg>
         </button>
+        {onImage && (
+          <button class="fig-tool" aria-label="Add a picture" title={'Picture\nFrom your computer. Dropping files on the page works too.'} onClick={onImage}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+              <circle cx="9" cy="10" r="1.8" />
+              <path d="M20.5 16l-5-5-9 8.5" />
+            </svg>
+          </button>
+        )}
         <span class="fig-sep" aria-hidden="true" />
         <button
           class={`fig-swatch ${paintsOpen ? 'on' : ''} ${swatch ? '' : 'none'}`}
@@ -2267,5 +2401,23 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A frame's name above its top-left corner, at screen size whatever the zoom. Drag it to move the frame; click
+ * another frame's to edit that one. The frame being edited is told by its weight and a marker, not by colour.
+ */
+function FrameLabel({ name, active = false, left, top, width, onPress }: { name: string; active?: boolean; left: number; top: number; width: number; onPress(e: PointerEvent): void }) {
+  return (
+    <button
+      class={`fig-frame-label ${active ? 'on' : ''}`}
+      style={{ left: `${left}px`, top: `${top - 24}px`, maxWidth: `${Math.max(48, width)}px` }}
+      title={active ? `${name}: the frame being edited. Drag its name to move it.` : `${name}. Click to edit it, or drag its name to move it.`}
+      onPointerDown={onPress}
+    >
+      {active && <span aria-hidden="true">▸ </span>}
+      {name}
+    </button>
   );
 }

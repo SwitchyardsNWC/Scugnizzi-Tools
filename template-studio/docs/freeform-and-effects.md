@@ -462,3 +462,27 @@ design usage patterns and tools."
 - **Right-click menu** on the canvas: cut, copy, paste, duplicate, delete, arrange, group or ungroup,
   flip, hide, lock, copy and paste style, zoom to selection, each with its key.
 - **Zoom.** ⇧1 fits the page, ⇧2 fits what is picked.
+
+## Frames on one board, fast preview, the top bar, a version *(2026-11-11)*
+
+Jared: "Allow multiple frames on the canvas. And for effects that lag the system have a preview/fast mode.
+Rework the top toolbar to make more sense. Add a version number for the scugnizzi tools." He chose the
+Figma board, a File / Canvas / Export bar, and one version for the suite.
+
+- **The board.** Every frame sits on one canvas at its own place (`model/board.ts`), kept on its entry in
+  the frames index. One is edited at a time, drawn live; the rest are drawn as they are, with their print
+  when they have effects, made once at page size. Click a frame, or its name, to edit it: the view does not
+  move. Drag a name to move a frame. A frame with no place yet goes to the right of the others. ⇧1 fits
+  the whole board. Undo is still each frame's own, so switching starts a new history.
+- **Not yet.** Places are kept in this browser, not in the project's files, so a teammate sees the row
+  order. Layers cannot be dragged from one frame to another.
+- **Effects preview.** Canvas settings, Effects, Preview (`app/effects-preview.ts`). Auto prints a quick
+  draft at page size first whenever the last sharp print took over 200 ms, then sharpens after a pause.
+  Fast keeps drafts only. Full is the old behaviour. The size label under the page says when a draft is
+  showing. Export is always full quality.
+- **Top bar.** Left: back, project, frame menu. Right: zoom, a gear for canvas settings, and Export: PNG
+  2× (⇧⌘E), PNG 1×, SVG, Copy as PNG, and Template Studio. Picture moves to the dock beside the brand
+  library.
+- **Version.** `version.js` at the top of the repository holds the suite's one version, 0.9.0 to start.
+  The dashboard footer, every tool's banner, and the Freeform settings show it; `CHANGELOG.md` keeps the
+  history, and a test holds the two together.

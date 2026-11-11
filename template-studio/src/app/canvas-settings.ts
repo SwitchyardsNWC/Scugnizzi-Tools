@@ -6,6 +6,8 @@
 
 import { useEffect, useState } from 'preact/hooks';
 
+import { EFFECTS_PREVIEWS, type EffectsPreview } from './effects-preview.ts';
+
 /** What lies under the board: nothing, drafting lines, a dot grid, or a cutting mat. */
 export type GroundKind = 'none' | 'lines' | 'dots' | 'mat';
 export const GROUND_KINDS: readonly GroundKind[] = ['none', 'lines', 'dots', 'mat'];
@@ -39,6 +41,8 @@ export interface CanvasSettings {
   holdMs: number;
   /** Whether a finger draws on the Freeform surface: never once a pencil has been seen, always, or never at all. */
   pencilOnly: 'auto' | 'on' | 'off';
+  /** How the Freeform canvas shows effects while working: a quick draft first when slow, drafts only, or always sharp (effects-preview.ts). */
+  effectsPreview: EffectsPreview;
 }
 
 export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
@@ -55,6 +59,7 @@ export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
   quickShapes: true,
   holdMs: 160,
   pencilOnly: 'auto',
+  effectsPreview: 'auto',
 };
 
 /** Each dial's floor, ceiling and step. */
@@ -107,6 +112,7 @@ export function parseCanvasSettings(raw: string | null): CanvasSettings {
     quickShapes: flag(value.quickShapes, d.quickShapes),
     holdMs: clamp(value.holdMs, CANVAS_RANGES.holdMs, d.holdMs),
     pencilOnly: pencil === 'on' || pencil === 'off' || pencil === 'auto' ? pencil : d.pencilOnly,
+    effectsPreview: (EFFECTS_PREVIEWS as readonly unknown[]).includes(value.effectsPreview) ? (value.effectsPreview as EffectsPreview) : d.effectsPreview,
   };
 }
 
