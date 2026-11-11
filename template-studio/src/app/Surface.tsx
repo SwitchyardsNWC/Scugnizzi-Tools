@@ -121,6 +121,8 @@ export interface SurfaceProps {
   api?: { current: SurfaceApi | null };
   /** The Freeform tool on its own: no email to fly back to, so its own pills replace Email and Done. */
   standalone?: { left: ComponentChildren; right: ComponentChildren };
+  /** Add a picture from the computer: a button in the dock beside the brand library. */
+  onImage?(): void;
 }
 
 export interface SurfaceApi {
@@ -128,7 +130,7 @@ export interface SurfaceApi {
   dropAsset(asset: AssetFile, at: { x: number; y: number } | null): void;
 }
 
-export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone }: SurfaceProps) {
+export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone, rectOf, api, standalone, onImage }: SurfaceProps) {
   /** In the Freeform app a page can be a poster; in an email it is a block, which a column limits. */
   const pageMax = standalone ? FRAME_MAX : EMAIL_MAX;
   const site = siteOf(editor.template, blockId);
@@ -2157,12 +2159,14 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             <span aria-hidden="true">←</span> Email
           </button>
         )}
-        <span class="fig-pill fig-title">
-          <b>Freeform</b>
-          <span>
-            {count} {count === 1 ? 'layer' : 'layers'}
+        {!standalone && (
+          <span class="fig-pill fig-title">
+            <b>Freeform</b>
+            <span>
+              {count} {count === 1 ? 'layer' : 'layers'}
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div class="fig-chrome fig-top fig-top-right">
         <div class="fig-pill fig-zoom">
@@ -2268,6 +2272,15 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             <circle cx="17" cy="17" r="3.5" />
           </svg>
         </button>
+        {onImage && (
+          <button class="fig-tool" aria-label="Add a picture" title={'Picture\nFrom your computer. Dropping files on the page works too.'} onClick={onImage}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+              <circle cx="9" cy="10" r="1.8" />
+              <path d="M20.5 16l-5-5-9 8.5" />
+            </svg>
+          </button>
+        )}
         <span class="fig-sep" aria-hidden="true" />
         <button
           class={`fig-swatch ${paintsOpen ? 'on' : ''} ${swatch ? '' : 'none'}`}

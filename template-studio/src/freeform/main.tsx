@@ -50,6 +50,7 @@ import { forgetTrashed } from '../workspace/trash.ts';
 import type { TrashRecord } from '../model/trash.ts';
 import { siteStore } from '../project/site-store.ts';
 import { useProject, type Project } from '../project/useProject.ts';
+import { ExportMenu } from './ExportMenu.tsx';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
@@ -190,6 +191,18 @@ function FreeformTool() {
   const [layer, setLayer] = useState<string | null>(null);
   const [assets, setAssets] = useState<AssetFile[]>([]);
   const api = useRef<SurfaceApi | null>(null);
+  /** ⇧⌘E: the newest export, read through a ref so the key is bound once. */
+  const exportRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyE') {
+        e.preventDefault();
+        exportRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const picker = useRef<HTMLInputElement | null>(null);
   // Remount the surface whenever a different drawing is on it, so it fits that page.
   const [session, setSession] = useState(0);
@@ -651,14 +664,25 @@ function FreeformTool() {
   const printed = hasEffects(block);
   const fileBase = slug(activeEntry.name);
   const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
-  const exportPng = async () => {
+  const pngCanvas = (scale: number) => freeformCanvas(block, ds, { assets: allAssets, scale, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
+  const exportPng = async (scale: 1 | 2 = 2) => {
     try {
-      const canvas = await freeformCanvas(block, ds, { assets: allAssets, scale: 2, ground: printed ? ground : (colorOf(ds, block.background) ?? 'rgba(0,0,0,0)') });
-      download(`${fileBase}@2x.png`, await canvasBlob(canvas));
+      download(`${fileBase}${scale === 2 ? '@2x' : ''}.png`, await canvasBlob(await pngCanvas(scale)));
     } catch (cause) {
       failed(cause);
     }
   };
+  /** The frame on the clipboard as a picture, for pasting into Slack, a deck or an email draft. */
+  const copyPng = async () => {
+    try {
+      const blob = canvasBlob(await pngCanvas(2));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      notify(`Copied ${activeEntry.name} as a PNG.`);
+    } catch (cause) {
+      failed(cause instanceof Error && cause.name === 'NotAllowedError' ? new Error('The browser would not let the picture onto the clipboard. Export PNG instead.') : cause);
+    }
+  };
+  exportRef.current = () => void exportPng(2);
   const exportSvg = async () => {
     if (!printed) return download(`${fileBase}.svg`, new Blob([freeformSvg(block, ds)], { type: 'image/svg+xml' }));
     // A print is pixels, which SVG cannot describe: the printed picture goes inside it as an image.
@@ -691,6 +715,7 @@ function FreeformTool() {
           onSelectLayer={setLayer}
           onDone={() => setLayer(null)}
           api={api}
+          onImage={() => picker.current?.click()}
           standalone={{
             left: (
               <>
@@ -711,35 +736,19 @@ function FreeformTool() {
                   onRename={renameKey}
                   onRemove={removeKey}
                 />
-                <button
-                  class="fig-pill fig-studio"
-                  title={
-                    studio
-                      ? inEmail
-                        ? `Template Studio has ${activeEntry.name} in ${studio.email}. Go to it.`
-                        : `Template Studio is open with ${studio.email}. Add ${activeEntry.name} to it, above the footer.`
-                      : `Open Template Studio with ${activeEntry.name} in the email, above the footer. It follows the frame from then on.`
-                  }
-                  onClick={toStudio}
-                >
-                  <span class={`fig-studio-dot ${studio ? 'live' : ''}`} aria-hidden="true" />
-                  {studio ? (inEmail ? `In ${studio.email}` : `Send to ${studio.email}`) : 'Use in Template Studio'}
-                  <span aria-hidden="true">↗</span>
-                </button>
               </>
             ),
             right: (
               <>
-                <CanvasMenu pill />
-                <button class="fig-pill" title="Add a picture from your computer. Dropping one on the canvas works too." onClick={() => picker.current?.click()}>
-                  Image
-                </button>
-                <button class="fig-pill" title="Download this frame as SVG" onClick={() => void exportSvg()}>
-                  SVG
-                </button>
-                <button class="fig-pill fig-done" title="Download this frame as a PNG at 2×, printed through its effects" onClick={() => void exportPng()}>
-                  Export PNG
-                </button>
+                <CanvasMenu pill gear />
+                <ExportMenu
+                  name={activeEntry.name}
+                  onPng={(scale) => void exportPng(scale)}
+                  onSvg={() => void exportSvg()}
+                  onCopy={() => void copyPng()}
+                  studio={{ label: studio ? (inEmail ? `In ${studio.email}` : `Send to ${studio.email}`) : 'Use in Template Studio', live: Boolean(studio) }}
+                  onStudio={toStudio}
+                />
               </>
             ),
           }}

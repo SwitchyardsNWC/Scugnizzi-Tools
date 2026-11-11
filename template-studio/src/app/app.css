@@ -2429,3 +2429,4 @@ button.phone-row { cursor: pointer; }
 .fig-menu button.danger:hover { background: var(--fig-danger-soft); color: var(--fig-danger); }
 .fig-menu button[disabled] { color: var(--fig-faint); cursor: default; }
 .fig-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--fig-line); }
+.fig-draft { font-weight: 500; }
