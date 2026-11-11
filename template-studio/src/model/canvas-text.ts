@@ -8,7 +8,7 @@
 // Pure: the compiler draws with `textStyleOf`, the canvas's text field sizes itself with it, and the
 // tests check both against the same numbers.
 
-import { canvasTypeOf, colorOf, fontOf, typeOf, type CanvasEffect, type ColorRef, type DesignSystem } from './design-system.ts';
+import { canvasTypeOf, colorOf, fontOf, typeOf, type ColorRef, type DesignSystem, type PresetHighlight, type PresetShadow, type PresetStroke } from './design-system.ts';
 import { MARKS } from './marks.ts';
 import { STICKY_COLORS } from './freeform.ts';
 import type { FreeformLayer } from './types.ts';
@@ -27,9 +27,11 @@ export interface ResolvedText {
   letterSpacing: number;
   /** The style's own colour, before the layer's. Null is the ink. */
   color: ColorRef;
-  effect: CanvasEffect;
-  effectColor: ColorRef;
-  amount: number;
+  stroke: PresetStroke | null;
+  shadow: PresetShadow | null;
+  highlight: PresetHighlight | null;
+  /** 0 is straight. */
+  curve: number;
 }
 
 /** A text or sticky layer's type, its style first and its tweaks over it. */
@@ -46,9 +48,10 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         uppercase: Boolean(look.uppercase),
         letterSpacing: look.letterSpacing ?? 0,
         color: look.color,
-        effect: look.effect,
-        effectColor: look.effectColor,
-        amount: look.amount,
+        stroke: look.stroke ?? null,
+        shadow: look.shadow ?? null,
+        highlight: look.highlight ?? null,
+        curve: look.curve ?? 0,
       }
     : {
         font: fontOf(ds, layer.role),
@@ -60,9 +63,10 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
         uppercase: layer.kind === 'text' && Boolean(role.uppercase),
         letterSpacing: layer.kind === 'text' ? (role.letterSpacing ?? 0) : 0,
         color: null,
-        effect: 'none',
-        effectColor: null,
-        amount: 0,
+        stroke: null,
+        shadow: null,
+        highlight: null,
+        curve: 0,
       };
   // A face of its own, from the design system's fonts, over whatever the style or role set.
   const face = layer.font ? ds.fonts[layer.font] : undefined;
@@ -73,28 +77,12 @@ export function textStyleOf(layer: TextLayer | StickyLayer, ds: DesignSystem): R
     ...(layer.size !== undefined ? { size: layer.size } : {}),
     ...(layer.letterSpacing !== undefined ? { letterSpacing: layer.letterSpacing } : {}),
     ...(layer.lineHeight !== undefined ? { lineHeight: layer.lineHeight } : {}),
-    ...(layer.amount !== undefined ? { amount: layer.amount } : {}),
   };
 }
 
-/** What the effect's amount does, in words, for the slider that sets it. Null when there is no effect. */
-export function amountLabel(effect: CanvasEffect): string | null {
-  switch (effect) {
-    case 'outline':
-      return 'Outline';
-    case 'shadow':
-      return 'Shadow';
-    case 'highlight':
-      return 'Highlight';
-    case 'sticker':
-      return 'Border';
-    case 'wobble':
-      return 'Wobble';
-    case 'arc':
-      return 'Bend';
-    default:
-      return null;
-  }
+/** What a preset is made of, in words, for search and hints: "stroke, shadow". */
+export function presetParts(style: { stroke?: unknown; shadow?: unknown; highlight?: unknown; curve?: number }): string[] {
+  return [style.stroke ? 'stroke' : '', style.shadow ? 'shadow' : '', style.highlight ? 'highlight' : '', style.curve ? 'curve' : ''].filter(Boolean);
 }
 
 // --- names ------------------------------------------------------------------------------------------
@@ -111,7 +99,7 @@ export function layerName(l: FreeformLayer): string {
 
 // --- slash commands -----------------------------------------------------------------------------------
 
-export type CommandGroup = 'Style' | 'Font' | 'Size' | 'Spacing' | 'Align' | 'Note' | 'Colour';
+export type CommandGroup = 'Preset' | 'Font' | 'Size' | 'Spacing' | 'Align' | 'Note' | 'Colour';
 
 export interface CanvasCommand {
   id: string;
@@ -144,9 +132,9 @@ export function canvasCommands(layer: TextLayer | StickyLayer, ds: DesignSystem)
   const plainSize = textStyleOf({ ...layer, size: undefined } as TextLayer | StickyLayer, ds).size;
 
   if (layer.kind === 'text') {
-    out.push({ id: 'style-plain', label: 'Plain', group: 'Style', keywords: ['heading', 'normal', 'none', 'reset'], hint: 'The heading role from Design › Type.', patch: { look: undefined, amount: undefined }, look: null });
+    out.push({ id: 'style-plain', label: 'Plain', group: 'Preset', keywords: ['heading', 'normal', 'none', 'reset'], hint: 'The heading role from Design › Type, no preset.', patch: { look: undefined, amount: undefined }, look: null });
     for (const [key, style] of Object.entries(canvasTypeOf(ds))) {
-      out.push({ id: `style-${key}`, label: style.label, group: 'Style', keywords: [key, style.effect, 'style', 'look'], hint: `Canvas type: ${style.label}.`, patch: { look: key, amount: undefined }, look: key });
+      out.push({ id: `style-${key}`, label: style.label, group: 'Preset', keywords: [key, ...presetParts(style), 'preset', 'brand', 'style'], hint: `Brand preset: ${style.label}.`, patch: { look: key, amount: undefined }, look: key });
     }
   }
   for (const [id, label, factor, keywords] of SIZES) {

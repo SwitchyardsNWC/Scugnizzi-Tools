@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { THEME_PICKS, useTheme } from './theme.ts';
 import { CANVAS_RANGES, DEFAULT_CANVAS_SETTINGS, resetCanvasSettings, useCanvasSettings, writeCanvasSettings, type CanvasSettings, type GroundKind } from './canvas-settings.ts';
 
 export function CanvasMenu({ pill = false }: { pill?: boolean }) {
@@ -56,8 +57,22 @@ export function CanvasSettingsPanel() {
   const changed = JSON.stringify(s) !== JSON.stringify(DEFAULT_CANVAS_SETTINGS);
   /** The ground that is drawn, whose opacity the dial shows; plain paper shows the lines' dial, greyed. */
   const drawn = s.ground === 'none' ? null : s.ground;
+  const [theme, setTheme] = useTheme();
   return (
     <div class="cv-pop" role="dialog" aria-label="Canvas settings" onPointerDown={(e) => e.stopPropagation()}>
+      <div class="cv-section">
+        <div class="cv-head">Look</div>
+        <div class="cv-row" title="Light, dark, or follow the system. For Template Studio and Freeform alike; the drawing itself is never themed.">
+          <span class="cv-label">Theme</span>
+          <div class="cv-seg" role="radiogroup" aria-label="Theme">
+            {THEME_PICKS.map((value) => (
+              <button key={value} role="radio" aria-checked={theme === value} class={theme === value ? 'on' : ''} onClick={() => setTheme(value)}>
+                {value === 'system' ? 'System' : value === 'light' ? 'Light' : 'Dark'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <div class="cv-section">
         <div class="cv-head">Moving</div>
         <Toggle label="Momentum" help="Let go mid-drag and the canvas keeps sliding, then eases to a stop." value={s.momentum} onChange={(v) => set({ momentum: v })} />
@@ -99,6 +114,7 @@ export function CanvasSettingsPanel() {
       </div>
       <div class="cv-section">
         <div class="cv-head">Drawing</div>
+        <Toggle label="Smart guides" help="On the Freeform canvas, a layer being moved or resized snaps to the page's edges and centre and to other layers, and shows the line it found. Hold ⌘ or Ctrl while dragging to place it freely." value={s.smartGuides} onChange={(v) => set({ smartGuides: v })} />
         <Toggle label="Quick shapes" help="Hold the pen still at the end of a stroke and it snaps to a line, box, circle or triangle." value={s.quickShapes} onChange={(v) => set({ quickShapes: v })} />
         <Slider label="Hold" help="How long to hold still before the stroke snaps." value={s.holdMs} range={CANVAS_RANGES.holdMs} format={fmt.holdMs} disabled={!s.quickShapes} onChange={(v) => set({ holdMs: v })} />
         <div class="cv-row" title="On a tablet, whether a finger draws. Auto: it draws until a pencil is seen, then it pans while the pencil draws.">

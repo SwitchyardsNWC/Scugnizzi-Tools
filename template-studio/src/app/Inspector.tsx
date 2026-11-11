@@ -18,6 +18,7 @@ import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import { InheritDial } from './InheritDial.tsx';
+import { hasEffects, stackSummary } from '../model/effects.ts';
 
 // The inspector, generated from the catalog.
 //
@@ -658,7 +659,6 @@ const LAYER_KINDS: Array<{ kind: LayerKind; label: string; help: string }> = [
   { kind: 'rect', label: 'Rectangle', help: 'A box: fill, outline, corner radius.' },
   { kind: 'ellipse', label: 'Ellipse', help: 'A circle when its width and height match.' },
   { kind: 'line', label: 'Line', help: 'From one point to another.' },
-  { kind: 'sticky', label: 'Note', help: 'A sticky note with words on it.' },
   { kind: 'mark', label: 'Stamp', help: 'A brand mark, in any colour.' },
 ];
 
@@ -717,7 +717,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
         )}
         <span class="canvas-facts">
           {n} {n === 1 ? 'layer' : 'layers'} · {block.width} × {block.height}
-          {block.effects?.length ? ' · Riso print' : ''}
+          {hasEffects(block) ? ` · ${stackSummary(block.effects) || 'layer effects'}` : ''}
         </span>
 
         {app && (
@@ -925,7 +925,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
           {picked.kind === 'text' && (
             <>
               <div class="layer-grid">
-                <label class="layer-num wide" title="A playful style from Design › Canvas type, or a role from Design › Type.">
+                <label class="layer-num wide" title="A brand preset from Design › Brand presets, or a role from Design › Type.">
                   <span>Style</span>
                   <select
                     value={picked.look ? `look:${picked.look}` : picked.role}
@@ -934,7 +934,7 @@ function LayersField({ editor, freeform }: { editor: Editor; freeform?: Freeform
                       patch(v.startsWith('look:') ? { look: v.slice(5) } : { role: v, look: undefined });
                     }}
                   >
-                    <optgroup label="Canvas type">
+                    <optgroup label="Brand presets">
                       {Object.entries(looks).map(([k, style]) => (
                         <option key={k} value={`look:${k}`}>
                           {style.label}

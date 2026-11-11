@@ -243,3 +243,156 @@ the selected layers as one picture and keeps them editable underneath.
    default with the alt editable, and says so in the block's In HubSpot panel.
 3. **Retina and size.** 2× is right for photos and text; a 560px surface becomes a 1120px PNG,
    about 150–400KB. Worth a check finding above a size, since a heavy picture is a heavy email.
+
+## Layout tool, not whiteboard *(2026-11-10)*
+
+Jared: the freeform tool is "too cute"; it should feel like Figma or Canva, and the built-in filters
+need reworking. Decided the same day:
+
+- **Sticky notes go.** The tool is off the strip and out of the Add list. Notes already in a frame
+  still draw and edit, so nothing saved breaks.
+- **Stamps become brand library assets.** *Not built yet.*
+- **The pen stays**, for marking up and drawing in a frame.
+- **Text looks go; brand presets take their place**, which can be tweaked, edited, deleted and
+  added to. They live in the design system. Built; see below.
+- **Effects work on a layer as well as the whole frame.** *Not built yet.*
+- **Light and dark.** Built.
+
+**What changed in the chrome.** Every colour on the canvas is a `--fig-*` token in `app.css`, with
+light and dark values. The canvas follows the app's theme now, where before it stayed light. A
+Theme row (System, Light, Dark) at the top of the Canvas menu sets `data-theme` on the root for
+Template Studio and Freeform together (`app/theme.ts`, key `scuggnizzi.theme`). The springy
+overshoot, tool wiggle, hover tilts, pop-in and poof are gone: there is one 120ms ease-out, and
+fades. The rounded system font and fully rounded pills are gone too: corners are 4–8px. Layer icons
+are one colour. Selection is one blue (`#0b6fd8`, medium blue; `#4b9eff`, light blue, on dark) and
+always comes with a shape cue as well: handles, a filled tool, a ring on the picked swatch.
+
+**Brand presets** *(2026-11-10)*. Jared: "Put brand presets in the design system." They are
+`ds.canvasType`, the same field the old canvas type styles used, so every template and frame on a
+design system shares them. A preset is type settings (font, weight, size, line height, tracking,
+case, colour) plus four parts, each on or off: **stroke** (width, colour, on or outside the
+letters), **shadow** (x, y, blur, colour), **highlight** (colour, how much of the line it covers)
+and **curve** (bend). Wobble is gone: it was a novelty. A preset saved with the old single
+`effect` reads as the parts that drew it (`normalizePreset`), and wobble's words set straight.
+
+The shipped six keep their old keys, so text that picked one keeps it, but they are rebuilt and
+named for use. *(Redrawn 2026-11-11.)* Jared: "Update the saved text presets to be less cheesy.
+Dig through mymind for typographic styles I like." His saves kept returning to quiet tracked caps,
+typewriter menus, painted shop fascias, script beside clean caps, a high-contrast display serif
+and gilded window lettering, and never to outlines, drop shadows or highlighters. So the six are
+type alone: **Letterhead** (tracked caps; the PY letterhead, El Bar's section heads), **Display
+serif** (Georgia set tight; New Hideaki, the Butte des Morts sign), **Shop sign** (bold caps in the
+palette's red; Trust Butchery, 24 HRS), **Supper club** (italic serif for script; El Bar, La
+Panetteria), **Typed menu** (Courier caps, open leading; the stamped tasting-menu strips, Index
+Monospace) and **Window gilding** (gold `#c9a13b`, antique gold, tracked bold caps on a gentle
+arch; Victory Brands). Only the last uses a part, a curve. The fonts are the ones the design system
+already has; a true script or a monospace with more character waits on fonts the picture can embed.
+
+- **Design › Brand presets** lists them as samples drawn by the canvas renderer. New preset,
+  Duplicate, Delete, a Name field, the type settings, and one row per part. Deleting a preset that
+  text uses says how many layers will set back to plain type first. Deleting every preset leaves
+  none, not the shipped ones.
+- **On the canvas**, the text bar's chip picks a preset. Tune holds size, letter spacing and line
+  height. Once the text is tweaked, *Update preset* writes the tweaks into its preset, and every
+  text in it follows. *New preset* saves them under a new name and moves the layer onto it. Plain
+  words can become a preset too. Either way the tweaks fold in and clear, so the picture does not
+  change; one undo step. The code is `model/brand-presets.ts`.
+- **Not yet:** in the Freeform app on its own, the design system is the frame's copy, so a preset
+  saved there stays with that frame until the frame is in an email. Presets belong to Template
+  Studio's design system first.
+- A layer's old effect-strength tweak (`amount`) is no longer read.
+
+**Properties and snapping** *(2026-11-11)*. Jared: "build the properties panel and snapping next."
+
+- **Properties.** With a layer picked, the panel under Layers shows its numbers in place of the
+  page's: X, Y, W, H, R (degrees) and Op (opacity), and a row of six buttons that align it to the
+  page's left, centre, right, top, middle or bottom. A field commits on Enter, on leaving it, or
+  on the arrow keys, and follows a drag on the canvas while it is not being typed into. A drawing
+  (a group of strokes) shows the box around them and scales them together, and does not turn.
+  Text shows its height but does not take one, since it is as tall as its words. Nothing picked
+  shows the page, as before (`model/properties.ts`).
+- **Opacity on every layer.** `opacity` is now on every kind, not only images, and draws as the
+  layer's own `opacity`. At 100% the field is removed, so a recipe nobody fades is unchanged.
+- **Snapping.** A layer or drawing being moved snaps its edges and centre to the page's edges and
+  centre, and to every other layer's. A layer being resized snaps only the edges its handle moves.
+  The pull is six screen pixels at any zoom. The lines it found draw while the drag lasts, in
+  red-orange (`#f24822`) so they read apart from selection blue. A turned layer counts by the box
+  its turned corners cover; a turned layer's own resize does not snap, and nor does a
+  proportional (Shift, or stamp corner) one. Hold ⌘ or Ctrl to place freely, as in Figma. Canvas
+  › Drawing › Smart guides turns it off (`model/snap.ts`).
+- Arrow keys already nudged 1px, or 10px with Shift.
+
+**The effects stack** *(2026-11-11)*. Jared: "Rework the effects system." Agreed the day before:
+"Love the idea of layer effects versus whole image effects."
+
+- **A stack, not one effect.** A page, or any one layer, carries `effects: EffectStep[]`, run top
+  first. Each step can be switched off without being removed, has a strength from 0 to 100% (the
+  result mixed back with what came in), moves up or down, and is removed on its own. The panel
+  shows the stack of whatever is picked: one layer's, or the page's when nothing or a drawing is
+  picked. Each row has an eye toggle; an off row is struck through and dimmed, so the state reads
+  without colour.
+- **The steps.** Adjust (brightness, contrast, saturation), Duotone, Halftone, Posterize, Grain,
+  Texture, Blur, Vignette, and Riso. All but Riso and Adjust are the Image Effects tool's filters,
+  moved into `effects/image.js` at the repo root beside `effects/riso.js` and typed by
+  `src/effects/image.ts`. Two changes on the way: grain was `Math.random` and is now seeded, and
+  halftone was drawn with canvas paths and is now computed per pixel. Both changes make the same
+  recipe give the same bytes everywhere. Spatial settings are in page pixels at any render scale.
+- **Per layer.** A layer with effects is drawn alone on a clear sheet, run through its stack, and
+  laid over the layers below it. Every step but Blur keeps the layer's own transparency, so an
+  effect stays inside its shape; Blur softens the edges too. The page's stack runs last, on
+  everything (`app/picture.ts`). A layer's effects are part of its recipe, so a change makes the
+  picture stale like any other edit. Everywhere that asked whether a page had effects now asks
+  `hasEffects`, which counts layers and ignores steps that are off or at 0%.
+- **Looks** replace a stack in one click: Film noir, Newsprint, Dirty 35mm, Screen print (the
+  Image Effects tool's presets, as it tuned them), and the three Riso presets.
+- **Riso** is one step among the rest. Its row opens to the controls it had: inks, screen,
+  misprint, soak, grain, paper, saved looks, and Open in Riso on the page. Riso is now handed the
+  picture as it stands just before its step, and its settings come back into that step, keeping
+  where it sits, its strength, and every other step.
+- **Not yet:** Looks have no thumbnails. Effects on a drawing (a group) go on the page, not on the
+  group.
+
+**One engine, version 2** *(2026-11-11)*. Jared: "Move it into the shared file. Update the effects
+engine to get pro level results."
+
+- **One code path.** The Image Effects tool loads `effects/image.js` and runs its settings through
+  it as a stack, in the order it always ran them. Its own copy of the filters is gone. A look tuned
+  there is the same picture in Freeform.
+- **A float pipeline.** A stack is decoded once into 32-bit linear light, every step runs there,
+  and it is encoded once with a fraction of a level of fixed dither. Steps no longer round to 8
+  bits for each other, so gradients do not band. Freeform runs each group of steps between Riso
+  steps as one pass. A step that changes nothing returns the picture byte for byte.
+- **Light where light adds.** Blur is an exact gaussian (three boxes past a σ of 12 image pixels)
+  in linear light, premultiplied, so a red/green seam does not go muddy and soft layer edges keep
+  their colour. Exposure, white balance, the vignette and the halftone's sampling are in linear
+  light. Contrast, posterize, grain response and blends are in perceptual sRGB.
+- **Halftone.** Dot area comes from the spot function's measured quantiles, and the target is the
+  light the original reflected, between this paper and this ink. So a screened flat tone averages
+  back to itself: within 3 levels for every dot shape from tone 40 up, and for round, diamond and
+  elliptical dots right down to black. Round dots are Euclidean: round in the highlights, a
+  checkerboard at 50%, round holes in the shadows, as on a press. Each cell's tone is averaged
+  over the cell. Edges are anti-aliased from the spot function's slope inside a cell, and sampled
+  in or out at cell borders, where neighbouring dots meet. New: **CMYK** (four screens at 15°, 75°,
+  0° and 45°, inks multiplying over the paper) and **dot gain**. About 0.3 s mono and 0.6 s CMYK
+  for a 560 × 280 page at 2×.
+- **Grain** is gaussian, has a **size**, and responds like film, strongest in the midtones.
+- **Duotone** blends through Oklab, so the steps between the two colours are even, with a
+  **balance**.
+- **Posterize** can dither, **ordered** (Bayer) or **diffusion** (Floyd–Steinberg, serpentine), in
+  page pixels.
+- **Adjust** adds **exposure** (stops), **vibrance**, **warmth** and **tint**. White balance holds
+  overall brightness. Contrast is an S-curve that holds black and white.
+- **Vignette** darkens in stops, up to 2½, with **feather** and **roundness**. `spread` 100 reaches
+  the corners.
+- **Texture** comes from seeded value noise that never repeats, gets a **reshuffle**, and adds
+  hard light.
+- **Sharpen** is new: an unsharp mask on lightness, with a threshold so flat areas and grain stay
+  calm.
+- **Compatibility.** Settings new in version 2 are optional, so a step saved before them reads.
+  The same settings look different from version 1, by design: tones are now right. The Image
+  Effects tool's presets were tuned on version 1; Newsprint and Screen print print darker,
+  because a dark sky now gets the ink it should.
+- A new Freeform look, **Four-colour print**, shows the CMYK screens.
+
+**Next.** The brand library replacing Stamp. Then per-layer effects, with the Image Effects tool's
+effects moved into `effects/` beside Riso.

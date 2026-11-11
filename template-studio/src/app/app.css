@@ -37,10 +37,35 @@
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light dark;
+
+  /* The freeform canvas (Surface, FigPanel, the Freeform app). Neutral and flat, like a layout tool:
+     one blue for selection, and colour never the only signal. */
+  --fig-bg: #f2f2f2;
+  --fig-dots: rgb(0 0 0 / 0.13);
+  --fig-surface: #ffffff;
+  --fig-paper: #fafafa;
+  --fig-ink: #1e1e1e;
+  --fig-ink-2: #383838;
+  --fig-muted: #666666;
+  --fig-faint: #8f8f8f;
+  --fig-hover: #f0f0f0;
+  --fig-line: #e5e5e5;
+  --fig-accent: #0b6fd8;
+  --fig-accent-soft: #e3effc;
+  --fig-on-accent: #ffffff;
+  --fig-danger: #c4321c;
+  --fig-danger-soft: #fcebe8;
+  --fig-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 6px 16px -6px rgb(0 0 0 / 0.16);
+  --fig-shadow-sm: 0 0 0 1px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.12);
+  --fig-ease: cubic-bezier(0.2, 0, 0, 1);
+  --fig-guide: #f24822;
+  --fig-swatch-edge: rgb(0 0 0 / 0.16);
+  --fig-check: #e2e2e2;
+  --fig-blend: multiply;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #0d1017;
     --panel: #161a24;
     --sunk: #1b1f2b;
@@ -63,8 +88,75 @@
     --mail-compose: #2d2f31;
     --mail-read: #262729;
     --mail-link: #0a84ff;
+    --fig-bg: #1b1b1b;
+    --fig-dots: rgb(255 255 255 / 0.09);
+    --fig-surface: #2b2b2b;
+    --fig-paper: #f4f4f4;
+    --fig-ink: #f0f0f0;
+    --fig-ink-2: #d4d4d4;
+    --fig-muted: #a8a8a8;
+    --fig-faint: #7d7d7d;
+    --fig-hover: #383838;
+    --fig-line: #3d3d3d;
+    --fig-accent: #4b9eff;
+    --fig-accent-soft: #1f3550;
+    --fig-on-accent: #0d1117;
+    --fig-danger: #ff8a75;
+    --fig-danger-soft: #4a2520;
+    --fig-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 20px -6px rgb(0 0 0 / 0.6);
+    --fig-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.5);
+    --fig-swatch-edge: rgb(255 255 255 / 0.3);
+    --fig-check: #4a4a4a;
+    --fig-blend: normal;
   }
 }
+/* Picked by hand (app/theme.ts): the same values, whatever the system says. */
+:root[data-theme="dark"] {
+  --paper: #0d1017;
+  --panel: #161a24;
+  --sunk: #1b1f2b;
+  --ink: #e7eaf2;
+  --muted: #99a0b2;
+  --faint: #737a8c;
+  --line: #272d3a;
+  --line-soft: #1f2430;
+  --accent: #7b8dff;
+  --good: #3fc894;
+  --warn: #e0a63c;
+  --bad: #ff7a7a;
+  --mail: #1f1f1f;
+  --mail-line: #303134;
+  --mail-ink: #e8eaed;
+  --mail-muted: #9aa0a6;
+  --mail-chip: #29392f;
+  --mail-chip-ink: #a8dab5;
+  --mail-sel: #0b57d0;
+  --mail-compose: #2d2f31;
+  --mail-read: #262729;
+  --mail-link: #0a84ff;
+  --fig-bg: #1b1b1b;
+  --fig-dots: rgb(255 255 255 / 0.09);
+  --fig-surface: #2b2b2b;
+  --fig-paper: #f4f4f4;
+  --fig-ink: #f0f0f0;
+  --fig-ink-2: #d4d4d4;
+  --fig-muted: #a8a8a8;
+  --fig-faint: #7d7d7d;
+  --fig-hover: #383838;
+  --fig-line: #3d3d3d;
+  --fig-accent: #4b9eff;
+  --fig-accent-soft: #1f3550;
+  --fig-on-accent: #0d1117;
+  --fig-danger: #ff8a75;
+  --fig-danger-soft: #4a2520;
+  --fig-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 20px -6px rgb(0 0 0 / 0.6);
+  --fig-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.5);
+  --fig-swatch-edge: rgb(255 255 255 / 0.3);
+  --fig-check: #4a4a4a;
+  --fig-blend: normal;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; }
@@ -811,16 +903,16 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .btn.attention { border-color: var(--warn); }
 
 /* --- the canvas (a freeform block, opened) ----------------------------------------------------
- * FigJam's shape, on purpose: floating chrome on a warm dotted field, a dock of chunky tools at the
- * bottom, pills at the top. It is an overlay above the email, so the zoom can start and end on the
- * block itself (learnings 3.68). Light whatever the app's theme, like FigJam: it is a table you work
- * on, not a panel of the tool. */
+ * A layout tool's shape: flat panels, small corners, one blue for selection, and motion that only
+ * says where something went. Floating chrome over a dotted field, as Figma's own canvas has. It is
+ * an overlay above the email, so the zoom can start and end on the block itself (learnings 3.68).
+ * It follows the app's theme, light or dark; the drawing itself is never themed. */
 .surface.fig {
   position: absolute; inset: 0; z-index: 60; overflow: hidden;
-  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, sans-serif;
+  font-family: var(--sans);
 }
 .surface-work { position: absolute; inset: 0; overflow: hidden; outline: none; }
-.surface-backdrop { position: absolute; inset: 0; background: #f5f3ee; transition: opacity 420ms ease; }
+.surface-backdrop { position: absolute; inset: 0; background: var(--fig-bg); transition: opacity 240ms ease; }
 .surface-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: default; }
 .surface-dots, .surface-page-shadow { transition: opacity 420ms ease; }
 .surface.phase-start .surface-backdrop, .surface.phase-start .surface-dots, .surface.phase-start .surface-page-shadow,
@@ -833,113 +925,114 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .surface.tool-line .surface-svg, .surface.tool-sticky .surface-svg, .surface.tool-stamp .surface-svg { cursor: crosshair; }
 .surface.tool-text .surface-svg { cursor: text; }
 .surface.tool-select .surface-svg [data-sy-layer] { cursor: move; }
-.surface-handle { fill: #fff; stroke: #7b61ff; stroke-width: 2px; vector-effect: non-scaling-stroke; }
-.surface-handle.rot { fill: #7b61ff; cursor: grab; }
+.surface-handle { fill: #fff; stroke: var(--fig-accent); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.surface-handle.rot { fill: var(--fig-accent); cursor: grab; }
 .surface-page-grip { fill: #fff; stroke: rgb(40 30 10 / 0.22); stroke-width: 1px; vector-effect: non-scaling-stroke; transition: fill 120ms; }
-.surface-page-grip:hover { fill: #7b61ff; stroke: #7b61ff; }
+.surface-page-grip:hover { fill: var(--fig-accent); stroke: var(--fig-accent); }
 .surface-selection { pointer-events: none; }
+/* Smart guides (model/snap.ts): the line a dragged layer snapped to. Red-orange, apart from selection blue; drawn only while dragging. */
+.surface-guide { stroke: var(--fig-guide); pointer-events: none; }
 .surface-selection [data-handle] { pointer-events: auto; }
 .surface-text {
   position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; border-radius: 2px; resize: none; overflow: hidden;
-  background: transparent; outline: 2px solid #7b61ff; outline-offset: 4px; transform-origin: 50% 50%;
+  background: transparent; outline: 2px solid var(--fig-accent); outline-offset: 4px; transform-origin: 50% 50%;
 }
 .surface-text.on-sticky { outline-offset: 12px; }
 .surface-text::placeholder { color: rgb(0 0 0 / 0.35); }
 
-.fig-chrome { position: absolute; z-index: 3; transition: opacity 260ms ease, transform 460ms cubic-bezier(.34, 1.56, .64, 1); }
+.fig-chrome { position: absolute; z-index: 3; transition: opacity 160ms ease, transform 200ms var(--fig-ease); }
 .surface.phase-start .fig-chrome, .surface.phase-exit .fig-chrome { opacity: 0; pointer-events: none; }
-.surface.phase-enter .fig-chrome { transition-delay: 180ms; }
+.surface.phase-enter .fig-chrome { transition-delay: 80ms; }
 .fig-top { top: 14px; display: flex; gap: 8px; }
 .fig-top-left { left: 14px; }
 .fig-top-right { right: 14px; }
-.surface.phase-start .fig-top, .surface.phase-exit .fig-top { transform: translateY(-18px); }
+.surface.phase-start .fig-top, .surface.phase-exit .fig-top { transform: translateY(-6px); }
 
 .fig-pill {
-  display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px; border: 0; border-radius: 999px;
-  background: #fff; color: #1e1c19; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
-  box-shadow: 0 1px 2px rgb(40 30 10 / 0.08), 0 8px 22px -8px rgb(40 30 10 / 0.26);
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: var(--fig-surface); color: var(--fig-ink); font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: var(--fig-shadow);
 }
-button.fig-pill { cursor: pointer; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms; }
-button.fig-pill:hover { transform: translateY(-1px) scale(1.04); }
-button.fig-pill:active { transform: scale(0.96); }
-.fig-title span { color: #8d877c; font-weight: 500; }
+button.fig-pill { cursor: pointer; transition: transform 120ms var(--fig-ease), background 120ms; }
+button.fig-pill:hover { }
+button.fig-pill:active { }
+.fig-title span { color: var(--fig-faint); font-weight: 500; }
 .fig-zoom { padding: 0 4px; gap: 0; }
 .fig-zoom button {
-  height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 999px; background: none;
-  color: #1e1c19; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 6px; background: none;
+  color: var(--fig-ink); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
 }
-.fig-zoom button:hover { background: #f2efe8; }
+.fig-zoom button:hover { background: var(--fig-hover); }
 .fig-zoom .pct { min-width: 54px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.fig-done { background: #7b61ff; color: #fff; }
-.fig-done:hover { background: #6b4ff6; }
+.fig-done { background: var(--fig-accent); color: var(--fig-on-accent); }
+.fig-done:hover { background: var(--fig-accent); }
 
 .fig-dock {
   left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
-  padding: 7px 10px; background: #fff; border-radius: 20px; max-width: calc(100% - 24px); overflow-x: auto;
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 16px 40px -14px rgb(40 30 10 / 0.34);
+  padding: 7px 10px; background: var(--fig-surface); border-radius: 8px; max-width: calc(100% - 24px); overflow-x: auto;
+  box-shadow: var(--fig-shadow);
 }
-.surface.phase-start .fig-dock, .surface.phase-exit .fig-dock { transform: translate(-50%, 28px) scale(0.94); }
+.surface.phase-start .fig-dock, .surface.phase-exit .fig-dock { transform: translate(-50%, 8px); }
 .fig-tools { display: flex; gap: 2px; }
 .fig-tool {
-  flex: none; width: 42px; height: 42px; display: grid; place-items: center; border: 0; border-radius: 13px;
-  background: none; color: #3d3931; cursor: pointer;
-  transition: transform 260ms cubic-bezier(.34, 1.56, .64, 1), background 120ms, color 120ms;
+  flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 6px;
+  background: none; color: var(--fig-ink-2); cursor: pointer;
+  transition: transform 120ms var(--fig-ease), background 120ms, color 120ms;
 }
-.fig-tool:hover { background: #f3f0e9; transform: translateY(-2px); }
-.fig-tool.on { background: #eee9ff; color: #6b4ff6; transform: translateY(-5px) scale(1.07); }
-.fig-tool.on svg { animation: fig-wiggle 460ms ease; }
-@keyframes fig-wiggle { 0% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 55% { transform: rotate(9deg); } 80% { transform: rotate(-3deg); } 100% { transform: rotate(0); } }
-.fig-sep { flex: none; width: 1px; align-self: stretch; margin: 6px 3px; background: #ece8df; }
+.fig-tool:hover { background: var(--fig-hover); }
+.fig-tool.on { background: var(--fig-accent); color: var(--fig-on-accent); }
+.fig-sep { flex: none; width: 1px; align-self: stretch; margin: 6px 3px; background: var(--fig-line); }
 .fig-swatch {
-  flex: none; width: 30px; height: 30px; margin: 0 4px; padding: 0; border-radius: 999px; border: 3px solid #fff; cursor: pointer;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.16); transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1);
+  flex: none; width: 30px; height: 30px; margin: 0 4px; padding: 0; border-radius: 999px; border: 3px solid var(--fig-surface); cursor: pointer;
+  box-shadow: 0 0 0 1px var(--fig-swatch-edge); transition: transform 120ms var(--fig-ease);
 }
-.fig-swatch.none, .fig-dot.none { background: conic-gradient(#ff8f8f, #ffd36e, #97e28f, #86c8ff, #c7a9ff, #ff8f8f); }
-.fig-swatch:hover, .fig-swatch.on { transform: scale(1.14) rotate(20deg); }
+/* None: a slash, as every layout tool marks it. */
+.fig-swatch.none, .fig-dot.none { background: linear-gradient(135deg, var(--fig-surface) 44%, var(--fig-danger) 44% 56%, var(--fig-surface) 56%); }
+.fig-swatch:hover, .fig-swatch.on { }
 
 .fig-trays { left: 50%; bottom: 84px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100% - 24px); }
-.surface.phase-start .fig-trays, .surface.phase-exit .fig-trays { transform: translate(-50%, 20px); }
+.surface.phase-start .fig-trays, .surface.phase-exit .fig-trays { transform: translate(-50%, 6px); }
 .fig-tray {
-  display: flex; align-items: center; gap: 6px; padding: 8px; max-width: 100%; overflow-x: auto; background: #fff; border-radius: 16px;
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 12px 30px -12px rgb(40 30 10 / 0.3);
-  animation: fig-pop 320ms cubic-bezier(.34, 1.56, .64, 1);
+  display: flex; align-items: center; gap: 6px; padding: 8px; max-width: 100%; overflow-x: auto; background: var(--fig-surface); border-radius: 8px;
+  box-shadow: var(--fig-shadow);
+  animation: fig-pop 120ms var(--fig-ease);
 }
-@keyframes fig-pop { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes fig-pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .fig-dot {
-  flex: none; width: 22px; height: 22px; padding: 0; border-radius: 999px; border: 2px solid #fff; cursor: pointer;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15); transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1);
+  flex: none; width: 22px; height: 22px; padding: 0; border-radius: 999px; border: 2px solid var(--fig-surface); cursor: pointer;
+  box-shadow: 0 0 0 1px var(--fig-swatch-edge); transition: transform 120ms var(--fig-ease);
 }
-.fig-dot:hover { transform: scale(1.2); }
-.fig-dot.on { box-shadow: 0 0 0 2.5px #7b61ff; transform: scale(1.12); }
+.fig-dot:hover { }
+.fig-dot.on { box-shadow: 0 0 0 2px var(--fig-surface), 0 0 0 4px var(--fig-ink); }
 .fig-tray .fig-sep { margin: 2px 3px; }
 .fig-stamp, .fig-look {
-  flex: none; border: 0; border-radius: 12px; background: #f6f4ef; display: grid; place-items: center; cursor: pointer;
-  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+  flex: none; border: 0; border-radius: 6px; background: var(--fig-hover); display: grid; place-items: center; cursor: pointer;
+  transition: transform 120ms var(--fig-ease), background 120ms;
 }
 .fig-stamp { width: 52px; height: 52px; }
 .fig-stamp svg { width: 34px; height: 34px; }
-.fig-stamp:hover { transform: rotate(-8deg) scale(1.1); }
+.fig-stamp:hover { }
 .fig-look { width: 88px; height: 46px; padding: 0 4px; overflow: hidden; }
 .fig-look span, .fig-look svg { display: block; width: 100%; height: 100%; }
-.fig-look:hover { transform: translateY(-2px) rotate(-2deg); }
-.fig-stamp.on, .fig-look.on { background: #eee9ff; box-shadow: inset 0 0 0 2px #7b61ff; }
+.fig-look:hover { }
+.fig-stamp.on, .fig-look.on { background: var(--fig-accent-soft); box-shadow: inset 0 0 0 2px var(--fig-accent); }
 
 .fig-size {
-  position: absolute; z-index: 2; transform: translateX(-100%); padding: 3px 9px; border-radius: 999px; pointer-events: none; white-space: nowrap;
-  background: rgb(30 28 25 / 0.07); color: #6f6a60; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  position: absolute; z-index: 2; transform: translateX(-100%); padding: 3px 9px; border-radius: 6px; pointer-events: none; white-space: nowrap;
+  background: rgb(30 28 25 / 0.07); color: var(--fig-muted); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
   transition: background 120ms, color 120ms;
 }
-.fig-size.on { background: #7b61ff; color: #fff; }
+.fig-size.on { background: var(--fig-accent); color: var(--fig-on-accent); }
 .fig-hint {
-  left: 50%; top: 64px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap;
-  background: #1e1c19; color: #fff; font-size: 12px; animation: fig-hint 4.6s ease forwards;
+  left: 50%; top: 64px; transform: translateX(-50%); padding: 8px 14px; border-radius: 6px; pointer-events: none; white-space: nowrap;
+  background: var(--fig-ink); color: var(--fig-surface); font-size: 12px; animation: fig-hint 4s ease forwards;
 }
-@keyframes fig-hint { 0% { opacity: 0; translate: 0 -8px; } 8% { opacity: 1; translate: 0 0; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fig-hint { 0% { opacity: 0; } 5% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 
 /* The freeform block in the side panel: a way in on the email, the stack inside the canvas. */
 .canvas-entry { display: grid; gap: 6px; }
-.btn.canvas-open { background: #7b61ff; border-color: #7b61ff; color: #fff; font-weight: 600; }
-.btn.canvas-open:hover { background: #6b4ff6; border-color: #6b4ff6; }
+.btn.canvas-open { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.canvas-open:hover { filter: brightness(1.08); }
 .canvas-facts { font-size: 11.5px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 .layer-list li.layer-group { display: block; }
 .layer-group-head { display: flex; align-items: center; gap: 2px; border-radius: 5px; }
@@ -951,13 +1044,22 @@ button.fig-pill:active { transform: scale(0.96); }
 /* Canvas type in the Design panel: chips drawn by the canvas renderer, on paper so the samples read. */
 .canvas-type-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .canvas-type-chip {
-  display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: #fbfaf6; cursor: pointer; text-align: left;
-  transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), border-color 120ms;
+  display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--fig-paper); cursor: pointer; text-align: left;
+  transition: transform 120ms var(--fig-ease), border-color 120ms;
 }
-.canvas-type-chip:hover { transform: translateY(-2px) rotate(-1deg); }
-.canvas-type-chip.on { border-color: #7b61ff; box-shadow: 0 0 0 1px #7b61ff; }
+.canvas-type-chip:hover { }
+.canvas-type-chip.on { border-color: var(--fig-accent); box-shadow: 0 0 0 1px var(--fig-accent); }
 .canvas-type-sample svg { display: block; width: 100%; height: auto; }
-.canvas-type-name { font-size: 11px; color: #5f5a50; font-weight: 600; }
+.canvas-type-name { font-size: 11px; color: #555555; font-weight: 600; }
+
+/* Brand presets (DesignPanel › BrandPresetsPanel): the list's actions, and one row per part. */
+.preset-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.preset-part { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius); }
+.preset-part-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.preset-part-state { margin-left: auto; font-family: var(--mono); font-size: 10.5px; font-weight: 400; color: var(--faint); }
+.preset-part.on .preset-part-state { color: var(--ink); }
+.preset-part-body { display: grid; gap: 8px; padding: 4px 8px 10px; border-top: 1px solid var(--line-soft); }
+.preset-part-body .dials { margin: 0; }
 
 /* Preview: the email and nothing else. The header stays — Export and the checks live there, and so
    does the way back — and the tools row keeps the device switches, which are part of looking. */
@@ -1736,35 +1838,35 @@ button.phone-row { cursor: pointer; }
 
 .fig-panel {
   top: 64px; right: 14px; bottom: 14px; width: 272px; display: flex; flex-direction: column; overflow: hidden;
-  background: #fff; border-radius: 20px; color: #1e1c19; font-size: 13px;
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 16px 40px -14px rgb(40 30 10 / 0.34);
+  background: var(--fig-surface); border-radius: 8px; color: var(--fig-ink); font-size: 13px;
+  box-shadow: var(--fig-shadow);
 }
-.surface.phase-start .fig-panel, .surface.phase-exit .fig-panel { transform: translateX(34px); }
+.surface.phase-start .fig-panel, .surface.phase-exit .fig-panel { transform: translateX(8px); }
 .fig-panel-open { top: 64px; right: 14px; }
 .fig-panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 16px; }
 .fig-panel-head b { font-size: 14px; }
 .fig-panel .grow { flex: 1; }
 .fig-count, .fig-badge {
-  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
-  background: #f3f0e9; color: #8d877c; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px;
+  background: var(--fig-hover); color: var(--fig-faint); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .fig-icon-btn {
-  flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 10px;
-  background: none; color: #3d3931; cursor: pointer; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms, color 120ms;
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px;
+  background: none; color: var(--fig-ink-2); cursor: pointer; transition: transform 120ms var(--fig-ease), background 120ms, color 120ms;
 }
-.fig-icon-btn:hover { background: #f3f0e9; transform: translateY(-1px); }
-.fig-icon-btn.on { background: #eee9ff; color: #6b4ff6; }
-.fig-icon-btn.danger:hover, .fig-layer-actions .danger:hover { background: #ffe7e3; color: #d8452b; }
+.fig-icon-btn:hover { background: var(--fig-hover); }
+.fig-icon-btn.on { background: var(--fig-accent-soft); color: var(--fig-accent); }
+.fig-icon-btn.danger:hover, .fig-layer-actions .danger:hover { background: var(--fig-danger-soft); color: var(--fig-danger); }
 
 .fig-layers { list-style: none; margin: 0; padding: 2px 8px 8px; overflow-y: auto; flex: 1; min-height: 0; }
 .fig-layers.nested { padding: 0 0 2px 22px; overflow: visible; }
 .fig-group { display: block; }
-.fig-layer { position: relative; display: flex; align-items: center; gap: 2px; border-radius: 12px; transition: background 120ms; }
-.fig-layer:hover, .fig-layer.hover { background: #f6f4ef; }
-.fig-layer.on { background: #eee9ff; }
+.fig-layer { position: relative; display: flex; align-items: center; gap: 2px; border-radius: 6px; transition: background 120ms; }
+.fig-layer:hover, .fig-layer.hover { background: var(--fig-hover); }
+.fig-layer.on { background: var(--fig-accent-soft); }
 .fig-layer[draggable="true"] { cursor: grab; }
 .fig-layer.gap-before::before, .fig-layer.gap-after::after {
-  content: ''; position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 3px; background: #7b61ff; pointer-events: none;
+  content: ''; position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 3px; background: var(--fig-accent); pointer-events: none;
 }
 .fig-layer.gap-before::before { top: -2px; }
 .fig-layer.gap-after::after { bottom: -2px; }
@@ -1773,191 +1875,233 @@ button.phone-row { cursor: pointer; }
   border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
 .fig-fold + .fig-layer-main { padding-left: 2px; }
-.fig-layer-icon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #f3f0e9; color: #5f5a50; transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1); }
-.fig-layer:hover .fig-layer-icon { transform: rotate(-6deg) scale(1.06); }
-.fig-layer-icon.k-text { background: #eee9ff; color: #6b4ff6; }
-.fig-layer-icon.k-sticky { background: #fff1bd; color: #8a6a00; }
-.fig-layer-icon.k-image { background: #dcefff; color: #2b6cb0; }
-.fig-layer-icon.k-mark { background: #ffe2ea; color: #c0355f; }
-.fig-layer-icon.k-group, .fig-layer-icon.k-path { background: #dff5dc; color: #2f7d32; }
-.fig-layer.on .fig-layer-icon { background: #fff; }
+.fig-layer-icon { flex: none; display: grid; place-items: center; width: 20px; height: 26px; border-radius: 4px; background: none; color: var(--fig-muted); }
+.fig-layer.on .fig-layer-icon { color: var(--fig-accent); }
 .fig-layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .fig-layer-actions { display: flex; gap: 1px; padding-right: 4px; opacity: 0; transition: opacity 120ms; }
 .fig-layer:hover .fig-layer-actions, .fig-layer.on .fig-layer-actions { opacity: 1; }
 .fig-layer-actions button {
-  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; color: #6f6a60; cursor: pointer;
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--fig-muted); cursor: pointer;
 }
-.fig-layer-actions button:hover { background: #fff; color: #1e1c19; }
-.fig-fold { flex: none; display: grid; place-items: center; width: 20px; height: 26px; margin-left: 2px; padding: 0; border: 0; background: none; color: #a39d92; cursor: pointer; }
+.fig-layer-actions button:hover { background: var(--fig-surface); color: var(--fig-ink); }
+.fig-fold { flex: none; display: grid; place-items: center; width: 20px; height: 26px; margin-left: 2px; padding: 0; border: 0; background: none; color: var(--fig-faint); cursor: pointer; }
 .fig-fold svg { transition: transform 200ms ease; }
 .fig-fold.open svg { transform: rotate(90deg); }
-.fig-empty { padding: 20px 12px; color: #8d877c; font-size: 12.5px; line-height: 1.45; text-align: center; }
+.fig-empty { padding: 20px 12px; color: var(--fig-faint); font-size: 12.5px; line-height: 1.45; text-align: center; }
 
-.fig-page { display: grid; gap: 10px; padding: 10px 14px 14px; border-top: 1px solid #f0ece4; }
+.fig-page { display: grid; gap: 10px; padding: 10px 14px 14px; border-top: 1px solid var(--fig-line); }
 .fig-page-row { display: flex; align-items: center; gap: 8px; }
-.fig-page-row b { flex: 1; font-size: 12px; color: #8d877c; }
-.fig-page label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #a39d92; }
+.fig-page-row b { flex: 1; font-size: 12px; color: var(--fig-faint); }
+.fig-page label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--fig-faint); }
 .fig-page input {
-  width: 58px; height: 28px; padding: 0 8px; border: 0; border-radius: 9px; background: #f6f4ef;
-  font: inherit; font-size: 12.5px; color: #1e1c19; font-variant-numeric: tabular-nums;
+  width: 58px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover);
+  font: inherit; font-size: 12.5px; color: var(--fig-ink); font-variant-numeric: tabular-nums;
 }
-.fig-page input:focus { outline: 2px solid #7b61ff; }
+.fig-page input:focus { outline: 2px solid var(--fig-accent); }
 .fig-page-row.dots { flex-wrap: wrap; gap: 6px; }
-.fig-dot.clear, .fig-swatch-btn span.empty { background: repeating-conic-gradient(#e7e2d8 0 25%, #fff 0 50%) 0 0 / 8px 8px; }
+/* The properties of what is picked (FigPanel › FigProps): numbers in a grid, then align to the page. */
+.fig-prop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; }
+.fig-prop { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; background: var(--fig-hover); }
+.fig-prop:focus-within { outline: 1.5px solid var(--fig-accent); }
+.fig-prop.off { opacity: 0.55; }
+.fig-prop-label { flex: none; width: 18px; font-size: 11px; font-weight: 600; color: var(--fig-faint); }
+.fig-prop input { flex: 1; min-width: 0; width: 100%; height: 26px; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--fig-ink); font-variant-numeric: tabular-nums; outline: none; -moz-appearance: textfield; }
+.fig-prop input::-webkit-inner-spin-button, .fig-prop input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.fig-prop-unit { flex: none; font-size: 11px; color: var(--fig-faint); }
+.fig-align { display: flex; justify-content: space-between; }
+.fig-dot.clear, .fig-swatch-btn span.empty { background: repeating-conic-gradient(var(--fig-check) 0 25%, var(--fig-surface) 0 50%) 0 0 / 8px 8px; }
 
 /* The mini menu over what is picked. Above it, the pop opens upward; below it, downward. */
-.fig-bar { z-index: 4; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; transform: translate(-50%, -100%); transform-origin: 50% 100%; animation: fig-bar-in 280ms cubic-bezier(.34, 1.56, .64, 1); }
+.fig-bar { z-index: 4; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; transform: translate(-50%, -100%); transform-origin: 50% 100%; animation: fig-bar-in 120ms var(--fig-ease); }
 .fig-bar.below { flex-direction: column; transform: translate(-50%, 0); transform-origin: 50% 0; }
-@keyframes fig-bar-in { from { opacity: 0; scale: 0.86; } to { opacity: 1; scale: 1; } }
+@keyframes fig-bar-in { from { opacity: 0; } to { opacity: 1; } }
 .fig-bar-row {
-  display: flex; align-items: center; gap: 3px; padding: 5px; white-space: nowrap; background: #fff; border-radius: 16px; color: #1e1c19;
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 12px 30px -10px rgb(40 30 10 / 0.35);
+  display: flex; align-items: center; gap: 3px; padding: 5px; white-space: nowrap; background: var(--fig-surface); border-radius: 8px; color: var(--fig-ink);
+  box-shadow: var(--fig-shadow);
 }
 .fig-bar-row .fig-sep { margin: 5px 3px; }
 .fig-chip {
-  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 3px; border: 0; border-radius: 11px;
-  background: #f6f4ef; font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; cursor: pointer; transition: background 120ms;
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 3px; border: 0; border-radius: 6px;
+  background: var(--fig-hover); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fig-ink); cursor: pointer; transition: background 120ms;
 }
-.fig-chip:hover, .fig-chip.on { background: #eee9ff; }
-.fig-chip .caret { font-size: 9px; color: #a39d92; }
-.fig-chip-sample { display: block; width: 44px; height: 26px; overflow: hidden; border-radius: 8px; background: #fff; }
+.fig-chip:hover, .fig-chip.on { background: var(--fig-accent-soft); }
+.fig-chip .caret { font-size: 9px; color: var(--fig-faint); }
+.fig-chip-sample { display: block; width: 44px; height: 26px; overflow: hidden; border-radius: 8px; background: var(--fig-surface); }
 .fig-chip-sample svg { display: block; width: 100%; height: 100%; }
-.fig-stepper { display: inline-flex; align-items: center; height: 32px; border-radius: 11px; background: #f6f4ef; }
-.fig-stepper button { width: 26px; height: 32px; padding: 0; border: 0; border-radius: 11px; background: none; font: inherit; font-size: 15px; font-weight: 700; color: #3d3931; cursor: pointer; }
-.fig-stepper button:hover { background: #eee9ff; color: #6b4ff6; }
+.fig-stepper { display: inline-flex; align-items: center; height: 32px; border-radius: 6px; background: var(--fig-hover); }
+.fig-stepper button { width: 26px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 15px; font-weight: 700; color: var(--fig-ink-2); cursor: pointer; }
+.fig-stepper button:hover { background: var(--fig-accent-soft); color: var(--fig-accent); }
 .fig-stepper-val { min-width: 28px; font-size: 12.5px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 .fig-swatch-btn { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 11px; background: none; cursor: pointer; }
-.fig-swatch-btn:hover, .fig-swatch-btn.on { background: #f3f0e9; }
-.fig-swatch-btn span { display: block; width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15), inset 0 0 0 2px #fff; transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1); }
-.fig-swatch-btn:hover span { transform: scale(1.12) rotate(12deg); }
+.fig-swatch-btn:hover, .fig-swatch-btn.on { background: var(--fig-hover); }
+.fig-swatch-btn span { display: block; width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px var(--fig-swatch-edge), inset 0 0 0 2px var(--fig-surface); transition: transform 120ms var(--fig-ease); }
+.fig-swatch-btn:hover span { }
 .fig-swatch-btn.square span { border-radius: 6px; }
-.fig-swatch-btn.ring span { background: none; border: 4px solid; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12); }
+.fig-swatch-btn.ring span { background: none; border: 4px solid; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
 .fig-bar-pop {
-  max-width: 440px; padding: 8px; background: #fff; border-radius: 16px; animation: fig-pop 260ms cubic-bezier(.34, 1.56, .64, 1);
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 12px 30px -10px rgb(40 30 10 / 0.35);
+  max-width: 440px; padding: 8px; background: var(--fig-surface); border-radius: 8px; animation: fig-pop 120ms var(--fig-ease);
+  box-shadow: var(--fig-shadow);
 }
 .fig-bar-dots { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .fig-bar-looks { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 420px; }
 .fig-sliders { display: grid; gap: 9px; width: 272px; padding: 4px 4px 2px; }
-.fig-slide { display: grid; grid-template-columns: 96px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #3d3931; }
-.fig-slide input { width: 100%; accent-color: #7b61ff; }
-.fig-slide-val { color: #8d877c; text-align: right; font-variant-numeric: tabular-nums; }
-.fig-reset { justify-self: start; padding: 2px 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: #6b4ff6; cursor: pointer; }
+.fig-slide { display: grid; grid-template-columns: 96px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fig-ink-2); }
+.fig-slide input { width: 100%; accent-color: var(--fig-accent); }
+.fig-slide-val { color: var(--fig-faint); text-align: right; font-variant-numeric: tabular-nums; }
+.fig-reset { justify-self: start; padding: 2px 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--fig-accent); cursor: pointer; }
 
 /* The slash menu under words being typed. */
 .fig-slash {
-  position: absolute; z-index: 5; width: 290px; max-height: 300px; overflow-y: auto; padding: 6px; background: #fff; border-radius: 16px;
-  box-shadow: 0 1px 3px rgb(40 30 10 / 0.12), 0 18px 40px -12px rgb(40 30 10 / 0.4); animation: fig-pop 240ms cubic-bezier(.34, 1.56, .64, 1);
+  position: absolute; z-index: 5; width: 290px; max-height: 300px; overflow-y: auto; padding: 6px; background: var(--fig-surface); border-radius: 8px;
+  box-shadow: var(--fig-shadow); animation: fig-pop 120ms var(--fig-ease);
 }
-.fig-slash-group { padding: 8px 8px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a39d92; }
+.fig-slash-group { padding: 8px 8px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fig-faint); }
 .fig-slash-item {
   display: grid; grid-template-columns: 50px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; width: 100%;
-  padding: 5px 8px 5px 5px; border: 0; border-radius: 11px; background: none; font: inherit; color: #1e1c19; text-align: left; cursor: pointer;
+  padding: 5px 8px 5px 5px; border: 0; border-radius: 6px; background: none; font: inherit; color: var(--fig-ink); text-align: left; cursor: pointer;
 }
-.fig-slash-item.on { background: #eee9ff; }
-.fig-slash-preview { grid-row: 1 / 3; display: grid; place-items: center; width: 50px; height: 34px; overflow: hidden; border-radius: 9px; background: #f6f4ef; }
-.fig-slash-item.on .fig-slash-preview { background: #fff; }
+.fig-slash-item.on { background: var(--fig-accent-soft); }
+.fig-slash-preview { grid-row: 1 / 3; display: grid; place-items: center; width: 50px; height: 34px; overflow: hidden; border-radius: 6px; background: var(--fig-hover); }
+.fig-slash-item.on .fig-slash-preview { background: var(--fig-surface); }
 .fig-slash-preview .look, .fig-slash-preview .look svg { display: block; width: 100%; height: 100%; }
-.fig-slash-preview .swatch { width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.15); }
-.fig-slash-preview .glyph { font-size: 13px; font-weight: 800; color: #6b4ff6; }
+.fig-slash-preview .swatch { width: 20px; height: 20px; border-radius: 999px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-slash-preview .glyph { font-size: 13px; font-weight: 800; color: var(--fig-accent); }
 .fig-slash-label { font-size: 13px; font-weight: 600; }
-.fig-slash-hint { overflow: hidden; font-size: 11px; color: #8d877c; white-space: nowrap; text-overflow: ellipsis; }
-.fig-slash-empty { padding: 12px; font-size: 12.5px; color: #8d877c; }
+.fig-slash-hint { overflow: hidden; font-size: 11px; color: var(--fig-faint); white-space: nowrap; text-overflow: ellipsis; }
+.fig-slash-empty { padding: 12px; font-size: 12.5px; color: var(--fig-faint); }
 
 /* Pens and the eraser. */
 .surface.tool-eraser .surface-svg { cursor: none; }
 .fig-brush {
-  flex: none; display: grid; justify-items: center; gap: 1px; width: 84px; padding: 6px 4px 5px; border: 0; border-radius: 12px;
-  background: #f6f4ef; font: inherit; font-size: 11px; color: #5f5a50; cursor: pointer;
-  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+  flex: none; display: grid; justify-items: center; gap: 1px; width: 84px; padding: 6px 4px 5px; border: 0; border-radius: 6px;
+  background: var(--fig-hover); font: inherit; font-size: 11px; color: var(--fig-muted); cursor: pointer;
+  transition: transform 120ms var(--fig-ease), background 120ms;
 }
 .fig-brush span, .fig-brush svg { display: block; width: 72px; height: 29px; }
 .fig-brush b { font-weight: 600; }
-.fig-brush:hover { transform: translateY(-2px) rotate(-2deg); }
-.fig-brush.on { background: #eee9ff; box-shadow: inset 0 0 0 2px #7b61ff; color: #6b4ff6; }
+.fig-brush:hover { }
+.fig-brush.on { background: var(--fig-accent-soft); box-shadow: inset 0 0 0 2px var(--fig-accent); color: var(--fig-accent); }
 
 /* Effects on the page (FigPanel.tsx › FigEffects). */
-.fig-effects { display: grid; gap: 9px; padding: 10px 14px 14px; border-top: 1px solid #f0ece4; max-height: 52%; overflow-y: auto; }
+.fig-effects { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; padding: 10px 14px 14px; border-top: 1px solid var(--fig-line); max-height: 60%; overflow-y: auto; align-content: start; }
 .fig-effects .fig-page-row .grow { flex: 1; }
 .fig-effects .fig-sliders { width: auto; padding: 0; }
 .fig-fx-presets { display: grid; gap: 6px; }
 .fig-fx-preset {
-  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 11px; background: #f6f4ef;
-  font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; text-align: left; cursor: pointer;
-  transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--fig-hover);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fig-ink); text-align: left; cursor: pointer;
+  transition: transform 120ms var(--fig-ease), background 120ms;
 }
-.fig-fx-preset:hover { background: #eee9ff; transform: translateX(3px) rotate(-1deg); }
+.fig-fx-preset:hover { background: var(--fig-accent-soft); }
 .fig-fx-inks { display: inline-flex; flex: none; }
-.fig-fx-inks i { width: 16px; height: 16px; margin-right: -5px; border: 2px solid #fff; border-radius: 999px; mix-blend-mode: multiply; }
-.fig-fx-hint { margin: 0; font-size: 11.5px; line-height: 1.4; color: #8d877c; }
-.fig-fx-busy { font-size: 11px; font-weight: 600; color: #6b4ff6; animation: fig-fx-pulse 900ms ease-in-out infinite alternate; }
+.fig-fx-inks i { width: 16px; height: 16px; margin-right: -5px; border: 2px solid var(--fig-surface); border-radius: 999px; mix-blend-mode: var(--fig-blend); }
+.fig-fx-hint { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--fig-faint); }
+.fig-fx-busy { font-size: 11px; font-weight: 600; color: var(--fig-accent); animation: fig-fx-pulse 900ms ease-in-out infinite alternate; }
 @keyframes fig-fx-pulse { from { opacity: 0.35; } to { opacity: 1; } }
-.fig-dot-add { display: grid; place-items: center; padding: 0; background: #f6f4ef; color: #6f6a60; font-size: 14px; font-weight: 700; line-height: 1; }
-.fig-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: #f6f4ef; }
-.fig-seg button { height: 24px; padding: 0 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: #6f6a60; cursor: pointer; text-transform: capitalize; }
-.fig-seg button.on { background: #fff; color: #1e1c19; box-shadow: 0 1px 2px rgb(40 30 10 / 0.12); }
-.fig-fx-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 8px; border-radius: 12px; background: #faf8f4; }
+.fig-dot-add { display: grid; place-items: center; padding: 0; background: var(--fig-hover); color: var(--fig-muted); font-size: 14px; font-weight: 700; line-height: 1; }
+.fig-seg { display: inline-flex; padding: 2px; border-radius: 6px; background: var(--fig-hover); }
+.fig-seg button { height: 24px; padding: 0 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--fig-muted); cursor: pointer; text-transform: capitalize; }
+.fig-seg button.on { background: var(--fig-surface); color: var(--fig-ink); box-shadow: 0 1px 2px rgb(40 30 10 / 0.12); }
+.fig-fx-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 8px; border-radius: 6px; background: var(--fig-hover); }
 .fig-fx-actions { display: flex; gap: 6px; }
 .fig-fx-actions .fig-chip { flex: 1; justify-content: center; padding: 0 10px; }
-.fig-chip.primary { background: #7b61ff; color: #fff; }
-.fig-chip.primary:hover { background: #6b4ff6; }
+.fig-chip.primary { background: var(--fig-accent); color: var(--fig-on-accent); }
+.fig-chip.primary:hover { background: var(--fig-accent); }
 
 /* Rich words while typing (Surface's editor, FigPanel › FigFormat) and fonts from the design system. */
 .surface-text[contenteditable] { white-space: pre-wrap; overflow-wrap: break-word; cursor: text; }
 .surface-text[contenteditable]:empty::before { content: attr(data-placeholder); color: rgb(0 0 0 / 0.35); pointer-events: none; }
 .fig-format {
   z-index: 5; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px;
-  transform: translateY(-100%); transform-origin: 0 100%; animation: fig-bar-in 240ms cubic-bezier(.34, 1.56, .64, 1);
+  transform: translateY(-100%); transform-origin: 0 100%; animation: fig-bar-in 120ms var(--fig-ease);
 }
 .fig-format.below { flex-direction: column; transform: none; transform-origin: 0 0; }
 .fmt-glyph { font: 700 15px/1 Georgia, "Times New Roman", serif; color: inherit; }
 .fmt-glyph.italic { font-style: italic; }
 .fmt-glyph.underline { text-decoration: underline; text-underline-offset: 2px; }
 .fmt-glyph.strike, .fmt-glyph.clear { text-decoration: line-through; }
-.fmt-hl { padding: 0 2px; font: 700 13px/1 ui-rounded, system-ui, sans-serif; color: #1e1c19; }
-.fig-format-scope { padding: 0 8px 0 4px; font-size: 11px; font-weight: 600; color: #a39d92; white-space: nowrap; }
+.fmt-hl { padding: 0 2px; font: 700 13px/1 var(--sans); color: var(--fig-ink); }
+.fig-format-scope { padding: 0 8px 0 4px; font-size: 11px; font-weight: 600; color: var(--fig-faint); white-space: nowrap; }
 .fig-font-list { display: grid; gap: 2px; min-width: 200px; max-height: 260px; overflow-y: auto; }
 .fig-font-item {
-  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 5px; border: 0; border-radius: 10px;
-  background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: #1e1c19; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 5px; border: 0; border-radius: 6px;
+  background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fig-ink); text-align: left; cursor: pointer;
 }
-.fig-font-item:hover { background: #f6f4ef; }
-.fig-font-item.on { background: #eee9ff; }
+.fig-font-item:hover { background: var(--fig-hover); }
+.fig-font-item.on { background: var(--fig-accent-soft); }
 .fig-font-item span, .fig-font-aa {
   display: inline-grid; place-items: center; width: 30px; height: 24px; border-radius: 7px;
-  background: #f6f4ef; font-size: 15px; font-weight: 400; color: #1e1c19;
+  background: var(--fig-hover); font-size: 15px; font-weight: 400; color: var(--fig-ink);
 }
-.fig-font-item.on span, .fig-chip .fig-font-aa { background: #fff; }
-.fig-slash-preview .glyph.face { font-size: 16px; font-weight: 400; color: #1e1c19; }
+.fig-font-item.on span, .fig-chip .fig-font-aa { background: var(--fig-surface); }
+.fig-slash-preview .glyph.face { font-size: 16px; font-weight: 400; color: var(--fig-ink); }
 
 /* Looks saved to the project, and swapping looks while a print is on. */
-.fig-fx-sub { margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a39d92; }
+.fig-fx-sub { margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fig-faint); }
 .fig-fx-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .fig-fx-chip {
-  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 9px 0 6px; border: 0; border-radius: 999px;
-  background: #f6f4ef; font: inherit; font-size: 11.5px; font-weight: 600; color: #3d3931; cursor: pointer; white-space: nowrap;
-  transition: transform 200ms cubic-bezier(.34, 1.56, .64, 1), background 120ms;
+  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 9px 0 6px; border: 0; border-radius: 6px;
+  background: var(--fig-hover); font: inherit; font-size: 11.5px; font-weight: 600; color: var(--fig-ink-2); cursor: pointer; white-space: nowrap;
+  transition: transform 120ms var(--fig-ease), background 120ms;
 }
-.fig-fx-chip:hover { background: #eee9ff; transform: translateY(-1px) rotate(-1deg); }
-.fig-fx-chip.saved { box-shadow: inset 0 0 0 1.5px #d9d0ff; }
+.fig-fx-chip:hover { background: var(--fig-accent-soft); }
+.fig-fx-chip.saved { box-shadow: inset 0 0 0 1.5px var(--fig-accent-soft); }
 .fig-fx-chip .fig-fx-inks i { width: 12px; height: 12px; margin-right: -4px; }
-.fig-text-btn { margin-left: auto; padding: 4px 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: #6b4ff6; cursor: pointer; }
-.fig-text-btn:hover { background: #eee9ff; }
+.fig-text-btn { margin-left: auto; padding: 4px 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--fig-accent); cursor: pointer; }
+.fig-text-btn:hover { background: var(--fig-accent-soft); }
 .fig-effects .fig-page-row .fig-text-btn + .fig-icon-btn { margin-left: 0; }
 .fig-fx-name { display: flex; gap: 6px; }
 .fig-fx-name input {
-  flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 0; border-radius: 10px; background: #f6f4ef;
-  font: inherit; font-size: 12.5px; color: #1e1c19;
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--fig-hover);
+  font: inherit; font-size: 12.5px; color: var(--fig-ink);
 }
-.fig-fx-name input:focus { outline: 2px solid #7b61ff; }
+.fig-fx-name input:focus { outline: 2px solid var(--fig-accent); }
+
+/* The effects stack (FigPanel › FigEffects): page or one layer, each step a row that opens to its dials. */
+.fig-fx-scope { padding: 1px 6px; border-radius: 4px; background: var(--fig-hover); font-size: 11px; font-weight: 600; color: var(--fig-muted); }
+.fig-text-btn.on { background: var(--fig-accent-soft); }
+.fig-fx-menu { display: grid; gap: 1px; margin: 0; padding: 4px; list-style: none; border-radius: 8px; background: var(--fig-surface); box-shadow: var(--fig-shadow-sm); }
+.fig-fx-menu button { display: grid; gap: 1px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; font: inherit; text-align: left; color: var(--fig-ink); cursor: pointer; }
+.fig-fx-menu button:hover { background: var(--fig-hover); }
+.fig-fx-menu b { font-size: 12.5px; font-weight: 600; }
+.fig-fx-menu span { font-size: 11px; color: var(--fig-faint); }
+.fig-fx-stack { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.fig-fx-step { border-radius: 6px; background: var(--fig-hover); }
+.fig-fx-step.open { box-shadow: inset 0 0 0 1px var(--fig-line); background: var(--fig-surface); }
+/* Off: struck through and dimmed, so the state reads without colour. */
+.fig-fx-step.off .fig-fx-name-btn { text-decoration: line-through; color: var(--fig-faint); }
+.fig-fx-row { display: flex; align-items: center; gap: 2px; padding: 2px 6px 2px 2px; }
+.fig-fx-name-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fig-ink); text-align: left; cursor: pointer; }
+.fig-fx-name-btn .caret { font-size: 9px; color: var(--fig-faint); }
+.fig-fx-num { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--fig-surface); font-size: 10px; font-weight: 700; color: var(--fig-muted); font-variant-numeric: tabular-nums; }
+.fig-fx-strength { display: flex; align-items: center; gap: 4px; flex: none; }
+.fig-fx-strength input { width: 64px; accent-color: var(--fig-accent); }
+.fig-fx-strength span { width: 34px; font-size: 11px; color: var(--fig-faint); text-align: right; font-variant-numeric: tabular-nums; }
+.fig-step-body { display: grid; gap: 8px; padding: 6px 8px 8px; width: auto; }
+.fig-fx-step .fig-fx-actions { padding: 0 8px 8px; }
+.fig-chip.danger:hover { background: var(--fig-danger-soft); color: var(--fig-danger); }
+.fig-chip:disabled { opacity: 0.4; cursor: default; }
+.fig-hex { display: grid; grid-template-columns: 96px 28px 1fr; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fig-ink-2); }
+.fig-hex input[type="color"] { width: 28px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; cursor: pointer; }
+.fig-hex code { font-family: var(--mono); font-size: 11px; color: var(--fig-muted); }
+.fig-step-body .fig-page-row { flex-wrap: wrap; gap: 4px 8px; }
+.fig-step-body .fig-seg { flex-wrap: wrap; }
+.fig-step-body .fig-seg button { text-transform: capitalize; }
+.fig-step-body .fig-slide { grid-template-columns: 64px minmax(0, 1fr) 40px; }
+.fig-step-body .fig-slide-label, .fig-hex .fig-slide-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fig-hex { grid-template-columns: 64px 28px minmax(0, 1fr); }
+.fig-hex input[type="color"] { box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-fx-stack, .fig-fx-step { min-width: 0; }
+.fig-effects .fig-step-body, .fig-effects .fig-sliders.fig-step-body { padding: 4px 10px 10px; }
+.fig-fx-step .fig-fx-actions { padding: 0 10px 10px; }
 
 /* A freeform block following a frame in the Freeform app (Inspector › LayersField). */
 .canvas-link { display: grid; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 .canvas-link-head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.canvas-link-badge { margin-left: auto; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, #7b61ff 22%, transparent); color: #c7b9ff; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.canvas-link-badge { margin-left: auto; padding: 2px 7px; border-radius: 6px; background: color-mix(in srgb, var(--fig-accent) 22%, transparent); color: #c7b9ff; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
 .canvas-link-badge.stale { background: color-mix(in srgb, #d9a441 22%, transparent); color: #e7bf6f; }
-.canvas-link-thumb { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #f5f3ee; overflow: hidden; cursor: pointer; }
-.canvas-link-thumb:hover { border-color: #7b61ff; }
+.canvas-link-thumb { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--fig-paper); overflow: hidden; cursor: pointer; }
+.canvas-link-thumb:hover { border-color: var(--fig-accent); }
 .canvas-link-thumb span, .canvas-link-thumb svg, .canvas-link-thumb img { display: block; width: 100%; height: auto; }
 
 /* Picking which Freeform frame a block follows (Inspector › LayersField). */
@@ -1966,9 +2110,9 @@ button.phone-row { cursor: pointer; }
   display: grid; gap: 2px; padding: 4px 4px 6px; border: 1px solid var(--line); border-radius: 8px;
   background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.canvas-frame:hover { border-color: color-mix(in srgb, #7b61ff 60%, var(--line)); }
-.canvas-frame.on { border-color: #7b61ff; box-shadow: 0 0 0 1px #7b61ff; }
-.canvas-frame-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 5px; background: #f5f3ee; }
+.canvas-frame:hover { border-color: color-mix(in srgb, var(--fig-accent) 60%, var(--line)); }
+.canvas-frame.on { border-color: var(--fig-accent); box-shadow: 0 0 0 1px var(--fig-accent); }
+.canvas-frame-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 5px; background: var(--fig-paper); }
 .canvas-frame-thumb span, .canvas-frame-thumb svg, .canvas-frame-thumb img { display: block; max-width: 100%; max-height: 100%; width: 100%; height: auto; }
 .canvas-frame-name { overflow: hidden; font-size: 11.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
 .canvas-frame-facts { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1977,37 +2121,37 @@ button.phone-row { cursor: pointer; }
 .cv-menu { position: relative; display: inline-flex; }
 .cv-pop {
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 340px; max-width: calc(100vw - 24px); padding: 0;
-  background: #fff; color: #0d0d0d; border: 1px solid #0d0d0d; font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  background: var(--fig-surface); color: var(--fig-ink); border: 1px solid var(--fig-ink); font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
   font-size: 13px; letter-spacing: 0.011em; text-align: left; white-space: normal; cursor: default;
 }
-.cv-menu.pill .cv-pop { border-color: #dededc; border-radius: 16px; box-shadow: 0 1px 3px rgb(40 30 10 / 0.1), 0 16px 40px -14px rgb(40 30 10 / 0.3); overflow: hidden; }
-.cv-menu.pill .fig-pill.on { background: #f2efe8; }
-.cv-section { padding: 6px 0 8px; border-bottom: 1px solid #e6e6e4; }
-.cv-head { padding: 8px 14px 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #6f726e; }
+.cv-menu.pill .cv-pop { border-color: var(--fig-line); border-radius: 8px; box-shadow: var(--fig-shadow); overflow: hidden; }
+.cv-menu.pill .fig-pill.on { background: var(--fig-hover); }
+.cv-section { padding: 6px 0 8px; border-bottom: 1px solid var(--fig-line); }
+.cv-head { padding: 8px 14px 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fig-muted); }
 .cv-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 2px 14px; cursor: pointer; }
-.cv-row:hover { background: #f5f5f4; }
-.cv-row.off { color: #a8aaa7; cursor: default; }
+.cv-row:hover { background: var(--fig-hover); }
+.cv-row.off { color: var(--fig-faint); cursor: default; }
 .cv-label { flex: none; width: 96px; }
 .cv-grow { flex: 1; }
-.cv-value { flex: none; min-width: 56px; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0; color: #3a3a38; font-variant-numeric: tabular-nums; }
-.cv-row.off .cv-value { color: #a8aaa7; }
-.cv-check { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border: 1px solid #0d0d0d; background: #fff; position: relative; cursor: pointer; }
-.cv-check::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; background: #a8aaa7; transition: transform 120ms linear, background-color 120ms linear; }
-.cv-check:checked::after { transform: translateX(12px); background: #0d0d0d; }
-.cv-range { flex: 1; height: 16px; margin: 0; accent-color: #495472; cursor: pointer; }
+.cv-value { flex: none; min-width: 56px; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0; color: var(--fig-ink-2); font-variant-numeric: tabular-nums; }
+.cv-row.off .cv-value { color: var(--fig-faint); }
+.cv-check { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border: 1px solid var(--fig-ink); background: var(--fig-surface); position: relative; cursor: pointer; }
+.cv-check::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; background: var(--fig-faint); transition: transform 120ms linear, background-color 120ms linear; }
+.cv-check:checked::after { transform: translateX(12px); background: var(--fig-ink); }
+.cv-range { flex: 1; height: 16px; margin: 0; accent-color: var(--fig-accent); cursor: pointer; }
 .cv-range:disabled { cursor: default; opacity: 0.5; }
-.cv-seg { display: inline-flex; margin-left: auto; border: 1px solid #0d0d0d; }
+.cv-seg { display: inline-flex; margin-left: auto; border: 1px solid var(--fig-ink); }
 /* 22 = 5 / 14 / 3: the line box centred and nudged 1px down, the x-height on the middle, as the board bar does. */
-.cv-seg button { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 5px 8px 3px; border: 0; background: none; color: #3a3a38; font: inherit; font-size: 12px; line-height: 14px; cursor: pointer; }
-.cv-seg button + button { border-left: 1px solid #0d0d0d; }
-.cv-seg button.on { background: #0d0d0d; color: #fff; }
-.cv-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 12px; color: #6f726e; }
+.cv-seg button { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 5px 8px 3px; border: 0; background: none; color: var(--fig-ink-2); font: inherit; font-size: 12px; line-height: 14px; cursor: pointer; }
+.cv-seg button + button { border-left: 1px solid var(--fig-ink); }
+.cv-seg button.on { background: var(--fig-ink); color: var(--fig-surface); }
+.cv-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 12px; color: var(--fig-muted); }
 .cv-foot span { flex: 1; }
-.cv-reset { padding: 0; border: 0; background: none; color: #495472; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-.cv-reset:disabled { color: #a8aaa7; text-decoration: none; cursor: default; }
-.cv-menu.pill .cv-check, .cv-menu.pill .cv-seg, .cv-menu.pill .cv-seg button + button { border-color: #cfc8ba; }
-.cv-menu.pill .cv-seg button.on { background: #7b61ff; }
-.cv-menu.pill .cv-check:checked::after { background: #7b61ff; }
+.cv-reset { padding: 0; border: 0; background: none; color: var(--fig-accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.cv-reset:disabled { color: var(--fig-faint); text-decoration: none; cursor: default; }
+.cv-menu.pill .cv-check, .cv-menu.pill .cv-seg, .cv-menu.pill .cv-seg button + button { border-color: var(--fig-line); }
+.cv-menu.pill .cv-seg button.on { background: var(--fig-accent); }
+.cv-menu.pill .cv-check:checked::after { background: var(--fig-accent); }
 
 /* What a closed design panel holds, in a few words beside its name. */
 .panel-sum { display: flex; align-items: center; gap: 5px; margin-left: auto; padding-left: 10px; overflow: hidden; font-size: 11px; font-weight: 400; color: var(--faint); white-space: nowrap; text-overflow: ellipsis; }

@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 
 import { brushSampleSvg, canvasTypeSampleSvg } from '../compile/freeform.ts';
-import { amountLabel, LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
+import { LAYER_NAMES, layerName, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
 import { canvasTypeOf, colorOf, type ColorRef, type DesignSystem } from '../model/design-system.ts';
 import { BRUSHES, groupKey, groupRuns, STICKY_COLORS } from '../model/freeform.ts';
+import { hasTweaks } from '../model/brand-presets.ts';
+import { alignToPage, geometryOf, withGeometry, withOpacity, withRotation, type AlignEdge } from '../model/properties.ts';
+import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
-import { misregister, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
+import { EFFECT_HELP, EFFECT_KINDS, EFFECT_LABELS, LOOKS, withLayerEffects, misregister, moveStep, newStep, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
 import type { MarkKey, MarkState } from '../model/rich-text.ts';
-import type { Align, EffectStep, FreeformBlock, FreeformLayer, RisoInk, TextMarks } from '../model/types.ts';
+import type { Align, EffectKind, EffectStep, FreeformBlock, FreeformLayer, RisoInk, RisoStep, TextMarks } from '../model/types.ts';
 
 // The canvas's own controls, in the canvas's own look: the layers panel docked on its right, the
 // mini menu that floats over whatever is picked, and the slash menu under text being typed.
@@ -72,9 +75,13 @@ export interface FigLayersProps {
   effectNote?: string | null;
   /** The printed picture is being made again after a change. */
   effectBusy?: boolean;
+  /** Text layers' measured heights, which their recipes do not hold. */
+  heights: Record<string, number>;
+  /** Swaps in changed layers from the properties panel. `coalesce` makes a run of edits one undo step. */
+  onLayers(label: string, next: FreeformLayer[], coalesce?: string): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy }: FigLayersProps) {
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** Where a drag would land, as a gap in the list as shown: 0 is above the first row. */
@@ -207,6 +214,9 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
         {n === 0 && <li class="fig-empty">Nothing here yet. Grab a tool from the dock and make a mess.</li>}
       </ul>
 
+      {picked && selectionOf(block, picked) ? (
+        <FigProps block={block} pickedKey={picked} heights={heights} onLayers={onLayers} />
+      ) : (
       <div class="fig-page">
         <div class="fig-page-row">
           <b>Page</b>
@@ -226,8 +236,25 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           ))}
         </div>
       </div>
+      )}
 
-      <FigEffects effects={block.effects} onEffects={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
+      {(() => {
+        // The one layer picked has its own stack; nothing picked, or a drawing, is the page's.
+        const sel = picked ? selectionOf(block, picked) : null;
+        const layer = sel && !sel.group ? sel.layers[0] : undefined;
+        return layer ? (
+          <FigEffects
+            key={`layer:${layer.id}`}
+            steps={layer.effects}
+            scope={LAYER_NAMES[layer.kind]}
+            onSteps={(next, label, coalesce) => onLayers(label, [withLayerEffects(layer, next)], coalesce ? `fx:${layer.id}:${coalesce}` : undefined)}
+            note={null}
+            busy={Boolean(effectBusy)}
+          />
+        ) : (
+          <FigEffects key="page" steps={block.effects} scope="Page" onSteps={onEffects} onOpenRiso={onOpenRiso} note={effectNote ?? null} busy={Boolean(effectBusy)} />
+        );
+      })()}
     </div>
   );
 }
@@ -238,7 +265,8 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
  * The presets' screens at half size. They were tuned on 900px photographs; a page of drawn lines and
  * type loses its detail in dots that coarse, and at half size it still reads as a print.
  */
-const pageScreens = (step: EffectStep): EffectStep => ({ ...step, inks: step.inks.map((k) => ({ ...k, cell: Math.max(2, Math.round(k.cell) / 2) })) });
+const pageScreens = <T extends EffectStep>(step: T): T =>
+  step.effect === 'riso' ? ({ ...step, inks: step.inks.map((k) => ({ ...k, cell: Math.max(2, Math.round(k.cell) / 2) })) } as T) : step;
 
 const PAPERS: Array<[string, string]> = [
   ['Natural', '#f6f2e8'],
@@ -247,14 +275,256 @@ const PAPERS: Array<[string, string]> = [
   ['Grey', '#dfe6e9'],
 ];
 
+/** A step's switch and strength, carried over when its settings are replaced by a look. */
+const keepBase = (s: EffectStep) => ({ ...(s.off ? { off: true } : {}), ...(s.strength !== undefined ? { strength: s.strength } : {}) });
+
+/** A colour field with its hex beside it, so a colour is never told by its swatch alone. */
+function HexField({ label, value, onInput }: { label: string; value: string; onInput(v: string): void }) {
+  return (
+    <label class="fig-hex" title={`${label}: ${value}`}>
+      <span class="fig-slide-label">{label}</span>
+      <input type="color" value={value} onInput={(e) => onInput((e.target as HTMLInputElement).value.toLowerCase())} />
+      <code>{value.toUpperCase()}</code>
+    </label>
+  );
+}
+
+function Seg<T extends string>({ label, value, options, onPick }: { label: string; value: T; options: readonly T[]; onPick(v: T): void }) {
+  return (
+    <div class="fig-page-row">
+      <span class="fig-slide-label">{label}</span>
+      <span class="fig-seg" role="group" aria-label={label}>
+        {options.map((o) => (
+          <button key={o} class={value === o ? 'on' : ''} aria-pressed={value === o} onClick={() => onPick(o)}>
+            {o.replace('-', ' ')}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** One step's own dials. Riso has its own set. */
+function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: EffectStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
+  const name = EFFECT_LABELS[step.effect];
+  const dial = (label: string, unit: string, min: number, max: number, value: number, patch: (v: number) => Partial<EffectStep>, stepBy = 1) => (
+    <Slide label={label} unit={unit} min={min} max={max} step={stepBy} value={value} onInput={(v) => set({ ...step, ...patch(v) } as EffectStep, `${name} ${label.toLowerCase()}`, `fx-${step.effect}-${label}`)} />
+  );
+  switch (step.effect) {
+    case 'riso':
+      return <RisoDials step={step} set={set} onOpenRiso={onOpenRiso} />;
+    case 'adjust':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Exposure', ' st', -3, 3, step.exposure ?? 0, (v) => ({ exposure: v }), 0.1)}
+          {dial('Brightness', '', -100, 100, step.brightness, (v) => ({ brightness: v }))}
+          {dial('Contrast', '', -100, 100, step.contrast, (v) => ({ contrast: v }))}
+          {dial('Saturation', '', -100, 100, step.saturation, (v) => ({ saturation: v }))}
+          {dial('Vibrance', '', -100, 100, step.vibrance ?? 0, (v) => ({ vibrance: v }))}
+          {dial('Warmth', '', -100, 100, step.temperature ?? 0, (v) => ({ temperature: v }))}
+          {dial('Tint', '', -100, 100, step.tint ?? 0, (v) => ({ tint: v }))}
+        </div>
+      );
+    case 'duotone':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <HexField label="Shadows" value={step.shadow} onInput={(v) => set({ ...step, shadow: v }, 'Duotone shadows', 'fx-duo-sh')} />
+          <HexField label="Highlights" value={step.highlight} onInput={(v) => set({ ...step, highlight: v }, 'Duotone highlights', 'fx-duo-hi')} />
+          {dial('Balance', '', -100, 100, step.balance ?? 0, (v) => ({ balance: v }))}
+        </div>
+      );
+    case 'posterize':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Levels', '', 2, 12, step.levels, (v) => ({ levels: v }))}
+          {dial('Gamma', '', 1, 10, step.gamma, (v) => ({ gamma: v }), 0.5)}
+          <Seg label="Dither" value={step.dither ?? 'none'} options={['none', 'ordered', 'diffusion'] as const} onPick={(v) => set({ ...step, dither: v }, 'Posterize dither')} />
+        </div>
+      );
+    case 'halftone':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <Seg label="Inks" value={step.mode ?? 'mono'} options={['mono', 'cmyk'] as const} onPick={(v) => set({ ...step, mode: v }, 'Halftone inks')} />
+          <Seg label="Dot" value={step.shape} options={['circle', 'square', 'diamond', 'line', 'ellipse'] as const} onPick={(v) => set({ ...step, shape: v }, 'Halftone dot')} />
+          {dial('Screen', 'px', 2, 40, step.spacing, (v) => ({ spacing: v }), 0.5)}
+          {dial('Angle', '°', 0, 180, step.angle, (v) => ({ angle: v }))}
+          {dial('Contrast', '', 1, 10, step.contrast, (v) => ({ contrast: v }), 0.5)}
+          {dial('Dot gain', '%', 0, 100, step.gain ?? 0, (v) => ({ gain: v }))}
+          {(step.mode ?? 'mono') === 'mono' && <HexField label="Ink" value={step.ink} onInput={(v) => set({ ...step, ink: v }, 'Halftone ink', 'fx-ht-ink')} />}
+          <HexField label="Paper" value={step.paper} onInput={(v) => set({ ...step, paper: v }, 'Halftone paper', 'fx-ht-paper')} />
+        </div>
+      );
+    case 'grain':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Size', 'px', 0.5, 4, step.size ?? 1, (v) => ({ size: v }), 0.1)}
+          {dial('Mono', '%', 0, 100, step.mono, (v) => ({ mono: v }))}
+          <button class="fig-reset" title="A new roll of the same grain" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle grain')}>
+            Reshuffle
+          </button>
+        </div>
+      );
+    case 'texture':
+      return (
+        <div class="fig-sliders fig-step-body">
+          <Seg label="Surface" value={step.kind} options={['paper', 'canvas', 'fibers', 'concrete', 'crosshatch'] as const} onPick={(v) => set({ ...step, kind: v }, 'Texture surface')} />
+          <Seg label="Blend" value={step.blend} options={['multiply', 'overlay', 'soft-light', 'hard-light', 'screen'] as const} onPick={(v) => set({ ...step, blend: v }, 'Texture blend')} />
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Scale', '', 5, 100, step.scale, (v) => ({ scale: v }))}
+          <button class="fig-reset" title="Another piece of the same surface" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle texture')}>
+            Reshuffle
+          </button>
+        </div>
+      );
+    case 'blur':
+      return <div class="fig-sliders fig-step-body">{dial('Radius', 'px', 0, 40, step.radius, (v) => ({ radius: v }), 0.5)}</div>;
+    case 'sharpen':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 200, step.amount, (v) => ({ amount: v }))}
+          {dial('Radius', 'px', 0.3, 5, step.radius, (v) => ({ radius: v }), 0.1)}
+          {dial('Threshold', '', 0, 50, step.threshold, (v) => ({ threshold: v }))}
+        </div>
+      );
+    case 'vignette':
+      return (
+        <div class="fig-sliders fig-step-body">
+          {dial('Amount', '%', 0, 100, step.amount, (v) => ({ amount: v }))}
+          {dial('Spread', '%', 5, 130, step.spread, (v) => ({ spread: v }))}
+          {dial('Feather', '%', 0, 100, step.feather ?? 60, (v) => ({ feather: v }))}
+          {dial('Roundness', '%', 0, 100, step.roundness ?? 0, (v) => ({ roundness: v }))}
+        </div>
+      );
+  }
+}
+
+const eyeOn = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />, <circle key="b" cx="12" cy="12" r="2.8" />);
+const eyeOff = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />, <path key="b" d="M4 20L20 4" />);
+
 /**
- * The page printed through the Riso press: a preset to start from, the few dials worth having on the
- * canvas, and every other dial one click away in the Riso tool itself.
+ * Effects as a stack, on the page or on the one layer picked. Each step can be switched off, turned down,
+ * moved up or down and removed, and opens to its own dials. Looks put a whole stack on at once.
  */
-function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: EffectStep[] | undefined; onEffects: FigLayersProps['onEffects']; onOpenRiso(): void; note: string | null; busy: boolean }) {
+function FigEffects({ steps, scope, onSteps, onOpenRiso, note, busy }: { steps: EffectStep[] | undefined; scope: string; onSteps(next: EffectStep[] | undefined, label: string, coalesce?: string): void; onOpenRiso?: () => void; note: string | null; busy: boolean }) {
+  const list = steps ?? [];
+  const [open, setOpen] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [looks, setLooks] = useState(false);
+  const replace = (i: number, next: EffectStep, label: string, coalesce?: string) => onSteps(list.map((s, j) => (j === i ? next : s)), label, coalesce);
+  const add = (kind: EffectKind) => {
+    const seed = 1 + Math.floor(Math.random() * 99999);
+    const made = kind === 'riso' && scope === 'Page' ? pageScreens(risoStep(0, seed)) : newStep(kind, seed);
+    onSteps([...list, made], `Add ${EFFECT_LABELS[kind].toLowerCase()}`);
+    setOpen(list.length);
+    setAdding(false);
+  };
+  const looksGrid = (
+    <div class="fig-fx-chips" role="group" aria-label="Looks">
+      {LOOKS.map((look) => (
+        <button
+          key={look.name}
+          class="fig-fx-chip"
+          title={`${look.name}: ${look.desc}. Replaces the effects here.`}
+          onClick={() => {
+            onSteps(look.steps().map((s) => (s.effect === 'riso' && scope === 'Page' ? pageScreens(s) : s)), `Look · ${look.name}`);
+            setOpen(null);
+            setLooks(false);
+          }}
+        >
+          {look.name}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div class="fig-effects">
+      <div class="fig-page-row">
+        <b>Effects</b>
+        <span class="fig-fx-scope" title={scope === 'Page' ? 'On the whole page, after every layer is drawn.' : 'On this layer alone, inside its own shape.'}>
+          {scope}
+        </span>
+        <span class="grow" />
+        {busy && <span class="fig-fx-busy">Rendering</span>}
+        <button class={`fig-text-btn ${looks ? 'on' : ''}`} title="Whole stacks, ready made" aria-expanded={looks} onClick={() => setLooks((v) => !v)}>
+          Looks
+        </button>
+        <button class={`fig-icon-btn ${adding ? 'on' : ''}`} title="Add an effect" aria-label="Add an effect" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+          {icon(<path key="a" d="M12 5v14M5 12h14" />)}
+        </button>
+      </div>
+      {adding && (
+        <ul class="fig-fx-menu" role="menu">
+          {EFFECT_KINDS.map((k) => (
+            <li key={k}>
+              <button role="menuitem" title={EFFECT_HELP[k]} onClick={() => add(k)}>
+                <b>{EFFECT_LABELS[k]}</b>
+                <span>{EFFECT_HELP[k]}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {looks && looksGrid}
+      {list.length === 0 && !adding && !looks && (
+        <p class="fig-fx-hint">
+          {scope === 'Page' ? 'Nothing on the page. Add an effect, or pick a look. Pick a layer to give it effects of its own.' : 'Nothing on this layer. Add an effect, or pick a look.'}
+        </p>
+      )}
+      {list.length > 0 && (
+        <ol class="fig-fx-stack">
+          {list.map((step, i) => {
+            const strength = Math.round((step.strength ?? 1) * 100);
+            const expanded = open === i;
+            return (
+              <li key={i} class={`fig-fx-step ${step.off ? 'off' : ''} ${expanded ? 'open' : ''}`}>
+                <div class="fig-fx-row">
+                  <button class="fig-icon-btn" title={step.off ? 'Off. Click to switch it on.' : 'On. Click to switch it off.'} aria-label={step.off ? `Switch ${EFFECT_LABELS[step.effect]} on` : `Switch ${EFFECT_LABELS[step.effect]} off`} aria-pressed={!step.off} onClick={() => replace(i, step.off ? (({ off: _o, ...rest }) => (void _o, rest as EffectStep))(step) : { ...step, off: true }, step.off ? 'Effect on' : 'Effect off')}>
+                    {step.off ? eyeOff() : eyeOn()}
+                  </button>
+                  <button class="fig-fx-name-btn" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : i)}>
+                    <span class="fig-fx-num">{i + 1}</span>
+                    {EFFECT_LABELS[step.effect]}
+                    <span class="caret">{expanded ? '▾' : '▸'}</span>
+                  </button>
+                  <span class="fig-fx-strength" title="Strength: how much of this step shows">
+                    <input type="range" min={0} max={100} value={strength} aria-label={`${EFFECT_LABELS[step.effect]} strength`} onInput={(e) => replace(i, { ...step, strength: Number((e.target as HTMLInputElement).value) / 100 }, 'Strength', `fx-strength-${i}`)} />
+                    <span>{strength}%</span>
+                  </span>
+                </div>
+                {expanded && (
+                  <>
+                    <StepDials step={step} set={(next, label, coalesce) => replace(i, next, label, coalesce)} onOpenRiso={scope === 'Page' ? onOpenRiso : undefined} />
+                    <div class="fig-fx-actions">
+                      <button class="fig-chip" disabled={i === 0} title="Run this step earlier" onClick={() => { onSteps(moveStep(list, i, i - 1), 'Move effect up'); setOpen(i - 1); }}>
+                        Up
+                      </button>
+                      <button class="fig-chip" disabled={i === list.length - 1} title="Run this step later" onClick={() => { onSteps(moveStep(list, i, i + 1), 'Move effect down'); setOpen(i + 1); }}>
+                        Down
+                      </button>
+                      <button class="fig-chip danger" title="Take this step off. Everything else stays." onClick={() => { onSteps(list.filter((_, j) => j !== i), 'Remove effect'); setOpen(null); }}>
+                        Remove
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {note && <p class="fig-fx-hint">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * A Riso step's settings: the inks, the screen, the few dials worth having on the canvas, the paper, the
+ * project's saved looks, and every other dial one click away in the Riso tool itself (page only).
+ */
+function RisoDials({ step, set, onOpenRiso }: { step: RisoStep; set(next: RisoStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
   const [ink, setInk] = useState<number | null>(null);
-  const step = effects?.find((e) => e.effect === 'riso');
-  const set = (next: EffectStep, label: string, coalesce?: string) => onEffects([next], label, coalesce);
   // The project's saved looks, kept current when one is saved in the Riso tab.
   const [saved, setSaved] = useState<SavedRisoPreset[]>(readSaved);
   const [naming, setNaming] = useState<string | null>(null);
@@ -266,7 +536,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const saveLook = () => {
-    if (!step || naming === null) return;
+    if (naming === null) return;
     try {
       localStorage.setItem(RISO_PROJECT_PRESETS, withSavedRisoPreset(localStorage.getItem(RISO_PROJECT_PRESETS), naming, step, `p${Date.now().toString(36)}`));
       setSaved(readSaved());
@@ -275,47 +545,6 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
     }
     setNaming(null);
   };
-
-  if (!step) {
-    return (
-      <div class="fig-effects">
-        <div class="fig-page-row">
-          <b>Effects</b>
-        </div>
-        <div class="fig-fx-presets">
-          {RISO_PRESETS.map((p, i) => (
-            <button key={p.name} class="fig-fx-preset" title={`Riso: ${p.desc}`} onClick={() => onEffects([pageScreens(risoStep(i, 1))], 'Riso print')}>
-              <span class="fig-fx-inks" aria-hidden="true">
-                {p.apply.inks.map((k, j) => (
-                  <i key={j} style={{ background: k.color }} />
-                ))}
-              </span>
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {saved.length > 0 && (
-          <>
-            <div class="fig-fx-sub">Saved in this project</div>
-            <div class="fig-fx-presets">
-              {saved.map((p) => (
-                <button key={p.id} class="fig-fx-preset" title={`${p.name}: a saved look`} onClick={() => onEffects([p.step], `Riso · ${p.name}`)}>
-                  <span class="fig-fx-inks" aria-hidden="true">
-                    {p.step.inks.map((k, j) => (
-                      <i key={j} style={{ background: k.color }} />
-                    ))}
-                  </span>
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        <p class="fig-fx-hint">{note ?? 'Print the page through the Riso press. The layers stay editable underneath.'}</p>
-      </div>
-    );
-  }
-
   const first = step.inks[0];
   const screen = first?.screen ?? 'dot';
   const addInk = () => {
@@ -328,18 +557,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
   };
 
   return (
-    <div class="fig-effects">
-      <div class="fig-page-row">
-        <b>Riso print</b>
-        {busy && <span class="fig-fx-busy">inking…</span>}
-        <button class="fig-text-btn" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
-          Save look
-        </button>
-        <button class="fig-icon-btn danger" title="Take the print off. The layers are untouched." aria-label="Remove effect" onClick={() => onEffects(undefined, 'Remove effect')}>
-          {icon(<path key="a" d="M6 6l12 12M18 6L6 18" />)}
-        </button>
-      </div>
-
+    <div class="fig-step-body">
       <div class="fig-page-row">
         {step.inks.map((k, i) => (
           <button key={i} class={`fig-dot ${ink === i ? 'on' : ''}`} style={{ background: k.color }} title={`Ink ${i + 1}: ${Riso.inkName(k.color)}. Click to change it.`} aria-label={`Ink ${i + 1}`} onClick={() => setInk(ink === i ? null : i)} />
@@ -418,7 +636,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
 
       <div class="fig-fx-chips" role="group" aria-label="Looks">
         {RISO_PRESETS.map((p, i) => (
-          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set(pageScreens(risoStep(i, step.seed)), `Riso · ${p.name}`)}>
+          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set({ ...pageScreens(risoStep(i, step.seed)), ...keepBase(step) }, `Riso · ${p.name}`)}>
             <span class="fig-fx-inks" aria-hidden="true">
               {p.apply.inks.map((k, j) => (
                 <i key={j} style={{ background: k.color }} />
@@ -428,7 +646,7 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
           </button>
         ))}
         {saved.map((p) => (
-          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set(p.step, `Riso · ${p.name}`)}>
+          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set({ ...p.step, ...keepBase(step) }, `Riso · ${p.name}`)}>
             <span class="fig-fx-inks" aria-hidden="true">
               {p.step.inks.map((k, j) => (
                 <i key={j} style={{ background: k.color }} />
@@ -447,14 +665,19 @@ function FigEffects({ effects, onEffects, onOpenRiso, note, busy }: { effects: E
         >
           Reshuffle
         </button>
-        <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
-          Open in Riso ↗
+        <button class="fig-chip" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
+          Save look
         </button>
+        {onOpenRiso && (
+          <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
+            Open in Riso ↗
+          </button>
+        )}
       </div>
-      {note && <p class="fig-fx-hint">{note}</p>}
     </div>
   );
 }
+
 
 const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : lo);
 
@@ -474,6 +697,8 @@ export interface FigBarProps {
   onRemove(): void;
   onUngroup(): void;
   onOrder(delta: number): void;
+  /** Saves the picked text's look into the design system's brand presets: into its own, or as a new one. */
+  onSavePreset?(mode: 'update' | 'new', label?: string): void;
 }
 
 type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' | 'brush' | null;
@@ -481,7 +706,7 @@ type Pop = 'style' | 'font' | 'colour' | 'fill' | 'outline' | 'tweak' | 'mark' |
 /** A design system font's key as a name: `georgia` is Georgia. */
 const fontName = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
-export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder }: FigBarProps) {
+export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplicate, onRemove, onUngroup, onOrder, onSavePreset }: FigBarProps) {
   const [pop, setPop] = useState<Pop>(null);
   const one = group ? undefined : layers[0];
   const inverted = layers.length > 0 && layers.every((l) => l.invert);
@@ -545,11 +770,12 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
   let tweaks: JSX.Element | null = null;
 
   if (text && style) {
-    const lookLabel = text.look ? (looks[text.look]?.label ?? 'Style') : 'Plain';
-    const amount = amountLabel(style.effect);
+    const lookLabel = text.look ? (looks[text.look]?.label ?? 'Preset') : 'Plain';
+    const preset = text.look ? looks[text.look] : undefined;
+    const tweaked = hasTweaks(text);
     quick = (
       <>
-        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Text style  ·  or type / while editing" onClick={() => toggle('style')}>
+        <button class={`fig-chip ${pop === 'style' ? 'on' : ''}`} title="Brand preset  ·  or type / while editing" onClick={() => toggle('style')}>
           <span class="fig-chip-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, text.look ?? null, 'Aa') }} />
           {lookLabel}
           <span class="caret">▾</span>
@@ -569,10 +795,19 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
         <Slide label="Size" unit="px" min={6} max={240} value={style.size} onInput={(v) => set('Text size', { size: v }, 'size')} />
         <Slide label="Letter spacing" unit="px" min={-6} max={30} step={0.5} value={style.letterSpacing} onInput={(v) => set('Letter spacing', { letterSpacing: v }, 'tracking')} />
         <Slide label="Line height" unit="%" min={60} max={220} value={style.lineHeight} onInput={(v) => set('Line height', { lineHeight: v }, 'leading')} />
-        {amount && <Slide label={amount} unit="" min={0} max={100} value={style.amount} onInput={(v) => set(amount, { amount: v }, 'amount')} />}
-        <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined })}>
-          Back to the style
-        </button>
+        {tweaked && (
+          <button class="fig-reset" onClick={() => set('Reset text', { size: undefined, letterSpacing: undefined, lineHeight: undefined, amount: undefined, font: undefined })}>
+            Back to {preset ? preset.label : 'the role'}
+          </button>
+        )}
+        {onSavePreset && (
+          <SavePreset
+            presetName={preset?.label ?? null}
+            canUpdate={Boolean(preset) && tweaked}
+            onUpdate={() => onSavePreset('update')}
+            onNew={(name) => onSavePreset('new', name)}
+          />
+        )}
       </>
     );
   } else if (sticky && style) {
@@ -651,7 +886,7 @@ export function FigBar({ ds, layers, group, left, top, below, onChange, onDuplic
       <div class="fig-bar-row">
         {quick}
         {tweaks && (
-          <button class={`fig-icon-btn ${pop === 'tweak' ? 'on' : ''}`} title="Tweak spacing and effects" aria-label="Tweak" onClick={() => toggle('tweak')}>
+          <button class={`fig-icon-btn ${pop === 'tweak' ? 'on' : ''}`} title="Size and spacing, and saving them as a brand preset" aria-label="Tune" onClick={() => toggle('tweak')}>
             {icon(<path key="a" d="M4 7h9M17 7h3M4 17h3M11 17h9" />, <circle key="b" cx="15" cy="7" r="2" />, <circle key="c" cx="9" cy="17" r="2" />)}
           </button>
         )}
@@ -943,4 +1178,165 @@ function readSaved(): SavedRisoPreset[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Saving a tweaked text back into the design system: into its preset, which every layer in it then
+ * follows, or as a new preset under a name. Both are one undo step.
+ */
+function SavePreset({ presetName, canUpdate, onUpdate, onNew }: { presetName: string | null; canUpdate: boolean; onUpdate(): void; onNew(name: string): void }) {
+  const [naming, setNaming] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement | null>(null);
+  const open = naming !== null;
+  // Selected once as it opens, so typing replaces the suggested name.
+  useEffect(() => {
+    if (open) {
+      field.current?.focus();
+      field.current?.select();
+    }
+  }, [open]);
+  if (naming !== null) {
+    return (
+      <form
+        class="fig-fx-name"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onNew(naming.trim() || 'New preset');
+          setNaming(null);
+        }}
+      >
+        <input
+          ref={field}
+          value={naming}
+          maxLength={40}
+          placeholder="Name this preset"
+          aria-label="Preset name"
+          onInput={(e) => setNaming((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            // Letters are words here, not the canvas's tool keys.
+            e.stopPropagation();
+            if (e.key === 'Escape') setNaming(null);
+          }}
+        />
+        <button class="fig-chip primary" type="submit">
+          Save
+        </button>
+      </form>
+    );
+  }
+  return (
+    <div class="fig-fx-actions">
+      {canUpdate && (
+        <button class="fig-chip" title={`Rewrite ${presetName} with these settings. Every text in it follows.`} onClick={onUpdate}>
+          Update preset
+        </button>
+      )}
+      <button class="fig-chip" title="Save these settings as a new brand preset in the design system." onClick={() => setNaming(presetName ? `${presetName} copy` : '')}>
+        New preset
+      </button>
+    </div>
+  );
+}
+
+// --- properties -------------------------------------------------------------------------------------
+
+/** One number: a short label, the field, committed on Enter, on leaving the field, or on the arrow keys. */
+function PropNum({ label, title, value, min, max, step = 1, suffix, disabled, onCommit }: { label: string; title: string; value: number; min?: number; max?: number; step?: number; suffix?: string; disabled?: boolean; onCommit(v: number): void }) {
+  const field = useRef<HTMLInputElement | null>(null);
+  // The field shows the layer's number unless it is being typed into; a drag on the canvas updates it live.
+  useEffect(() => {
+    const el = field.current;
+    if (el && document.activeElement !== el) el.value = String(value);
+  }, [value]);
+  const commit = (el: HTMLInputElement) => {
+    const v = Number(el.value);
+    if (!Number.isFinite(v)) return void (el.value = String(value));
+    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+    if (clamped !== value) onCommit(clamped);
+    else el.value = String(value);
+  };
+  return (
+    <label class={`fig-prop ${disabled ? 'off' : ''}`} title={title}>
+      <span class="fig-prop-label">{label}</span>
+      <input
+        ref={field}
+        type="number"
+        defaultValue={String(value)}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        onChange={(e) => commit(e.currentTarget)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') commit(e.currentTarget);
+        }}
+      />
+      {suffix && <span class="fig-prop-unit">{suffix}</span>}
+    </label>
+  );
+}
+
+const ALIGNS: Array<{ edge: AlignEdge; label: string; d: string }> = [
+  { edge: 'left', label: 'Align left', d: 'M4 4v16M8 8h10M8 16h6' },
+  { edge: 'centre', label: 'Align centre', d: 'M12 4v16M6 8h12M8 16h8' },
+  { edge: 'right', label: 'Align right', d: 'M20 4v16M6 8h10M10 16h6' },
+  { edge: 'top', label: 'Align top', d: 'M4 4h16M8 8v10M16 8v6' },
+  { edge: 'middle', label: 'Align middle', d: 'M4 12h16M8 6v12M16 8v8' },
+  { edge: 'bottom', label: 'Align bottom', d: 'M4 20h16M8 6v10M16 10v6' },
+];
+
+/**
+ * Exact numbers for what is picked, the way a layout tool shows them: X, Y, W, H, rotation, opacity,
+ * and a row that lines it up with the page. A drawing (a group) shows the box around its strokes and
+ * scales them together; it does not turn. Text finds its own height, so H is shown but not set.
+ */
+function FigProps({ block, pickedKey, heights, onLayers }: { block: FreeformBlock; pickedKey: string; heights: Record<string, number>; onLayers: FigLayersProps['onLayers'] }) {
+  const sel = selectionOf(block, pickedKey);
+  if (!sel) return null;
+  const group = Boolean(sel.group);
+  const g = geometryOf(sel.layers, group, heights);
+  if (!g) return null;
+  const one = sel.layers[0]!;
+  const name = group ? 'Drawing' : LAYER_NAMES[one.kind];
+  const box = (label: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => onLayers(label, withGeometry(sel.layers, group, patch, heights));
+  return (
+    <div class="fig-page fig-props">
+      <div class="fig-page-row">
+        <b>{name}</b>
+      </div>
+      <div class="fig-prop-grid">
+        <PropNum label="X" title="Left edge, in pixels from the page's left" value={g.x} onCommit={(v) => box('Move', { x: v })} />
+        <PropNum label="Y" title="Top edge, in pixels from the page's top" value={g.y} onCommit={(v) => box('Move', { y: v })} />
+        <PropNum label="W" title="Width, in pixels" value={g.width} min={1} onCommit={(v) => box('Resize', { width: v })} />
+        <PropNum
+          label="H"
+          title={g.heightFixed ? 'Text is as tall as its words. Change the width or the size to change it.' : 'Height, in pixels'}
+          value={g.height}
+          min={1}
+          disabled={g.heightFixed}
+          onCommit={(v) => box('Resize', { height: v })}
+        />
+        <PropNum
+          label="R"
+          title={g.rotation === null ? 'A drawing scales but does not turn.' : 'Rotation, in degrees clockwise'}
+          value={g.rotation ?? 0}
+          step={1}
+          suffix="°"
+          disabled={g.rotation === null}
+          onCommit={(v) => onLayers('Rotate', [withRotation(one, v)])}
+        />
+        <PropNum label="Op" title="Opacity, 0 to 100 percent" value={Math.round(g.opacity * 100)} min={0} max={100} suffix="%" onCommit={(v) => onLayers('Opacity', withOpacity(sel.layers, v / 100))} />
+      </div>
+      <div class="fig-align" role="group" aria-label="Align to page">
+        {ALIGNS.map((a) => (
+          <button key={a.edge} class="fig-icon-btn" title={`${a.label} to the page`} aria-label={`${a.label} to the page`} onClick={() => onLayers(a.label, alignToPage(sel.layers, block, a.edge, heights))}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d={a.d} />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

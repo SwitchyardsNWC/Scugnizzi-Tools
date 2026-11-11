@@ -38,6 +38,7 @@ import { blankTemplate } from '../model/starters.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { canvasBlob, freeformCanvas } from '../app/picture.ts';
+import { startTheme } from '../app/theme.ts';
 import { keepPicture, loadKeptPictures } from '../app/kept-pictures.ts';
 import { readStudioPresence, STUDIO_PRESENCE, STUDIO_REQUEST, type StudioPresence } from '../model/freeform-link.ts';
 import { CanvasMenu } from '../app/CanvasMenu.tsx';
@@ -52,6 +53,9 @@ import { useProject, type Project } from '../project/useProject.ts';
 import { FramesMenu } from './FramesMenu.tsx';
 import '../app/app.css';
 import './freeform.css';
+import { hasEffects } from '../model/effects.ts';
+
+startTheme();
 
 const store = siteStore();
 
@@ -632,7 +636,7 @@ function FreeformTool() {
   // What the page sits on. A plain export keeps a transparent page; a print needs paper under it.
   const section = editor.template.sections.find((s) => s.id === found.sectionId);
   const ground = colorOf(ds, block.background) ?? section?.containerColor ?? section?.bandColor ?? '#ffffff';
-  const printed = Boolean(block.effects?.length);
+  const printed = hasEffects(block);
   const fileBase = slug(activeEntry.name);
   const failed = (cause: unknown) => notify(cause instanceof Error ? cause.message : 'The picture could not be drawn.');
   const exportPng = async () => {

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compile/compile.ts';
 import { brushOutline, canvasTypeSampleSvg, freeformSvg } from '../src/compile/freeform.ts';
 import { lint } from '../src/compile/lint.ts';
-import { canvasTypeOf, DEFAULT_CANVAS_TYPE, DEFAULT_DESIGN_SYSTEM, theme } from '../src/model/design-system.ts';
+import { canvasTypeOf, DEFAULT_CANVAS_TYPE, DEFAULT_DESIGN_SYSTEM, normalizePreset, theme } from '../src/model/design-system.ts';
 import { convertBlock, renderAsImage } from '../src/model/edit.ts';
 import {
   addLayer,
@@ -278,32 +278,73 @@ describe('drawings group themselves', () => {
   });
 });
 
-describe('canvas type', () => {
+describe('brand presets', () => {
   const withLook = (look?: string) =>
     surface({ layers: [{ kind: 'text', id: 't', text: 'Hey', role: 'h2', color: null, x: 10, y: 10, width: 300, align: 'center', ...(look ? { look } : {}) }] });
   const svgOf = (look?: string) => freeformSvg(withLook(look), DEFAULT_DESIGN_SYSTEM);
 
-  it('falls back to the shipped styles for a system that has none', () => {
+  it('falls back to the shipped presets for a system that has none, and to none for a system that deleted them all', () => {
     expect(Object.keys(canvasTypeOf(DEFAULT_DESIGN_SYSTEM))).toEqual(Object.keys(DEFAULT_CANVAS_TYPE));
+    expect(canvasTypeOf({ ...DEFAULT_DESIGN_SYSTEM, canvasType: {} })).toEqual({});
   });
 
-  it('draws each effect as something the picture carries', () => {
+  /** A preset of each part, so the renderer is tested on parts rather than on whatever the shipped presets use. */
+  const parts = {
+    ...DEFAULT_DESIGN_SYSTEM,
+    canvasType: {
+      stroked: { label: 'Stroked', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, stroke: { color: '#011272', width: 2 } },
+      tagged: { label: 'Tagged', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, stroke: { color: '#011272', width: 4, outside: true } },
+      shadowed: { label: 'Shadowed', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, shadow: { color: '#d10000', x: 3, y: 3, blur: 0 } },
+      marked: { label: 'Marked', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, highlight: { color: '#FFE58A', cover: 40 } },
+      curved: { label: 'Curved', size: 30, weight: 'bold' as const, lineHeight: 100, uppercase: true, color: null, curve: 45 },
+    },
+  };
+  const partOf = (look: string) => freeformSvg(withLook(look), parts);
+
+  it('draws each part as something the picture carries', () => {
     expect(svgOf()).not.toContain('text-shadow');
-    expect(svgOf('outline')).toContain('-webkit-text-stroke:');
-    expect(svgOf('retro')).toContain('text-shadow:');
-    expect((svgOf('sticker').match(/px 0 #ffffff/g) ?? []).length).toBe(16);
-    expect(svgOf('highlight')).toContain('linear-gradient(transparent');
-    expect((svgOf('marker').match(/display:inline-block/g) ?? []).length).toBe(3);
-    expect(svgOf('arc')).toMatch(/<textPath href="#sy-arc-t-10-10-300" startOffset="50%" text-anchor="middle">HEY<\/textPath>/);
+    expect(partOf('stroked')).toContain('-webkit-text-stroke:2px #011272');
+    expect(partOf('shadowed')).toContain('text-shadow:3px 3px 0px #d10000');
+    expect((partOf('tagged').match(/px 0 #011272/g) ?? []).length).toBe(12);
+    expect(partOf('marked')).toContain('linear-gradient(transparent');
+    expect(partOf('curved')).toMatch(/<textPath href="#sy-arc-t-10-10-300" startOffset="50%" text-anchor="middle">HEY<\/textPath>/);
   });
 
-  it('wobbles the same way every time, and a changed style is a stale picture', () => {
-    expect(svgOf('marker')).toBe(svgOf('marker'));
+  it('ships presets drawn from type alone, named for their use', () => {
+    const shipped = Object.values(DEFAULT_CANVAS_TYPE);
+    expect(shipped.map((p) => p.label)).toEqual(['Letterhead', 'Display serif', 'Shop sign', 'Supper club', 'Typed menu', 'Window gilding']);
+    expect(shipped.filter((p) => p.stroke || p.shadow || p.highlight)).toEqual([]);
+    expect(svgOf('arc')).toContain('<textPath');
+    expect(svgOf('highlight')).toContain(`font-family:${DEFAULT_DESIGN_SYSTEM.fonts['courier']}`);
+  });
+
+  it('combines parts: a stroke and a shadow together, and both on a curve', () => {
+    const ds2 = { ...DEFAULT_DESIGN_SYSTEM, canvasType: { both: { label: 'Both', size: 30, weight: 'bold' as const, lineHeight: 100, color: null, stroke: { color: '#000000', width: 2 }, shadow: { color: '#ff0000', x: 2, y: 4, blur: 6 } } } };
+    const svg = freeformSvg(withLook('both'), ds2);
+    expect(svg).toContain('-webkit-text-stroke:2px #000000');
+    expect(svg).toContain('text-shadow:2px 4px 6px #ff0000');
+    const curved = { ...ds2, canvasType: { both: { ...ds2.canvasType.both, curve: 40 } } };
+    const arc = freeformSvg(withLook('both'), curved);
+    expect(arc).toContain('stroke="#000000" stroke-width="2"');
+    expect(arc).toContain('<feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#ff0000"');
+  });
+
+  it('reads a preset saved with the old single effect as the parts that draw it', () => {
+    expect(normalizePreset({ label: 'Old', size: 20, weight: 'bold', lineHeight: 100, color: null, effect: 'shadow', effectColor: '#123456', amount: 50 })).toEqual({
+      label: 'Old', size: 20, weight: 'bold', lineHeight: 100, color: null, shadow: { color: '#123456', x: 5, y: 5, blur: 0 },
+    });
+    expect(normalizePreset({ label: 'Wob', size: 20, weight: 'bold', lineHeight: 100, color: null, effect: 'wobble', effectColor: null, amount: 30 })).toEqual({ label: 'Wob', size: 20, weight: 'bold', lineHeight: 100, color: null });
+    expect(normalizePreset({ label: 'Arc', size: 20, weight: 'bold', lineHeight: 100, color: null, effect: 'arc', effectColor: null, amount: 45 }).curve).toBe(45);
+  });
+
+  it('draws the same every time, and a changed preset is a stale picture', () => {
+    expect(partOf('curved')).toBe(partOf('curved'));
     expect(recipeHash(withLook('outline'))).not.toBe(recipeHash(withLook('retro')));
   });
 
   it('samples a style with the same renderer', () => {
-    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, 'retro', 'Aa')).toContain('text-shadow:');
+    expect(canvasTypeSampleSvg(parts, 'shadowed', 'Aa')).toContain('text-shadow:');
+    expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, 'sticker', 'Aa')).toContain('font-style:italic');
     expect(canvasTypeSampleSvg(DEFAULT_DESIGN_SYSTEM, null, 'Aa')).toContain('>Aa</div>');
   });
 });
@@ -338,28 +379,28 @@ describe('the canvas’s own controls', () => {
     expect(moveItem(same, 'f', 't', 2)).toBe(same);
   });
 
-  it('draws a layer’s own size, spacing and effect strength over its style', () => {
+  it('draws a layer’s own size and spacing over its preset', () => {
     const text = { kind: 'text' as const, id: 'l1', text: 'Big', role: 'h2', color: null, x: 0, y: 0, width: 300, align: 'left' as const, look: 'retro' };
     const plain = freeformSvg(surface({ layers: [text] }), ds);
     expect(plain).toContain(`font-size:${DEFAULT_CANVAS_TYPE.retro!.size}px`);
-    const tweaked = freeformSvg(surface({ layers: [{ ...text, size: 72, letterSpacing: 6, lineHeight: 140, amount: 100 }] }), ds);
+    const tweaked = freeformSvg(surface({ layers: [{ ...text, size: 72, letterSpacing: 6, lineHeight: 140 }] }), ds);
     expect(tweaked).toContain('font-size:72px');
     expect(tweaked).toContain('letter-spacing:6px');
     expect(tweaked).toContain('line-height:140%');
-    expect(tweaked).toContain('text-shadow:9px 9px 0');
+    expect(tweaked).toContain('text-transform:uppercase');
     expect(textStyleOf({ ...text, size: 72 }, ds).size).toBe(72);
   });
 
   it('answers to slash commands for styles, sizes, spacing and colour', () => {
     const text = { kind: 'text' as const, id: 'l1', text: 'Hi', role: 'h2', color: null, x: 0, y: 0, width: 300, align: 'left' as const };
     const all = canvasCommands(text, ds);
-    expect(filterCommands(all, 'mar')[0]!.patch).toEqual({ look: 'marker', amount: undefined });
+    expect(filterCommands(all, 'letterh')[0]!.patch).toEqual({ look: 'marker', amount: undefined });
     expect(filterCommands(all, 'huge')[0]!.patch).toEqual({ size: Math.round(textStyleOf(text, ds).size * 2.2) });
     expect(filterCommands(all, 'wide')[0]!.id).toBe('spacing-wide');
     expect(filterCommands(all, 'navy')[0]!.patch).toEqual({ color: 'navy' });
     const note = { kind: 'sticky' as const, id: 'n', text: '', role: 'body', color: null, fill: STICKY_COLORS[0]!, x: 0, y: 0, width: 180, height: 180 };
     const noteCommands = canvasCommands(note, ds);
-    expect(noteCommands.some((c) => c.group === 'Style')).toBe(false);
+    expect(noteCommands.some((c) => c.group === 'Preset')).toBe(false);
     expect(filterCommands(noteCommands, 'pink')[0]!.patch).toEqual({ fill: STICKY_COLORS[1] });
   });
 

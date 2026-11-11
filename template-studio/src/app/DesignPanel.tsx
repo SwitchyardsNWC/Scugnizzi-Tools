@@ -1,4 +1,5 @@
-import { CANVAS_EFFECTS, canvasTypeOf, type CanvasEffect, type CanvasTextStyle } from '../model/design-system.ts';
+import { canvasTypeOf, type CanvasTextStyle } from '../model/design-system.ts';
+import { addPreset as addBrandPreset, duplicatePreset, freshLabel, presetUses, removePreset as removeBrandPreset, updatePreset as updateBrandPreset, withPresets } from '../model/brand-presets.ts';
 import { roleIsStyled } from '../compile/colors.ts';
 import { canvasTypeSampleSvg } from '../compile/freeform.ts';
 import type { ComponentChildren } from 'preact';
@@ -172,7 +173,7 @@ export function DesignPanel({ editor, onClose, device, onDevice, systems, folder
       <ButtonPanel editor={editor} ds={ds} phone={phone} />
       <ImagePanel editor={editor} ds={ds} />
       {/* Playful type for the freeform canvas, last and on its own: it follows none of the email's rules above. */}
-      <CanvasTypePanel editor={editor} ds={ds} />
+      <BrandPresetsPanel editor={editor} ds={ds} />
 
       <SystemFooter
         editor={editor}
@@ -1363,96 +1364,197 @@ function PagePanel({ editor, ds, phone, onPadHot }: { editor: Editor; ds: Design
   );
 }
 
-// --- canvas type -----------------------------------------------------------------------------------
-
-const AMOUNT_LABEL: Record<CanvasEffect, string> = { none: 'Amount', outline: 'Outline', shadow: 'Shadow', highlight: 'Highlight', sticker: 'Border', wobble: 'Wobble', arc: 'Bend' };
+// --- brand presets ---------------------------------------------------------------------------------
 
 /**
- * Canvas type: playful text styles for the freeform canvas.
+ * Brand presets: the type the freeform canvas sets words in.
  *
- * Its own category because it follows none of the email's rules. It only ever ships as part of a
- * picture, so it can outline, shadow, highlight, sticker, wobble and bend (learnings 3.68). Each
- * chip is drawn by the canvas's own renderer, so the sample is exactly the picture.
+ * Jared: take away the text effects, "make brand presets. But allow them to be tweaked, edited, and
+ * deleted. And new ones added." A preset is type settings plus four parts, each switched on or off:
+ * stroke, shadow, highlight, curve. Each chip is drawn by the canvas's own renderer, so the sample is
+ * exactly the picture. A tweak made on the canvas can be saved back here from the text's tune menu.
  */
-function CanvasTypePanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
-  const styles = canvasTypeOf(ds);
-  const keys = Object.keys(styles);
+function BrandPresetsPanel({ editor, ds }: { editor: Editor; ds: DesignSystem }) {
+  const presets = canvasTypeOf(ds);
+  const keys = Object.keys(presets);
   const [chosen, setChosen] = useState(keys[0] ?? '');
-  const key = styles[chosen] ? chosen : (keys[0] ?? '');
-  const style = styles[key];
-  if (!style) return null;
-  const set = (change: Partial<CanvasTextStyle>) => editor.set('ds.canvasType', { ...styles, [key]: { ...style, ...change } });
+  const [removing, setRemoving] = useState(false);
+  const key = presets[chosen] ? chosen : (keys[0] ?? '');
+  const style = presets[key];
+  const set = (change: Partial<CanvasTextStyle>) => editor.set('ds.canvasType', updateBrandPreset(presets, key, change));
   const fonts = Object.keys(ds.fonts);
+  const commitPresets = (label: string, next: Record<string, CanvasTextStyle>, pick?: string) => {
+    editor.commit(label, withPresets(editor.template, next));
+    if (pick !== undefined) setChosen(pick);
+  };
+  const addNew = () => {
+    const made = addBrandPreset(presets, { label: 'New preset', size: 32, weight: 'bold', lineHeight: 110, color: null });
+    commitPresets('New preset', made.presets, made.key);
+  };
+  const uses = style ? presetUses(editor.template, key) : 0;
 
   return (
     <Panel
-      name="Canvas type"
-      summary={`${Object.keys(canvasTypeOf(ds)).length} styles`}
-      help="Playful type for the freeform canvas. It ships inside a picture, so it can outline, shadow, highlight, sticker, wobble and bend. Pick a style on the canvas with the Text tool."
+      name="Brand presets"
+      summary={`${keys.length} preset${keys.length === 1 ? '' : 's'}`}
+      help="Type for the freeform canvas, shared by every template and frame on this design system. Pick one on the canvas with the Text tool; tweaks made there can be saved back here."
     >
       <div class="canvas-type-chips">
         {keys.map((k) => (
-          <button key={k} class={`canvas-type-chip ${k === key ? 'on' : ''}`} aria-pressed={k === key} title={`${styles[k]!.label}. Click to tune it.`} onClick={() => setChosen(k)}>
-            <span class="canvas-type-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Play!') }} />
-            <span class="canvas-type-name">{styles[k]!.label}</span>
+          <button key={k} class={`canvas-type-chip ${k === key ? 'on' : ''}`} aria-pressed={k === key} title={`${presets[k]!.label}. Click to edit it.`} onClick={() => { setChosen(k); setRemoving(false); }}>
+            <span class="canvas-type-sample" dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Club') }} />
+            <span class="canvas-type-name">{presets[k]!.label}</span>
           </button>
         ))}
       </div>
-      <div class="controls">
-        <div class="field" title="What the style does beyond the letters.">
-          <label>Effect</label>
-          <select value={style.effect} onChange={(e) => set({ effect: (e.target as HTMLSelectElement).value as CanvasEffect })}>
-            {CANVAS_EFFECTS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div class="field">
-          <label>Font</label>
-          <select
-            value={style.font ?? ''}
-            onChange={(e) => {
-              const v = (e.target as HTMLSelectElement).value;
-              set({ font: v || undefined });
-            }}
-          >
-            <option value="">The email’s font</option>
-            {fonts.map((f) => (
-              <option key={f} value={f}>
-                {f[0]!.toUpperCase() + f.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div class="field">
-          <label>Weight</label>
-          <select value={style.weight} onChange={(e) => set({ weight: (e.target as HTMLSelectElement).value as 'normal' | 'bold' })}>
-            <option value="normal">Regular</option>
-            <option value="bold">Bold</option>
-          </select>
-        </div>
-        <label class="field toggle">
-          <input type="checkbox" checked={Boolean(style.uppercase)} onChange={(e) => set({ uppercase: (e.target as HTMLInputElement).checked })} />
-          <span>Uppercase</span>
-        </label>
-        <label class="field toggle">
-          <input type="checkbox" checked={Boolean(style.italic)} onChange={(e) => set({ italic: (e.target as HTMLInputElement).checked })} />
-          <span>Italic</span>
-        </label>
+      <div class="preset-actions">
+        <button class="btn" onClick={addNew}>
+          New preset
+        </button>
+        {style && (
+          <button class="btn" onClick={() => { const made = duplicatePreset(presets, key); commitPresets('Duplicate preset', made.presets, made.key); }}>
+            Duplicate
+          </button>
+        )}
+        {style && (
+          <button class="btn chip bad" onClick={() => (uses ? setRemoving(true) : commitPresets('Delete preset', removeBrandPreset(presets, key), ''))}>
+            Delete
+          </button>
+        )}
       </div>
-      <div class="dials">
-        <Dial label="Size" value={style.size} onChange={(v) => set({ size: v })} min={8} max={140} suffix="px" />
-        <Dial label="Line height" value={style.lineHeight} onChange={(v) => set({ lineHeight: v })} min={70} max={200} suffix="%" />
-        <Dial label="Tracking" value={style.letterSpacing ?? 0} onChange={(v) => set({ letterSpacing: v })} min={-4} max={20} step={0.5} suffix="px" zero="Normal" />
-        {style.effect !== 'none' && <Dial label={AMOUNT_LABEL[style.effect]} value={style.amount} onChange={(v) => set({ amount: v })} min={0} max={100} suffix="%" />}
-      </div>
-      <PresetSlot ds={ds} label="Colour" value={style.color} onChange={(v: CanvasTextStyle['color']) => set({ color: v })} help="The letters. Left alone they take the ink." allowNone noneLabel="Ink" />
-      {(style.effect === 'outline' || style.effect === 'shadow' || style.effect === 'highlight' || style.effect === 'sticker') && (
-        <PresetSlot ds={ds} label="Effect colour" value={style.effectColor} onChange={(v: CanvasTextStyle['color']) => set({ effectColor: v })} help="The outline, the shadow, the highlight or the sticker's border." allowNone noneLabel="Auto" />
+      {removing && style && (
+        <div class="swatch-remove">
+          <p>
+            <b>{style.label}</b> is used by {uses} text layer{uses === 1 ? '' : 's'} in this template. Deleting it sets {uses === 1 ? 'that one' : 'them'} back to plain type.
+          </p>
+          <div class="swatch-remove-row">
+            <button class="btn chip bad" onClick={() => { setRemoving(false); commitPresets('Delete preset', removeBrandPreset(presets, key), ''); }}>
+              Delete anyway
+            </button>
+            <button class="link" onClick={() => setRemoving(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {!style ? (
+        <p class="hint">No presets. Words on the canvas set in the heading role until one is added.</p>
+      ) : (
+        <>
+          <div class="controls">
+            <div class="field">
+              <label>Name</label>
+              <input
+                key={key}
+                type="text"
+                value={style.label}
+                maxLength={40}
+                onChange={(e) => {
+                  const v = (e.target as HTMLInputElement).value.trim();
+                  if (v && v !== style.label) set({ label: freshLabel(removeBrandPreset(presets, key), v) });
+                }}
+              />
+            </div>
+            <div class="field">
+              <label>Font</label>
+              <select
+                value={style.font ?? ''}
+                onChange={(e) => {
+                  const v = (e.target as HTMLSelectElement).value;
+                  set({ font: v || undefined });
+                }}
+              >
+                <option value="">The email’s font</option>
+                {fonts.map((f) => (
+                  <option key={f} value={f}>
+                    {f[0]!.toUpperCase() + f.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="field">
+              <label>Weight</label>
+              <select value={style.weight} onChange={(e) => set({ weight: (e.target as HTMLSelectElement).value as 'normal' | 'bold' })}>
+                <option value="normal">Regular</option>
+                <option value="bold">Bold</option>
+              </select>
+            </div>
+            <label class="field toggle">
+              <input type="checkbox" checked={Boolean(style.uppercase)} onChange={(e) => set({ uppercase: (e.target as HTMLInputElement).checked || undefined })} />
+              <span>Uppercase</span>
+            </label>
+            <label class="field toggle">
+              <input type="checkbox" checked={Boolean(style.italic)} onChange={(e) => set({ italic: (e.target as HTMLInputElement).checked || undefined })} />
+              <span>Italic</span>
+            </label>
+          </div>
+          <div class="dials">
+            <Dial label="Size" value={style.size} onChange={(v) => set({ size: v })} min={8} max={140} suffix="px" />
+            <Dial label="Line height" value={style.lineHeight} onChange={(v) => set({ lineHeight: v })} min={70} max={200} suffix="%" />
+            <Dial label="Tracking" value={style.letterSpacing ?? 0} onChange={(v) => set({ letterSpacing: v })} min={-4} max={20} step={0.5} suffix="px" zero="Normal" />
+          </div>
+          <PresetSlot ds={ds} label="Colour" value={style.color} onChange={(v: CanvasTextStyle['color']) => set({ color: v })} help="The letters. Left alone they take the ink." allowNone noneLabel="Ink" />
+
+          <PresetPart name="Stroke" on={Boolean(style.stroke)} help="An outline on the letters, or a border around them." onToggle={(on) => set({ stroke: on ? { color: null, width: 2 } : undefined })}>
+            {style.stroke && (
+              <>
+                <PresetSlot ds={ds} label="Stroke colour" value={style.stroke.color} onChange={(v: CanvasTextStyle['color']) => set({ stroke: { ...style.stroke!, color: v } })} help="Left alone it takes the ink." allowNone noneLabel="Ink" />
+                <div class="dials">
+                  <Dial label="Width" value={style.stroke.width} onChange={(v) => set({ stroke: { ...style.stroke!, width: v } })} min={0.5} max={16} step={0.5} suffix="px" />
+                </div>
+                <label class="field toggle" title="Outside draws a border around the letters, the way a die-cut tag reads. Off strokes the letters themselves.">
+                  <input type="checkbox" checked={Boolean(style.stroke.outside)} onChange={(e) => set({ stroke: { ...style.stroke!, outside: (e.target as HTMLInputElement).checked || undefined } })} />
+                  <span>Outside the letters</span>
+                </label>
+              </>
+            )}
+          </PresetPart>
+          <PresetPart name="Shadow" on={Boolean(style.shadow)} help="A shadow behind the letters. Blur 0 is a hard, printed offset." onToggle={(on) => set({ shadow: on ? { color: null, x: 3, y: 3, blur: 0 } : undefined })}>
+            {style.shadow && (
+              <>
+                <PresetSlot ds={ds} label="Shadow colour" value={style.shadow.color} onChange={(v: CanvasTextStyle['color']) => set({ shadow: { ...style.shadow!, color: v } })} help="Left alone it takes the ink." allowNone noneLabel="Ink" />
+                <div class="dials">
+                  <Dial label="X" value={style.shadow.x} onChange={(v) => set({ shadow: { ...style.shadow!, x: v } })} min={-20} max={20} step={0.5} suffix="px" />
+                  <Dial label="Y" value={style.shadow.y} onChange={(v) => set({ shadow: { ...style.shadow!, y: v } })} min={-20} max={20} step={0.5} suffix="px" />
+                  <Dial label="Blur" value={style.shadow.blur} onChange={(v) => set({ shadow: { ...style.shadow!, blur: v } })} min={0} max={30} suffix="px" zero="Hard" />
+                </div>
+              </>
+            )}
+          </PresetPart>
+          <PresetPart name="Highlight" on={Boolean(style.highlight)} help="A band of colour behind each line, from the baseline up. Not drawn on a curve." onToggle={(on) => set({ highlight: on ? { color: '#FFE58A', cover: 40 } : undefined })}>
+            {style.highlight && (
+              <>
+                <PresetSlot ds={ds} label="Highlight colour" value={style.highlight.color} onChange={(v: CanvasTextStyle['color']) => set({ highlight: { ...style.highlight!, color: v } })} help="The band behind the words." />
+                <div class="dials">
+                  <Dial label="Cover" value={style.highlight.cover} onChange={(v) => set({ highlight: { ...style.highlight!, cover: v } })} min={10} max={100} suffix="%" />
+                </div>
+              </>
+            )}
+          </PresetPart>
+          <PresetPart name="Curve" on={Boolean(style.curve)} help="Bends the line along an arc, for a seal or a badge. A curve sets one line." onToggle={(on) => set({ curve: on ? 45 : undefined })}>
+            {style.curve ? (
+              <div class="dials">
+                <Dial label="Bend" value={style.curve} onChange={(v) => set({ curve: Math.max(1, v) })} min={1} max={100} suffix="%" />
+              </div>
+            ) : null}
+          </PresetPart>
+        </>
       )}
     </Panel>
+  );
+}
+
+/** One part of a preset: a switch, and its settings while it is on. */
+function PresetPart({ name, on, help, onToggle, children }: { name: string; on: boolean; help: string; onToggle(on: boolean): void; children: ComponentChildren }) {
+  return (
+    <div class={`preset-part ${on ? 'on' : ''}`}>
+      <label class="preset-part-head" title={help}>
+        <input type="checkbox" checked={on} onChange={(e) => onToggle((e.target as HTMLInputElement).checked)} />
+        <span>{name}</span>
+        <span class="preset-part-state">{on ? 'On' : 'Off'}</span>
+      </label>
+      {on && <div class="preset-part-body">{children}</div>}
+    </div>
   );
 }
 

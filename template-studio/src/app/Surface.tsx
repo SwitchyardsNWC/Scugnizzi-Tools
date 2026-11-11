@@ -34,16 +34,18 @@ import {
   type Box,
 } from '../model/freeform.ts';
 import { canvasCommands, filterCommands, slashAt, textStyleOf, type CanvasCommand } from '../model/canvas-text.ts';
+import { savePresetFromLayer } from '../model/brand-presets.ts';
+import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
 import { useCanvasSettings } from './canvas-settings.ts';
 import { TouchGestures } from './gestures.ts';
 import { glide, PanTracker } from './inertia.ts';
-import { HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects } from '../model/effects.ts';
+import { hasEffects, HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects, withRisoStep } from '../model/effects.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
 import { MARKS } from '../model/marks.ts';
-import type { Brush, FreeformBlock, FreeformLayer, StyleRange, Template, TextMarks } from '../model/types.ts';
+import type { Brush, FreeformBlock, FreeformLayer, RisoStep, StyleRange, Template, TextMarks } from '../model/types.ts';
 import { FigBar, FigFormat, FigLayers, FigSlash, type FormatState } from './FigPanel.tsx';
 import { editableHtml, keepEnd, readEditable, selectionOffsets, setSelectionOffsets } from './rich-editing.ts';
 import { applyMarks, clearMarks, markState, spliceText, toggleMark, type MarkKey } from '../model/rich-text.ts';
@@ -69,7 +71,6 @@ import {
   ERASER,
   clampZoom,
   deg,
-  easeOutBack,
   easeInOutCubic,
   easeOutCubic,
   rotatePoint,
@@ -160,7 +161,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   brushRef.current = brush;
   /** Where the eraser is over the page, for its ring. */
   const [eraserAt, setEraserAt] = useState<Point | null>(null);
-  /** The canvas type style new text is set in; null is the plain heading role. */
+  /** The brand preset new text is set in; null is the plain heading role. */
   const [look, setLook] = useState<string | null>(() => Object.keys(canvasTypeOf(ds))[0] ?? null);
   const lookRef = useRef(look);
   lookRef.current = look;
@@ -174,6 +175,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
   const [textHeights, setTextHeights] = useState<Record<string, number>>({});
+  /** The smart guides of the drag under way: the lines a moved or resized layer snapped to. */
+  const [guides, setGuides] = useState<Guide[]>([]);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -299,7 +302,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     setPhase('start');
     const id = requestAnimationFrame(() => {
       setPhase('enter');
-      animateView(fit, 640, easeOutBack, () => setPhase('idle'));
+      animateView(fit, 360, easeOutCubic, () => setPhase('idle'));
     });
     return () => {
       cancelAnimationFrame(id);
@@ -347,7 +350,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const f = fitView();
     if (!f) return;
     if (reduced) setView(f);
-    else animateView(f, 420, easeOutBack);
+    else animateView(f, 240, easeOutCubic);
   }, [fitView, animateView, setView, reduced]);
 
   // Wheel: ⌘ or a pinch zooms about the pointer, a plain wheel pans. Non-passive, or the page scrolls.
@@ -439,7 +442,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const waiting: string[] = [];
     for (const id of fresh.current) {
       const el = layerEl(id);
-      if (el) springy(el, POP, 440);
+      if (el) springy(el, POP, 120);
       else waiting.push(id);
     }
     fresh.current = waiting;
@@ -454,7 +457,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       onSelectLayer(null);
       const gone = () =>
         commit(sel.group ? 'Remove drawing' : 'Remove layer', sel.group ? removeGroup(tpl(), blockId, sel.group) : removeLayer(tpl(), blockId, sel.layers[0]!.id));
-      const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 220, 'forwards') : null));
+      const anims = sel.layers.map((l) => layerEl(l.id)).map((el) => (el ? springy(el, POOF, 100, 'forwards') : null));
       const first = anims.find(Boolean);
       if (first) first.onfinish = gone;
       else gone();
@@ -490,7 +493,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   assetsRef.current = assets;
   const dsRef = useRef(ds);
   dsRef.current = ds;
-  const fxKey = block?.type === 'freeform' && block.effects?.length ? recipeHash(block) : null;
+  const fxKey = block?.type === 'freeform' && hasEffects(block) ? recipeHash(block) : null;
   /** What the page sits on. A print needs an opaque ground: it reads a transparent pixel as black ink. */
   const groundOf = useCallback(
     (b: FreeformBlock) => {
@@ -529,11 +532,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const b = blockRef.current;
     if (!b) return;
     try {
-      const canvas = await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b), effects: false });
+      // Riso gets the picture as it stands just before the Riso step: layer effects and earlier page steps on.
+      const at = b.effects?.findIndex((e) => e.effect === 'riso') ?? -1;
+      const canvas = await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: 2, ground: groundOf(b), pageEffects: at < 0 ? b.effects : b.effects!.slice(0, at) });
       let image = canvas.toDataURL('image/png');
       if (image.length > 3_500_000) image = canvas.toDataURL('image/jpeg', 0.92);
       const session = `${blockId}:${Date.now().toString(36)}`;
-      const step = b.effects?.find((e) => e.effect === 'riso') ?? risoStep(0);
+      const step = b.effects?.find((e): e is RisoStep => e.effect === 'riso') ?? risoStep(0);
       // `returnUrl`: where Riso goes back to when it opened in this same tab rather than a new one.
       localStorage.setItem(HANDOFF_RISO, JSON.stringify({ session, blockId, title: b.alt || 'Freeform', image, unit: 2, step, returnUrl: window.location.href, zoom: viewRef.current.z }));
       const tab = window.open(new URL(`../../riso/riso.html?handoff=${encodeURIComponent(session)}`, window.location.href).href, '_blank');
@@ -565,7 +570,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       }
       if (!step) return;
       const ed = editorRef.current;
-      const next = setEffects(ed.template, blockId, [step]);
+      const page = ed.template.sections.flatMap((x) => x.rows.flatMap((r) => r.columns.flatMap((c) => c.blocks))).find((x) => x.id === blockId);
+      const next = setEffects(ed.template, blockId, withRisoStep(page?.type === 'freeform' ? page.effects : undefined, step));
       if (next !== ed.template) ed.commit('Riso, from the tool', next);
       setFxNote('Back from Riso.');
     };
@@ -850,21 +856,35 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         setView({ ...state.view, x: state.view.x + (event.clientX - state.x), y: state.view.y + (event.clientY - state.y) });
         return;
       case 'move': {
-        const dx = p.x - state.x;
-        const dy = p.y - state.y;
+        let dx = p.x - state.x;
+        let dy = p.y - state.y;
         if (!state.moved && Math.hypot(dx, dy) * viewRef.current.z < 3) return;
         state.moved = true;
         window.clearTimeout(holdPan.current);
+        const snap = snapping(event, state.layers.map((l) => l.id));
+        if (snap) {
+          const start = boundsOfLayers(state.layers, textHeights);
+          const found = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, snap.targets, snap.threshold);
+          dx += found.dx;
+          dy += found.dy;
+          setGuides(found.guides);
+        } else setGuides([]);
         commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
       case 'resizeMany': {
-        const box = boxFromHandle(state.box, state.handle, p.x - state.x, p.y - state.y, event.shiftKey);
+        let box = boxFromHandle(state.box, state.handle, p.x - state.x, p.y - state.y, event.shiftKey);
+        const snap = event.shiftKey ? null : snapping(event, state.layers.map((l) => l.id));
+        if (snap) {
+          const found = snapResize(box, state.handle, snap.targets, snap.threshold);
+          box = found.box;
+          setGuides(found.guides);
+        } else setGuides([]);
         commit('Resize drawing', replaceLayers(tpl(), blockId, scaleLayers(state.layers, state.box, box)), `${key}:resize:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
       case 'resize':
-        commit('Resize layer', updateLayer(tpl(), blockId, state.layer.id, fields(resized(state, p, event.shiftKey))), `${key}:resize:${state.layer.id}`);
+        commit('Resize layer', updateLayer(tpl(), blockId, state.layer.id, fields(resized(state, p, event.shiftKey, snapping(event, [state.layer.id])))), `${key}:resize:${state.layer.id}`);
         return;
       case 'endpoint': {
         if (state.layer.kind !== 'line') return;
@@ -936,6 +956,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     if (svg) release(svg as unknown as HTMLElement, event.pointerId);
     drag.current = null;
     setGhost(null);
+    setGuides([]);
     setPageDrag(false);
     setDragging(false);
     if (!state) return;
@@ -999,7 +1020,19 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
    * rebuilt there with the opposite side anchored; and then shifted so that anchor stays where it
    * was on screen, which a rotated box otherwise walks away from.
    */
-  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: Point, uniform: boolean): FreeformLayer => {
+  /**
+   * What a drag can snap to now, or null when snapping is off: the Canvas menu's Smart guides, set aside
+   * while ⌘ or Ctrl is held, as in Figma. The threshold is six screen pixels at any zoom.
+   */
+  const snapping = (event: PointerEvent, moving: string[]): { targets: Box[]; threshold: number } | null => {
+    const b = blockRef.current;
+    if (!b || !settingsRef.current.smartGuides || event.metaKey || event.ctrlKey) return null;
+    const ids = new Set(moving);
+    const others = b.layers.filter((l) => !ids.has(l.id)).map((l) => boundsOf(l, textHeights[l.id]));
+    return { targets: snapTargets(b, others), threshold: 6 / viewRef.current.z };
+  };
+
+  const resized = (state: Extract<Drag, { kind: 'resize' }>, p: Point, uniform: boolean, snap: { targets: Box[]; threshold: number } | null = null): FreeformLayer => {
     const angle = state.layer.rotation ?? 0;
     const start = state.box;
     const c = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
@@ -1028,6 +1061,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       if (h.includes('n')) y = start.y + start.height - height;
     }
     let box: Box = { x, y, width, height };
+    // Only a square-on layer snaps its edges: a turned one's edges are not where its box's are.
+    const proportional = (uniform || state.layer.kind === 'mark') && h.length === 2;
+    if (snap && !angle && !proportional) {
+      const found = snapResize(box, h, snap.targets, snap.threshold);
+      box = found.box;
+      setGuides(found.guides);
+    } else setGuides([]);
     if (angle) {
       const anchor = {
         x: h.includes('w') ? start.x + start.width : h.includes('e') ? start.x : c.x,
@@ -1412,10 +1452,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         >
           <defs>
             <pattern id="fig-dots" width={22 * view.z} height={22 * view.z} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
-              <circle cx={1.3} cy={1.3} r={1.3} fill="rgba(70,58,38,0.17)" />
+              <circle cx={1.3} cy={1.3} r={1.3} style={{ fill: 'var(--fig-dots)' }} />
             </pattern>
             <filter id="fig-shadow" x="-20%" y="-20%" width="140%" height="150%">
-              <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#3a2f1d" flood-opacity="0.2" />
+              <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000000" flood-opacity="0.14" />
             </filter>
           </defs>
           <rect class="surface-dots" width="100%" height="100%" fill="url(#fig-dots)" />
@@ -1465,6 +1505,13 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                 ))}
               {tool === 'eraser' && eraserAt && idle && (
                 <circle cx={eraserAt.x} cy={eraserAt.y} r={ERASER / view.z} fill="rgba(255,255,255,0.65)" stroke="#1e1c19" stroke-width={1.5 / view.z} />
+              )}
+              {guides.map((g, i) =>
+                g.axis === 'x' ? (
+                  <line key={`g${i}`} class="surface-guide" x1={g.at} y1={g.from} x2={g.at} y2={g.to} stroke-width={1 / view.z} />
+                ) : (
+                  <line key={`g${i}`} class="surface-guide" x1={g.from} y1={g.at} x2={g.to} y2={g.at} stroke-width={1 / view.z} />
+                ),
               )}
               {pickedBox && centre && sel && (
                 <g transform={rotation ? `rotate(${rotation} ${centre.x} ${centre.y})` : undefined}>
@@ -1639,6 +1686,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onRemove={() => layer && poof(layer)}
           onUngroup={() => sel.group && ungroup(sel.group)}
           onOrder={(d) => layer && orderKey(layer, d)}
+          onSavePreset={(mode, label) => {
+            const one = sel.group ? undefined : sel.layers[0];
+            if (one?.kind !== 'text') return;
+            const saved = savePresetFromLayer(tpl(), blockId, one, mode, label);
+            if (saved) commit(mode === 'update' ? 'Update preset' : 'New preset', saved.template);
+          }}
         />
       )}
 
@@ -1665,6 +1718,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onUngroup={ungroup}
           onMove={(key, to) => commit('Reorder', moveItem(tpl(), blockId, key, to))}
           onPage={setPage}
+          heights={textHeights}
+          onLayers={(label, next, coalesce) => commit(label, replaceLayers(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}
           effectNote={fxNote}
@@ -1734,7 +1789,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                   key={k ?? 'plain'}
                   class={`fig-look ${currentLook === k ? 'on' : ''}`}
                   aria-pressed={currentLook === k}
-                  title={k ? `${canvasTypeOf(ds)[k]!.label}. Tune it in Design › Canvas type.` : 'Plain: the heading role from Design › Type.'}
+                  title={k ? `${canvasTypeOf(ds)[k]!.label}. Edit it in Design › Brand presets.` : 'Plain: the heading role from Design › Type.'}
                   onClick={() => chooseLook(k)}
                 >
                   <span dangerouslySetInnerHTML={{ __html: canvasTypeSampleSvg(ds, k, 'Aa') }} />
@@ -1795,7 +1850,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
 
       {hint && idle && (
         <div class="fig-chrome fig-hint" aria-hidden="true" onAnimationEnd={() => setHint(false)}>
-          Double-click text to type · / for styles · hold Space to pan · hold still to snap a shape · ⌘C ⌘V copy layers
+          Double-click text to type · / for presets · hold Space to pan · hold ⌘ to drag without snapping · ⌘C ⌘V copy layers
         </div>
       )}
     </div>

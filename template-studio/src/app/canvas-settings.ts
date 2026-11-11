@@ -31,6 +31,8 @@ export interface CanvasSettings {
   gridStep: number;
   /** Cards and groups let go on the board land on the grid. */
   snap: boolean;
+  /** On the Freeform canvas, a layer being moved or resized snaps to the page and to other layers, and shows guides (model/snap.ts). */
+  smartGuides: boolean;
   /** A stroke held still at its end snaps to the shape it meant (quick-shape.ts). */
   quickShapes: boolean;
   /** How long the pen must sit still for that, in ms. */
@@ -49,6 +51,7 @@ export const DEFAULT_CANVAS_SETTINGS: CanvasSettings = {
   groundOpacity: { lines: 0.5, dots: 0.6, mat: 0.85 },
   gridStep: 24,
   snap: true,
+  smartGuides: true,
   quickShapes: true,
   holdMs: 160,
   pencilOnly: 'auto',
@@ -100,6 +103,7 @@ export function parseCanvasSettings(raw: string | null): CanvasSettings {
     },
     gridStep: clamp(value.gridStep, CANVAS_RANGES.gridStep, d.gridStep),
     snap: flag(value.snap, d.snap),
+    smartGuides: flag(value.smartGuides, d.smartGuides),
     quickShapes: flag(value.quickShapes, d.quickShapes),
     holdMs: clamp(value.holdMs, CANVAS_RANGES.holdMs, d.holdMs),
     pencilOnly: pencil === 'on' || pencil === 'off' || pencil === 'auto' ? pencil : d.pencilOnly,

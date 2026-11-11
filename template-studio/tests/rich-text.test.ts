@@ -69,10 +69,7 @@ describe('formatted words, drawn', () => {
     expect(svg).toContain('>big</span> world');
   });
 
-  it('carries formatting into the wobble letter by letter, and the arc run by run', () => {
-    const styles: StyleRange[] = [{ from: 0, to: 5, italic: false }];
-    const wobble = freeformSvg(page([layer({ look: 'marker', styles })]), ds);
-    expect(wobble).toContain('; font-style:normal">H</span>');
+  it('carries formatting into a curve run by run', () => {
     const arc = freeformSvg(page([layer({ look: 'arc', styles: [{ from: 0, to: 5, bold: false }] })]), ds);
     expect(arc).toContain('<tspan font-weight="normal">HELLO</tspan> BIG WORLD');
   });

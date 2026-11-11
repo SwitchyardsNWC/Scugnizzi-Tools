@@ -12,6 +12,7 @@ import { recipeHash } from '../model/freeform.ts';
 import type { FreeformBlock, Template } from '../model/types.ts';
 import type { AssetFile } from '../workspace/workspace.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
+import { hasEffects } from '../model/effects.ts';
 
 export type Prints = Record<string, { key: string; url: string }>;
 
@@ -27,7 +28,7 @@ export function usePrints(shownTemplate: Template, allAssets: AssetFile[]): Prin
       for (const r of s.rows)
         for (const c of r.columns)
           for (const b of c.blocks) {
-            if (b.type !== 'freeform' || !b.effects?.length) continue;
+            if (b.type !== 'freeform' || !hasEffects(b)) continue;
             const ground = colorOf(ds, b.background) ?? s.containerColor ?? s.bandColor ?? '#ffffff';
             wanted.push({ block: b, ground, key: `${recipeHash(b)}|${ground}|${names}` });
           }

@@ -379,7 +379,7 @@ export interface TextTweaks {
   letterSpacing?: number;
   /** Percent. */
   lineHeight?: number;
-  /** The effect's strength, 0 to 100 — see `CanvasTextStyle.amount`. */
+  /** @deprecated The old single effect's strength. Nothing reads it since brand presets; cleared when a preset is picked or saved. */
   amount?: number;
   /** A key of the design system's `fonts`, over the style's own face. */
   font?: string;
@@ -415,6 +415,10 @@ interface LayerBase {
   invert?: boolean;
   /** Strokes drawn in one marker session share one, and move, scale, colour and delete as one. */
   group?: string;
+  /** 0 to 1, from the properties panel. Absent is opaque. An image carries its own, required. */
+  opacity?: number;
+  /** Effects on this layer alone, run on it before it is laid over the layers below. */
+  effects?: EffectStep[];
 }
 
 /**
@@ -422,8 +426,8 @@ interface LayerBase {
  * until it renders identically on export (docs/freeform-and-effects.md). Positions and sizes are
  * in the surface's own pixels.
  *
- * `look` on text names a style from Design › Canvas type: playful type that only ever ships as a
- * picture (learnings 3.68). Absent, the text is set in its email type role.
+ * `look` on text names a brand preset from the design system (Design › Brand presets): type that only
+ * ever ships as a picture (learnings 3.68). Absent, the text is set in its email type role.
  */
 export type FreeformLayer =
   | (LayerBase & { kind: 'text'; text: string; role: string; color: ColorRef; x: number; y: number; width: number; align: Align; look?: string; styles?: StyleRange[] } & TextTweaks)
@@ -626,8 +630,42 @@ export interface RisoPress {
   misreg: number;
 }
 
+/** What every step carries: switched off without being removed, and how much of it shows. */
+export interface StepBase {
+  /** Kept in the stack but not run. */
+  off?: boolean;
+  /** 0 to 1: the result mixed back with what came in. Absent is 1. */
+  strength?: number;
+}
+
 /**
- * A step run on a freeform page's picture after it is drawn. Every setting and the seed are stored,
- * so the same recipe prints the same picture on every export.
+ * A step run on a freeform picture, or on one layer of it, after it is drawn. Steps run in order, top
+ * first. Every setting and every seed is stored, so the same recipe makes the same picture on every
+ * export. Riso is the press in `effects/riso.js`; the rest are the image effects in `effects/image.js`.
  */
-export type EffectStep = { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number };
+export type EffectStep = StepBase &
+  (
+    | { effect: 'riso'; inks: RisoInk[]; press: RisoPress; seed: number }
+    // Settings added in engine version 2 are optional, so a step saved before them reads as it did.
+    | { effect: 'adjust'; brightness: number; contrast: number; saturation: number; exposure?: number; vibrance?: number; temperature?: number; tint?: number }
+    | { effect: 'duotone'; shadow: string; highlight: string; balance?: number }
+    | { effect: 'posterize'; levels: number; gamma: number; dither?: 'none' | 'ordered' | 'diffusion' }
+    | {
+        effect: 'halftone';
+        spacing: number;
+        angle: number;
+        shape: 'circle' | 'square' | 'diamond' | 'line' | 'ellipse';
+        contrast: number;
+        ink: string;
+        paper: string;
+        mode?: 'mono' | 'cmyk';
+        gain?: number;
+      }
+    | { effect: 'grain'; amount: number; mono: number; seed: number; size?: number }
+    | { effect: 'texture'; kind: 'paper' | 'canvas' | 'fibers' | 'concrete' | 'crosshatch'; amount: number; scale: number; blend: 'multiply' | 'overlay' | 'soft-light' | 'hard-light' | 'screen'; seed?: number }
+    | { effect: 'blur'; radius: number }
+    | { effect: 'vignette'; amount: number; spread: number; feather?: number; roundness?: number }
+    | { effect: 'sharpen'; amount: number; radius: number; threshold: number }
+  );
+export type EffectKind = EffectStep['effect'];
+export type RisoStep = Extract<EffectStep, { effect: 'riso' }>;

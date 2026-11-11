@@ -53,7 +53,6 @@ export const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string
         <path key="c" d="M14.1 11.2V7a1.4 1.4 0 012.8 0v6.6a6 6 0 01-6 6h-.6a5.8 5.8 0 01-4.6-2.3l-2.3-3a1.4 1.4 0 012.1-1.8l1.7 1.7" />,
       ),
   },
-  { tool: 'sticky', label: 'Sticky note', key: 'S', help: 'Click to drop a note, then type.', icon: () => glyph(<path key="a" d="M5 4.5h14v9.8L14.3 19.5H5z" />, <path key="b" d="M14 19.3v-5h5" />) },
   { tool: 'rect', label: 'Box', key: 'R', help: 'Drag out a box. Shift for a square.', icon: () => glyph(<rect key="a" x="4" y="6" width="16" height="12" rx="2.5" />) },
   { tool: 'ellipse', label: 'Ellipse', key: 'O', help: 'Drag out an ellipse. Shift for a circle.', icon: () => glyph(<ellipse key="a" cx="12" cy="12" rx="8.2" ry="6.2" />) },
   { tool: 'line', label: 'Line', key: 'L', help: 'Drag from one end to the other.', icon: () => glyph(<path key="a" d="M5 19L19 5" />) },
@@ -87,10 +86,11 @@ export const TOOLS: Array<{ tool: Tool; label: string; key: string; help: string
 ];
 
 /** With a pencil about, a finger on these tools pans instead of drawing: the pencil draws, the hand moves the page. */
-export const DRAW_TOOLS = new Set<Tool>(['pen', 'eraser', 'rect', 'ellipse', 'line', 'text', 'sticky', 'stamp']);
+export const DRAW_TOOLS = new Set<Tool>(['pen', 'eraser', 'rect', 'ellipse', 'line', 'text', 'stamp']);
 
-export const POP: Keyframe[] = [{ scale: '0.2', opacity: 0 }, { scale: '1.14', opacity: 1, offset: 0.6 }, { scale: '0.97', offset: 0.82 }, { scale: '1', opacity: 1 }];
-export const POOF: Keyframe[] = [{ scale: '1', opacity: 1 }, { scale: '1.12', opacity: 1, offset: 0.35 }, { scale: '0', opacity: 0 }];
+/** A new layer fades in; a removed one fades out. No bounce: the motion says where, not how it feels. */
+export const POP: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
+export const POOF: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
 
 /** What is picked: one layer, or a group (`group:<id>`) of more than one. */
 export function selectionOf(block: FreeformBlock, key: string | null): { layers: FreeformLayer[]; group: string | null } | null {
@@ -107,7 +107,8 @@ export function selectionOf(block: FreeformBlock, key: string | null): { layers:
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 8;
 export const HANDLE = 9;
-export const ACCENT = '#7b61ff';
+/** Selection on the canvas. A strong blue that reads on light and dark drawings; handles are also shaped, so colour is never the only cue. */
+export const ACCENT = '#0b6fd8';
 /** The width the docked layers panel takes from the canvas, margins included. */
 export const PANEL_ROOM = 300;
 /** The eraser's radius on screen, whatever the zoom. */
@@ -116,7 +117,7 @@ export const ERASER = 11;
 export const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 export const deg = (r: number) => (r * 180) / Math.PI;
 export const rad = (d: number) => (d * Math.PI) / 180;
-/** A little overshoot, so a flight lands rather than stops. */
+/** A little overshoot. No longer used for the canvas's flights, which ease out without it. */
 export const easeOutBack = (t: number) => {
   const c1 = 1.18;
   return 1 + (c1 + 1) * (t - 1) ** 3 + c1 * (t - 1) ** 2;
@@ -152,7 +153,7 @@ export function ghostShape(g: { tool: 'rect' | 'ellipse' | 'line'; from: Point; 
   const w = Math.abs(g.to.x - g.from.x);
   const h = Math.abs(g.to.y - g.from.y);
   if (g.tool === 'line') return <line x1={g.from.x} y1={g.from.y} x2={g.to.x} y2={g.to.y} stroke={ACCENT} stroke-width={2.5} stroke-linecap="round" />;
-  const paint = { fill: 'rgba(123,97,255,0.1)', stroke: ACCENT, 'stroke-width': 2 };
+  const paint = { fill: 'rgba(11,111,216,0.08)', stroke: ACCENT, 'stroke-width': 2 };
   if (g.tool === 'ellipse') return <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2} {...paint} />;
   return <rect x={x} y={y} width={w} height={h} rx={3} {...paint} />;
 }

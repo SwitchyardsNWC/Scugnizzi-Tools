@@ -86,6 +86,7 @@ import { readRecent, writeRecent } from './recent-blocks.ts';
 import { type Device, Framed, SaveBadge } from './app-chrome.tsx';
 import { usePrints } from './usePrints.ts';
 import { useDraftKeeping } from './useDraft.ts';
+import { hasEffects } from '../model/effects.ts';
 
 /** Wide enough to show the page background either side of the 600px column, which is a setting. */
 const WIDTHS: Record<Device, number> = { desktop: 680, phone: 375 };
@@ -1202,7 +1203,7 @@ export function App() {
     const els = cells.length ? cells : doc.querySelectorAll<HTMLElement>(`[data-sy-block][data-sy-section="${part}"]`);
     for (const el of els) {
       el.setAttribute('data-sy-noted', '');
-      el.style.outline = '2px dashed #7b61ff';
+      el.style.outline = '2px dashed #0b6fd8';
       el.style.outlineOffset = '-2px';
     }
   }, []);
@@ -1444,7 +1445,7 @@ export function App() {
         width: f.page.width,
         height: f.page.height,
         layers: f.page.layers.length,
-        printed: Boolean(f.page.effects?.length),
+        printed: hasEffects(f.page),
         thumb: withoutMissingPictures(withLocalAssets(freeformSvg(f.page, ds), allAssets)),
       })),
       linkedKey,
@@ -1587,7 +1588,7 @@ export function App() {
         // markup on the canvas cannot carry.
         const printed = allBlocks(editor.template).find((b) => b.id === blockId);
         const shot =
-          printed?.type === 'freeform' && printed.effects?.length
+          printed?.type === 'freeform' && hasEffects(printed)
             ? await (async () => {
                 const canvas = await freeformCanvas(printed, designSystemOf(editor.template), { assets: allAssets, scale: 2, ground });
                 const blob = await canvasBlob(canvas);
