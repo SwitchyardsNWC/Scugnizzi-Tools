@@ -465,12 +465,13 @@ list; HUB-MOD avoids the module tag's own parameters (`label`, `path`, `no_wrapp
 methods (`items`, `keys`, `values`) and HubL's names. Renaming a field orphans what the team typed, as in 1.10.
 
 **Getting it in.** HubSpot CLI 8 moved every CMS command under `hs cms`: `hs upload` now only prints "Did you mean
-hs cms upload?". `hs account auth` (a personal access key) replaced `hs init`. `hs cms upload x.module
-"Folder/x.module"` needs both paths to end in `.module`, publishes immediately (`-m draft` does not), and
-overwrites in place; `--clean` deletes the folder first and must never touch a module emails already use. Design
+hs cms upload?". `hs account auth` (a personal access key, which it fetches through the browser) replaced `hs init`. `hs cms upload x.module
+"Folder/x.module"` needs both paths to end in `.module`, publishes immediately (8.18 ignores `-m draft` for a
+folder; it reaches only single files and `hs cms watch`), and overwrites in place; `--clean` deletes the folder first and must never touch a module emails already use. Design
 Manager cannot take a zip or a folder, and has nowhere to paste fields.json: by hand, every field is added with
 Add field, named in "HubL variable name", and module.html is pasted into the HTML + HubL pane. Custom modules in
-email need Marketing Hub Professional or Enterprise.
+email need Marketing Hub Professional or Enterprise; on another plan a CLI upload succeeds and the module never
+appears in the editor (community).
 
 **Still to confirm in the first send of a HUB-MOD module:**
 

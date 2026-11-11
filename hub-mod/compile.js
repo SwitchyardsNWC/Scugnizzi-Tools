@@ -1052,21 +1052,22 @@ ${ind(inner, 6)}
       // CLI 8 moved every CMS command under `hs cms`; plain `hs upload` now only asks "Did you mean hs cms upload?".
       once: [
         { cmd: 'npm install -g @hubspot/cli@latest', note: 'Needs Node 20 or later.' },
-        { cmd: 'hs account auth', note: 'It asks for a personal access key: in HubSpot, Development › Keys › Personal access key. Your user needs the Design tools permission.' },
+        { cmd: 'hs account auth', note: 'It opens HubSpot in the browser to make a personal access key and waits for it. Your user needs the Design tools permission.' },
       ],
       cli: [
         { cmd: `cd ~/Downloads && unzip -o ${folder}.zip`, note: 'Wherever the zip landed. The CLI uploads a folder, not a zip.' },
         { cmd: `hs cms lint ${folder}`, note: 'Optional: HubSpot checks the HubL before anything goes up.' },
-        { cmd: `hs cms upload ${folder} "${dest}"`, note: 'Goes live straight away. Add -m draft to upload it unpublished.' },
+        { cmd: `hs cms upload ${folder} "${dest}"`, note: 'Goes live straight away. A module folder has no draft upload: CLI 8.18 ignores -m draft for a folder.' },
       ],
       cliNotes: [
+        'Custom modules appear in the email editor on Marketing Hub Professional or Enterprise only. On another plan the upload succeeds and the module never shows.',
         'Uploading again replaces the files in place. Fields whose names stayed the same keep what the team typed into them.',
         'Never add --clean to a module that emails already use: it deletes the folder first.',
         `On CLI 7 the command is still hs upload ${folder} "${dest}".`,
       ],
       manual: [
         'Needs Marketing Hub Professional or Enterprise. Without it, Emails is not offered.',
-        'In HubSpot: <b>Content › Design Manager</b>. <b>File › New file</b>, choose <b>Module</b>, <b>Next</b>.',
+        'In HubSpot: <b>Content › Design Manager</b> (or <b>More › Content › Design Manager</b>). <b>File › New file</b>, and make a <b>Module</b>.',
         `Under <i>Where would you like to use this module</i>, tick <b>Emails</b> and nothing else. Keep it a <b>Local module</b>. Name it <code>${escHtml(d.slug)}</code>, then <b>Create</b>.`,
         'The editor says CSS and JavaScript are unavailable for email modules. That is expected: everything is in module.html.',
       ],
