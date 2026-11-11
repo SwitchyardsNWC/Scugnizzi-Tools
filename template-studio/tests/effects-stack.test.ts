@@ -46,7 +46,8 @@ const seenFromAfar = (d: Uint8ClampedArray, channel = 0) => {
 };
 
 describe('image effects', () => {
-  const kinds = EFFECT_KINDS.filter((k) => k !== 'riso');
+  // Riso and ink bleed have engines of their own (effects/riso.js, effects/ink.js), tested beside them.
+  const kinds = EFFECT_KINDS.filter((k) => k !== 'riso' && k !== 'ink');
 
   it('every effect changes the picture, and does it the same way every time', () => {
     for (const kind of kinds) {

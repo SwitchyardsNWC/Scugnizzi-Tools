@@ -51,10 +51,14 @@ export function toggleUnit(key: string | null, unit: string): string | null {
   return keyOf(units.includes(unit) ? units.filter((u) => u !== unit) : [...units, unit]);
 }
 
-/** Every unit on the page that still exists, for ⌘A. */
+/** Hidden and locked layers are out of reach on the canvas; the layers list still picks them. */
+const reachable = (l: FreeformLayer) => !l.hidden && !l.locked;
+
+/** Every unit on the page that can be reached, for ⌘A. */
 export function allUnits(block: FreeformBlock): string[] {
   const out: string[] = [];
   for (const l of block.layers) {
+    if (!reachable(l)) continue;
     const u = unitOfLayer(block, l);
     if (!out.includes(u)) out.push(u);
   }
@@ -67,6 +71,7 @@ const intersects = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.widt
 export function marqueeUnits(block: FreeformBlock, box: Box, heights: Record<string, number> = {}): string[] {
   const out: string[] = [];
   for (const l of block.layers) {
+    if (!reachable(l)) continue;
     const u = unitOfLayer(block, l);
     if (out.includes(u)) continue;
     if (intersects(box, boundsOfLayers(unitLayers(block, u), heights))) out.push(u);
@@ -155,8 +160,11 @@ export function removeUnits(template: Template, blockId: string, block: Freeform
   return withFreeform(template, blockId, (b) => ({ ...b, layers: b.layers.filter((l) => !ids.has(l.id)) }));
 }
 
-/** A copy of the units, a step down and right, on top of the stack; drawings stay drawings. Returns the copies' key. */
-export function duplicateUnits(template: Template, blockId: string, block: FreeformBlock, units: string[]): { template: Template; key: string | null } {
+/**
+ * A copy of the units, a step down and right (or `offset` away; 0 for Alt-drag, which copies in place), on top of
+ * the stack; drawings stay drawings. Returns the copies' key.
+ */
+export function duplicateUnits(template: Template, blockId: string, block: FreeformBlock, units: string[], offset = 16): { template: Template; key: string | null } {
   let made: string[] = [];
   const next = withFreeform(template, blockId, (b) => {
     let layers = b.layers;
@@ -166,7 +174,7 @@ export function duplicateUnits(template: Template, blockId: string, block: Freef
       if (!source.length) continue;
       const gid = groupOfKey(u) ? newGroupId({ ...b, layers }) : null;
       const copies = source.map((l) => {
-        const copy = { ...translateLayer(l, 16, 16), id: newLayerId({ ...b, layers }) } as FreeformLayer;
+        const copy = { ...translateLayer(l, offset, offset), id: newLayerId({ ...b, layers }) } as FreeformLayer;
         layers = [...layers, gid ? { ...copy, group: gid } : (({ group: _g, ...rest }) => (void _g, rest as FreeformLayer))(copy)];
         return copy;
       });

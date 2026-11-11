@@ -435,3 +435,30 @@ handling, and multi-select.
   linking should scale it down, type included. The library has no patterns or approved photography of its
   own yet; it shows what the project holds. Hosted pictures (HubSpot URLs) cannot be drawn into the
   export, since the browser will not read their pixels back, so the library uses the project's files.
+
+## Ink bleed, and the everyday layout moves *(2026-11-11)*
+
+Jared: "add the effects from the ink bleed tool into freeform. add multiple item select and other common
+design usage patterns and tools."
+
+- **Ink bleed is an effect step.** The Ink bleed tool's processing moved into `effects/ink.js`
+  (`InkBleed`), shared like the Riso and image engines. On a layer, the layer's own shape is the ink; on
+  the page, ink is whatever is darker than the paper. Ink settings (spread, rough, soft, worn, grit,
+  stamp, smudge), copier settings (stretch, drift) and paper (grain, dust, speckle, streaks). Looks:
+  Photocopied, Fax transmission, Fresh ribbon, Rubber stamp.
+- **Multi-select** was already in (Shift-click, a box on the page, ⌘A, align, distribute, ⌘G). It now
+  leaves out locked and hidden things.
+- **Arrange.** ⌘] and ⌘[ one step, ⌥⌘] and ⌥⌘[ to the front or back. Several picked things move
+  together and keep their order among themselves; a group moves as one (`model/arrange.ts`).
+- **Flip.** ⇧H and ⇧V mirror what is picked across its shared middle; a rotation mirrors with it.
+  Stored as `flipX` and `flipY` on the layer, drawn as a scale in the same transform as the rotation.
+- **Hide and lock.** An eye and a lock on every row of the layers list, or ⇧⌘H and ⇧⌘L. Both icons stay
+  in view while on, so state reads by the icon, not by colour. Hidden layers are not drawn or exported.
+  Locked layers let clicks through, stay out of the selection box and ⌘A, have no handles, and do not
+  nudge or flip; the list still picks them.
+- **Copy and paste style.** ⌥⌘C takes the first picked layer's look; ⌥⌘V lays it onto what is picked,
+  each kind taking only what it has (a box takes a fill and corner, text takes type).
+- **Alt-drag** moves a copy and leaves the original. One undo step.
+- **Right-click menu** on the canvas: cut, copy, paste, duplicate, delete, arrange, group or ungroup,
+  flip, hide, lock, copy and paste style, zoom to selection, each with its key.
+- **Zoom.** ⇧1 fits the page, ⇧2 fits what is picked.

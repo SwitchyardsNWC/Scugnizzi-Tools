@@ -15,6 +15,7 @@ import { measureImage, shownImageHref } from './picture-size.ts';
 import { selectionOf } from './surface-tools.tsx';
 import { MARKS } from '../model/marks.ts';
 import { Riso } from '../effects/riso.ts';
+import { InkBleed } from '../effects/ink.ts';
 import { EFFECT_HELP, EFFECT_KINDS, EFFECT_LABELS, LOOKS, withLayerEffects, misregister, moveStep, newStep, readSavedRisoPresets, RISO_PRESETS, RISO_PROJECT_PRESETS, RISO_SWATCHES, risoStep, withSavedRisoPreset, type SavedRisoPreset } from '../model/effects.ts';
 import type { MarkKey, MarkState } from '../model/rich-text.ts';
 import type { Align, EffectKind, EffectStep, FreeformBlock, FreeformLayer, RisoInk, RisoStep, TextMarks } from '../model/types.ts';
@@ -92,9 +93,30 @@ export interface FigLayersProps {
   onAlignUnits(edge: AlignEdge): void;
   onDistribute(axis: 'x' | 'y'): void;
   onGroup(): void;
+  /** Hide or show, lock or unlock, a row: a layer or a whole group. */
+  onFlag(key: string, flag: 'hidden' | 'locked'): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, pageMax }: FigLayersProps) {
+const EYE = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />, <circle key="b" cx="12" cy="12" r="2.8" />);
+const EYE_OFF = () => icon(<path key="a" d="M4 4l16 16" />, <path key="b" d="M9.9 5.7A9.6 9.6 0 0112 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 01-2.6 3.3M6.3 7.5C3.9 9.2 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.5 0 2.8-.4 4-1" />);
+const LOCK = () => icon(<rect key="a" x="5" y="11" width="14" height="9" rx="2" />, <path key="b" d="M8 11V8a4 4 0 018 0v3" />);
+const UNLOCK = () => icon(<rect key="a" x="5" y="11" width="14" height="9" rx="2" />, <path key="b" d="M8 11V8a4 4 0 017.7-1.5" />);
+
+/** The eye and the lock on a row. Each stays in view while it is on, so a hidden or locked row reads at a glance, not by colour. */
+function Flags({ hidden, locked, onFlag }: { hidden: boolean; locked: boolean; onFlag(flag: 'hidden' | 'locked'): void }) {
+  return (
+    <span class="fig-layer-flags">
+      <button class={locked ? 'on' : ''} title={locked ? 'Unlock  ·  ⇧⌘L' : 'Lock: the canvas cannot pick or move it  ·  ⇧⌘L'} aria-label={locked ? 'Unlock' : 'Lock'} aria-pressed={locked} onClick={() => onFlag('locked')}>
+        {locked ? LOCK() : UNLOCK()}
+      </button>
+      <button class={hidden ? 'on' : ''} title={hidden ? 'Show  ·  ⇧⌘H' : 'Hide: not drawn, not exported  ·  ⇧⌘H'} aria-label={hidden ? 'Show' : 'Hide'} aria-pressed={hidden} onClick={() => onFlag('hidden')}>
+        {hidden ? EYE_OFF() : EYE()}
+      </button>
+    </span>
+  );
+}
+
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, onFlag, pageMax }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const pickedUnits = unitsOf(picked);
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -120,7 +142,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
     return (
       <li
         key={key}
-        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${l.hidden ? 'is-hidden' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
         draggable={index !== null}
         onDragStart={(e) => {
           if (index === null) return;
@@ -149,6 +171,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           <span class={`fig-layer-icon k-${l.kind}`}>{KIND_ICONS[l.kind]()}</span>
           <span class="fig-layer-name">{layerName(l)}</span>
         </button>
+        <Flags hidden={Boolean(l.hidden)} locked={Boolean(l.locked)} onFlag={(f) => onFlag(key, f)} />
         <span class="fig-layer-actions">
           <button title="Duplicate  ·  ⌘D" aria-label="Duplicate" onClick={() => onDuplicate(key)}>
             {icon(<rect key="a" x="8" y="8" width="12" height="12" rx="2.5" />, <path key="b" d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" />)}
@@ -213,6 +236,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
                   <span class="fig-layer-name">{item.layers.every((l) => l.kind === 'path') ? 'Drawing' : 'Group'}</span>
                   <span class="fig-badge">{item.layers.length}</span>
                 </button>
+                <Flags hidden={item.layers.every((l) => l.hidden)} locked={item.layers.every((l) => l.locked)} onFlag={(f) => onFlag(key, f)} />
                 <span class="fig-layer-actions">
                   <button title="Ungroup: every stroke its own layer" aria-label="Ungroup" onClick={() => onUngroup(item.id)}>
                     {icon(<rect key="a" x="3" y="3" width="8" height="8" rx="2" />, <rect key="b" x="13" y="13" width="8" height="8" rx="2" />)}
@@ -338,6 +362,7 @@ function Seg<T extends string>({ label, value, options, onPick }: { label: strin
 
 /** One step's own dials. Riso has its own set. */
 function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: EffectStep, label: string, coalesce?: string): void; onOpenRiso?: () => void }) {
+  const onOpenInk = () => window.open(new URL('../../text bleed/ink-bleed.html', window.location.href).href, '_blank');
   const name = EFFECT_LABELS[step.effect];
   const dial = (label: string, unit: string, min: number, max: number, value: number, patch: (v: number) => Partial<EffectStep>, stepBy = 1) => (
     <Slide label={label} unit={unit} min={min} max={max} step={stepBy} value={value} onInput={(v) => set({ ...step, ...patch(v) } as EffectStep, `${name} ${label.toLowerCase()}`, `fx-${step.effect}-${label}`)} />
@@ -411,6 +436,46 @@ function StepDials({ step, set, onOpenRiso }: { step: EffectStep; set(next: Effe
       );
     case 'blur':
       return <div class="fig-sliders fig-step-body">{dial('Radius', 'px', 0, 40, step.radius, (v) => ({ radius: v }), 0.5)}</div>;
+    case 'ink':
+      // The ink bleed tool's dials, grouped as it groups them. Paper applies to a page; a layer has none.
+      return (
+        <div class="fig-sliders fig-step-body fig-ink">
+          <div class="fig-riso-looks" role="group" aria-label="Ink looks">
+            {InkBleed.PRESETS.map((p) => (
+              <button key={p.name} title={p.desc} onClick={() => set({ ...step, ...p.apply }, `Ink · ${p.name}`)}>
+                <span class="fig-riso-look-name">{p.name}</span>
+              </button>
+            ))}
+          </div>
+          <span class="fig-fx-sub">Ink</span>
+          {dial('Spread', '', 0, 300, Math.round(step.spread * 100), (v) => ({ spread: v / 100 }))}
+          {dial('Rough', '%', 0, 100, Math.round(step.rough * 100), (v) => ({ rough: v / 100 }))}
+          {dial('Soft', '', 0, 300, Math.round(step.soft * 100), (v) => ({ soft: v / 100 }))}
+          {dial('Worn', '%', 0, 100, Math.round(step.fade * 100), (v) => ({ fade: v / 100 }))}
+          {dial('Grit', '%', 0, 100, Math.round(step.grit * 100), (v) => ({ grit: v / 100 }))}
+          {dial('Stamp', '%', 0, 100, Math.round(step.stamp * 100), (v) => ({ stamp: v / 100 }))}
+          {dial('Smudge', '%', 0, 100, Math.round(step.smudge * 100), (v) => ({ smudge: v / 100 }))}
+          <span class="fig-fx-sub">Copier</span>
+          {dial('Stretch', '%', 0, 100, Math.round(step.elong * 100), (v) => ({ elong: v / 100 }))}
+          {dial('Drift', '%', 0, 100, Math.round(step.jitter * 100), (v) => ({ jitter: v / 100 }))}
+          <span class="fig-fx-sub">Paper · on the page</span>
+          {dial('Grain', '%', 0, 100, Math.round(step.grain * 100), (v) => ({ grain: v / 100 }))}
+          {dial('Dust', '%', 0, 100, Math.round(step.dust * 100), (v) => ({ dust: v / 100 }))}
+          {dial('Speckle', '%', 0, 100, Math.round(step.speckle * 100), (v) => ({ speckle: v / 100 }))}
+          {dial('Streaks', '%', 0, 100, Math.round(step.streaks * 100), (v) => ({ streaks: v / 100 }))}
+          <div class="fig-riso-actions">
+            <button class="fig-text-btn" title="A new roll of the same wear" onClick={() => set({ ...step, seed: 1 + Math.floor(Math.random() * 99999) }, 'Reshuffle ink')}>
+              Reshuffle
+            </button>
+            <span class="grow" />
+            {onOpenInk && (
+              <button class="fig-text-btn" title="Open the ink bleed tool, for type set letter by letter with typewriter strikes" onClick={onOpenInk}>
+                Ink bleed tool ↗
+              </button>
+            )}
+          </div>
+        </div>
+      );
     case 'sharpen':
       return (
         <div class="fig-sliders fig-step-body">

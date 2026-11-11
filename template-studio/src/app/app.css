@@ -1931,6 +1931,15 @@ button.phone-row { cursor: pointer; }
   display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--fig-muted); cursor: pointer;
 }
 .fig-layer-actions button:hover { background: var(--fig-surface); color: var(--fig-ink); }
+/* Eye and lock: shown on hover, and kept in view while on, so state reads by the icon, not by colour. */
+.fig-layer-flags { display: flex; gap: 1px; }
+.fig-layer-flags button {
+  display: grid; place-items: center; width: 24px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--fig-muted); cursor: pointer; opacity: 0; transition: opacity 120ms;
+}
+.fig-layer:hover .fig-layer-flags button, .fig-layer-flags button.on, .fig-layer-flags button:focus-visible { opacity: 1; }
+.fig-layer-flags button.on { color: var(--fig-ink); }
+.fig-layer-flags button:hover { background: var(--fig-surface); color: var(--fig-ink); }
+.fig-layer.is-hidden .fig-layer-name, .fig-layer.is-hidden .fig-layer-icon { opacity: 0.45; }
 .fig-fold { flex: none; display: grid; place-items: center; width: 20px; height: 26px; margin-left: 2px; padding: 0; border: 0; background: none; color: var(--fig-faint); cursor: pointer; }
 .fig-fold svg { transition: transform 200ms ease; }
 .fig-fold.open svg { transform: rotate(90deg); }
@@ -2177,7 +2186,7 @@ button.phone-row { cursor: pointer; }
 .fig-riso-swatches button.on { box-shadow: 0 0 0 2px var(--fig-surface), 0 0 0 3.5px var(--fig-ink); }
 .fig-riso-screen { display: flex; }
 .fig-riso-screen button { flex: 1; }
-.fig-step-body.fig-riso .fig-slide { grid-template-columns: 58px minmax(0, 1fr) 44px; }
+.fig-step-body.fig-riso .fig-slide, .fig-step-body.fig-ink .fig-slide { grid-template-columns: 58px minmax(0, 1fr) 44px; }
 .fig-riso-papers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .fig-riso-papers button { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover); font: inherit; font-size: 12px; color: var(--fig-ink); cursor: pointer; }
 .fig-riso-papers button.on { box-shadow: inset 0 0 0 1.5px var(--fig-ink); }
@@ -2405,3 +2414,18 @@ button.phone-row { cursor: pointer; }
 .folder-can { width: 26px; height: 26px; margin: -4px -4px -4px 4px; }
 .folder-can .sy-can-art { width: 18px; height: 20px; }
 .folder-can .sy-can-count { top: -2px; right: -3px; min-width: 14px; height: 14px; font-size: 9px; }
+
+/* The canvas's right-click menu. */
+.fig-menu {
+  position: fixed; z-index: 60; min-width: 220px; padding: 5px; border: 1px solid var(--fig-line); border-radius: 10px;
+  background: var(--fig-surface); box-shadow: var(--fig-shadow); font-size: 12.5px;
+}
+.fig-menu button {
+  display: flex; align-items: center; gap: 18px; width: 100%; padding: 6px 10px; border: 0; border-radius: 6px; background: none; color: var(--fig-ink); text-align: left; cursor: pointer;
+}
+.fig-menu button span { flex: 1; }
+.fig-menu button kbd { font: inherit; color: var(--fig-faint); letter-spacing: 0.04em; }
+.fig-menu button:hover:not([disabled]), .fig-menu button:focus-visible { background: var(--fig-hover); outline: none; }
+.fig-menu button.danger:hover { background: var(--fig-danger-soft); color: var(--fig-danger); }
+.fig-menu button[disabled] { color: var(--fig-faint); cursor: default; }
+.fig-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--fig-line); }

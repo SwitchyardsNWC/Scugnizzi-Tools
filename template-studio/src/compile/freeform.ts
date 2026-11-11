@@ -82,16 +82,21 @@ export function freeformLayersSvg(block: FreeformBlock, ds: DesignSystem): strin
         '<feColorMatrix type="matrix" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/></filter></defs>',
     );
   }
-  for (const layer of block.layers) parts.push(layerSvg(layer, ds, h));
+  for (const layer of block.layers) if (!layer.hidden) parts.push(layerSvg(layer, ds, h));
   return parts.join('');
 }
 
-/** A layer's rotation, about the centre of its unrotated box, as an SVG transform attribute. */
+/** A layer's rotation and flip, about the centre of its unrotated box, as an SVG transform attribute. */
 function rotationOf(layer: FreeformLayer): string {
   const angle = layer.rotation ?? 0;
-  if (!angle) return '';
+  const sx = layer.flipX ? -1 : 1;
+  const sy = layer.flipY ? -1 : 1;
+  if (!angle && sx === 1 && sy === 1) return '';
   const box = layerBox(layer, layer.kind === 'text' ? 24 : undefined);
-  return ` transform="rotate(${num(angle)} ${num(box.x + box.width / 2)} ${num(box.y + box.height / 2)})"`;
+  const cx = num(box.x + box.width / 2);
+  const cy = num(box.y + box.height / 2);
+  if (sx === 1 && sy === 1) return ` transform="rotate(${num(angle)} ${cx} ${cy})"`;
+  return ` transform="translate(${cx} ${cy})${angle ? ` rotate(${num(angle)})` : ''} scale(${sx} ${sy}) translate(${-box.x - box.width / 2} ${-box.y - box.height / 2})"`;
 }
 
 /**

@@ -7,7 +7,7 @@ import { groupOfKey, membersOf, type Box } from '../model/freeform.ts';
 import { isMultiKey, unitLayers, unitsOf } from '../model/selection.ts';
 import type { QuickShape } from '../model/quick-shape.ts';
 import type { PanTracker } from './inertia.ts';
-import type { FreeformBlock, FreeformLayer } from '../model/types.ts';
+import type { FreeformBlock, FreeformLayer, Template } from '../model/types.ts';
 
 export type Tool = 'select' | 'hand' | 'sticky' | 'rect' | 'ellipse' | 'line' | 'pen' | 'eraser' | 'text' | 'stamp';
 export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -23,7 +23,7 @@ export interface View {
 
 export type Drag =
   | { kind: 'pan'; x: number; y: number; view: View; tracker: PanTracker }
-  | { kind: 'move'; layers: FreeformLayer[]; x: number; y: number; moved: boolean }
+  | { kind: 'move'; layers: FreeformLayer[]; x: number; y: number; moved: boolean; copy?: boolean; coalesce?: string; base?: Template }
   | { kind: 'resizeMany'; layers: FreeformLayer[]; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'resize'; layer: FreeformLayer; handle: Handle; box: Box; x: number; y: number }
   | { kind: 'endpoint'; layer: FreeformLayer; which: 1 | 2 }

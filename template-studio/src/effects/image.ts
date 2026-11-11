@@ -7,7 +7,7 @@
 import '../../../effects/image.js';
 import type { EffectKind, EffectStep } from '../model/types.ts';
 
-export type ImageEffectKind = Exclude<EffectKind, 'riso'>;
+export type ImageEffectKind = Exclude<EffectKind, 'riso' | 'ink'>;
 
 export interface ImageEffectsApi {
   version: number;

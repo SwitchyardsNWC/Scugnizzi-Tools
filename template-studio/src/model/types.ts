@@ -424,6 +424,13 @@ interface LayerBase {
   opacity?: number;
   /** Effects on this layer alone, run on it before it is laid over the layers below. */
   effects?: EffectStep[];
+  /** Not drawn, on the canvas or in the picture, until shown again. */
+  hidden?: boolean;
+  /** Not picked or moved on the canvas; still picked from the layers list. */
+  locked?: boolean;
+  /** Mirrored across its own centre, left to right or top to bottom. */
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 /**
@@ -692,6 +699,24 @@ export type EffectStep = StepBase &
     | { effect: 'blur'; radius: number }
     | { effect: 'vignette'; amount: number; spread: number; feather?: number; roundness?: number }
     | { effect: 'sharpen'; amount: number; radius: number; threshold: number }
+    /** Ink bleed (effects/ink.js), the press half of the ink bleed tool. 0 to 1 each but `seed`. */
+    | {
+        effect: 'ink';
+        spread: number;
+        rough: number;
+        soft: number;
+        fade: number;
+        grit: number;
+        stamp: number;
+        elong: number;
+        jitter: number;
+        smudge: number;
+        grain: number;
+        dust: number;
+        speckle: number;
+        streaks: number;
+        seed: number;
+      }
   );
 export type EffectKind = EffectStep['effect'];
 export type RisoStep = Extract<EffectStep, { effect: 'riso' }>;
