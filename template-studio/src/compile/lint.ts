@@ -114,7 +114,12 @@ export function lint({ tree, registry, html, bytes, mode = 'hubl', template }: L
 
   // --- dark mode coverage ----------------------------------------------------------------------
   // Checked by parsing the emitted CSS, not by trusting the generator that just wrote it.
-  for (const entry of allColors(registry)) {
+  //
+  // Only when the template asks for the layers. With Force light off the compiler emits none of them on purpose
+  // (compile.ts), so every colour came back as an error the designer had no way to fix but to turn it on again.
+  // Without a template — the command line — the check runs as it always has.
+  const darkLayers = template ? Boolean(template.forceLight) : true;
+  for (const entry of darkLayers ? allColors(registry) : []) {
     const [kind, hex] = entry.split(':') as [string, string];
     const key = hex.replace('#', '');
     const selector = kind === 'link' ? `.sy-link-${key} a` : `.sy-${kind}-${key}`;
@@ -146,7 +151,9 @@ export function lint({ tree, registry, html, bytes, mode = 'hubl', template }: L
   }
   for (const tag of html.match(/<a\b[^>]*href="([^"]*)"/g) ?? []) {
     const href = /href="([^"]*)"/.exec(tag)?.[1] ?? '';
-    if (href && !/^(https?:|mailto:|\{\{|#)/.test(href)) {
+    // Schemes are case-insensitive (`HTTPS://` is a link), and `tel:` and `sms:` are ones a phone follows — the
+    // sanitiser keeps `tel:`, so lint failing it was the two halves of the app disagreeing.
+    if (href && !/^(https?:|mailto:|tel:|sms:|\{\{|#)/i.test(href)) {
       error('relative-link', `Link "${href}" is not absolute. Email clients have no base URL to resolve it against.`);
     }
   }
