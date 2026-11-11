@@ -588,56 +588,94 @@ function RisoDials({ step, set, onOpenRiso }: { step: RisoStep; set(next: RisoSt
     setInk(n);
   };
 
-  return (
-    <div class="fig-step-body">
-      <div class="fig-page-row">
-        {step.inks.map((k, i) => (
-          <button key={i} class={`fig-dot ${ink === i ? 'on' : ''}`} style={{ background: k.color }} title={`Ink ${i + 1}: ${Riso.inkName(k.color)}. Click to change it.`} aria-label={`Ink ${i + 1}`} onClick={() => setInk(ink === i ? null : i)} />
-        ))}
-        {step.inks.length < 3 && (
-          <button class="fig-dot fig-dot-add" title="Add an ink (up to three)" aria-label="Add an ink" onClick={addInk}>
-            +
-          </button>
-        )}
-        <span class="grow" />
-        <span class="fig-seg" role="group" aria-label="Screen">
-          {(['dot', 'line', 'grain'] as const).map((s) => (
-            <button key={s} class={screen === s ? 'on' : ''} aria-pressed={screen === s} onClick={() => set({ ...step, inks: step.inks.map((k) => ({ ...k, screen: s })) }, 'Screen')}>
-              {s}
-            </button>
-          ))}
-        </span>
-      </div>
-
-      {ink !== null && step.inks[ink] && (
-        <div class="fig-fx-swatches">
+  const inkRow = (k: RisoInk, i: number) => (
+    <li key={i} class={`fig-riso-ink ${ink === i ? 'open' : ''}`}>
+      <button class="fig-riso-ink-main" aria-expanded={ink === i} title="Change this ink" onClick={() => setInk(ink === i ? null : i)}>
+        <i style={{ background: k.color }} aria-hidden="true" />
+        <span>{Riso.inkName(k.color)}</span>
+        <code>{k.color.toUpperCase()}</code>
+      </button>
+      {step.inks.length > 1 && (
+        <button
+          class="fig-icon-btn danger"
+          title="Remove this ink"
+          aria-label={`Remove ${Riso.inkName(k.color)}`}
+          onClick={() => {
+            set({ ...step, inks: step.inks.filter((_, j) => j !== i) }, 'Remove ink');
+            setInk(null);
+          }}
+        >
+          {icon(<path key="a" d="M6 6l12 12M18 6L6 18" />)}
+        </button>
+      )}
+      {ink === i && (
+        <div class="fig-riso-swatches" role="group" aria-label="Ink colour">
           {RISO_SWATCHES.map(([name, hex]) => (
-            <button key={hex} class={`fig-dot ${step.inks[ink]!.color === hex ? 'on' : ''}`} style={{ background: hex }} title={name} aria-label={name} onClick={() => set({ ...step, inks: step.inks.map((k, j) => (j === ink ? { ...k, color: hex } : k)) }, 'Ink colour')} />
+            <button key={hex} class={k.color === hex ? 'on' : ''} style={{ background: hex }} title={`${name}, ${hex.toUpperCase()}`} aria-label={name} aria-pressed={k.color === hex} onClick={() => set({ ...step, inks: step.inks.map((x, j) => (j === i ? { ...x, color: hex } : x)) }, 'Ink colour')} />
           ))}
-          {step.inks.length > 1 && (
-            <button
-              class="fig-reset"
-              onClick={() => {
-                set({ ...step, inks: step.inks.filter((_, j) => j !== ink) }, 'Remove ink');
-                setInk(null);
-              }}
-            >
-              Remove this ink
-            </button>
-          )}
         </div>
       )}
+    </li>
+  );
+
+  return (
+    <div class="fig-step-body fig-riso">
+      <div class="fig-riso-head">
+        <span class="fig-fx-sub">Inks</span>
+        {step.inks.length < 3 && (
+          <button class="fig-text-btn" title="Up to three inks" onClick={addInk}>
+            + Add ink
+          </button>
+        )}
+      </div>
+      <ul class="fig-riso-inks">{step.inks.map(inkRow)}</ul>
+
+      <span class="fig-seg fig-riso-screen" role="group" aria-label="Screen">
+        {(['dot', 'line', 'grain'] as const).map((s) => (
+          <button key={s} class={screen === s ? 'on' : ''} aria-pressed={screen === s} onClick={() => set({ ...step, inks: step.inks.map((k) => ({ ...k, screen: s })) }, 'Screen')}>
+            {s}
+          </button>
+        ))}
+      </span>
 
       <div class="fig-sliders">
         {screen !== 'grain' && <Slide label="Screen" unit="px" min={2} max={24} step={0.5} value={first?.cell ?? 6} onInput={(v) => set({ ...step, inks: step.inks.map((k) => ({ ...k, cell: v })) }, 'Screen size', 'fx-cell')} />}
         <Slide label="Misprint" unit="mm" min={0} max={3} step={0.1} value={step.press.misreg} onInput={(v) => set(misregister(step, v), 'Misprint', 'fx-misreg')} />
-        <Slide label="Ink soak" unit="%" min={0} max={100} value={Math.round(step.press.soak * 100)} onInput={(v) => set({ ...step, press: { ...step.press, soak: v / 100 } }, 'Ink soak', 'fx-soak')} />
-        <Slide label="Paper grain" unit="%" min={0} max={100} value={Math.round(step.press.grain * 100)} onInput={(v) => set({ ...step, press: { ...step.press, grain: v / 100 } }, 'Paper grain', 'fx-grain')} />
+        <Slide label="Soak" unit="%" min={0} max={100} value={Math.round(step.press.soak * 100)} onInput={(v) => set({ ...step, press: { ...step.press, soak: v / 100 } }, 'Ink soak', 'fx-soak')} />
+        <Slide label="Grain" unit="%" min={0} max={100} value={Math.round(step.press.grain * 100)} onInput={(v) => set({ ...step, press: { ...step.press, grain: v / 100 } }, 'Paper grain', 'fx-grain')} />
       </div>
 
-      <div class="fig-page-row dots" role="group" aria-label="Paper">
+      <span class="fig-fx-sub">Paper</span>
+      <div class="fig-riso-papers" role="group" aria-label="Paper">
         {PAPERS.map(([name, hex]) => (
-          <button key={hex} class={`fig-dot ${step.press.paper === hex ? 'on' : ''}`} style={{ background: hex }} title={`${name} paper`} aria-label={`${name} paper`} onClick={() => set({ ...step, press: { ...step.press, paper: hex } }, 'Paper')} />
+          <button key={hex} class={step.press.paper === hex ? 'on' : ''} aria-pressed={step.press.paper === hex} title={`${name} paper, ${hex.toUpperCase()}`} onClick={() => set({ ...step, press: { ...step.press, paper: hex } }, 'Paper')}>
+            <i style={{ background: hex }} aria-hidden="true" />
+            {name}
+          </button>
+        ))}
+      </div>
+
+      <span class="fig-fx-sub">Looks</span>
+      <div class="fig-riso-looks" role="group" aria-label="Looks">
+        {RISO_PRESETS.map((p, i) => (
+          <button key={p.name} title={`${p.name}: ${p.desc}`} onClick={() => set({ ...pageScreens(risoStep(i, step.seed)), ...keepBase(step) }, `Riso · ${p.name}`)}>
+            <span class="fig-fx-inks" aria-hidden="true">
+              {p.apply.inks.map((k, j) => (
+                <i key={j} style={{ background: k.color }} />
+              ))}
+            </span>
+            <span class="fig-riso-look-name">{p.name}</span>
+          </button>
+        ))}
+        {saved.map((p) => (
+          <button key={p.id} class="saved" title={`${p.name}: saved in this project`} onClick={() => set({ ...p.step, ...keepBase(step) }, `Riso · ${p.name}`)}>
+            <span class="fig-fx-inks" aria-hidden="true">
+              {p.step.inks.map((k, j) => (
+                <i key={j} style={{ background: k.color }} />
+              ))}
+            </span>
+            <span class="fig-riso-look-name">{p.name}</span>
+          </button>
         ))}
       </div>
 
@@ -666,43 +704,17 @@ function RisoDials({ step, set, onOpenRiso }: { step: RisoStep; set(next: RisoSt
         </form>
       )}
 
-      <div class="fig-fx-chips" role="group" aria-label="Looks">
-        {RISO_PRESETS.map((p, i) => (
-          <button key={p.name} class="fig-fx-chip" title={`${p.name}: ${p.desc}`} onClick={() => set({ ...pageScreens(risoStep(i, step.seed)), ...keepBase(step) }, `Riso · ${p.name}`)}>
-            <span class="fig-fx-inks" aria-hidden="true">
-              {p.apply.inks.map((k, j) => (
-                <i key={j} style={{ background: k.color }} />
-              ))}
-            </span>
-            {p.name}
-          </button>
-        ))}
-        {saved.map((p) => (
-          <button key={p.id} class="fig-fx-chip saved" title={`${p.name}: saved in this project`} onClick={() => set({ ...p.step, ...keepBase(step) }, `Riso · ${p.name}`)}>
-            <span class="fig-fx-inks" aria-hidden="true">
-              {p.step.inks.map((k, j) => (
-                <i key={j} style={{ background: k.color }} />
-              ))}
-            </span>
-            {p.name}
-          </button>
-        ))}
-      </div>
-
-      <div class="fig-fx-actions">
-        <button
-          class="fig-chip"
-          title="A new roll: grain, screen noise and misprint"
-          onClick={() => set(misregister(step, step.press.misreg, 1 + Math.floor(Math.random() * 99999)), 'Reshuffle')}
-        >
+      <div class="fig-riso-actions">
+        <button class="fig-text-btn" title="A new roll: grain, screen noise and misprint" onClick={() => set(misregister(step, step.press.misreg, 1 + Math.floor(Math.random() * 99999)), 'Reshuffle')}>
           Reshuffle
         </button>
-        <button class="fig-chip" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
+        <button class="fig-text-btn" title="Save these settings as a look for the project. The Riso tool and every Freeform page offer it." onClick={() => setNaming('')}>
           Save look
         </button>
+        <span class="grow" />
         {onOpenRiso && (
-          <button class="fig-chip primary" title="Open this page in the Riso separator with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
-            Open in Riso ↗
+          <button class="fig-text-btn" title="Open this page in the Riso tool with every dial. Back to Freeform there sends the settings here." onClick={onOpenRiso}>
+            Riso tool ↗
           </button>
         )}
       </div>

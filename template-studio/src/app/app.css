@@ -914,10 +914,29 @@ input[type='color'].empty::-webkit-color-swatch { opacity: 0; }
 .surface-work { position: absolute; inset: 0; overflow: hidden; outline: none; }
 .surface-backdrop { position: absolute; inset: 0; background: var(--fig-bg); transition: opacity 240ms ease; }
 .surface-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: default; }
-.surface-dots, .surface-page-shadow { transition: opacity 420ms ease; }
-.surface.phase-start .surface-backdrop, .surface.phase-start .surface-dots, .surface.phase-start .surface-page-shadow,
-.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-dots, .surface.phase-exit .surface-page-shadow { opacity: 0; }
-.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-dots, .surface.phase-exit .surface-page-shadow { transition-duration: 360ms; }
+.surface-under, .surface-page-shadow { transition: opacity 420ms ease; }
+/* Under the page (Canvas › Background), the same grounds the project board has, in the canvas's own colours. */
+.surface-under { position: absolute; inset: 0; pointer-events: none; }
+.surface.fig { --fig-g-line: rgb(0 0 0 / 0.09); --fig-g-major: rgb(0 0 0 / 0.18); --fig-g-dot: rgb(0 0 0 / 0.34); --fig-g-dot-major: rgb(0 0 0 / 0.5); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .surface.fig { --fig-g-line: rgb(255 255 255 / 0.07); --fig-g-major: rgb(255 255 255 / 0.15); --fig-g-dot: rgb(255 255 255 / 0.25); --fig-g-dot-major: rgb(255 255 255 / 0.4); } }
+:root[data-theme="dark"] .surface.fig { --fig-g-line: rgb(255 255 255 / 0.07); --fig-g-major: rgb(255 255 255 / 0.15); --fig-g-dot: rgb(255 255 255 / 0.25); --fig-g-dot-major: rgb(255 255 255 / 0.4); }
+.fig-under-lines {
+  background-image:
+    linear-gradient(to right, var(--fig-g-line) 1px, transparent 1px), linear-gradient(to bottom, var(--fig-g-line) 1px, transparent 1px),
+    linear-gradient(to right, var(--fig-g-major) 1px, transparent 1px), linear-gradient(to bottom, var(--fig-g-major) 1px, transparent 1px);
+}
+.fig-under-dots { background-image: radial-gradient(circle, var(--fig-g-dot-major) 1.5px, transparent 2.2px), radial-gradient(circle, var(--fig-g-dot) 1px, transparent 1.6px); }
+.fig-under-mat {
+  background-color: #3c7358;
+  background-image:
+    linear-gradient(to right, rgb(240 246 234 / 0.6) 1px, transparent 1px), linear-gradient(to bottom, rgb(240 246 234 / 0.6) 1px, transparent 1px),
+    linear-gradient(45deg, transparent calc(50% - 0.75px), rgb(240 246 234 / 0.42) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+    linear-gradient(-45deg, transparent calc(50% - 0.75px), rgb(240 246 234 / 0.42) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+    linear-gradient(to right, rgb(232 240 224 / 0.26) 1px, transparent 1px), linear-gradient(to bottom, rgb(232 240 224 / 0.26) 1px, transparent 1px);
+}
+.surface.phase-start .surface-backdrop, .surface.phase-start .surface-under, .surface.phase-start .surface-page-shadow,
+.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-under, .surface.phase-exit .surface-page-shadow { opacity: 0 !important; }
+.surface.phase-exit .surface-backdrop, .surface.phase-exit .surface-under, .surface.phase-exit .surface-page-shadow { transition-duration: 360ms; }
 
 .surface.panning .surface-svg { cursor: grab; }
 .surface.panning .surface-svg:active { cursor: grabbing; }
@@ -2134,6 +2153,41 @@ button.phone-row { cursor: pointer; }
 .fig-hex { grid-template-columns: 64px 28px minmax(0, 1fr); }
 .fig-hex input[type="color"] { box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
 .fig-fx-stack, .fig-fx-step { min-width: 0; }
+/* A step's row: its name never wraps, and the strength stays compact beside it. */
+.fig-fx-name-btn { overflow: hidden; white-space: nowrap; }
+.fig-fx-name-btn > :not(.fig-fx-num):not(.caret) { overflow: hidden; text-overflow: ellipsis; }
+.fig-fx-strength input { width: 56px; }
+.fig-fx-strength span { width: 32px; }
+
+/* Riso, inside the stack (FigPanel › RisoDials): inks as named rows, paper by name, looks as a list. */
+.fig-riso { gap: 10px; }
+.fig-riso-head, .fig-riso-actions { display: flex; align-items: center; gap: 4px; }
+.fig-riso-head .fig-text-btn { margin-left: auto; }
+.fig-riso-inks { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.fig-riso-ink { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-radius: 6px; }
+.fig-riso-ink.open { background: var(--fig-hover); }
+.fig-riso-ink-main { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; height: 30px; padding: 0 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--fig-ink); text-align: left; cursor: pointer; }
+.fig-riso-ink-main:hover { background: var(--fig-hover); }
+.fig-riso-ink-main i { width: 18px; height: 18px; border-radius: 999px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-riso-ink-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fig-riso-ink-main code, .fig-riso-papers code { font-family: var(--mono); font-size: 11px; color: var(--fig-muted); }
+.fig-riso-ink .fig-icon-btn { width: 26px; height: 26px; }
+.fig-riso-swatches { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; padding: 4px 6px 8px; }
+.fig-riso-swatches button { aspect-ratio: 1; width: 100%; padding: 0; border: 0; border-radius: 999px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); cursor: pointer; }
+.fig-riso-swatches button.on { box-shadow: 0 0 0 2px var(--fig-surface), 0 0 0 3.5px var(--fig-ink); }
+.fig-riso-screen { display: flex; }
+.fig-riso-screen button { flex: 1; }
+.fig-step-body.fig-riso .fig-slide { grid-template-columns: 58px minmax(0, 1fr) 44px; }
+.fig-riso-papers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.fig-riso-papers button { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fig-hover); font: inherit; font-size: 12px; color: var(--fig-ink); cursor: pointer; }
+.fig-riso-papers button.on { box-shadow: inset 0 0 0 1.5px var(--fig-ink); }
+.fig-riso-papers i { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px var(--fig-swatch-edge); }
+.fig-riso-looks { display: grid; gap: 2px; }
+.fig-riso-looks button { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12px; color: var(--fig-ink); text-align: left; cursor: pointer; }
+.fig-riso-looks button:hover { background: var(--fig-hover); }
+.fig-riso-look-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fig-riso-looks .fig-fx-inks i { width: 12px; height: 12px; margin-right: -4px; }
+.fig-riso-actions .fig-text-btn { margin: 0; padding: 4px 6px; }
 .fig-effects .fig-step-body, .fig-effects .fig-sliders.fig-step-body { padding: 4px 10px 10px; }
 .fig-fx-step .fig-fx-actions { padding: 0 10px 10px; }
 
