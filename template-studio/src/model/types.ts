@@ -424,6 +424,13 @@ interface LayerBase {
   opacity?: number;
   /** Effects on this layer alone, run on it before it is laid over the layers below. */
   effects?: EffectStep[];
+  /** Not drawn, on the canvas or in the picture, until shown again. */
+  hidden?: boolean;
+  /** Not picked or moved on the canvas; still picked from the layers list. */
+  locked?: boolean;
+  /** Mirrored across its own centre, left to right or top to bottom. */
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 /**

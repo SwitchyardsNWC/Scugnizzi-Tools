@@ -43,6 +43,8 @@ import { focusAfterDrag, imagePlacement } from '../model/image-layer.ts';
 import { measureImage, shownImageHref } from './picture-size.ts';
 import { keyOf as keyOfUnits, allUnits, alignUnits, boxFromCorners, distributeUnits, duplicateUnits, groupUnits, marqueeUnits, removeUnits, toggleUnit, unitOfLayer, type AlignEdge as UnitEdge } from '../model/selection.ts';
 import { BRAND_PRESETS } from './features.ts';
+import { arrangeUnits, canArrange, copyInPlace, flipLayers, styleOf, toggleFlag, withStyle, type Arrange, type LayerStyle } from '../model/arrange.ts';
+import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
 import { boundsOf, boundsOfLayers, snapMove, snapResize, snapTargets, type Guide } from '../model/snap.ts';
 import { addQuickShape, BRUSHES, erasePaths, groupRuns, moveItem, recipeHash, ungroupLayers } from '../model/freeform.ts';
 import { QUICK_SHAPE_JITTER_PX, quickShape, type QuickShape } from '../model/quick-shape.ts';
@@ -181,6 +183,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   const penGroup = useRef<string | null>(null);
   /** How many times the clipboard has been pasted since it was copied, so each paste steps further out. */
   const pasteCount = useRef(0);
+  /** A copied look, for Paste style. */
+  const styleClip = useRef<LayerStyle | null>(null);
+  /** The right-click menu, where it opened. */
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [pageDrag, setPageDrag] = useState(false);
   /** The selection box being dragged, in page coordinates. */
   const [marquee, setMarquee] = useState<Box | null>(null);
@@ -735,7 +741,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       const id = el.closest?.('[data-sy-layer]')?.getAttribute('data-sy-layer');
       if (!id) continue;
       const l = b.layers.find((x) => x.id === id);
-      if (!l) continue;
+      // Locked and hidden layers let the click through to what is under them; the layers list still picks them.
+      if (!l || l.locked || l.hidden) continue;
       if (l.kind === 'text') {
         const box = boundsOf(l, textHeights[l.id]);
         if (p.x < box.x || p.x > box.x + box.width || p.y < box.y || p.y > box.y + box.height) continue;
@@ -895,7 +902,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       } else if (before?.multi && before.units.includes(unit)) {
         movers = before.layers;
       } else onSelectLayer(unit);
-      drag.current = { kind: 'move', layers: movers, x: p.x, y: p.y, moved: false };
+      // Alt-drag leaves the original where it was and moves a copy, as in any layout tool.
+      drag.current = { kind: 'move', layers: movers, x: p.x, y: p.y, moved: false, copy: event.altKey && !event.shiftKey };
       // Held still on it for a beat: the hand from here, so dragging moves the page and not the layer.
       const { clientX, clientY } = event;
       window.clearTimeout(holdPan.current);
@@ -953,6 +961,18 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         let dx = p.x - state.x;
         let dy = p.y - state.y;
         if (!state.moved && Math.hypot(dx, dy) * viewRef.current.z < 3) return;
+        if (!state.moved && state.copy) {
+          const s0 = selectionOf(b, layerRef.current);
+          if (s0) {
+            const made = copyInPlace(tpl(), blockId, b, s0.units);
+            // The copies are moved from the template that holds them: the editor's own may not have caught up yet.
+            state.coalesce = `${key}:copymove:${made.layers.map((l) => l.id).join(',')}`;
+            state.base = made.template;
+            state.layers = made.layers;
+            commit('Duplicate and move', made.template, state.coalesce);
+            onSelectLayer(made.key);
+          }
+        }
         state.moved = true;
         window.clearTimeout(holdPan.current);
         const snap = snapping(event, state.layers.map((l) => l.id));
@@ -969,7 +989,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             if (!found.guides.some((g) => g.axis === 'y')) dy = Math.round((start.y + dy) / step) * step - start.y;
           }
         } else setGuides([]);
-        commit('Move', replaceLayers(tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
+        commit(state.coalesce ? 'Duplicate and move' : 'Move', replaceLayers(state.base ?? tpl(), blockId, state.layers.map((l) => translateLayer(l, dx, dy))), state.coalesce ?? `${key}:move:${state.layers.map((l) => l.id).join(',')}`);
         return;
       }
       case 'resizeMany': {
@@ -1240,8 +1260,25 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
       zoomTo(viewRef.current.z * (event.key === '-' ? 1 / 1.25 : 1.25), undefined, true);
       return;
     }
+    // Shift-1 fits the page, Shift-2 the picked things. By the key's place, so it works on any keyboard layout.
+    if (event.shiftKey && !meta && !event.altKey && (event.code === 'Digit1' || event.code === 'Digit2')) {
+      event.preventDefault();
+      if (event.code === 'Digit1') fitSmooth();
+      else zoomToPicked();
+      return;
+    }
+    if (meta && event.altKey && event.code === 'KeyV') {
+      event.preventDefault();
+      pasteStyle();
+      return;
+    }
     if (!meta && !event.altKey && event.key.toLowerCase() === 'e') {
       setLibraryOpen((o) => !o);
+      return;
+    }
+    if (!meta && !event.altKey && event.shiftKey && (event.code === 'KeyH' || event.code === 'KeyV') && layerRef.current) {
+      event.preventDefault();
+      flip(event.code === 'KeyH' ? 'x' : 'y');
       return;
     }
     if (!meta && !event.altKey && event.key.length === 1) {
@@ -1259,6 +1296,23 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const picked = layerRef.current;
     const sel = selectionOf(b, picked);
     if (!picked || !sel) return;
+    // ⌘] forward, ⌘[ backward; with ⌥, all the way. By the key's place, since ⌥ changes the character.
+    if (meta && (event.code === 'BracketRight' || event.code === 'BracketLeft')) {
+      event.preventDefault();
+      const up = event.code === 'BracketRight';
+      arrange(event.altKey ? (up ? 'front' : 'back') : up ? 'forward' : 'backward');
+      return;
+    }
+    if (meta && event.altKey && event.code === 'KeyC') {
+      event.preventDefault();
+      copyStyle();
+      return;
+    }
+    if (meta && event.shiftKey && (event.code === 'KeyH' || event.code === 'KeyL')) {
+      event.preventDefault();
+      flag(event.code === 'KeyH' ? 'hidden' : 'locked');
+      return;
+    }
     if (meta && event.key.toLowerCase() === 'g') {
       event.preventDefault();
       if (event.shiftKey) {
@@ -1281,6 +1335,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     const move = arrows[event.key];
     if (move) {
       event.preventDefault();
+      if (sel.layers.some((l) => l.locked)) return;
       commit('Nudge', replaceLayers(tpl(), blockId, sel.layers.map((l) => translateLayer(l, move[0], move[1]))), `surface:${blockId}:nudge:${picked}`);
     }
   };
@@ -1497,6 +1552,118 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     commit('Ungroup drawing', ungroupLayers(tpl(), blockId, gid));
     onSelectLayer(null);
   };
+  const ARRANGE_LABEL: Record<Arrange, string> = { front: 'Bring to front', forward: 'Bring forward', backward: 'Send backward', back: 'Send to back' };
+  /** The picked things up or down the stack, together. */
+  const arrange = (how: Arrange) => {
+    const s = selectionOf(blockRef.current!, layerRef.current);
+    if (s) commit(ARRANGE_LABEL[how], arrangeUnits(tpl(), blockId, s.units, how));
+  };
+  /** Mirrored as one, across the middle of everything picked. */
+  const flip = (axis: 'x' | 'y') => {
+    const s = selectionOf(blockRef.current!, layerRef.current);
+    if (s && !s.layers.some((l) => l.locked)) commit(axis === 'x' ? 'Flip horizontal' : 'Flip vertical', replaceLayers(tpl(), blockId, flipLayers(s.layers, axis, groupBox(s.layers, textHeights), textHeights)));
+  };
+  /** Hidden or shown, locked or unlocked: all of the picked things on, unless every one already is. */
+  const flagUnits = (units: string[], which: 'hidden' | 'locked') => {
+    const b = blockRef.current;
+    if (!b || !units.length) return;
+    const next = toggleFlag(b, units, which);
+    const on = Boolean(next[0]?.[which]);
+    commit(which === 'hidden' ? (on ? 'Hide' : 'Show') : on ? 'Lock' : 'Unlock', replaceLayers(tpl(), blockId, next));
+  };
+  const flag = (which: 'hidden' | 'locked') => {
+    const s = selectionOf(blockRef.current!, layerRef.current);
+    if (s) flagUnits(s.units, which);
+  };
+  /** The look of the first picked thing, kept to lay onto others. */
+  const copyStyle = () => {
+    const s = selectionOf(blockRef.current!, layerRef.current);
+    if (s) styleClip.current = styleOf(s.layers[0]!);
+  };
+  const pasteStyle = () => {
+    const s = selectionOf(blockRef.current!, layerRef.current);
+    if (s && styleClip.current) commit('Paste style', replaceLayers(tpl(), blockId, withStyle(s.layers, styleClip.current)));
+  };
+  /** The view fitted to what is picked, or to the page when nothing is. */
+  const zoomToPicked = () => {
+    const b = blockRef.current;
+    const s = b ? selectionOf(b, layerRef.current) : null;
+    const w = work.current?.getBoundingClientRect();
+    if (!s || !w) return fitSmooth();
+    const box = groupBox(s.layers, textHeights);
+    const room = w.width - (panelRef.current ? PANEL_ROOM : 0);
+    const z = clampZoom(Math.min(4, (room - 160) / Math.max(8, box.width), (w.height - 240) / Math.max(8, box.height)));
+    const v = { z, x: room / 2 - (box.x + box.width / 2) * z, y: w.height / 2 - (box.y + box.height / 2) * z };
+    if (reduced) setView(v);
+    else animateView(v, 240, easeOutCubic);
+  };
+  /** Layers off the system clipboard, for the menu's Paste; the keys use the paste event. */
+  const pasteFromMenu = async () => {
+    try {
+      const layers = parseLayerClip(await navigator.clipboard.readText());
+      if (!layers) return;
+      pasteCount.current += 1;
+      placeMany('Paste', pasteLayers(tpl(), blockId, layers, 24 * pasteCount.current), layers.length);
+    } catch {
+      // The browser said no to reading the clipboard; ⌘V still works.
+    }
+  };
+  const menuItems = (): MenuItem[] => {
+    const b = blockRef.current!;
+    const s = selectionOf(b, layerRef.current);
+    const clip = (cmd: 'copy' | 'cut') => () => document.execCommand(cmd);
+    if (!s) {
+      return [
+        { label: 'Paste', keys: '⌘V', run: () => void pasteFromMenu() },
+        { label: 'Select all', keys: '⌘A', run: () => onSelectLayer(keyOfUnits(allUnits(b))), off: !allUnits(b).length },
+        'sep',
+        { label: 'Zoom to fit', keys: '⇧1', run: fitSmooth },
+      ];
+    }
+    const locked = s.layers.some((l) => l.locked);
+    const hidden = s.layers.every((l) => l.hidden);
+    const allLocked = s.layers.every((l) => l.locked);
+    const can = (how: Arrange) => canArrange(b, s.units, how);
+    return [
+      { label: 'Cut', keys: '⌘X', run: clip('cut') },
+      { label: 'Copy', keys: '⌘C', run: clip('copy') },
+      { label: 'Paste', keys: '⌘V', run: () => void pasteFromMenu() },
+      { label: 'Duplicate', keys: '⌘D', run: () => duplicateKey(layerRef.current!) },
+      { label: 'Delete', keys: '⌫', run: () => poof(layerRef.current!), danger: true },
+      'sep',
+      { label: 'Bring to front', keys: '⌥⌘]', run: () => arrange('front'), off: !can('front') },
+      { label: 'Bring forward', keys: '⌘]', run: () => arrange('forward'), off: !can('forward') },
+      { label: 'Send backward', keys: '⌘[', run: () => arrange('backward'), off: !can('backward') },
+      { label: 'Send to back', keys: '⌥⌘[', run: () => arrange('back'), off: !can('back') },
+      'sep',
+      s.multi ? { label: 'Group', keys: '⌘G', run: groupPicked } : { label: 'Ungroup', keys: '⇧⌘G', run: () => s.group && ungroup(s.group), off: !s.group },
+      { label: 'Flip horizontal', keys: '⇧H', run: () => flip('x'), off: locked },
+      { label: 'Flip vertical', keys: '⇧V', run: () => flip('y'), off: locked },
+      'sep',
+      { label: hidden ? 'Show' : 'Hide', keys: '⇧⌘H', run: () => flag('hidden') },
+      { label: allLocked ? 'Unlock' : 'Lock', keys: '⇧⌘L', run: () => flag('locked') },
+      'sep',
+      { label: 'Copy style', keys: '⌥⌘C', run: copyStyle },
+      { label: 'Paste style', keys: '⌥⌘V', run: pasteStyle, off: !styleClip.current },
+      'sep',
+      { label: 'Zoom to selection', keys: '⇧2', run: zoomToPicked },
+    ];
+  };
+  const onContextMenu = (event: MouseEvent) => {
+    const b = blockRef.current;
+    if (!b || phaseRef.current !== 'idle' || editingText) return;
+    event.preventDefault();
+    const p = toSurface(event.clientX, event.clientY);
+    const hit = layerAt(event.clientX, event.clientY, p);
+    if (hit) {
+      // Right-click on something not picked picks it, as a layout tool does; on something picked keeps them all.
+      const l = b.layers.find((x) => x.id === hit)!;
+      const unit = unitOfLayer(b, l);
+      if (!selectionOf(b, layerRef.current)?.units.includes(unit)) onSelectLayer(unit);
+    } else onSelectLayer(null);
+    setTool('select');
+    setMenu({ x: event.clientX, y: event.clientY });
+  };
   const setPage = (patch: { width?: number; height?: number; background?: ColorRef }) => {
     const s = siteOf(tpl(), blockId);
     if (!s) return;
@@ -1638,6 +1805,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onContextMenu={onContextMenu}
           onPointerLeave={() => {
             setEraserAt(null);
             if (drag.current) return;
@@ -1735,7 +1903,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
                     stroke-width={1.5 / view.z}
                     stroke-dasharray={sel.many ? `${5 / view.z} ${4 / view.z}` : undefined}
                   />
-                  {picked?.kind === 'line' ? (
+                  {sel.layers.some((l) => l.locked) ? null : picked?.kind === 'line' ? (
                     <>
                       <circle data-handle="p1" cx={picked.x1} cy={picked.y1} r={hs * 0.6} class="surface-handle" />
                       <circle data-handle="p2" cx={picked.x2} cy={picked.y2} r={hs * 0.6} class="surface-handle" />
@@ -1759,6 +1927,8 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
             </g>
           </g>
         </svg>
+
+        {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
 
         {idle && (
           <div class={`fig-size ${pageDrag ? 'on' : ''}`} style={{ left: `${view.x + block.width * view.z}px`, top: `${view.y + block.height * view.z + 12}px` }}>
@@ -1947,6 +2117,7 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
           onAlignUnits={alignPicked}
           onDistribute={distributePicked}
           onGroup={groupPicked}
+          onFlag={(key, which) => flagUnits([key], which)}
           onLayers={(label, next, coalesce) => commit(label, replaceLayers(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onEffects={(next, label, coalesce) => commit(label, setEffects(tpl(), blockId, next), coalesce ? `surface:${blockId}:${coalesce}` : undefined)}
           onOpenRiso={() => void openInRiso()}

@@ -93,9 +93,30 @@ export interface FigLayersProps {
   onAlignUnits(edge: AlignEdge): void;
   onDistribute(axis: 'x' | 'y'): void;
   onGroup(): void;
+  /** Hide or show, lock or unlock, a row: a layer or a whole group. */
+  onFlag(key: string, flag: 'hidden' | 'locked'): void;
 }
 
-export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, pageMax }: FigLayersProps) {
+const EYE = () => icon(<path key="a" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />, <circle key="b" cx="12" cy="12" r="2.8" />);
+const EYE_OFF = () => icon(<path key="a" d="M4 4l16 16" />, <path key="b" d="M9.9 5.7A9.6 9.6 0 0112 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 01-2.6 3.3M6.3 7.5C3.9 9.2 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.5 0 2.8-.4 4-1" />);
+const LOCK = () => icon(<rect key="a" x="5" y="11" width="14" height="9" rx="2" />, <path key="b" d="M8 11V8a4 4 0 018 0v3" />);
+const UNLOCK = () => icon(<rect key="a" x="5" y="11" width="14" height="9" rx="2" />, <path key="b" d="M8 11V8a4 4 0 017.7-1.5" />);
+
+/** The eye and the lock on a row. Each stays in view while it is on, so a hidden or locked row reads at a glance, not by colour. */
+function Flags({ hidden, locked, onFlag }: { hidden: boolean; locked: boolean; onFlag(flag: 'hidden' | 'locked'): void }) {
+  return (
+    <span class="fig-layer-flags">
+      <button class={locked ? 'on' : ''} title={locked ? 'Unlock  ·  ⇧⌘L' : 'Lock: the canvas cannot pick or move it  ·  ⇧⌘L'} aria-label={locked ? 'Unlock' : 'Lock'} aria-pressed={locked} onClick={() => onFlag('locked')}>
+        {locked ? LOCK() : UNLOCK()}
+      </button>
+      <button class={hidden ? 'on' : ''} title={hidden ? 'Show  ·  ⇧⌘H' : 'Hide: not drawn, not exported  ·  ⇧⌘H'} aria-label={hidden ? 'Show' : 'Hide'} aria-pressed={hidden} onClick={() => onFlag('hidden')}>
+        {hidden ? EYE_OFF() : EYE()}
+      </button>
+    </span>
+  );
+}
+
+export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, onDuplicate, onRemove, onUngroup, onMove, onPage, onClose, onEffects, onOpenRiso, effectNote, effectBusy, heights, onLayers, onAlignUnits, onDistribute, onGroup, onFlag, pageMax }: FigLayersProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const pickedUnits = unitsOf(picked);
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -121,7 +142,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
     return (
       <li
         key={key}
-        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
+        class={`fig-layer ${pickedUnits.includes(key) ? 'on' : ''} ${hover === key ? 'hover' : ''} ${depth ? 'nested' : ''} ${l.hidden ? 'is-hidden' : ''} ${index !== null && gap === index && dragKey ? 'gap-before' : ''} ${index !== null && gap === index + 1 && dragKey && index === n - 1 ? 'gap-after' : ''}`}
         draggable={index !== null}
         onDragStart={(e) => {
           if (index === null) return;
@@ -150,6 +171,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
           <span class={`fig-layer-icon k-${l.kind}`}>{KIND_ICONS[l.kind]()}</span>
           <span class="fig-layer-name">{layerName(l)}</span>
         </button>
+        <Flags hidden={Boolean(l.hidden)} locked={Boolean(l.locked)} onFlag={(f) => onFlag(key, f)} />
         <span class="fig-layer-actions">
           <button title="Duplicate  ·  ⌘D" aria-label="Duplicate" onClick={() => onDuplicate(key)}>
             {icon(<rect key="a" x="8" y="8" width="12" height="12" rx="2.5" />, <path key="b" d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" />)}
@@ -214,6 +236,7 @@ export function FigLayers({ block, ds, picked, hover, onPick, onHover, onEdit, o
                   <span class="fig-layer-name">{item.layers.every((l) => l.kind === 'path') ? 'Drawing' : 'Group'}</span>
                   <span class="fig-badge">{item.layers.length}</span>
                 </button>
+                <Flags hidden={item.layers.every((l) => l.hidden)} locked={item.layers.every((l) => l.locked)} onFlag={(f) => onFlag(key, f)} />
                 <span class="fig-layer-actions">
                   <button title="Ungroup: every stroke its own layer" aria-label="Ungroup" onClick={() => onUngroup(item.id)}>
                     {icon(<rect key="a" x="3" y="3" width="8" height="8" rx="2" />, <rect key="b" x="13" y="13" width="8" height="8" rx="2" />)}
