@@ -16,10 +16,21 @@
     #tool-banner a .arr{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif}
     #tool-banner .name{margin-left:auto;color:${t.muted};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #tool-banner .name::after{content:"_";color:${t.muted}}
+    #tool-banner .ver{color:${t.muted};font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:nowrap}
     #tool-banner a:focus-visible{outline:1px solid ${t.ink};outline-offset:-3px}`;
   document.head.appendChild(style);
   const el = document.createElement('div'); el.id = 'tool-banner';
   el.innerHTML = `<a href="${home}"><span class="arr">←</span><span>Scugnizzi tools</span></a><span class="name"></span>`;
   el.querySelector('.name').textContent = name.toLowerCase();
   document.body.prepend(el);
+  // The suite's version, from version.js beside the dashboard (the one place it is written).
+  const ver = document.createElement('span'); ver.className = 'ver'; el.appendChild(ver);
+  const show = () => { if (window.SCUGNIZZI_VERSION) ver.textContent = 'v' + window.SCUGNIZZI_VERSION; };
+  if (window.SCUGNIZZI_VERSION) show();
+  else {
+    const v = document.createElement('script');
+    v.src = new URL('version.js', new URL(home, location.href)).href;
+    v.onload = show;
+    document.head.appendChild(v);
+  }
 })();

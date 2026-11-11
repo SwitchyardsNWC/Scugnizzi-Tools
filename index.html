@@ -130,6 +130,8 @@
   footer{padding:var(--spacing-16) var(--spacing-24);border-top:var(--border-width) solid var(--border-hairline);background:var(--surface-paper);
     display:flex;gap:var(--spacing-24);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:var(--tracking-caption)}
   footer .mono{font-family:var(--font-mono-detail);letter-spacing:0}
+  footer .version{color:var(--text-muted);text-decoration:none}
+  footer .version:hover{color:var(--text-primary)}
 
   @media (max-width:1023px){
     .hub-top{grid-template-columns:1fr;min-height:0}
@@ -188,8 +190,11 @@
     <span class="mono">node serve.js · localhost:8770</span>
     <span class="spacer"></span>
     <span>Press <span class="mono">?</span> for shortcuts</span>
+    <a class="mono version" id="suite-version" href="CHANGELOG.md" title="What changed, newest first"></a>
   </footer>
 
+<script src="version.js"></script>
+<script>document.getElementById('suite-version').textContent = 'v' + (window.SCUGNIZZI_VERSION || '?');</script>
 <script src="tool-kit.js"></script>
 <script src="project.js"></script>
 <script>

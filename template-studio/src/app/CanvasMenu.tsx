@@ -134,6 +134,25 @@ export function CanvasSettingsPanel() {
           </div>
         </div>
       </div>
+      <div class="cv-section">
+        <div class="cv-head">Effects</div>
+        <div class="cv-row" title="Auto: a quick, softer draft while you work when the effects are slow, sharpened once you pause. Fast: drafts only, for heavy pages on a slow machine. Full: always sharp. Export is always full quality.">
+          <span class="cv-label">Preview</span>
+          <div class="cv-seg" role="radiogroup" aria-label="Effects preview">
+            {(
+              [
+                ['auto', 'Auto'],
+                ['fast', 'Fast'],
+                ['full', 'Full'],
+              ] as Array<[CanvasSettings['effectsPreview'], string]>
+            ).map(([value, label]) => (
+              <button key={value} role="radio" aria-checked={s.effectsPreview === value} class={s.effectsPreview === value ? 'on' : ''} onClick={() => set({ effectsPreview: value })}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <div class="cv-foot">
         <span>Kept in this browser, for every canvas.</span>
         <button class="cv-reset" disabled={!changed} onClick={() => resetCanvasSettings()}>

@@ -53,6 +53,7 @@ import { TouchGestures } from './gestures.ts';
 import { glide, PanTracker } from './inertia.ts';
 import { hasEffects, HANDOFF_RISO, HANDOFF_RISO_RETURN, normalizeRiso, risoStep, setEffects, withRisoStep } from '../model/effects.ts';
 import { canvasBlob, freeformCanvas } from './picture.ts';
+import { printPasses, sharpScale } from './effects-preview.ts';
 import { brushOutline, brushSampleSvg, HIGHLIGHTER } from '../compile/freeform.ts';
 import { MARKS } from '../model/marks.ts';
 import type { Brush, FreeformBlock, FreeformLayer, RisoStep, StyleRange, Template, TextMarks } from '../model/types.ts';
@@ -512,7 +513,10 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
   // --- effects: the page printed through them, and the round trip to the Riso tool ---------------------
 
   /** The page printed through its effects, laid over the drawing. The drawing stays underneath to be picked. */
-  const [fx, setFx] = useState<{ key: string; url: string } | null>(null);
+  const [fx, setFx] = useState<{ key: string; url: string; draft: boolean } | null>(null);
+  /** What the print on screen is of, and whether it is a draft; and how long the last sharp print took. */
+  const fxShown = useRef<{ key: string; draft: boolean } | null>(null);
+  const lastSharpMs = useRef<number | null>(null);
   const fxUrl = useRef<string | null>(null);
   const [fxNote, setFxNote] = useState<string | null>(null);
   const assetsRef = useRef(assets);
@@ -529,31 +533,39 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
     [blockId],
   );
 
-  // Printed again once a change settles — never mid-drag or mid-word, which would stutter.
+  // Printed again once a change settles — never mid-drag or mid-word, which would stutter. Slow effects get a
+  // quick draft at the page's own size first, then the sharp print once the work pauses (effects-preview.ts).
+  const previewMode = settings.effectsPreview;
   useEffect(() => {
     if (!fxKey || dragging || editingText) return;
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const b = blockRef.current;
-      if (!b) return;
-      try {
-        // Printed at the resolution the screen shows it, up to 4×, so a zoomed-in print is sharp rather than
-        // stretched. The export stays at 2×, and every distance in the press is in page pixels at any scale.
-        const scale = Math.min(4, Math.max(2, Math.ceil(viewRef.current.z * (window.devicePixelRatio || 1))));
-        const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale, ground: groundOf(b) }));
-        if (cancelled) return;
-        if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
-        fxUrl.current = URL.createObjectURL(blob);
-        setFx({ key: fxKey, url: fxUrl.current });
-      } catch {
-        // The plain drawing stays on screen.
-      }
-    }, 120);
+    // Printed at the resolution the screen shows it, up to 4×, so a zoomed-in print is sharp rather than
+    // stretched. The export stays at 2×, and every distance in the press is in page pixels at any scale.
+    const sharp = sharpScale(viewRef.current.z, window.devicePixelRatio || 1);
+    const timers = printPasses(previewMode, lastSharpMs.current, sharp).map((pass) =>
+      window.setTimeout(async () => {
+        const b = blockRef.current;
+        if (!b || cancelled) return;
+        try {
+          const started = performance.now();
+          const blob = await canvasBlob(await freeformCanvas(b, dsRef.current, { assets: assetsRef.current, scale: pass.scale, ground: groundOf(b) }));
+          if (!pass.draft) lastSharpMs.current = performance.now() - started;
+          // A draft never replaces a sharper print of the same page.
+          if (cancelled || (pass.draft && fxShown.current?.key === fxKey && !fxShown.current.draft)) return;
+          if (fxUrl.current) URL.revokeObjectURL(fxUrl.current);
+          fxUrl.current = URL.createObjectURL(blob);
+          fxShown.current = { key: fxKey, draft: pass.draft };
+          setFx({ key: fxKey, url: fxUrl.current, draft: pass.draft });
+        } catch {
+          // The plain drawing stays on screen.
+        }
+      }, pass.delay),
+    );
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      timers.forEach((t) => window.clearTimeout(t));
     };
-  }, [fxKey, dragging, editingText, assets, groundOf]);
+  }, [fxKey, dragging, editingText, assets, groundOf, previewMode]);
   useEffect(() => () => void (fxUrl.current && URL.revokeObjectURL(fxUrl.current)), []);
 
   /** The plain page and its settings, left for the Riso tool, which opens in a tab of its own. */
@@ -1933,6 +1945,12 @@ export function Surface({ editor, blockId, assets, layer, onSelectLayer, onDone,
         {idle && (
           <div class={`fig-size ${pageDrag ? 'on' : ''}`} style={{ left: `${view.x + block.width * view.z}px`, top: `${view.y + block.height * view.z + 12}px` }}>
             {block.width} × {block.height}
+            {/* Said in words, not by a softer picture alone: a draft is on screen, and whether it will sharpen. */}
+            {showFx && fx?.draft && (
+              <span class="fig-draft" title={previewMode === 'fast' ? 'Fast preview: effects drawn at page size while you work. Export is full quality. Change it in Canvas settings.' : 'A quick draft of the effects; the sharp print follows when you pause.'}>
+                {previewMode === 'fast' ? ' · Fast preview' : ' · Draft, sharpening'}
+              </span>
+            )}
           </div>
         )}
 
