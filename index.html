@@ -4,25 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scugnizzi tools</title>
-<meta name="theme-color" content="#1e1c19">
+<meta name="theme-color" content="#151515">
+<script src="theme.js"></script>
 <link rel="manifest" href="template-studio/dist/manifest.webmanifest">
 <link rel="icon" href="template-studio/dist/icons/app-192.png" type="image/png">
 <link rel="stylesheet" href="design system/Enkel Design system v2/styles.css">
 <style>
   /* Enkel: sunken page, paper cards, one soft hairline, no shadow, no radius on containers. Words in the sans, figures in mono. */
-  html,body{height:100%}
   body{background:var(--surface-sunken);display:flex;flex-direction:column;min-height:100vh}
+  /* Bars keep their height: in a flex column they would otherwise give it up to a long page. */
+  .shell-header,.section-head,footer{flex:none}
   .spacer{flex:1}
   .shell-header{height:var(--shell-header-height);box-sizing:border-box;display:flex;align-items:center;gap:var(--spacing-24);padding:0 var(--spacing-24);
     background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-hairline)}
-  .wordmark{font-size:var(--text-heading-sm);letter-spacing:var(--tracking-heading-sm);color:var(--text-primary);text-decoration:none}
+  .wordmark{font-size:var(--text-heading-sm);line-height:1;letter-spacing:var(--tracking-heading-sm);color:var(--text-primary);text-decoration:none;white-space:nowrap}
+  .wordmark:hover{color:var(--text-primary)}
+  /* Words in the bar share a baseline, whatever their size; the bar centres the group. */
+  .lockup{display:flex;align-items:baseline;gap:var(--spacing-24);min-width:0}
+  .lockup:last-child{gap:var(--spacing-16)}
   .shell-header .tagline{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .shell-header .count{font-family:var(--font-mono);font-size:var(--text-meta);color:var(--text-muted);letter-spacing:0}
+  .shell-header .count{font-family:var(--font-mono);font-size:var(--text-meta);color:var(--text-muted);letter-spacing:0;white-space:nowrap}
+  /* Light or dark, for the dashboard and every tool (theme.js keeps the pick). Enkel's ThemeToggle at 28: 1 + 2 + (6 / 14 / 2) + 2 + 1. */
+  .theme{display:inline-flex;gap:2px;padding:2px;border:var(--border-width) solid var(--border-card);border-radius:var(--radius-buttons-sm);background:var(--surface-sunken)}
+  .theme button{min-height:22px;padding:6px 8px 2px;border:0;border-radius:2px;background:transparent;color:var(--text-muted);cursor:pointer;
+    font-size:var(--text-meta);line-height:var(--control-line-sm);letter-spacing:var(--tracking-meta);transition:background-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+  .theme button:hover{color:var(--text-primary)}
+  .theme button[aria-checked="true"]{background:var(--text-primary);color:var(--surface-paper);cursor:default}
   main{flex:1;width:100%;box-sizing:border-box;padding:0}
 
   /* Section heads: an uppercase index entry and a count, over a soft rule. */
   .section-head{display:flex;align-items:center;gap:var(--spacing-8);height:40px;box-sizing:border-box;padding:0 var(--spacing-24);border-bottom:var(--border-width) solid var(--border-card);
     font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+  .section-head>*{white-space:nowrap}
   .section-head .n{font-family:var(--font-mono);letter-spacing:0}
   .section-head .hint{text-transform:none;font-size:var(--text-caption);letter-spacing:var(--tracking-caption)}
   .dot{width:8px;height:8px;background:var(--delta-flat);flex:0 0 8px}
@@ -145,7 +158,7 @@
   }
   @media (max-width:767px){
     .shell-header,.section-head{padding:0 var(--gutter-phone)}
-    .shell-header .tagline,.section-head .hint{display:none}
+    .shell-header .tagline,.section-head .hint,.section-head .wide{display:none}
     .hub-intro{padding:var(--spacing-24) var(--gutter-phone)}
     .hub-board{padding:var(--gutter-phone)}
     .type{padding:var(--card-padding) var(--gutter-phone)}
@@ -156,16 +169,17 @@
 </head>
 <body>
   <header class="shell-header">
-    <a class="wordmark" href="./">Scugnizzi tools</a>
-    <span class="tagline">One project folder, and the small tools that work in it.</span>
+    <span class="lockup"><a class="wordmark" href="./" aria-label="Scugnizzi tools">scugnizzi tools_</a>
+    <span class="tagline">One project folder, and the small tools that work in it.</span></span>
     <span class="spacer"></span>
-    <span class="count" id="count"></span>
+    <span class="lockup"><span class="count" id="count"></span>
+    <span class="theme" id="theme" role="radiogroup" aria-label="Colour mode"><button type="button" role="radio" data-t="light">Light</button><button type="button" role="radio" data-t="dark">Dark</button></span></span>
   </header>
 
   <main>
     <section class="hub" aria-labelledby="hub-label">
       <div class="section-head">
-        <span id="hub-label">Project</span><span>·</span><span>One folder for every tool</span>
+        <span id="hub-label">Project</span><span class="wide">·</span><span class="wide">One folder for every tool</span>
         <span class="spacer"></span><span class="dot" id="hub-dot"></span><span id="hub-state"></span>
       </div>
       <div class="hub-top">
@@ -194,7 +208,16 @@
   </footer>
 
 <script src="version.js"></script>
-<script>document.getElementById('suite-version').textContent = 'v' + (window.SCUGNIZZI_VERSION || '?');</script>
+<script>
+document.getElementById('suite-version').textContent = 'v' + (window.SCUGNIZZI_VERSION || '?');
+// The colour-mode switch in the header: theme.js keeps the pick, for this page and every tool.
+(function () {
+  const el = document.getElementById('theme'), T = window.ScugnizziTheme;
+  const paint = () => el.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.t === T.get())));
+  el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) T.set(b.dataset.t); });
+  T.onChange(paint); paint();
+})();
+</script>
 <script src="tool-kit.js"></script>
 <script src="project.js"></script>
 <script>

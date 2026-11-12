@@ -28,7 +28,7 @@
 - **Data palette** (`--data-1…6`): 1 blue #4a5fa5 is the default bar/line; 2 green #5b8a5e revenue/good; 3 amber #c48a2e warn; 4 brick #b8412b bad; 5 grey neutral; 6 teal secondary series. `--data-track` is the empty bar. One tone per chart; 3 and 4 only to flag the row that matters.
 - **Deltas:** `--delta-up` #2f7a44, `--delta-down` #b8412b, `--delta-flat` graphite. Direction of good follows the metric (`invert` for costs, open items).
 - **Status set** (`tokens/status.css`): done/on track moss, in progress slate, at risk amber, blocked brick, not started graphite; each with a soft ground. Colour means status, not personality.
-- **Dark mode:** every token above flips under `[data-theme="dark"]` (sunken #0e0e0e, card #1a1a1a, text #f2f2f0, hairline #3a3a38, data colours lifted). Components never hard-code a hex — if something doesn't flip, fix the token use. `ThemeToggle` sets the attribute and remembers it in localStorage `enkel-theme`; first load follows the OS.
+- **Dark mode:** every token above flips under `[data-theme="dark"]` (sunken #0e0e0e, card #1a1a1a, text #f2f2f0, hairline #3a3a38, data colours lifted). Components never hard-code a hex — if something doesn't flip, fix the token use. `ThemeToggle` sets the attribute and remembers it in localStorage `enkel-theme`; first load follows the OS. The Scugnizzi suite sets the attribute with its own `theme.js` instead (key `scuggnizzi.theme`, dark unless picked), so the dashboard, the tools and Template Studio share one choice.
 
 ## Type
 
@@ -61,6 +61,19 @@
 - **Motion:** essentially none. Bars and progress animate width 120ms; nothing else moves.
 - **Refusals** (brick gate / amber shortfall), **provenance** (glyph + label), **two clocks**, **freshness** carry over unchanged from the project tooling.
 
+## Tool layer
+
+The dashboard is for reading; a tool is for making. `tools.css` is the same system at a tool's density, for the Scugnizzi tools and anything shaped like them: a paper side panel, a sunken stage that holds the work, an export bar. Load it after `styles.css`; a tool's own `<style>` comes after both and only says what is particular to it. `guidelines/controls-tools.html` shows every part in light and dark.
+
+- **Frame:** `.app` = `aside` (320, paper, ink hairline on its edge) + `main` (sunken). `main` = `.topbar` (40, figures in mono) + `.stage` (flat, sunken; the work sits in a hairline, never a shadow) + `.footer` (the export bar: `.actions` and `pre.recipe`). A second panel is the 280 rail.
+- **Sections:** `details.panel` — a 40px header that is the dashboard's section head (11px uppercase, state in `.v` on the right, 12px secondary), a typographic chevron that turns, nothing that slides. Sub-groups are `h3` at 13 in ink: size and colour, never weight.
+- **Controls at 28:** buttons, fields, selects and segmented controls are all 28 = 1 + 8 / 14 / 4 + 1, top = bottom + 4. Row labels carry the same 4px nudge so a label and its control share a baseline. Icon buttons and banner controls are 24.
+- **Fields are wells:** `--surface-field` (sunken) inside the paper panel, `--border-card` at rest, `--border-control` on hover, ink when focused. Numbers in a field stay in the sans with tabular figures; the readout beside a slider is mono.
+- **Buttons:** outline on `--border-control` by default; `.primary` slate iris, once per view, for the thing that finishes the job; `.ghost` for quiet; `.danger` turns brick on hover, and its label always says what it destroys.
+- **Indicators are squares:** check and radio 14, the switch a square knob in a square track, the slider thumb 12 on a 2px track, colour wells 28 with a hairline round the chip.
+- **Selection is ink:** a filled segment, a 2px marker down a selected row, a 2px ink edge and a square mark on a chosen preset. Lightness and shape carry it, so it reads without colour.
+- **Theme:** tools default to dark, because pictures read best on it. `theme.js` at the suite root keeps one pick for the dashboard, every tool and Template Studio (`scuggnizzi.theme`), and the banner carries the switch.
+
 ## Layout tiers
 
 - **Shell:** `AppShell` owns the viewport — 200px paper rail | static `header` (ShellHeader + FilterBar) above a scrolling `main`. `ground="sunken"` tints the main for dashboards; `width="full"` for tables. `ShellHeader` 56px: kicker/breadcrumb, 18px title, actions.
@@ -83,13 +96,14 @@
 
 ## Index
 
-- `styles.css` — global entry; imports `tokens/*.css` (fonts, colors incl. dark theme, status, typography, spacing, layout, base).
-- `guidelines/` — foundation cards: colours (surfaces & dark, data, neutrals, status…), type scale, spacing scale, control geometry, drill-down patterns, layout, imagery, brand.
+- `styles.css` — global entry; imports `tokens/*.css` (fonts, colors incl. dark theme, status, typography, spacing, layout, controls, base).
+- `tools.css` — the tool layer: panel, sections, 28px controls, slider, segmented, checks, colour wells, presets, selectable lists, drop zone, stage, export bar. `tokens/controls.css` holds its measures.
+- `guidelines/` — foundation cards: colours (surfaces & dark, data, neutrals, status…), type scale, spacing scale, control geometry, tool controls, drill-down patterns, layout, imagery, brand.
 - `ui_kits/dashboard/` — Switchyards Ops Dashboard: Overview (Stats → drawers), Clubs (table with inline expand → club page with breadcrumb, or cards), Projects (table → inspector drawer). Warehouse, Signage, Team not built.
 - `ui_kits/switchyards/` — Design Projects: My work, Projects, Checklist, Schedule (editorial pages on the same tokens).
 - `thumbnail.html` — project tile. `SKILL.md` — agent skill entry.
 
 ## Caveats
 
-- Helvetica Neue LT Std is self-hosted from `fonts/`. The mono is a system stack (SF Mono / Menlo / Consolas) — no mono file was supplied; drop one into `fonts/` and add an `@font-face` to `tokens/fonts.css` to pin it.
+- Helvetica Neue LT Std is self-hosted from `fonts/`. The monos come from Google Fonts: IBM Plex Mono 400/500 for figures (`--font-mono`) and JetBrains Mono 300/400 for codes and reference strings (`--font-mono-detail`), each with a system mono behind it. Offline, figures fall back to SF Mono / Menlo / Consolas; to pin them, drop the woff2 files into `fonts/`, add `@font-face` rules to `tokens/fonts.css` and remove its `@import`.
 - No logo, imagery or icons supplied — placeholders are hairline boxes.

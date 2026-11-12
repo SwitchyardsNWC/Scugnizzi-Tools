@@ -155,32 +155,42 @@
     if (styled) return;
     styled = true;
     const css = document.createElement('style');
+    // Enkel's tokens, with the dark values as fallbacks. The project's state is a square and a word: the button that
+    // appears when Chrome wants a click says what is wrong, so the dot is never the only signal.
+    const v = (token, dark) => `var(--${token},${dark})`;
+    const SANS = v('font-helveticaneue', '"Helvetica Neue",Helvetica,Arial,sans-serif');
     css.textContent = `
       #tool-banner .sp-project{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
       #tool-banner .sp-project[hidden]{display:none}
-      #tool-banner .sp-project a{margin-left:0;height:24px;padding:0 6px;border-radius:4px;color:#f2f2f0;max-width:220px;overflow:hidden;text-overflow:ellipsis}
-      #tool-banner .sp-project a.sp-muted{color:#9a9c99}
-      #tool-banner .sp-dot{flex:none;width:7px;height:7px;border-radius:50%;background:#9a9c99}
-      #tool-banner .sp-dot.ready{background:#3fb96b;box-shadow:0 0 0 3px rgba(63,185,107,.2)}
-      #tool-banner .sp-dot.view-only,#tool-banner .sp-dot.asking{background:#e2a33b;box-shadow:0 0 0 3px rgba(226,163,59,.2)}
-      #tool-banner .sp-project button{height:22px;padding:0 8px;border:1px solid #3a3a38;border-radius:4px;background:#222;color:#f2f2f0;font:inherit;font-size:12px;cursor:pointer}
-      #tool-banner .sp-project button:hover{background:#2c2c2c}
-      .sp-toast{position:fixed;left:50%;bottom:24px;z-index:1001;max-width:min(580px,calc(100vw - 32px));padding:9px 14px;transform:translateX(-50%);
-        border-radius:8px;background:#e8e5df;color:#121213;font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.45)}
-      .sp-picker{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.55)}
-      .sp-sheet{display:flex;flex-direction:column;width:min(720px,100%);max-height:min(640px,calc(100vh - 48px));background:#1b1b1d;border:1px solid #2c2c30;border-radius:10px;
-        color:#e8e5df;font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-      .sp-sheet header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #2c2c30}
-      .sp-sheet header b{font-weight:600}
-      .sp-x{background:none;border:0;color:#8f8c86;font-size:14px;cursor:pointer}
-      .sp-x:hover{color:#e8e5df}
-      .sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;padding:14px;overflow:auto}
-      .sp-pic{display:grid;gap:6px;padding:6px;background:#232326;border:1px solid #2c2c30;border-radius:8px;color:inherit;font:inherit;text-align:left;cursor:pointer}
-      .sp-pic:hover,.sp-pic:focus-visible{border-color:#d9b36b;outline:none}
-      .sp-thumb{display:grid;place-items:center;aspect-ratio:1;overflow:hidden;border-radius:5px;background:repeating-conic-gradient(#2a2a2d 0 25%,#232326 0 50%) 0 0/14px 14px}
+      #tool-banner .sp-project a{display:inline-flex;align-items:center;height:24px;margin-left:0;padding:0 6px;border-radius:4px;color:${v('text-primary', '#f2f2f0')};text-decoration:none;
+        max-width:220px;overflow:hidden;text-overflow:ellipsis;transition:color 120ms linear,background-color 120ms linear}
+      #tool-banner .sp-project a:hover{background:${v('surface-row-hover', '#222222')}}
+      #tool-banner .sp-project a.sp-muted{color:${v('text-muted', '#9a9c99')}}
+      #tool-banner .sp-project a.sp-muted:hover{color:${v('text-primary', '#f2f2f0')}}
+      #tool-banner .sp-dot{flex:none;width:8px;height:8px;background:${v('status-notstarted', '#9a9c99')}}
+      #tool-banner .sp-dot.ready{background:${v('status-done', '#8fb082')}}
+      #tool-banner .sp-dot.view-only,#tool-banner .sp-dot.asking{background:${v('status-risk', '#d9a54c')}}
+      #tool-banner .sp-project button{box-sizing:border-box;height:22px;min-height:0;padding:5px 8px 1px;border:1px solid ${v('border-control', '#454543')};border-radius:4px;background:transparent;
+        color:${v('text-primary', '#f2f2f0')};font:12px/14px ${SANS};letter-spacing:.132px;cursor:pointer;transition:background-color 120ms linear}
+      #tool-banner .sp-project button:hover{background:${v('surface-row-hover', '#222222')}}
+      .sp-toast{position:fixed;left:50%;bottom:24px;z-index:1001;box-sizing:border-box;max-width:min(580px,calc(100vw - 32px));min-height:32px;padding:9px 12px 5px;transform:translateX(-50%);
+        background:${v('text-primary', '#f2f2f0')};color:${v('surface-paper', '#151515')};font:13px/1.35 ${SANS};letter-spacing:.143px}
+      .sp-picker{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:${v('surface-scrim', 'rgba(0,0,0,.6)')}}
+      .sp-sheet{display:flex;flex-direction:column;width:min(720px,100%);max-height:min(640px,calc(100vh - 48px));background:${v('surface-card', '#1a1a1a')};
+        border:1px solid ${v('border-hairline', '#3a3a38')};color:${v('text-primary', '#f2f2f0')};font:13px/1.35 ${SANS};letter-spacing:.143px}
+      .sp-sheet header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 8px 0 16px;border-bottom:1px solid ${v('border-card', '#2a2a29')}}
+      .sp-sheet header b{font-weight:400;font-size:16px}
+      .sp-x{display:grid;place-items:center;width:28px;height:28px;min-height:0;padding:0;background:none;border:1px solid transparent;border-radius:4px;color:${v('text-muted', '#9a9c99')};font-size:13px;cursor:pointer}
+      .sp-x:hover{color:${v('text-primary', '#f2f2f0')};border-color:${v('border-control', '#454543')};background:none}
+      .sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;padding:16px;overflow:auto;scrollbar-width:thin}
+      .sp-pic{display:grid;gap:8px;min-height:0;padding:4px 4px 8px;background:transparent;border:1px solid ${v('border-card', '#2a2a29')};border-radius:4px;color:inherit;font:inherit;text-align:left;cursor:pointer;
+        transition:border-color 120ms linear,background-color 120ms linear}
+      .sp-pic:hover,.sp-pic:focus-visible{border-color:${v('text-primary', '#f2f2f0')};background:${v('surface-row-hover', '#222222')};outline:none}
+      .sp-thumb{display:grid;place-items:center;aspect-ratio:1;overflow:hidden;border-radius:2px;
+        background:repeating-conic-gradient(${v('surface-selected', '#2a2a2a')} 0 25%,${v('surface-sunken', '#0e0e0e')} 0 50%) 0 0/12px 12px}
       .sp-thumb img{max-width:100%;max-height:100%;object-fit:contain}
-      .sp-name{overflow:hidden;font-size:11.5px;color:#8f8c86;white-space:nowrap;text-overflow:ellipsis}
-      .sp-empty{grid-column:1/-1;margin:28px 0;text-align:center;color:#8f8c86}`;
+      .sp-name{overflow:hidden;padding:0 4px;font-size:12px;color:${v('text-muted', '#9a9c99')};white-space:nowrap;text-overflow:ellipsis}
+      .sp-empty{grid-column:1/-1;margin:28px 0;text-align:center;color:${v('text-muted', '#9a9c99')}}`;
     document.head.appendChild(css);
   }
 

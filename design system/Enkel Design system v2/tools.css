@@ -1,0 +1,289 @@
+/* Enkel — the tool layer.
+ *
+ * The dashboard is for reading; a tool is for making. This layer is the same system at a tool's density: a paper side
+ * panel of collapsible sections, rows of 28px controls, a sunken stage that holds the work, and an export bar along the
+ * bottom. Load it after styles.css; a tool's own <style> comes after both and only says what is particular to it.
+ *
+ *   <script src="../theme.js"></script>
+ *   <link rel="stylesheet" href="../design system/Enkel Design system v2/styles.css">
+ *   <link rel="stylesheet" href="../design system/Enkel Design system v2/tools.css">
+ *
+ * Rules, as on the dashboard: the panel and the bars are paper, the stage is sunken, ink hairlines for structure (rail
+ * edge, bars) and soft ones inside. Radii only on what you press (4), never on a container. Every indicator is a square.
+ * Slate iris fills one button per view, the one that finishes the job. Selection is ink: a 2px marker or an ink edge,
+ * never a colour on its own. Hover is a 120ms colour change and nothing moves.
+ *
+ * Markup it expects (the vocabulary the tools already share):
+ *   .app > aside + main                         the panel and the work
+ *   aside > h1 + p.sub, details.panel           title, then sections: summary > .t (name) + .v (state), > .body
+ *   .row > label + control                      one labelled line of controls, 28px
+ *   .stack > label + control                    a label over a full-width control
+ *   .slider > label + output + input[range]     label and figure on one line, the track under them
+ *   .seg > button(.on)                          an exclusive pick of 2–5
+ *   .check > input[checkbox] + span(+small)     a checkbox with its words
+ *   .presets > button(.on) > small              cards you pick a look from
+ *   .list > .item(.on)                          rows you select: layers, inks, messages, modules
+ *   .drop(.over)                                where a file lands
+ *   main > .topbar + .stage + .footer           the bar over the work, the work, the export bar
+ *   .footer > .actions + pre.recipe             what you take away, and what made it
+ */
+
+/* --- page ------------------------------------------------------------------------------------------------------------- */
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--surface-sunken);color:var(--text-primary);
+  font-size:var(--text-meta);line-height:1.35;letter-spacing:var(--tracking-em)}
+h1,h2,h3,h4{margin:0;font-weight:400}
+p{max-width:none}
+.mono{font-family:var(--font-mono);letter-spacing:0;font-variant-numeric:tabular-nums}
+.spacer{flex:1}
+
+/* --- the frame: panel, stage ------------------------------------------------------------------------------------------- */
+.app{display:grid;grid-template-columns:var(--tool-panel-width) minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px));min-height:0}
+aside{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--surface-paper);border-right:var(--border-width) solid var(--border-hairline);
+  padding:0 var(--panel-pad) 48px}
+aside.right,aside + main + aside{border-right:0;border-left:var(--border-width) solid var(--border-hairline)}
+main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface-sunken)}
+
+/* The panel opens with the tool's name and one line on what it does. */
+aside > h1,.panel-title{padding-top:20px;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);color:var(--text-primary)}
+aside > .sub,.panel-sub{margin:4px 0 20px;font-size:var(--text-meta);line-height:var(--leading-prose-tight);color:var(--text-muted)}
+
+/* Scrollbars: thin, on the soft hairline, so a long panel doesn't carry a grey slab down its side. */
+aside,.stage,.scroll,pre,textarea{scrollbar-width:thin;scrollbar-color:var(--border-control) transparent}
+
+/* --- sections ---------------------------------------------------------------------------------------------------------- */
+/* A section header is the dashboard's section head: an 11px uppercase index entry, its state on the right. */
+details.panel{border-top:var(--border-width) solid var(--border-muted)}
+details.panel>summary{list-style:none;display:flex;align-items:center;gap:var(--spacing-8);min-height:var(--panel-section-height);padding:2px 0 0;cursor:pointer;user-select:none;
+  font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted);
+  transition:color var(--duration-fast) var(--ease-standard)}
+details.panel>summary::-webkit-details-marker{display:none}
+/* The disclosure: a typographic chevron, right when closed, down when open. It turns; nothing slides. */
+details.panel>summary::before{content:"";flex:0 0 5px;width:5px;height:5px;margin:-2px 3px 0 1px;border-right:var(--border-width) solid currentColor;border-bottom:var(--border-width) solid currentColor;transform:rotate(-45deg)}
+details.panel[open]>summary::before{margin-top:-5px;transform:rotate(45deg)}
+details.panel>summary:hover{color:var(--text-primary)}
+details.panel>summary .t{flex:1;min-width:0}
+details.panel>summary .v{max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-transform:none;
+  font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-secondary)}
+details.panel>.body{padding:0 0 var(--spacing-16)}
+/* A plain section without the disclosure, for panels that never collapse. */
+.pane{padding:var(--spacing-16) var(--panel-pad);border-bottom:var(--border-width) solid var(--border-muted)}
+.pane-head{display:flex;align-items:center;gap:var(--spacing-8);margin:0 0 var(--spacing-12);
+  font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+.pane-head .t{flex:1;min-width:0}
+.pane-head .n,.pane-head .v{font-family:var(--font-mono);letter-spacing:0;text-transform:none;font-size:var(--text-caption)}
+
+/* A sub-heading inside a section: the next group of controls. Size and colour, never weight. */
+aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);color:var(--text-primary)}
+
+/* --- rows --------------------------------------------------------------------------------------------------------------- */
+.row{display:flex;align-items:center;gap:var(--spacing-8);min-height:var(--control-height-sm);margin:var(--spacing-8) 0}
+/* A label's words drop by the same 4px nudge as the control's, so the two share a baseline (padding 4 centred = 2 down). */
+.row>label,.row>.lab{flex:0 0 var(--row-label-width);min-width:0;padding-top:var(--optical-nudge);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row>.hint,.row>span{padding-top:var(--optical-nudge)}
+.row>.hint{margin:0}
+.row>.ctl{flex:1;min-width:0;display:flex;align-items:center;gap:var(--spacing-8)}
+.row>select,.row>input[type=text],.row>input[type=url],.row>input[type=search]{flex:1;min-width:0}
+.stack{display:flex;flex-direction:column;gap:var(--spacing-4);margin:var(--spacing-12) 0}
+.stack>label,.stack>.lab{color:var(--text-secondary)}
+.addrow,.btn-row{display:flex;gap:var(--spacing-8);margin:var(--spacing-8) 0}
+.addrow>button,.btn-row>button{flex:1;min-width:0}
+
+/* Words under a control. 12px muted, a sentence at most two lines long. */
+.hint{margin:var(--spacing-8) 0 0;font-size:var(--text-caption);line-height:1.4;letter-spacing:var(--tracking-caption);color:var(--text-muted);max-width:none}
+.hint b,.hint strong{font-weight:400;color:var(--text-secondary)}
+.hint code,.hint kbd{font-family:var(--font-mono-detail);font-size:11px;letter-spacing:0}
+
+/* --- buttons ------------------------------------------------------------------------------------------------------------- */
+/* 28 tall from padding, never centring: 1 + 8 / 14 / 4 + 1. An outline on the control edge; ink when it matters. */
+button,.button{display:inline-flex;align-items:center;justify-content:center;gap:var(--spacing-8);box-sizing:border-box;min-width:0;max-width:100%;
+  min-height:var(--control-height-sm);padding:var(--control-pad-sm);margin:0;
+  font:inherit;font-size:var(--text-meta);line-height:var(--control-line-sm);letter-spacing:var(--tracking-meta);color:var(--text-primary);text-decoration:none;white-space:nowrap;
+  background:transparent;border:var(--border-width) solid var(--border-control);border-radius:var(--radius-controls);cursor:pointer;appearance:none;-webkit-appearance:none;
+  transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+button:hover,.button:hover{background:var(--surface-row-hover);border-color:var(--text-muted);color:var(--text-primary)}
+button:active,.button:active{background:var(--surface-selected)}
+/* The one that finishes the job: slate iris, once per view. */
+button.primary,.button.primary{background:var(--action-primary);border-color:var(--action-primary);color:var(--action-primary-text)}
+button.primary:hover,.button.primary:hover{background:var(--action-primary-hover);border-color:var(--action-primary-hover);color:var(--action-primary-text)}
+/* Quiet: no edge until you point at it. */
+button.ghost,.button.ghost{border-color:transparent;color:var(--text-muted)}
+button.ghost:hover,.button.ghost:hover{border-color:transparent;color:var(--text-primary)}
+/* Destructive: reads as a normal button until you point at it, then says so in brick and in its edge. Its label says what it does. */
+button.danger:hover,.button.danger:hover{border-color:var(--status-blocked);color:var(--status-blocked);background:var(--status-blocked-soft)}
+/* A glyph in a square: up, down, remove, refresh. 24, so it sits inside a 28 row without crowding it. */
+button.icon,.button.icon{flex:none;width:var(--control-height-xs);min-width:var(--control-height-xs);min-height:var(--control-height-xs);height:var(--control-height-xs);padding:0;
+  border-color:transparent;color:var(--text-muted);font-family:var(--font-helveticaneue);font-size:var(--text-meta);line-height:1}
+button.icon:hover,.button.icon:hover{border-color:var(--border-control);color:var(--text-primary)}
+button.small,.button.small{min-height:var(--control-height-xs);padding:var(--control-pad-xs);font-size:var(--text-caption);line-height:var(--control-line-sm)}
+button:disabled,button[aria-disabled="true"],.button[aria-disabled="true"]{color:var(--action-disabled-text);border-color:var(--border-muted);background:transparent;cursor:default}
+button.primary:disabled,button.primary[aria-disabled="true"]{background:var(--action-disabled-surface);border-color:var(--action-disabled-surface);color:var(--action-disabled-text)}
+button.ghost:disabled,button.icon:disabled{border-color:transparent}
+
+/* --- segmented ----------------------------------------------------------------------------------------------------------- */
+/* An exclusive pick of 2–5: a soft box, the chosen one filled ink. Ink against paper is a change of lightness, so it reads
+   without colour. 28 = 1 + 2 + (6 / 14 / 2) + 2 + 1. */
+.seg{display:flex;flex:1;min-width:0;gap:2px;padding:2px;min-height:var(--control-height-sm);background:var(--surface-field);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls)}
+.seg button{flex:1 1 0;min-width:0;min-height:22px;padding:6px 8px 2px;border:0;border-radius:2px;background:transparent;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis}
+.seg button:hover{background:transparent;color:var(--text-primary)}
+.seg button.on,.seg button[aria-checked="true"],.seg button[aria-pressed="true"]{background:var(--text-primary);color:var(--surface-paper);cursor:default}
+.seg.inline{display:inline-flex;flex:0 0 auto}
+.seg.inline button{flex:0 0 auto;padding-left:10px;padding-right:10px}
+
+/* --- fields -------------------------------------------------------------------------------------------------------------- */
+/* Wells: sunken into the paper, a soft hairline, the control edge on hover, ink while you type. */
+input[type=text],input[type=number],input[type=url],input[type=search],input[type=email],input:not([type]),select,textarea{
+  box-sizing:border-box;min-width:0;height:var(--control-height-sm);margin:0;padding:var(--control-pad-sm);padding-left:8px;padding-right:8px;
+  font:inherit;font-size:var(--text-meta);line-height:var(--control-line-sm);letter-spacing:var(--tracking-meta);color:var(--text-primary);
+  background:var(--surface-field);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls);outline:none;
+  transition:border-color var(--duration-fast) var(--ease-standard)}
+input[type=text]:hover,input[type=number]:hover,input[type=url]:hover,input[type=search]:hover,input[type=email]:hover,input:not([type]):hover,select:hover,textarea:hover{border-color:var(--border-control)}
+input[type=text]:focus,input[type=number]:focus,input[type=url]:focus,input[type=search]:focus,input[type=email]:focus,input:not([type]):focus,select:focus,textarea:focus{border-color:var(--text-primary)}
+/* Figures in a field stay in the sans, with tabular digits: a mono beside sans labels lands on a different baseline. */
+input[type=number]{width:72px;flex:0 0 72px;font-variant-numeric:tabular-nums}
+input::placeholder,textarea::placeholder{color:var(--text-faint)}
+textarea{display:block;width:100%;height:auto;min-height:72px;padding:8px;line-height:1.45;resize:vertical}
+/* The chevron is drawn in the muted ink, so it flips with the theme. */
+select{appearance:none;-webkit-appearance:none;padding-right:24px;cursor:pointer;text-overflow:ellipsis;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);
+  background-position:calc(100% - 13px) 12px,calc(100% - 9px) 12px;background-size:4px 4px,4px 4px;background-repeat:no-repeat}
+select option{background:var(--surface-card);color:var(--text-primary)}
+input:disabled,select:disabled,textarea:disabled{color:var(--action-disabled-text);border-color:var(--border-muted);cursor:default}
+
+/* --- check and radio ----------------------------------------------------------------------------------------------------- */
+/* Squares. Checked fills ink and carries a paper tick, so on and off differ in shape and lightness, not hue. */
+input[type=checkbox],input[type=radio]{appearance:none;-webkit-appearance:none;flex:0 0 var(--check-size);width:var(--check-size);height:var(--check-size);margin:0;
+  position:relative;display:inline-block;vertical-align:-2px;background:var(--surface-field);border:var(--border-width) solid var(--text-muted);border-radius:0;cursor:pointer;
+  transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard)}
+input[type=checkbox]:hover,input[type=radio]:hover{border-color:var(--text-primary)}
+input[type=checkbox]:checked,input[type=radio]:checked{background:var(--text-primary);border-color:var(--text-primary)}
+input[type=checkbox]:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--surface-paper);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+input[type=radio]:checked::after{content:"";position:absolute;inset:3px;background:var(--surface-paper)}
+input[type=checkbox]:indeterminate{background:var(--surface-field);border-color:var(--text-primary)}
+input[type=checkbox]:indeterminate::after{content:"";position:absolute;left:2px;right:2px;top:5px;height:2px;background:var(--text-primary)}
+input[type=checkbox]:disabled,input[type=radio]:disabled{border-color:var(--border-control);cursor:default}
+/* A checkbox with its words. */
+.check{display:flex;align-items:flex-start;gap:var(--spacing-8);margin:var(--spacing-8) 0;cursor:pointer;color:var(--text-primary)}
+.check>input{margin-top:1px}
+.check>span{flex:1;min-width:0}
+.check small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:1.4;color:var(--text-muted)}
+/* An on/off switch: a square knob in a square track. On is ink with the knob at the right, so position says it too. */
+input[type=checkbox].switch{flex:0 0 26px;width:26px;height:14px;border-color:var(--text-muted);background:var(--surface-field)}
+input[type=checkbox].switch::after{content:"";position:absolute;left:2px;top:2px;width:8px;height:8px;border:0;transform:none;background:var(--text-muted)}
+input[type=checkbox].switch:checked{background:var(--text-primary);border-color:var(--text-primary)}
+input[type=checkbox].switch:checked::after{left:14px;background:var(--surface-paper)}
+
+/* --- slider -------------------------------------------------------------------------------------------------------------- */
+/* Label and figure on one line, a hairline track under them, a square thumb you can't miss. */
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:0 var(--spacing-8);margin:var(--spacing-12) 0 var(--spacing-8)}
+.slider>label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+.slider>output,.slider>.val{font-family:var(--font-mono);font-size:var(--text-caption);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--text-muted);white-space:nowrap}
+.slider>input[type=range]{grid-column:1/-1;margin-top:var(--spacing-4)}
+input[type=range]{-webkit-appearance:none;appearance:none;display:block;width:100%;height:16px;margin:0;padding:0;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:var(--track-size);background:var(--control-track);border:0}
+input[type=range]::-moz-range-track{height:var(--track-size);background:var(--control-track);border:0}
+input[type=range]::-moz-range-progress{height:var(--track-size);background:var(--text-primary)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:var(--thumb-size);height:var(--thumb-size);margin-top:calc((var(--track-size) - var(--thumb-size)) / 2);
+  background:var(--surface-paper);border:var(--border-width) solid var(--text-primary);border-radius:0;transition:background-color var(--duration-fast) var(--ease-standard)}
+input[type=range]::-moz-range-thumb{width:var(--thumb-size);height:var(--thumb-size);box-sizing:border-box;background:var(--surface-paper);border:var(--border-width) solid var(--text-primary);border-radius:0}
+input[type=range]:hover::-webkit-slider-thumb,input[type=range]:active::-webkit-slider-thumb,input[type=range]:focus-visible::-webkit-slider-thumb{background:var(--text-primary)}
+input[type=range]:hover::-moz-range-thumb,input[type=range]:active::-moz-range-thumb{background:var(--text-primary)}
+input[type=range]:focus-visible{outline:var(--border-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}
+input[type=range]:disabled{cursor:default;opacity:.5}
+
+/* --- colour -------------------------------------------------------------------------------------------------------------- */
+/* A colour well: the chip inside a pressable square. The chip carries a hairline so white on paper still has an edge. */
+input[type=color]{flex:0 0 var(--swatch-size);width:var(--swatch-size);height:var(--swatch-size);padding:3px;margin:0;background:var(--surface-field);
+  border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls);cursor:pointer;-webkit-appearance:none;appearance:none}
+input[type=color]:hover{border-color:var(--border-control)}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+input[type=color]::-webkit-color-swatch{border:var(--border-width) solid var(--border-muted);border-radius:2px}
+input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--border-muted);border-radius:2px}
+/* A row of preset chips: square-ish, the chosen one outlined in ink with paper between. */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(24px,1fr));gap:4px;margin:var(--spacing-8) 0}
+.swatches>button{height:24px;min-height:24px;padding:0;border:var(--border-width) solid var(--border-muted);border-radius:2px}
+.swatches>button:hover{border-color:var(--text-primary)}
+.swatches>button.on{outline:var(--border-width-focus) solid var(--text-primary);outline-offset:1px}
+
+/* --- presets ------------------------------------------------------------------------------------------------------------- */
+/* Cards you pick a look from: a name and one line on what it is. Chosen: an ink edge two pixels thick and a square mark. */
+.presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--spacing-8)}
+.presets>button{position:relative;display:block;width:100%;min-height:0;padding:9px 10px 9px;text-align:left;white-space:normal;line-height:1.3;border-color:var(--border-card)}
+.presets>button small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:1.35;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+.presets>button.on{border-color:var(--text-primary);box-shadow:inset 0 0 0 var(--border-width) var(--text-primary);background:var(--surface-row-hover)}
+.presets>button.on::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;background:var(--text-primary)}
+.presets>button.saved{padding-right:28px}
+.presets>button .x{position:absolute;top:4px;right:4px;width:20px;height:20px;display:grid;place-items:center;color:var(--text-muted);font-size:var(--text-meta);line-height:1;border-radius:2px}
+.presets>button .x:hover{color:var(--status-blocked);background:var(--status-blocked-soft)}
+.presets>button.on.saved::before{display:none}
+
+/* --- lists you select from ----------------------------------------------------------------------------------------------- */
+/* Layers, inks, messages, modules. A row on the soft hairline; the selected one takes the selection surface and a 2px ink
+   marker down its left edge, so it shows in shape as well as tone. */
+.list{display:flex;flex-direction:column;gap:2px;margin:0 0 var(--spacing-8)}
+.item{position:relative;display:flex;align-items:center;gap:var(--spacing-8);min-height:36px;padding:4px 4px 4px 10px;
+  background:transparent;border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls);color:var(--text-primary);cursor:pointer;
+  transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard)}
+.item:hover{background:var(--surface-row-hover);border-color:var(--border-control)}
+.item.on,.item[aria-selected="true"]{background:var(--surface-selected);border-color:var(--text-primary);box-shadow:inset 2px 0 0 var(--text-primary)}
+.item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .name,.item .meta{padding-top:var(--optical-nudge)}
+.item .meta{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
+
+/* --- drop zone ----------------------------------------------------------------------------------------------------------- */
+.drop{display:block;padding:var(--spacing-16);text-align:center;color:var(--text-muted);font-size:var(--text-caption);line-height:1.4;cursor:pointer;
+  background:var(--surface-field);border:var(--border-width) dashed var(--border-control);border-radius:var(--radius-controls);
+  transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+.drop b{display:block;margin-bottom:2px;font-weight:400;font-size:var(--text-meta);color:var(--text-primary)}
+.drop:hover,.drop.over{border-color:var(--text-primary);border-style:solid;color:var(--text-secondary);background:var(--surface-row-hover)}
+
+/* --- the bar over the stage ---------------------------------------------------------------------------------------------- */
+/* Figures about the work in mono, its views on the right. */
+.topbar{flex:none;display:flex;align-items:center;gap:var(--spacing-12);min-height:var(--tool-bar-height);padding:0 var(--spacing-16);
+  background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card);
+  font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
+.topbar .spacer{flex:1}
+.topbar label{display:inline-flex;align-items:baseline;gap:var(--spacing-8);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
+.topbar button,.topbar select{font-family:var(--font-helveticaneue)}
+.topbar select{width:auto}
+.topbar .seg{flex:0 0 auto}
+
+/* --- the stage ---------------------------------------------------------------------------------------------------------- */
+/* Sunken and flat. The work sits on it in a hairline, not a shadow, so its own edges and colours are what you judge. */
+.stage{flex:1;min-height:0;position:relative;overflow:auto;padding:var(--spacing-32);display:flex;align-items:center;justify-content:center;background:var(--surface-sunken)}
+.stage canvas,.stage .work{box-shadow:0 0 0 var(--border-width) var(--border-card)}
+.stage.dropping::after{content:"Drop an image";position:absolute;inset:var(--spacing-12);display:flex;align-items:center;justify-content:center;pointer-events:none;
+  border:var(--border-width) dashed var(--text-primary);background:color-mix(in srgb,var(--surface-sunken) 82%,transparent);color:var(--text-primary);font-size:var(--text-meta)}
+
+/* --- the export bar ------------------------------------------------------------------------------------------------------ */
+.footer{flex:none;display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--spacing-16);align-items:start;padding:var(--spacing-12) var(--spacing-16);
+  background:var(--surface-paper);border-top:var(--border-width) solid var(--border-hairline)}
+.actions{display:flex;flex-direction:column;gap:var(--spacing-8);min-width:168px}
+.actions>button{justify-content:flex-start;width:100%}
+pre.recipe,pre#recipe{margin:0;max-height:96px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
+  font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:1.5;letter-spacing:0}
+
+/* --- small parts --------------------------------------------------------------------------------------------------------- */
+kbd{display:inline-block;min-width:18px;padding:2px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;text-align:center;
+  color:var(--text-secondary);background:var(--surface-field);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+.tag{display:inline-block;max-width:100%;min-height:18px;padding:3px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--text-muted);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+.empty{color:var(--text-muted);font-size:var(--text-meta)}
+.sq{display:inline-block;flex:none;width:8px;height:8px;background:currentColor}
+
+/* --- focus -------------------------------------------------------------------------------------------------------------- */
+:focus-visible{outline:var(--border-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}
+.seg button:focus-visible,.item:focus-visible{outline-offset:-1px}
+input[type=text]:focus-visible,input[type=number]:focus-visible,input[type=url]:focus-visible,input[type=search]:focus-visible,input:not([type]):focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+
+/* --- narrow windows ----------------------------------------------------------------------------------------------------- */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(60vh,1fr);height:auto;min-height:calc(100vh - var(--tool-banner,0px))}
+  aside{max-height:50vh;border-right:0;border-bottom:var(--border-width) solid var(--border-hairline)}
+  .footer{grid-template-columns:1fr}
+  .actions{flex-direction:row;flex-wrap:wrap;min-width:0}
+  .actions>button{width:auto}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
