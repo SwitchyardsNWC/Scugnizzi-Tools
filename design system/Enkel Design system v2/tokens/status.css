@@ -1,7 +1,7 @@
 :root{
 /* semantic status — muted, monochrome-adjacent. Colour means status, not personality. */
 --color-moss:#5b6b4e;--color-moss-soft:#e8ece3;
---color-amber:#a8782a;--color-amber-soft:#f3ead6;
+--color-amber:#8a6222; /* 5.45:1 on card, 4.56 on its own soft ground */--color-amber-soft:#f3ead6;
 --color-brick:#8a3b2e;--color-brick-soft:#f1e0dc;
 --color-slate-soft:#e2e5ec;
 --color-fossil-soft:#eeeeed;
@@ -9,7 +9,7 @@
 --status-progress:var(--color-slate-iris);--status-progress-soft:var(--color-slate-soft);
 --status-risk:var(--color-amber);--status-risk-soft:var(--color-amber-soft);
 --status-blocked:var(--color-brick);--status-blocked-soft:var(--color-brick-soft);
---status-notstarted:var(--color-graphite);--status-notstarted-soft:var(--color-fossil-soft);
+--status-notstarted:#666965;--status-notstarted-soft:var(--color-fossil-soft);
 /* source — where a schedule row comes from */
 --source-warehouse:var(--color-charcoal);--source-warehouse-soft:var(--color-fossil-soft);
 --source-purchase:var(--color-ink-black);--source-purchase-soft:var(--color-paper-white);

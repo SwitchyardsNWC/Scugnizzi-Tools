@@ -1,0 +1,86 @@
+<!-- @dsCard group="Spacing" viewport="1180x860" name="Tool controls" subtitle="The tool layer: a paper panel of 28px controls beside a sunken stage" -->
+<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8"><title>Tool controls</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../styles.css"><link rel="stylesheet" href="../tools.css"><style>
+/* The specimen: one tool panel per theme, side by side, and the stage between their figures. */
+body{height:auto;background:var(--surface-sunken)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:100vh}
+.side{display:grid;grid-template-columns:var(--tool-panel-width) minmax(0,1fr);background:var(--surface-sunken);color:var(--text-primary);border-right:var(--border-width) solid var(--border-hairline)}
+.side aside{overflow:visible}
+.side main{min-height:0}
+.notes{padding:20px 16px;font-size:var(--text-caption);line-height:1.5;color:var(--text-muted)}
+.notes h2{margin:0 0 8px;font-size:var(--text-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+.notes dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0 0 16px}
+.notes dt{font-family:var(--font-mono);color:var(--text-primary)}
+.notes dd{margin:0}
+.art{width:160px;height:110px;background:#f3eee2;color:#221f1c;display:grid;place-items:center;font:28px/1 Georgia,serif}
+</style></head><body>
+<div class="pair">
+<template id="panel">
+  <aside>
+    <h1>Riso separator</h1>
+    <p class="sub">Split a picture into two or three Riso inks.</p>
+    <details class="panel" open>
+      <summary><span class="t">Image</span><span class="v">sample · 900 × 640</span></summary>
+      <div class="body">
+        <div class="drop"><b>Drop an image here</b>or click to choose · O</div>
+        <p class="hint">Photos and flat graphics both work.</p>
+      </div>
+    </details>
+    <details class="panel" open>
+      <summary><span class="t">Inks</span><span class="v">Blue + Pink</span></summary>
+      <div class="body">
+        <div class="list">
+          <div class="item on" tabindex="0"><span class="sq" style="color:#0078bf"></span><span class="name">1 · Blue</span><span class="meta">dot 15°</span><button class="icon" title="Remove">×</button></div>
+          <div class="item" tabindex="0"><span class="sq" style="color:#ff48b0"></span><span class="name">2 · Fluorescent pink</span><span class="meta">dot 75°</span><button class="icon" title="Remove">×</button></div>
+        </div>
+        <div class="addrow"><button>+ Ink</button><button class="danger">Remove ink</button></div>
+        <div class="row"><label>Source</label><select><option>Darkness (1 − luminance)</option></select></div>
+        <div class="row"><label>Screen</label><div class="seg"><button class="on">Dot</button><button>Line</button><button>Grain</button></div></div>
+        <div class="slider"><label>Contrast</label><output>1.25×</output><input type="range" min="0" max="2" step=".05" value="1.25"></div>
+        <div class="slider"><label>Angle</label><output>15°</output><input type="range" min="0" max="90" value="15"></div>
+        <div class="row"><label>Paper</label><input type="color" value="#f6f2e8"><span class="hint" style="margin:0">#f6f2e8 · Natural</span></div>
+        <div class="row"><label>Seed</label><input type="number" value="1"><button>Reshuffle</button></div>
+        <label class="check"><input type="checkbox" checked><span>Invert<small>Pull from the light parts instead.</small></span></label>
+        <label class="check"><input type="checkbox" class="switch"><span>Grain</span></label>
+      </div>
+    </details>
+    <details class="panel" open>
+      <summary><span class="t">Presets</span><span class="v">custom</span></summary>
+      <div class="body">
+        <div class="presets"><button class="on">Pink &amp; blue<small>two drums, dot screens</small></button><button>Zine grain<small>black and orange, kraft</small></button></div>
+        <div class="row"><input type="text" placeholder="Name this look…"><button>Save preset</button></div>
+      </div>
+    </details>
+    <details class="panel"><summary><span class="t">Press</span><span class="v">closed</span></summary><div class="body"></div></details>
+  </aside>
+  <main>
+    <div class="topbar"><span>900 × 640 px · sample · 189 ms</span><span class="spacer"></span>
+      <div class="seg inline"><button class="on">Print</button><button>Separations</button></div>
+      <label>Zoom <select><option>Fit</option></select></label></div>
+    <div class="stage"><div class="art work">riso</div></div>
+    <div class="footer"><div class="actions"><button class="primary">Download print</button><button>Copy image</button><button disabled>Save to project</button></div>
+      <pre class="recipe">Riso print of sample (900 × 640 px) on #f6f2e8 paper, 30% grain, 50% ink soak.
+Ink 1 Blue (#0078bf) from darkness: density 100%, contrast 1.25×.</pre></div>
+    <div class="notes">
+      <h2>Geometry</h2>
+      <dl>
+        <dt>28</dt><dd>button, field, select, segmented — 1 + 8 / 14 / 4 + 1</dd>
+        <dt>24</dt><dd>icon button, banner controls</dd>
+        <dt>40</dt><dd>section header, bar over the stage</dd>
+        <dt>14</dt><dd>check and radio, square</dd>
+        <dt>12</dt><dd>slider thumb, square, on a 2px track</dd>
+        <dt>320</dt><dd>side panel; the list rail 280</dd>
+      </dl>
+      <h2>Selection</h2>
+      <p>Chosen is ink: a filled segment, a 2px marker down a row, a 2px ink edge on a preset. Lightness and shape carry it; colour never does on its own.</p>
+    </div>
+  </main>
+</template>
+<div class="side" data-theme="light"></div>
+<div class="side" data-theme="dark"></div>
+</div>
+<script>
+for (const side of document.querySelectorAll('.side')) side.appendChild(document.getElementById('panel').content.cloneNode(true));
+</script>
+</body></html>

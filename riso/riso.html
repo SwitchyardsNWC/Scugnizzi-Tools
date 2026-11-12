@@ -1,103 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Riso separator</title>
+<meta name="theme-color" content="#151515">
+<script src="../theme.js"></script>
+<link rel="stylesheet" href="../design system/Enkel Design system v2/styles.css">
+<link rel="stylesheet" href="../design system/Enkel Design system v2/tools.css">
 <style>
-  :root{
-    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
-    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
-  }
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
-  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
-  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
-  .sub{margin:0 0 18px;color:var(--muted)}
-  details.panel{border-top:1px solid var(--line)}
-  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
-    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
-  details.panel>summary::-webkit-details-marker{display:none}
-  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
-    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
-  details.panel[open]>summary::before{transform:rotate(45deg)}
-  details.panel>summary:hover{color:var(--text)}
-  details.panel>summary .t{flex:1}
-  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  details.panel>.body{padding:0 0 10px}
-  h3{font-size:12px;font-weight:600;margin:14px 0 4px;color:var(--text)}
-  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
-  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
-  .row>label{flex:0 0 78px;color:var(--muted)}
-  .row select,.row input[type=text],.row input[type=number]{flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
-  .row input[type=number]{flex:0 1 80px}
-  .row input[type=checkbox]{accent-color:var(--accent)}
-  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
-  input:focus,select:focus{border-color:#4a4a50;outline:none}
-  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
-  button:hover{border-color:#55555c}
-  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  button.primary:hover{filter:brightness(1.06)}
-  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
-  .seg{display:flex;flex:1}
-  .seg button{flex:1;border-radius:0;padding:5px 0}
-  .seg button:first-child{border-radius:5px 0 0 5px}
-  .seg button:last-child{border-radius:0 5px 5px 0}
-  .seg button.on{background:#3a3a40;color:#fff}
-  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
-  .slider label{color:var(--text)}
-  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
-  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
-  .drop{border:1px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);cursor:pointer;background:var(--panel2)}
-  .drop:hover,.drop.over{border-color:var(--sel);color:var(--text)}
-  .drop b{display:block;color:var(--text);margin-bottom:2px}
-  /* Ink list */
-  #inkList{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
-  .irow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:pointer}
-  .irow:hover{border-color:#55555c}
-  .irow.on{border-color:var(--sel)}
-  .irow .sw{width:18px;height:18px;border-radius:3px;flex:0 0 18px;border:1px solid rgba(255,255,255,.12)}
-  .irow .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .irow .meta{color:var(--muted);font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
-  .irow .x{color:var(--muted);padding:0 4px}
-  .irow .x:hover{color:#f0b0b0}
-  .swatches{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin:6px 0 4px}
-  .swatches button{padding:0;height:24px;border-radius:4px;border:1px solid rgba(255,255,255,.1)}
-  .swatches button.on{outline:2px solid var(--text);outline-offset:1px}
-  .addrow{display:flex;gap:6px}
-  .addrow button{flex:1}
-  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
-  .presets button small{display:block;color:var(--muted);font-size:11px}
-  .presets button.on{border-color:var(--accent);color:#fff}
-  .presets button{position:relative}
-  .presets button.saved{padding-right:22px}
-  .presets button .x{position:absolute;top:4px;right:6px;color:var(--muted);font-size:14px;line-height:1;padding:1px 3px;border-radius:3px}
-  .presets button .x:hover{color:#f0b0b0;background:rgba(255,255,255,.06)}
-  main{display:flex;flex-direction:column;min-width:0;min-height:0}
-  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
-  .topbar .spacer{flex:1}
-  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
-  .topbar .seg{flex:0 0 auto;width:300px}
-  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  /* Riso separator: only what is particular to this tool. The panel, rows, sliders, segments, presets, list, drop zone,
+     bars and stage are tools.css on the Enkel tokens. Ink and paper hexes are the work, not chrome: they stay as data. */
+
+  /* A section that opens on a sub-heading: the summary above is already its space. */
+  details.panel>.body>h3:first-child{margin-top:var(--spacing-4)}
+
+  /* A shortcut chip inside a control. A button is a flex box, so the chip in it is a block 18 tall in a 14 line: pulled
+     up 4 so its box sits on the true middle and the button keeps its 28 (without it, Shuffle grows to 30). In the drop
+     zone's 12px line the chip stays inline on the words' baseline, its line no taller than theirs, so the zone keeps the
+     70 of every other drop zone. */
+  button kbd{margin-top:-4px}
+  .drop kbd{margin-left:var(--spacing-4);line-height:14px}
+
+  /* Inks: a row per drum. The chip is the ink itself, square, on the control edge so black still shows on dark paper.
+     No trailing button, so the figure stands 12 in from the edge, where a remove glyph's centre would be. */
+  .irow{padding-right:var(--spacing-12)}
+  .irow .sw{flex:0 0 12px;width:12px;height:12px;border:var(--border-width) solid var(--border-control)}
+
+  /* The drum colours: nine squares to a row, each the size of the Custom well (28, not the shared 24), so the eighteen
+     make two full rows edge to edge. Chosen is the shared 2px ink ring. */
+  .swatches{grid-template-columns:repeat(9,var(--swatch-size));justify-content:space-between}
+  .swatches>button{width:var(--swatch-size);height:var(--swatch-size);min-height:var(--swatch-size)}
+  /* Pointing at a drum, or arrowing to it, names it at the end of its heading: a preview, kept apart from the readout
+     beside the Custom well, which always names the chosen ink. */
+  .drum-head{display:flex;align-items:baseline;gap:var(--spacing-8)}
+  .drum-head>.hint{margin:0 0 0 auto;line-height:1;white-space:nowrap}   /* a 12 line inside the heading's, so it never grows it */
+
+  /* A colour's name and its hex beside its well: the pick never rests on the colour alone. The readout is the shared
+     row hint; the mono hex inside it takes a 12 line so its taller ascent doesn't grow the hint's line and drop the
+     words off the label's baseline. */
+  .hex{line-height:1}
+
+  /* Presets: two cards to a row, each name over its whole description, read from the top. The name keeps 4 clear of the
+     chosen mark (8 in, 6 wide: 18; the shared 20 wraps "Pink & blue poster"); the description runs under the mark to the
+     card's own 10. A saved card's name keeps clear of its delete target (24, the icon size, 4 in) and of the chosen mark,
+     which stays on a saved card, 4 to the left of the × on its centre line, since the × holds the corner (32 + 6 + 4). */
+  .presets>button{padding-right:18px}
+  .presets>button small{margin-right:-8px}
+  .presets>button.saved{padding-right:42px}
+  .presets>button.saved small{margin-right:-32px}
+  .presets>button .x{width:24px;height:24px}
+  .presets>button.saved.on::before{display:block;top:13px;right:32px}
+  #presets + .row{margin-top:var(--spacing-12)}
+  #presets ~ .btn-row{margin-top:var(--spacing-16)}
+  /* "Saved ✓" or "Storage full" for a moment, without the field beside it jumping. */
+  #savePreset{flex:0 0 auto;min-width:104px}
+
+  /* Paper stock: four names need the panel's whole width. */
+  #paperSeg{margin:var(--spacing-8) 0}
+
+  /* The stage: Fit shrinks the print into view; any other zoom sizes the canvas inline and the stage scrolls. */
   .stage.fit{overflow:hidden}
   .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
   .stage:not(.fit){display:block}
   .stage:not(.fit) canvas{display:block;margin:0 auto}
-  .stage.dropping::after{content:"Drop an image";position:absolute;inset:12px;border:2px dashed var(--sel);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#cfe0ff;background:rgba(59,130,246,.12);pointer-events:none}
-  canvas{box-shadow:0 24px 60px rgba(0,0,0,.65),0 2px 4px rgba(0,0,0,.5)}
-  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
-  .actions{display:flex;flex-direction:column;gap:6px}
-  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
+
+  /* The bar over the stage: the figures give way before the views and the zoom do. */
+  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+  /* The recipe: its first line 5 down (shared), on the baseline of the first button's label, and only whole lines in
+     view, so none is cut through: seven beside four actions (5 + 7 × 18 = 131, under their 136), nine beside five (167,
+     under 172). */
+  pre#recipe{max-height:131px}
+  @media (min-width:901px){
+    .footer:has(#backToFreeform:not([hidden])) pre#recipe,.footer:has(#saveProject:not([hidden])) pre#recipe{max-height:167px}
+  }
+
+  /* Stacked, the panel is the window's width: the preset cards flow into as many columns as fit, and the drums into as
+     many squares as fit, from the left. */
   @media (max-width:900px){
-    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
-    aside{max-height:50vh}
-    .footer{grid-template-columns:1fr}
-    .actions{flex-direction:row;flex-wrap:wrap}
+    .presets{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+    .swatches{grid-template-columns:repeat(auto-fill,var(--swatch-size));justify-content:start}
+    /* The recipe sits under the actions here (the shared layer drops its offset): still whole lines, seven of them. */
+    pre#recipe{max-height:126px}
+  }
+  /* A phone: the figures take a line of their own, and the views and the zoom wrap under them from the left, so a zoom
+     pushed to a third line never sits under a right-aligned segment. */
+  @media (max-width:600px){
+    .topbar{flex-wrap:wrap;row-gap:var(--spacing-8);padding-top:var(--spacing-8);padding-bottom:var(--spacing-8)}
+    .topbar .spacer{display:none}
+    #meta{flex:1 0 100%}
   }
 </style>
 </head>
@@ -114,11 +106,11 @@
     <details class="panel" data-panel="image" open>
       <summary><span class="t">Image</span><span class="v" id="hint-image"></span></summary>
       <div class="body">
-        <div class="drop" id="drop"><b>Drop an image here</b>or click to choose · O</div>
+        <div class="drop" id="drop" role="button" tabindex="0" aria-keyshortcuts="O"><b>Drop an image here</b>or click to choose<kbd aria-hidden="true">O</kbd></div>
         <input type="file" id="file" accept="image/*" hidden>
-        <div class="row" style="margin-top:8px"><label></label><button id="sample">Use the sample image</button></div>
+        <div class="btn-row"><button id="sample">Use the sample image</button></div>
         <div id="projectRow" hidden>
-          <div class="row"><label></label><button id="fromProject">From the project…</button></div>
+          <div class="btn-row"><button id="fromProject">From the project…</button></div>
           <p class="hint">Save to project puts the print beside its picture in the project's assets, at the press size, and keeps its settings with the project.</p>
         </div>
         <p class="hint">Photos and flat graphics both work. The image is downscaled to 900 px for the press and kept in this browser.</p>
@@ -128,10 +120,10 @@
     <details class="panel" data-panel="looks" open>
       <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
-        <div class="presets" id="presets"></div>
-        <div class="row" style="margin-top:10px"><input type="text" id="presetName" placeholder="Name this look…" maxlength="40"><button id="savePreset">Save preset</button></div>
+        <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+        <div class="row"><input type="text" id="presetName" placeholder="Name this look…" maxlength="40" aria-label="Name for the new preset"><button id="savePreset" aria-live="polite">Save preset</button></div>
         <p class="hint">Saved presets belong to the project: every tool on this site sees them, Freeform included.</p>
-        <div class="row" style="margin-top:10px"><label></label><button id="resetTool" class="danger">Reset to defaults</button></div>
+        <div class="btn-row"><button id="resetTool" class="danger">Reset to defaults</button></div>
         <p class="hint">A preset sets the inks and the press; the image stays. Reset clears everything saved for this tool, image included.</p>
       </div>
     </details>
@@ -139,13 +131,13 @@
     <details class="panel" data-panel="inks" open>
       <summary><span class="t">Inks</span><span class="v" id="hint-inks"></span></summary>
       <div class="body">
-        <div id="inkList"></div>
+        <div id="inkList" class="list" role="listbox" aria-label="Inks"></div>
         <div class="addrow"><button id="addInk">+ Ink</button><button id="delInk" class="danger">Remove ink</button></div>
-        <h3>Ink colour</h3>
-        <div class="swatches" id="swatches"></div>
-        <div class="row"><label>Custom</label><input type="color" id="inkColor"><span class="hint" id="inkName"></span></div>
-        <h3>Pulls from</h3>
-        <div class="row"><label>Source</label><select id="source">
+        <h3 class="drum-head">Ink colour<span class="hint" id="drumName" aria-hidden="true"></span></h3>
+        <div class="swatches" id="swatches" role="group" aria-label="Riso drum colours"></div>
+        <div class="row"><label for="inkColor">Custom</label><input type="color" id="inkColor" aria-label="Custom ink colour"><span class="hint" id="inkName"></span></div>
+        <h3>Separation</h3>
+        <div class="row"><label for="source">Pulls from</label><select id="source">
           <option value="lum">Darkness (1 − luminance)</option>
           <option value="shadows">Shadows</option>
           <option value="mids">Midtones</option>
@@ -156,10 +148,10 @@
           <option value="sat">Saturation</option>
           <option value="flat">Flat fill</option>
         </select></div>
-        <div class="row"><label></label><label style="color:var(--text)"><input type="checkbox" id="invert"> invert</label></div>
+        <label class="check"><input type="checkbox" id="invert" aria-keyshortcuts="I"><span>Invert<small>Swap the inked and the bare parts.</small></span></label>
         <div id="curveSliders"></div>
         <h3>Screen</h3>
-        <div class="row"><label>Screen</label><div class="seg" id="screenSeg"><button data-v="dot">Dot</button><button data-v="line">Line</button><button data-v="grain">Grain</button></div></div>
+        <div class="row"><span class="lab">Pattern</span><div class="seg" id="screenSeg" role="group" aria-label="Screen pattern"><button data-v="dot">Dot</button><button data-v="line">Line</button><button data-v="grain">Grain</button></div></div>
         <div id="screenSliders"></div>
         <h3>Registration</h3>
         <div id="regSliders"></div>
@@ -169,9 +161,11 @@
     <details class="panel" data-panel="press">
       <summary><span class="t">Press</span><span class="v" id="hint-press"></span></summary>
       <div class="body">
-        <div class="row"><label>Paper</label><input type="color" id="paper"><div class="seg" id="paperSeg" style="margin-left:4px"><button data-v="#f6f2e8">Natural</button><button data-v="#ffffff">White</button><button data-v="#e9dcc2">Kraft</button><button data-v="#dfe6e9">Grey</button></div></div>
+        <h3>Paper</h3>
+        <div class="seg" id="paperSeg" role="group" aria-label="Paper stock"><button data-v="#f6f2e8">Natural</button><button data-v="#ffffff">White</button><button data-v="#e9dcc2">Kraft</button><button data-v="#dfe6e9">Grey</button></div>
+        <div class="row"><label for="paper">Custom</label><input type="color" id="paper" aria-label="Custom paper colour"><span class="hint" id="paperName"></span></div>
         <div id="pressSliders"></div>
-        <div class="row"><label></label><button id="shuffle">Shuffle misregistration · M</button></div>
+        <div class="btn-row"><button id="shuffle" aria-keyshortcuts="M">Shuffle misregistration<kbd aria-hidden="true">M</kbd></button></div>
         <p class="hint">Inks multiply, so overlaps mix into a third colour, the way they do on the duplicator.</p>
       </div>
     </details>
@@ -179,7 +173,7 @@
     <details class="panel" data-panel="random">
       <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
       <div class="body">
-        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <div class="row"><label for="seed">Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
         <p class="hint">The seed drives grain, the stochastic screen and shuffled misregistration.</p>
       </div>
     </details>
@@ -188,9 +182,8 @@
   <main>
     <div class="topbar">
       <span id="meta"></span>
-      <button id="backToFreeform" class="primary" hidden title="Send these settings back to the Freeform canvas. It keeps its layers and prints them again whenever they change.">Back to Freeform</button>
       <span class="spacer"></span>
-      <div class="seg" id="viewSeg"><button data-v="composite">Print</button><button data-v="separations">Separations</button><button data-v="compare">Before · after</button></div>
+      <div class="seg inline" id="viewSeg" role="group" aria-label="View"><button data-v="composite" aria-keyshortcuts="P">Print</button><button data-v="separations" aria-keyshortcuts="S">Separations</button><button data-v="compare" aria-keyshortcuts="B">Before · after</button></div>
       <label>Zoom <select id="zoomSel">
         <option value="fit">Fit</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option>
       </select></label>
@@ -198,13 +191,14 @@
     <div class="stage fit" id="stage"><canvas id="canvas" width="600" height="450"></canvas></div>
     <div class="footer">
       <div class="actions">
+        <button id="backToFreeform" class="primary" hidden title="Send these settings back to the Freeform canvas. It keeps its layers and prints them again whenever they change.">Back to Freeform</button>
         <button id="saveProject" class="primary" hidden>Save to project</button>
         <button id="download" class="primary">Download print</button>
         <button id="downloadSeps" title="One black-on-white PNG per ink, ready for the duplicator">Download separations</button>
-        <button id="copyImg">Copy image</button>
-        <button id="copyRecipe">Copy recipe</button>
+        <button id="copyImg" aria-live="polite">Copy image</button>
+        <button id="copyRecipe" aria-live="polite">Copy recipe</button>
       </div>
-      <pre id="recipe"></pre>
+      <pre id="recipe" tabindex="0" aria-label="Recipe"></pre>
     </div>
   </main>
 </div>
@@ -313,35 +307,70 @@ function render() {
   if (state.view === 'composite') {
     setSize(w, h); ctx.putImageData(composite(covs), 0, 0);
   } else if (state.view === 'separations') {
-    const gap = 12, W = w * state.inks.length + gap * (state.inks.length - 1);
-    setSize(W, h + 28); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, W, h + 28);
+    // Each separation is named under it as the ink list names it: a 12 chip on the control edge and 12px secondary
+    // words in a 28 band, sized for the scale the canvas is shown at, so they read at 12 however far Fit shrinks it.
+    const n = state.inks.length, gap = 12, W = w * n + gap * (n - 1);
+    const s = shownScale(W, h + Math.round(28 / shownScale(W, h + 28))), u = v => Math.max(1, Math.round(v / s));
+    setSize(W, h + u(28)); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const edge = cssVar('--border-control'), words = cssVar('--text-secondary'), mid = h + u(14);
+    ctx.font = `${u(12)}px ${getComputedStyle(document.body).fontFamily}`; ctx.textBaseline = 'middle';
     state.inks.forEach((ink, k) => {
       const x = k * (w + gap); ctx.putImageData(separationImage(covs[k]), x, 0);
-      ctx.fillStyle = ink.color; ctx.fillRect(x, h + 8, 12, 12);
-      ctx.fillStyle = '#cfcfcc'; ctx.font = '12px -apple-system,Helvetica,Arial,sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(`${k + 1} · ${inkName(ink.color)}`, x + 18, h + 14);
+      ctx.fillStyle = edge; ctx.fillRect(x, mid - u(6), u(12), u(12));
+      ctx.fillStyle = ink.color; ctx.fillRect(x + u(1), mid - u(6) + u(1), u(12) - 2 * u(1), u(12) - 2 * u(1));
+      ctx.fillStyle = words; ctx.fillText(`${k + 1} · ${inkName(ink.color)}`, x + u(20), mid, Math.max(1, w - u(20)));
     });
   } else {
-    const gap = 12; setSize(w * 2 + gap, h); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, w * 2 + gap, h);
+    const gap = 12; setSize(w * 2 + gap, h); ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(srcCanvas, 0, 0); ctx.putImageData(composite(covs), w + gap, 0);
   }
   updateMeta(Math.round(performance.now() - t0));
 }
+// The views that lay pictures side by side leave their gutters clear, so the stage shows through in either theme. Their
+// words take the theme's colours and the scale they are shown at, so those views draw again when either changes.
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function shownScale(W, H) {
+  if (state.zoom !== 'fit') return parseFloat(state.zoom) || 1;
+  const st = $('#stage'), cs = getComputedStyle(st);
+  const aw = st.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = st.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  return Math.max(0.05, Math.min(1, aw / W, ah / H));
+}
+function redrawView() { if (state.view === 'separations' && !pending) pending = requestAnimationFrame(render); }
+window.addEventListener('resize', redrawView);
+if (window.ScugnizziTheme) ScugnizziTheme.onChange(redrawView);
+if (document.fonts) document.fonts.ready.then(redrawView);
 function setSize(w, h) { if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; applyZoom(); } }
 function applyZoom() {
   const z = state.zoom, stage = $('#stage');
   if (z === 'fit') { stage.classList.add('fit'); canvas.style.width = ''; canvas.style.height = ''; }
   else { stage.classList.remove('fit'); canvas.style.width = canvas.width * parseFloat(z) + 'px'; canvas.style.height = canvas.height * parseFloat(z) + 'px'; }
 }
-function updateMeta(ms) { $('#meta').innerHTML = src ? `${src.w} × ${src.h} px &nbsp;·&nbsp; ${src.name}` + (ms != null ? ` &nbsp;·&nbsp; ${ms} ms` : '') : 'No image'; }
+// The file name is the user's: escaped, so a name with markup in it stays a name.
+function updateMeta(ms) { $('#meta').innerHTML = src ? `${src.w} × ${src.h} px &nbsp;·&nbsp; ${escHtml(src.name)}` + (ms != null ? ` &nbsp;·&nbsp; ${ms} ms` : '') : 'No image'; }
+// A colour's name and its hex side by side, so a pick never rests on the colour alone.
+function nameHex(el, name, hex) {
+  el.textContent = name && name !== hex ? `${name} · ` : '';
+  const h = document.createElement('span'); h.className = 'hex'; h.textContent = hex; el.appendChild(h);
+}
+function showInkName(hex, name) { nameHex($('#inkName'), name || inkName(hex), hex); }
+// The paper stocks are named by the segment's own buttons; a custom paper is its hex.
+function paperLabel(hex) { const b = [...$('#paperSeg').children].find(b => b.dataset.v.toLowerCase() === String(hex).toLowerCase()); return b ? b.textContent : hex; }
+function syncPaper() {
+  const p = String(state.press.paper).toLowerCase();
+  for (const b of $('#paperSeg').children) { const on = b.dataset.v.toLowerCase() === p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+  nameHex($('#paperName'), paperLabel(state.press.paper), state.press.paper);
+}
 function updateHints() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // The title carries the whole value when the summary has to cut it short.
+  const set = (id, v) => { const el = document.getElementById(id); if (el) { el.textContent = v; el.title = v; } };
   const I = sel(), P = state.press;
   set('hint-image', src ? `${src.name} · ${src.w} × ${src.h}` : 'none');
   set('hint-inks', state.inks.map(i => inkName(i.color)).join(' + '));
-  set('hint-press', `${P.paper} · soak ${Math.round(P.soak * 100)}%`);
+  set('hint-press', `${paperLabel(P.paper)} · soak ${Math.round(P.soak * 100)}%`);
   set('hint-random', `seed ${state.seed}`);
   set('hint-looks', [...(presetsEl ? presetsEl.children : [])].find(c => c.classList.contains('on'))?.firstChild.textContent || 'custom');
-  if (I) $('#inkName').textContent = inkName(I.color);
+  if (I) showInkName(I.color);
+  syncPaper();
 }
 function updateRecipe() {
   const P = state.press, pct = v => Math.round(v * 100) + '%';
@@ -355,7 +384,8 @@ function updateRecipe() {
 const controls = {};
 function addSlider(parent, spec) {
   const wrap = document.createElement('div'); wrap.className = 'slider';
-  wrap.innerHTML = `<label>${spec.label}</label><output></output><input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
+  const id = 'ctl-' + spec.path.replace(/\W+/g, '-');   // the label names its slider, for a screen reader and a click
+  wrap.innerHTML = `<label for="${id}">${spec.label}</label><output for="${id}"></output><input type="range" id="${id}" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
   const input = wrap.querySelector('input'), out = wrap.querySelector('output');
   const refresh = () => { const v = getPath(spec.path); if (v == null) return; input.value = v; out.textContent = spec.fmt(+v); };
   input.addEventListener('input', () => { const v = parseFloat(input.value); setPath(spec.path, v); out.textContent = spec.fmt(v); renderInkList(); clearPreset(); invalidate(); });
@@ -400,23 +430,33 @@ function renderPresets() {
   presetsEl.innerHTML = '';
   PRESETS.forEach((p, i) => {
     const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
-    b.classList.toggle('on', activePreset === `b${i}`);
+    b.classList.toggle('on', activePreset === `b${i}`); b.setAttribute('aria-pressed', String(activePreset === `b${i}`));
     b.addEventListener('click', () => applyLook(p.apply, `b${i}`));
     presetsEl.appendChild(b);
   });
   for (const p of savedPresets()) {
-    const b = document.createElement('button'); b.className = 'saved'; b.classList.toggle('on', activePreset === p.id);
-    b.innerHTML = `${escHtml(p.name)}<small>saved to the project · ${p.inks.map(i => escHtml(inkName(i.color || ''))).join(' + ')}</small><span class="x" role="button" title="Delete this preset" aria-label="Delete ${escHtml(p.name)}">×</span>`;
+    const b = document.createElement('button'); b.className = 'saved'; b.classList.toggle('on', activePreset === p.id); b.setAttribute('aria-pressed', String(activePreset === p.id));
+    // The × is a target for the pointer; the keyboard deletes with Delete on the card (a button can't hold a button).
+    const about = `saved to the project · ${p.inks.map(i => escHtml(inkName(i.color || ''))).join(' + ')}`;
+    b.innerHTML = `${escHtml(p.name)}<small>${about}</small><span class="x" aria-hidden="true" title="Delete this preset">×</span>`;
+    b.setAttribute('aria-keyshortcuts', 'Delete');
     b.addEventListener('click', e => {
-      if (e.target.closest('.x')) {
-        writePresets(savedPresets().filter(q => q.id !== p.id));
-        if (activePreset === p.id) activePreset = null;
-        renderPresets(); updateHints(); return;
-      }
+      if (e.target.closest('.x')) { deletePreset(p, b, false); return; }
       applyLook({ inks: p.inks, press: p.press, seed: p.seed }, p.id);
     });
+    b.addEventListener('keydown', e => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); deletePreset(p, b, true); } });
     presetsEl.appendChild(b);
   }
+}
+// A saved look belongs to the whole project and has no undo, so deleting it asks first.
+async function deletePreset(p, btn, fromKeys) {
+  const ok = await ToolKit.ask({ title: `Delete ${p.name}?`, body: 'Every tool on this site stops offering this look. The settings on the press stay as they are.', ok: 'Delete preset', danger: true });
+  if (!ok) return;
+  const at = [...presetsEl.children].indexOf(btn);
+  writePresets(savedPresets().filter(q => q.id !== p.id));
+  if (activePreset === p.id) activePreset = null;
+  renderPresets(); updateHints();
+  if (fromKeys) { const kids = presetsEl.children; (kids[Math.min(at, kids.length - 1)] || $('#presetName')).focus(); }
 }
 presetsEl = $('#presets');
 renderPresets();
@@ -429,34 +469,75 @@ $('#savePreset').addEventListener('click', () => {
   if (!writePresets(next)) { flash($('#savePreset'), 'Storage full'); return; }
   input.value = ''; activePreset = id; renderPresets(); updateHints(); flash($('#savePreset'), 'Saved ✓');
 });
-$('#presetName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('#savePreset').click(); });
+$('#presetName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('#savePreset').click(); else if (e.key === 'Escape') e.target.blur(); });
 window.addEventListener('storage', e => { if (e.key === PROJECT_PRESETS) renderPresets(); });
 $('#resetTool').addEventListener('click', () => ToolKit.reset());
 
 // Ink list and per-ink controls
+// The list is a listbox: Tab lands on the selected ink, the arrows move the selection, and focus survives a redraw.
 function renderInkList() {
-  const list = $('#inkList'); list.innerHTML = '';
+  const list = $('#inkList'), hadFocus = list.contains(document.activeElement); list.innerHTML = '';
   state.inks.forEach((ink, i) => {
-    const row = document.createElement('div'); row.className = 'irow' + (i === state.selected ? ' on' : '');
+    const on = i === state.selected;
+    const row = document.createElement('div'); row.className = 'irow item' + (on ? ' on' : '');
+    row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(on)); row.tabIndex = on ? 0 : -1;
     row.innerHTML = `<span class="sw" style="background:${ink.color}"></span><span class="name">${i + 1} · ${inkName(ink.color)}</span><span class="meta">${ink.screen}${ink.screen !== 'grain' ? ' ' + ink.angle + '°' : ''}</span>`;
     row.addEventListener('click', () => selectInk(i));
+    row.addEventListener('keydown', e => {
+      const n = state.inks.length;
+      const j = { ArrowDown: Math.min(n - 1, i + 1), ArrowUp: Math.max(0, i - 1), Home: 0, End: n - 1, Enter: i, ' ': i }[e.key];
+      if (j == null) return;
+      e.preventDefault(); e.stopPropagation(); selectInk(j);
+    });
     list.appendChild(row);
   });
-  $('#delInk').disabled = state.inks.length <= 1; $('#addInk').disabled = state.inks.length >= 3;
+  if (hadFocus && list.children[state.selected]) list.children[state.selected].focus();
+  // Remove says which ink it takes away.
+  const del = $('#delInk'); del.disabled = state.inks.length <= 1; $('#addInk').disabled = state.inks.length >= 3;
+  del.textContent = state.inks.length > 1 ? `Remove ink ${state.selected + 1}` : 'Remove ink';
 }
 function selectInk(i) { state.selected = i; renderInkList(); refreshInk(); updateHints(); }
 function refreshInk() {
   const I = sel(); if (!I) return;
   for (const p in controls) if (p.startsWith('I.')) controls[p].refresh();
   $('#source').value = I.source; $('#invert').checked = I.invert; $('#inkColor').value = I.color;
-  for (const b of $('#screenSeg').children) b.classList.toggle('on', b.dataset.v === I.screen);
-  for (const b of $('#swatches').children) b.classList.toggle('on', b.dataset.v === I.color);
+  for (const b of $('#screenSeg').children) { b.classList.toggle('on', b.dataset.v === I.screen); b.setAttribute('aria-pressed', String(b.dataset.v === I.screen)); }
+  for (const b of $('#swatches').children) { b.classList.toggle('on', b.dataset.v === I.color); b.setAttribute('aria-pressed', String(b.dataset.v === I.color)); }
+  swatchStop();
   $('#screenSliders').hidden = I.screen === 'grain';
-  $('#inkName').textContent = inkName(I.color);
+  showInkName(I.color);
 }
-function clearPreset() { activePreset = null; [...presetsEl.children].forEach(c => c.classList.remove("on")); }
+function clearPreset() { activePreset = null; [...presetsEl.children].forEach(c => { c.classList.remove("on"); c.setAttribute('aria-pressed', 'false'); }); }
 const sw = $('#swatches');
-SWATCHES.forEach(([name, hex]) => { const b = document.createElement('button'); b.style.background = hex; b.title = name; b.dataset.v = hex; b.addEventListener('click', () => { const I = sel(); if (!I) return; I.color = hex; refreshInk(); renderInkList(); invalidate(); }); sw.appendChild(b); });
+// Pointing at a drum colour, or arrowing to it, names it at the end of the "Ink colour" heading, so the eighteen can be
+// told apart without waiting on a tooltip. The readout beside the Custom well goes on naming the chosen ink.
+function showDrum(hex, name) { const el = $('#drumName'); if (hex) nameHex(el, name, hex); else el.textContent = ''; }
+function drumOff() { const f = document.activeElement; if (f && f.parentNode === sw && f.matches(':focus-visible')) showDrum(f.dataset.v, f.title); else showDrum(); }
+SWATCHES.forEach(([name, hex]) => {
+  const b = document.createElement('button'); b.style.background = hex; b.title = name; b.dataset.v = hex; b.setAttribute('aria-label', name); b.tabIndex = -1;
+  b.addEventListener('click', () => { const I = sel(); if (!I) return; I.color = hex; refreshInk(); renderInkList(); invalidate(); });
+  b.addEventListener('pointerenter', () => showDrum(hex, name)); b.addEventListener('focus', () => showDrum(hex, name));
+  b.addEventListener('pointerleave', drumOff); b.addEventListener('blur', () => showDrum());
+  sw.appendChild(b);
+});
+// The eighteen drums are one Tab stop: Tab lands on the chosen colour (the first, for a custom one), the arrows move
+// along the grid a square or a row at a time, Home and End go to the ends, and Enter or Space picks.
+function swatchStop() {
+  const kids = [...$('#swatches').children], here = kids.includes(document.activeElement) ? document.activeElement : null;
+  const stop = here || kids.find(b => b.classList.contains('on')) || kids[0];
+  for (const b of kids) b.tabIndex = b === stop ? 0 : -1;
+}
+sw.addEventListener('keydown', e => {
+  const kids = [...sw.children], i = kids.indexOf(e.target); if (i < 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+  const cols = getComputedStyle(sw).gridTemplateColumns.split(' ').length;
+  const j = { ArrowRight: i + 1, ArrowLeft: i - 1, ArrowDown: i + cols, ArrowUp: i - cols, Home: 0, End: kids.length - 1 }[e.key];
+  if (j == null) return;
+  e.preventDefault(); e.stopPropagation();
+  if (j < 0 || j >= kids.length) return;
+  for (const b of kids) b.tabIndex = b === kids[j] ? 0 : -1;
+  kids[j].focus();
+});
+sw.addEventListener('focusout', e => { if (!sw.contains(e.relatedTarget)) swatchStop(); });
 $('#inkColor').addEventListener('input', e => { const I = sel(); if (!I) return; I.color = e.target.value; refreshInk(); renderInkList(); invalidate(); });
 $('#source').addEventListener('change', e => { const I = sel(); if (!I) return; I.source = e.target.value; invalidate(); });
 $('#invert').addEventListener('change', e => { const I = sel(); if (!I) return; I.invert = e.target.checked; invalidate(); });
@@ -478,11 +559,12 @@ $('#shuffle').addEventListener('click', shuffleMisreg);
 $('#paper').addEventListener('input', e => { state.press.paper = e.target.value; invalidate(); });
 $('#paperSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.press.paper = b.dataset.v; $('#paper').value = b.dataset.v; invalidate(); });
 $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; syncView(); invalidate(); });
-function syncView() { for (const b of $('#viewSeg').children) b.classList.toggle('on', b.dataset.v === state.view); }
+function syncView() { for (const b of $('#viewSeg').children) { b.classList.toggle('on', b.dataset.v === state.view); b.setAttribute('aria-pressed', String(b.dataset.v === state.view)); } }
 $('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate(); });
 $('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate(); });
-$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
+$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); redrawView(); });
 $('#drop').addEventListener('click', () => $('#file').click());
+$('#drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#file').click(); } });
 $('#file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
 $('#sample').addEventListener('click', () => { forgetProjectPicture(); sampleImage(); });
 for (const el of [$('#drop'), $('#stage')]) {
@@ -504,7 +586,12 @@ function refreshAll() {
 })();
 
 // ---------- Export ----------
-function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
+// A second press while the first message shows must not keep the message as the button's label.
+function flash(btn, msg) {
+  if (btn.dataset.rest == null) btn.dataset.rest = btn.textContent;
+  clearTimeout(btn._flash); btn.textContent = msg;
+  btn._flash = setTimeout(() => { btn.textContent = btn.dataset.rest; delete btn.dataset.rest; }, 1300);
+}
 function downloadCanvas(c, name) { c.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, 'image/png'); }
 function printCanvas() { const c = document.createElement('canvas'); c.width = src.w; c.height = src.h; c.getContext('2d').putImageData(composite(coverages()), 0, 0); return c; }
 $('#download').addEventListener('click', () => { if (src) downloadCanvas(printCanvas(), `riso-print-${src.w}x${src.h}.png`); });
@@ -518,9 +605,9 @@ $('#downloadSeps').addEventListener('click', async () => {
 });
 $('#copyImg').addEventListener('click', async () => {
   const btn = $('#copyImg'); if (!src) return;
-  try { const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied!'); } catch (e) { flash(btn, 'Clipboard blocked'); }
+  try { const blob = await new Promise(r => printCanvas().toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied'); } catch (e) { flash(btn, 'Clipboard blocked'); }
 });
-$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
+$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
 
 // ---------- Hand-off from Freeform ----------
 // Freeform's "Open in Riso" leaves the canvas's picture and its current settings in this browser and
@@ -534,7 +621,7 @@ const handoff = (() => {
 
 // ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
 const ZOOMS = ['fit', '0.5', '1', '2'];
-function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); redrawView(); }
 // A hand-off starts from the settings Freeform sent, never from the last session's. ToolKit restores saved
 // state once the document has loaded, which is after the hand-off below has been applied, so a session's
 // saved state would quietly overwrite it: a screen tuned to 2 px in Freeform came back 4.5 px here.
@@ -584,7 +671,7 @@ function syncProject() {
   const on = Boolean(Project && ['ready', 'view-only', 'asking'].includes(Project.status));
   const save = $('#saveProject');
   $('#projectRow').hidden = !on; save.hidden = !on;
-  $('#download').classList.toggle('primary', !on);
+  $('#download').classList.toggle('primary', !on && !handoff);   // one filled button: Save to project, or Back to Freeform
   if (!on) return;
   save.textContent = made && made.output ? `Save to ${made.output.split('/').pop()}` : 'Save to project';
   save.title = Project.status !== 'ready' ? `Chrome needs one click to let this page save into ${Project.name}`
@@ -676,7 +763,7 @@ if (handoff) {
     $('#zoomSel').prepend(opt); state.zoom = z;
   }
   refreshAll();
-  const back = $('#backToFreeform'); back.hidden = false;
+  const back = $('#backToFreeform'); back.hidden = false; $('#download').classList.remove('primary');   // Back to Freeform finishes this job
   back.addEventListener('click', () => {
     const step = { effect: 'riso', inks: JSON.parse(JSON.stringify(state.inks)), press: { ...state.press }, seed: state.seed };
     try { localStorage.setItem(RETURN_KEY, JSON.stringify({ session: handoff.session, blockId: handoff.blockId, step, at: Date.now() })); }

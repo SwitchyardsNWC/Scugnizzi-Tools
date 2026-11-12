@@ -51,16 +51,25 @@ is always the site as it is on Pages. Chrome and Edge on a computer only, as wit
 
 ### What the single-file tools share
 
+- **`theme.js`** keeps one light or dark pick for the dashboard, every tool and Template Studio. It
+  sets `data-theme` on `<html>` and keeps the pick in `localStorage` under `scuggnizzi.theme`. With
+  nothing picked, the dashboard and the tools are dark; Template Studio follows the system. Load it
+  first in `<head>`, before any stylesheet, so a page paints in the right theme the first time.
 - **`tool-banner.js`** draws the 32px strip at the top of every tool with the link back to the
-  index. Include it right after `<body>` with `data-tool="Name"`.
+  index and the light/dark switch. Include it right after `<body>` with `data-tool="Name"`.
 - **`tool-kit.js`** gives every tool the same keyboard: ⌘Z undo, ⇧⌘Z redo, `?` for the shortcut
   sheet, Esc to close, ⌥⌘R to reset. It also keeps each tool's state in `localStorage` under
   `scuggnizzi.<tool>.*` (the original spelling, kept so saved state survives), so a page reload does not lose work. A tool registers its own shortcuts
   with `ToolKit.register('mod+s', 'Download PNG', fn)`.
-- **`design system/Enkel Design system v2/`** is the design system the index page is set in.
-  *Enkel* is Swedish for simple: one sans for words, one mono for figures, a sunken page with
-  paper cards, hairlines instead of shadows. `styles.css` carries the tokens, `readme.md` the
-  rules, `SKILL.md` the instructions for building with it.
+- **`project.js`** finds the open project, the folder the board and Template Studio opened, so a
+  tool can read pictures from it and save its result and recipe into it without asking for a
+  folder again. Load it after `tool-kit.js`. It never picks a folder itself; the board does that.
+- **`design system/Enkel Design system v2/`** is the design system the dashboard and every tool
+  are set in. *Enkel* is Swedish for simple: one sans for words, one mono for figures, a sunken
+  page with paper cards, hairlines instead of shadows. `styles.css` carries the tokens, `readme.md`
+  the rules, `SKILL.md` the instructions for building with it. A tool links `tools.css` after
+  `styles.css` for its side panel, 28px controls, stage and export bar;
+  `guidelines/controls-tools.html` shows every part of it in light and dark.
 
 ### Adding a tool
 
@@ -159,8 +168,12 @@ What a module has learned about HubSpot, and what is still unverified until the 
 Scugnizzi-Tools/
 ├── index.html                      the dashboard
 ├── serve.js                        static server on :8770
+├── theme.js                        one light/dark pick for every page
 ├── tool-banner.js  tool-kit.js     shared by the single-file tools
-├── design system/                  Enkel, the index page's design system
+├── project.js                      the open project, for the single-file tools
+├── version.js                      the suite's version, the one place it is written
+├── CHANGELOG.md                    what changed in each version
+├── design system/                  Enkel, the design system every page is set in
 ├── text bleed/  image effects/  split flap/  riso/  hub-mod/
 └── template-studio/                the email template builder (Vite + TypeScript + Preact)
 ```

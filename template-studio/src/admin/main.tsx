@@ -7,10 +7,13 @@ import { render } from 'preact';
 import { useCallback, useState } from 'preact/hooks';
 
 import { Admin } from './Admin.tsx';
+import { startPageTheme } from '../project/page-theme.ts';
 import { useProject } from '../project/useProject.ts';
 import '../app/app.css';
 import '../project/project.css';
 import './admin.css';
+
+startPageTheme();
 
 function AdminTool() {
   const project = useProject();

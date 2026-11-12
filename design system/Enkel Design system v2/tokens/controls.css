@@ -1,0 +1,36 @@
+:root{
+/* Tool chrome — the dense side panel, the stage, the export bar (tools.css). Same rules as the dashboard: the panel is
+   paper, the stage is sunken, ink hairlines for structure, soft ones inside, square everything except what you press. */
+--tool-banner-height:32px;
+--tool-panel-width:320px; /* one side panel; a tool with two panels uses this for the inspector and --tool-rail-width for the list */
+--tool-rail-width:280px;
+--tool-bar-height:40px; /* the bar over the stage */
+--panel-pad:16px;
+--panel-section-height:40px; /* a collapsible section's header row, the same 40 as the dashboard's section heads */
+--row-label-width:80px;
+/* The edge of anything you press or type into: firmer than a card's hairline, softer than ink, 3:1 against the panel
+   so a field or an outline button reads as a control without leaning on its fill. */
+--border-control:#8f918d;
+/* Controls at panel density. 28 = 1 + 8 / 14 / 4 + 1, top = bottom + 4 (--optical-nudge), the same build as the dashboard's 36. */
+--control-height-xs:24px;
+--control-pad-sm:8px 12px 4px; /* @kind other */
+--control-pad-xs:6px 8px 2px; /* @kind other */
+/* Slider: a hairline track and a square thumb. No fill: the figure beside the label says the value. */
+--control-track:#bfc0bd;
+--track-size:2px;
+--thumb-size:12px;
+/* Check, radio and colour swatch: squares, like every other indicator. */
+--check-size:14px;
+--swatch-size:28px;
+/* The export bar: two columns of 160 (room for "Download separations"), three rows of 28 with 8 between. */
+--export-col:160px;
+--export-height:100px;
+--radius-controls:4px; /* everything you press in a tool panel; the panel itself stays square */
+}
+/* Fields are wells: sunken into the paper panel, one soft hairline, ink when focused. Declared on every themed element,
+   not only :root, so a var() of a var() resolves against the theme it sits in. */
+:root,[data-theme]{--surface-field:var(--surface-sunken)}
+[data-theme="dark"]{
+--border-control:#666765;
+--control-track:#4a4a48;
+}

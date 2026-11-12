@@ -1,53 +1,173 @@
 /* The project board (src/project), second pass.
  *
  * The dashboard's shape, Enkel: a sunken page, paper for what you read, one sans for words and mono for figures,
- * hairlines for structure, square everything except what you press, no shadows, nothing that bounces. The board
- * stays light whatever the dashboard's theme: it is a table you work on. The one hint of an older screen is the
+ * hairlines for structure, square everything except what you press, no shadows, nothing that bounces. Light or dark
+ * with the rest of the suite (the Canvas menu's Theme, app/theme.ts). What is on the board keeps its own colours in
+ * both: the emails, the frames, the pictures, a note's paper, the cutting mat. The one hint of an older screen is the
  * drafting grid under everything, the status line along the bottom, and the corner marks on what is selected. */
 
 html, body, #app { height: 100%; margin: 0; }
+/* The page behind the app, before it draws: --surface-sunken, the --pb-ground below, in each theme. */
 body { background: #f5f5f4; }
+:root[data-theme="dark"] body { background: #0e0e0e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body { background: #0e0e0e; } }
 
-.pb-app {
-  --pb-ground: #f5f5f4;
-  --pb-paper: #ffffff;
-  --pb-row: #f0f0ef;
-  --pb-ink: #0d0d0d;
-  --pb-text: #3a3a38;
-  --pb-muted: #6f726e;
-  --pb-faint: #a8aaa7;
-  --pb-hairline: #0d0d0d;
-  --pb-card-border: #dededc;
-  --pb-soft: #e6e6e4;
+/* The palette is Enkel's, written out rather than imported (design system/Enkel Design system v2/tokens/). A comment
+   `= --token` says which token a value is, in the theme its rule is for; tests/enkel-tokens.test.ts reads Enkel's
+   files and fails when the two part, so a change to Enkel is carried here on purpose rather than drifting.
+   A note is light paper in either theme (its colours are the project's, model/project.ts), so it takes the light
+   values whatever the page around it does: the ink on a note is always the light theme's. */
+.pb-note, .pb-app {
+  /* surfaces */
+  --pb-ground: #f5f5f4; /* = --surface-sunken */
+  --pb-paper: #ffffff; /* = --surface-paper */
+  --pb-row: #f0f0ef; /* = --surface-row-hover */
+  --pb-selected: #e9e9e7; /* = --surface-selected */
+  --pb-field: #f5f5f4; /* = --surface-field */
+  --pb-scrim: rgba(0,0,0,.4); /* = --surface-scrim */
+  /* text */
+  --pb-ink: #0d0d0d; /* = --text-primary */
+  --pb-text: #3a3a38; /* = --text-secondary */
+  --pb-muted: #666965; /* = --text-muted */
+  --pb-faint: #a8aaa7; /* = --text-faint */
+  --pb-on-accent: #ffffff; /* = --text-on-accent */
+  /* lines */
+  --pb-hairline: #0d0d0d; /* = --border-hairline */
+  --pb-card-border: #dededc; /* = --border-card */
+  --pb-soft: #e6e6e4; /* = --border-muted */
+  --pb-control-edge: #8f918d; /* = --border-control */
+  --pb-track: #bfc0bd; /* = --control-track */
+  /* actions */
+  --pb-accent: #495472; /* = --action-primary */
+  --pb-accent-hover: #3f4862; /* = --action-primary-hover */
+  --pb-disabled-surface: #ededec; /* = --action-disabled-surface */
+  --pb-disabled-text: #a8aaa7; /* = --action-disabled-text */
+  /* data: the link lines and the kinds of document */
+  --pb-blue: #4a5fa5; /* = --data-1 */
+  --pb-green: #5b8a5e; /* = --data-2 */
+  --pb-amber: #ba832c; /* = --data-3 */
+  --pb-brick: #b8412b; /* = --data-4 */
+  /* status: the dot on the status line, a warning, and what deletes */
+  --pb-moss: #5b6b4e; /* = --status-done */
+  --pb-risk: #8a6222; /* = --status-risk */
+  --pb-danger: #8a3b2e; /* = --status-blocked */
+  --pb-danger-soft: #f1e0dc; /* = --status-blocked-soft */
+  /* The board's own: the drafting grid, a group's paper, and the cutting mat. --pb-grid is ink at 4.5%, the lines at
+     their shipped 50%; the rest are what lies under the board at full strength, which the Canvas menu's opacity dial
+     brings down. The mat is the green of a self-healing cutting mat, with its pale lines: a thing on the table, the
+     same in either theme. */
   --pb-grid: rgb(13 13 13 / 0.045);
-  --pb-grid-major: rgb(13 13 13 / 0.09);
-  /* What lies under the board, at full strength; the Canvas menu's opacity dial brings each down. Lines at the
-     shipped 50% are the 0.045 and 0.09 above. The mat is the green of a self-healing cutting mat, with its pale lines. */
   --pb-line: rgb(13 13 13 / 0.09);
   --pb-line-major: rgb(13 13 13 / 0.18);
   --pb-dot: rgb(13 13 13 / 0.34);
   --pb-dot-major: rgb(13 13 13 / 0.5);
+  --pb-group-fill: rgb(255 255 255 / 0.55);
   --pb-mat: #3c7358;
   --pb-mat-line: rgb(232 240 224 / 0.26);
   --pb-mat-major: rgb(240 246 234 / 0.6);
   --pb-mat-diag: rgb(240 246 234 / 0.42);
-  --pb-accent: #495472;
-  --pb-accent-hover: #3b4560;
-  --pb-accent-soft: #e9ecf3;
-  --pb-blue: #4a5fa5;
-  --pb-green: #5b8a5e;
-  --pb-amber: #c48a2e;
-  --pb-brick: #b8412b;
-  --pb-moss: #2f7a44;
-  --pb-sans: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, sans-serif;
-  --pb-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --pb-fast: 120ms linear;
+  /* type: Enkel's faces first (--font-sans, --font-mono), by the names the dashboard self-hosts and pins them under,
+     then the system faces this page has always fallen back to. No @font-face here, so nothing is fetched: where the
+     dashboard's fonts are installed they are used, and elsewhere the system's. */
+  --pb-sans: "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, sans-serif;
+  --pb-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --pb-fast: 120ms linear; /* --duration-fast, --ease-standard */
+  /* The bar across the top: Enkel's --tool-bar-height, a 28 control with 6 above and below. */
+  --pb-bar: 40px;
+  color-scheme: light;
+}
+/* Dark, picked by hand or by the system (app/theme.ts sets data-theme, or leaves it off to follow the system): the
+   same names, Enkel's dark values. Twice, as app.css does, because a media query cannot share a rule with a selector. */
+:root[data-theme="dark"] .pb-app {
+  --pb-ground: #0e0e0e; /* = --surface-sunken */
+  --pb-paper: #151515; /* = --surface-paper */
+  --pb-row: #222222; /* = --surface-row-hover */
+  --pb-selected: #2a2a2a; /* = --surface-selected */
+  --pb-field: #0e0e0e; /* = --surface-field */
+  --pb-scrim: rgba(0,0,0,.6); /* = --surface-scrim */
+  --pb-ink: #f2f2f0; /* = --text-primary */
+  --pb-text: #cfcfcc; /* = --text-secondary */
+  --pb-muted: #9a9c99; /* = --text-muted */
+  --pb-faint: #5e605d; /* = --text-faint */
+  --pb-on-accent: #ffffff; /* = --text-on-accent */
+  --pb-hairline: #3a3a38; /* = --border-hairline */
+  --pb-card-border: #2a2a29; /* = --border-card */
+  --pb-soft: #242423; /* = --border-muted */
+  --pb-control-edge: #666765; /* = --border-control */
+  --pb-track: #4a4a48; /* = --control-track */
+  --pb-accent: #5a67a0; /* = --action-primary */
+  --pb-accent-hover: #4f5b93; /* = --action-primary-hover */
+  --pb-disabled-surface: #232323; /* = --action-disabled-surface */
+  --pb-disabled-text: #5e605d; /* = --action-disabled-text */
+  --pb-blue: #7e92d6; /* = --data-1 */
+  --pb-green: #86b389; /* = --data-2 */
+  --pb-amber: #dba64d; /* = --data-3 */
+  --pb-brick: #e0705a; /* = --data-4 */
+  --pb-moss: #8fb082; /* = --status-done */
+  --pb-risk: #d9a54c; /* = --status-risk */
+  --pb-danger: #dc7a64; /* = --status-blocked */
+  --pb-danger-soft: #301b16; /* = --status-blocked-soft */
+  --pb-grid: rgb(242 242 240 / 0.05);
+  --pb-line: rgb(242 242 240 / 0.08);
+  --pb-line-major: rgb(242 242 240 / 0.16);
+  --pb-dot: rgb(242 242 240 / 0.3);
+  --pb-dot-major: rgb(242 242 240 / 0.46);
+  --pb-group-fill: rgb(21 21 21 / 0.6);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pb-app {
+    --pb-ground: #0e0e0e; /* = --surface-sunken */
+    --pb-paper: #151515; /* = --surface-paper */
+    --pb-row: #222222; /* = --surface-row-hover */
+    --pb-selected: #2a2a2a; /* = --surface-selected */
+    --pb-field: #0e0e0e; /* = --surface-field */
+    --pb-scrim: rgba(0,0,0,.6); /* = --surface-scrim */
+    --pb-ink: #f2f2f0; /* = --text-primary */
+    --pb-text: #cfcfcc; /* = --text-secondary */
+    --pb-muted: #9a9c99; /* = --text-muted */
+    --pb-faint: #5e605d; /* = --text-faint */
+    --pb-on-accent: #ffffff; /* = --text-on-accent */
+    --pb-hairline: #3a3a38; /* = --border-hairline */
+    --pb-card-border: #2a2a29; /* = --border-card */
+    --pb-soft: #242423; /* = --border-muted */
+    --pb-control-edge: #666765; /* = --border-control */
+    --pb-track: #4a4a48; /* = --control-track */
+    --pb-accent: #5a67a0; /* = --action-primary */
+    --pb-accent-hover: #4f5b93; /* = --action-primary-hover */
+    --pb-disabled-surface: #232323; /* = --action-disabled-surface */
+    --pb-disabled-text: #5e605d; /* = --action-disabled-text */
+    --pb-blue: #7e92d6; /* = --data-1 */
+    --pb-green: #86b389; /* = --data-2 */
+    --pb-amber: #dba64d; /* = --data-3 */
+    --pb-brick: #e0705a; /* = --data-4 */
+    --pb-moss: #8fb082; /* = --status-done */
+    --pb-risk: #d9a54c; /* = --status-risk */
+    --pb-danger: #dc7a64; /* = --status-blocked */
+    --pb-danger-soft: #301b16; /* = --status-blocked-soft */
+    --pb-grid: rgb(242 242 240 / 0.05);
+    --pb-line: rgb(242 242 240 / 0.08);
+    --pb-line-major: rgb(242 242 240 / 0.16);
+    --pb-dot: rgb(242 242 240 / 0.3);
+    --pb-dot-major: rgb(242 242 240 / 0.46);
+    --pb-group-fill: rgb(21 21 21 / 0.6);
+    color-scheme: dark;
+  }
+}
+.pb-app {
   position: fixed; inset: 0; overflow: hidden; color: var(--pb-ink); background: var(--pb-ground);
   font-family: var(--pb-sans); font-size: 13px; line-height: 1.3; letter-spacing: 0.011em; -webkit-font-smoothing: antialiased;
 }
 .pb-app *, .pb-app *::before, .pb-app *::after { box-sizing: border-box; }
 .pb-app button, .pb-app input { font-family: inherit; letter-spacing: inherit; }
 .pb-app :focus-visible { outline: 1px solid var(--pb-ink); outline-offset: 2px; }
+/* A hairline field shows the keyboard itself, its rule thickening to 2px ink; a ring round it as well says it twice. */
+.pb-app .pb-field input:focus-visible, .pb-app .cp-name:focus-visible, .pb-app .pb-group-input:focus-visible { outline: none; }
+/* app.css rounds whatever has the keyboard by 3px. Here nothing changes shape when it is focused: this rule is no
+   more specific than app.css's and comes after it, and every rule that gives a control its radius is at least as
+   specific and comes later still (or is more specific), so what you press keeps its own corner and the rest stay
+   square: rows, tabs, inline links, the Canvas menu's segments, switches and sliders. */
+.pb-app :where(:focus-visible) { border-radius: 0; }
 .pb-mono, .pb-count, .pb-card-meta, .pb-group-folder, .pb-doc-host, .pb-zoom .pct, .pb-title-type, .pb-tree code, .pb-menu-head span { font-family: var(--pb-mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 
 /* --- the bars: a header across the top, a status line along the bottom ------------------------------------ */
@@ -55,55 +175,93 @@ body { background: #f5f5f4; }
   position: absolute; left: 0; right: 0; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 0 12px;
   background: var(--pb-paper); color: var(--pb-ink); white-space: nowrap;
 }
-.pb-bar-top { top: 0; height: 44px; border-bottom: 1px solid var(--pb-hairline); }
-.pb-bar-bottom { bottom: 0; height: 28px; padding: 0 12px; border-top: 1px solid var(--pb-hairline); font-size: 12px; color: var(--pb-muted); }
+/* 40 = 6 + 28 + 5 + the 1 of its rule, so every 28 control sits on whole pixels, 6 under the window's top edge. */
+.pb-bar-top { top: 0; height: var(--pb-bar); padding-top: 6px; padding-bottom: 5px; border-bottom: 1px solid var(--pb-hairline); }
+/* The status line's words and its mono count share a baseline, whatever faces the system falls back to: the row aligns
+   by baseline, the words 6 under its rule; what has no words (the separators, the dot) stays centred. */
+.pb-bar-bottom { bottom: 0; height: 28px; align-items: baseline; padding: 0 12px; border-top: 1px solid var(--pb-hairline); font-size: 12px; line-height: 16px; color: var(--pb-muted); }
+.pb-bar-bottom > .pb-status { margin-top: 6px; }
 .pb-grow { flex: 1; min-width: 8px; }
 .pb-sep { flex: none; width: 1px; height: 16px; margin: 0 8px; background: var(--pb-soft); }
-.pb-bar-bottom .pb-sep { height: 12px; }
+.pb-bar-bottom .pb-sep { align-self: center; height: 12px; }
 .pb-hint { overflow: hidden; text-overflow: ellipsis; }
 .pb-count { flex: none; color: var(--pb-text); }
-.pb-status { display: inline-flex; align-items: center; gap: 8px; color: var(--pb-text); }
-.pb-inline { padding: 0; border: 0; background: none; color: var(--pb-accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.pb-status { display: inline-flex; align-items: baseline; gap: 8px; color: var(--pb-text); }
+.pb-status > .pb-dot { align-self: center; }
+/* A link in words: Enkel's link, graphite to ink, underlined so it does not lean on colour. */
+.pb-inline { padding: 0; border: 0; background: none; color: var(--pb-muted); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-inline:hover { color: var(--pb-ink); }
 
-/* Controls. 28px tall, the text's 14px line box centred by flex and nudged 1px down (padding 7 over 5), which puts
-   the x-height, where the words' weight is, on the bar's middle. Glyphs are drawn (glyphs.tsx), 12px squares
-   centred the same way, so an arrow, a plus and the words beside them share one line. */
+/* Controls. 28 tall from padding, as Enkel builds them: 1 + 8 / 14 / 4 + 1, the top 4px more than the bottom
+   (--optical-nudge) so the cap height lands on the bar's true middle. Glyphs are drawn (glyphs.tsx), 12px squares
+   centred in the same line box, so an arrow, a plus and the words beside them share one line. */
 .pb-ghost, .pb-filled, .pb-outline, .pb-title, .pb-zoom button {
-  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 7px 8px 5px; border: 1px solid transparent; border-radius: 4px;
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 8px 8px 4px; border: 1px solid transparent; border-radius: 4px;
   background: none; color: var(--pb-text); font-size: 13px; line-height: 14px; white-space: nowrap; cursor: pointer; text-decoration: none;
   transition: background-color var(--pb-fast), border-color var(--pb-fast), color var(--pb-fast);
 }
 .pb-glyph { flex: none; display: block; width: 12px; height: 12px; margin-top: -1px; }
 .pb-ghost:hover, .pb-zoom button:hover { background: var(--pb-row); color: var(--pb-ink); }
-.pb-ghost.on { background: var(--pb-row); color: var(--pb-ink); }
-.pb-ghost:disabled, .pb-filled:disabled, .pb-outline:disabled { color: var(--pb-faint); background: none; cursor: default; }
-.pb-filled { background: var(--pb-accent); border-color: var(--pb-accent); color: #fff; }
+/* On (Group mode, an open menu) is a selection, so it is ink: the selection surface inside an ink edge. Hover is
+   only a tint, so the two never read alike. */
+.pb-ghost.on, .pb-ghost.on:hover { background: var(--pb-selected); border-color: var(--pb-ink); color: var(--pb-ink); }
+.pb-filled, .pb-outline { padding-left: 12px; padding-right: 12px; }
+.pb-filled { background: var(--pb-accent); border-color: var(--pb-accent); color: var(--pb-on-accent); }
 .pb-filled:hover { background: var(--pb-accent-hover); border-color: var(--pb-accent-hover); }
-.pb-filled:disabled { background: var(--pb-soft); border-color: var(--pb-soft); }
-.pb-outline { border-color: var(--pb-hairline); color: var(--pb-ink); }
-.pb-outline:hover { background: var(--pb-row); }
+/* Outline on the control edge, as Enkel's outline button: 3:1 on paper, a control without leaning on ink. */
+.pb-outline { border-color: var(--pb-control-edge); color: var(--pb-ink); }
+.pb-outline:hover { background: var(--pb-row); border-color: var(--pb-muted); }
+/* Disabled, the same everywhere on these pages (Enkel's): the words faint; a filled button's fill goes to the
+   disabled surface; an outline keeps a soft edge; nothing fades by opacity. */
+.pb-ghost:disabled, .pb-ghost:disabled:hover, .pb-outline:disabled, .pb-outline:disabled:hover { color: var(--pb-disabled-text); background: none; cursor: default; }
+.pb-ghost:disabled { border-color: transparent; }
+.pb-outline:disabled { border-color: var(--pb-soft); }
+.pb-filled:disabled, .pb-filled:disabled:hover { background: var(--pb-disabled-surface); border-color: var(--pb-disabled-surface); color: var(--pb-disabled-text); cursor: default; }
 .pb-filled.small { height: 28px; }
+/* The zoom: one 28 box, its buttons 26 inside the box's own 1px edge, so 1 + 8 / 14 / 4 + 1 still. */
 .pb-zoom { display: inline-flex; align-items: center; border: 1px solid var(--pb-soft); border-radius: 4px; }
-.pb-zoom button { height: 26px; border-radius: 0; }
+.pb-zoom button { height: 26px; border: 0; border-radius: 0; }
 /* The two steps are squares, the glyph dead centre; the figure between them keeps the text rule. */
 .pb-zoom button:not(.pct) { width: 26px; padding: 0; justify-content: center; }
 .pb-zoom button:not(.pct) .pb-glyph { margin-top: 0; }
 .pb-zoom button + button { border-left: 1px solid var(--pb-soft); }
 .pb-zoom .pct { min-width: 58px; justify-content: center; font-size: 12px; color: var(--pb-ink); }
-.pb-zoom button:disabled { color: var(--pb-faint); background: none; cursor: default; }
+.pb-zoom button:disabled, .pb-zoom button:disabled:hover { color: var(--pb-disabled-text); background: none; cursor: default; }
 .pb-actions { display: inline-flex; align-items: center; gap: 2px; }
 
-.pb-title { gap: 8px; padding-left: 6px; padding-right: 6px; color: var(--pb-ink); }
+/* The project's name and its type (mono) on one baseline; the caret centred. */
+.pb-title { align-items: baseline; gap: 8px; padding-left: 6px; padding-right: 6px; color: var(--pb-ink); }
 .pb-title b { max-width: 300px; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
 .pb-title-type { font-size: 11px; color: var(--pb-muted); }
-.pb-title:hover, .pb-title.on { background: var(--pb-row); }
-.pb-caret { display: inline-flex; color: var(--pb-muted); }
+.pb-title:hover { background: var(--pb-row); }
+.pb-title.on, .pb-title.on:hover { background: var(--pb-selected); border-color: var(--pb-ink); }
+.pb-caret { display: inline-flex; align-self: center; color: var(--pb-muted); }
 .pb-caret .pb-glyph { margin-top: 0; }
+/* A long project name gives way first: the title shrinks and ends in an ellipsis before anything is pushed off. */
+.pb-bar-top > .pb-menu { min-width: 0; }
+.pb-bar-top > .pb-menu > .pb-title { min-width: 0; max-width: 100%; }
+.pb-title b { min-width: 0; }
 
+/* The board's bar holds 1,200px of controls. On a narrower window it takes two rows of 40 rather than push the zoom
+   and the Canvas menu off the edge: the project and its history on the first, what you add, the Canvas menu and the
+   zoom on the second, every word kept. The spacer after Tidy becomes the break (a full-width line of no height), and a
+   soft hairline divides the rows, as inside any panel. The canvas starts under both (--pb-bar). */
+@media (max-width: 1239px) {
+  .pb-app:has(.pb-board) { --pb-bar: 80px; }
+  .pb-board .pb-bar-top {
+    flex-wrap: wrap; align-content: space-between; row-gap: 0;
+    background: linear-gradient(var(--pb-soft), var(--pb-soft)) 0 39px / 100% 1px no-repeat, var(--pb-paper);
+  }
+  .pb-board .pb-bar-top > .pb-grow { flex: 0 0 100%; height: 0; min-width: 0; }
+  .pb-board .pb-bar-top > .pb-grow + .pb-sep { display: none; }
+  .pb-board .pb-bar-top > .pb-actions { margin-right: auto; }
+}
+
+/* The status line's square: done is moss, view-only is the risk amber, nothing open is faint. Words beside it say
+   the same, so the colour is never the only signal. */
 .pb-dot { display: inline-block; flex: none; width: 8px; height: 8px; background: var(--pb-faint); }
 .pb-dot.ready { background: var(--pb-moss); }
-.pb-dot.view-only { background: var(--pb-amber); }
+.pb-dot.view-only { background: var(--pb-risk); }
 
 /* Popovers: paper, one hairline, no shadow. */
 .pb-menu { position: relative; display: inline-flex; }
@@ -119,16 +277,20 @@ body { background: #f5f5f4; }
 }
 .pb-menu-pop .pb-menu-note + button { border-top: 0; }
 .pb-menu-pop button:hover { background: var(--pb-row); }
-.pb-menu-pop button.danger { color: var(--pb-brick); }
+.pb-menu-pop button.danger { color: var(--pb-danger); }
+.pb-menu-pop button.danger:hover { background: var(--pb-danger-soft); }
 
 .pb-linkform { right: 0; left: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; width: 380px; max-width: calc(100vw - 24px); padding: 12px; }
 .pb-field { display: grid; gap: 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pb-muted); }
+/* A field is a hairline under the words, ink and 2px while you type (Enkel's TextInput). 28 tall, built as the
+   buttons beside it are: 9 (8, and the 1 a box would spend on its top edge) / 14 / 4 + 1. */
 .pb-field input {
-  width: 100%; min-width: 0; height: 32px; padding: 9px 0 5px; border: 0; border-bottom: 1px solid var(--pb-soft); border-radius: 0; background: none; color: var(--pb-ink);
-  font-size: 14px; line-height: 16px; letter-spacing: 0.011em; text-transform: none; outline: none; transition: border-color var(--pb-fast);
+  width: 100%; min-width: 0; height: 28px; padding: 9px 0 4px; border: 0; border-bottom: 1px solid var(--pb-card-border); border-radius: 0; background: none; color: var(--pb-ink);
+  font-size: 13px; line-height: 14px; letter-spacing: 0.011em; text-transform: none; outline: none; transition: border-color var(--pb-fast);
 }
-.pb-field input:focus { border-bottom: 2px solid var(--pb-ink); padding-bottom: 4px; }
-.pb-field input::placeholder { color: var(--pb-faint); }
+.pb-field input:hover { border-bottom-color: var(--pb-control-edge); }
+.pb-field input:focus { border-bottom: 2px solid var(--pb-ink); padding-bottom: 3px; }
+.pb-field input::placeholder { color: var(--pb-muted); }
 .pb-linkform-foot { display: flex; align-items: center; gap: 4px; }
 .pb-linkform-kind { flex: 1; font-size: 12px; color: var(--pb-muted); }
 .pb-linkform-note { margin: 0; font-size: 12px; line-height: 1.4; color: var(--pb-muted); }
@@ -136,7 +298,7 @@ body { background: #f5f5f4; }
 /* --- the field: drafting paper between the bars ---------------------------------------------------------- */
 .pb-board { position: absolute; inset: 0; }
 .pb-stage {
-  position: absolute; left: 0; right: 0; top: 44px; bottom: 28px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+  position: absolute; left: 0; right: 0; top: var(--pb-bar); bottom: 28px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
   background-color: var(--pb-ground);
 }
 /* What lies under the board (Canvas › Background): a layer of repeating images that Board.tsx sizes to the zoom and
@@ -160,46 +322,54 @@ body { background: #f5f5f4; }
     linear-gradient(-45deg, transparent calc(50% - 0.75px), var(--pb-mat-diag) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
     linear-gradient(to right, var(--pb-mat-line) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-mat-line) 1px, transparent 1px);
 }
-/* On a mat shown strongly the ground is dark: lines keep their colours but lighten, and faint text turns pale. */
+/* On a mat shown strongly the ground is dark: lines keep their colours and their strokes but lighten. Only the drawn
+   line takes them, never its wide hit twin (path.hit), which stays invisible. A group is still paper on the mat: its
+   head goes opaque so its name and folder read at full strength, and the words in it stay the page's. */
 .pb-stage.dark-ground .pb-link { opacity: 0.55; }
 .pb-stage.dark-ground.has-selection .pb-link { opacity: 0.25; }
-.pb-stage.dark-ground .pb-link.follows path { stroke: #aebcf0; }
+.pb-stage.dark-ground .pb-link.follows path:not(.hit) { stroke: #aebcf0; }
 .pb-stage.dark-ground .pb-link.follows rect { fill: #aebcf0; }
-.pb-stage.dark-ground .pb-link.uses path { stroke: #d6e8a8; }
+.pb-stage.dark-ground .pb-link.uses path:not(.hit) { stroke: #d6e8a8; }
 .pb-stage.dark-ground .pb-link.uses rect { fill: #d6e8a8; }
-.pb-stage.dark-ground .pb-link.made path { stroke: #f2b39f; }
+.pb-stage.dark-ground .pb-link.made path:not(.hit) { stroke: #f2b39f; }
 .pb-stage.dark-ground .pb-link.made rect { fill: #f2b39f; }
 .pb-stage.dark-ground .pb-link.picked path:not(.hit) { stroke: #fff; }
 .pb-stage.dark-ground .pb-link.picked rect { fill: #fff; }
-.pb-stage.dark-ground .pb-group-empty { color: rgb(255 255 255 / 0.7); }
+.pb-stage.dark-ground .pb-group-head { background: var(--pb-paper); }
+.pb-stage.dark-ground .pb-group-empty { color: var(--pb-text); }
 .pb-stage.panning { cursor: grabbing; }
 .pb-stage.hand, .pb-stage.hand .pb-card, .pb-stage.hand .pb-group-head, .pb-stage.hand .pb-group-resize { cursor: grab; }
 .pb-stage.panning .pb-card, .pb-stage.panning .pb-group-head, .pb-stage.hand.panning, .pb-stage.hand.panning .pb-card { cursor: grabbing; }
 .pb-stage.grouping, .pb-stage.grouping .pb-card, .pb-stage.grouping .pb-group-head { cursor: crosshair; }
-.pb-marquee { position: absolute; z-index: 3; border: 1px dashed var(--pb-accent); background: rgb(73 84 114 / 0.08); pointer-events: none; }
+/* The region a drag is drawing (a new group): ink, dashed, with a 4% wash of ink so it reads on any ground. */
+.pb-marquee { position: absolute; z-index: 3; border: 1px dashed var(--pb-ink); background: color-mix(in srgb, var(--pb-ink) 4%, transparent); pointer-events: none; }
 .pb-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 
 .pb-links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .pb-link path { fill: none; stroke-width: 1px; vector-effect: non-scaling-stroke; }
-/* A wide, invisible twin of each line, so a line can be picked without aiming at a hairline. */
-.pb-link path.hit { stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
-.pb-link.picked { opacity: 1; }
-.pb-link.picked path:not(.hit) { stroke: var(--pb-ink); stroke-width: 2px; stroke-dasharray: none; }
-.pb-link.picked rect { fill: var(--pb-ink); }
+/* A wide, invisible twin of each line, so a line can be picked without aiming at a hairline. The kinds' colours and
+   dashes (below, and on the dark mat above) are written for path:not(.hit), so they never reach it. */
+.pb-links .pb-link path.hit { stroke: transparent; stroke-width: 14px; stroke-dasharray: none; pointer-events: stroke; cursor: pointer; }
 .pb-link-break {
   position: absolute; z-index: 5; height: 24px; padding: 6px 8px 2px; border: 1px solid var(--pb-ink); border-radius: 4px; background: var(--pb-paper); color: var(--pb-ink);
   font: inherit; font-size: 12px; line-height: 14px; white-space: nowrap; cursor: pointer; transform-origin: 50% 50%;
 }
-.pb-link-break:hover { background: var(--pb-ink); color: #fff; }
-/* Lines rest quiet. Pick a card and its lines are the thick ones, in their colours; every other line fades further. */
+.pb-link-break:hover { background: var(--pb-ink); color: var(--pb-paper); }
+/* Lines rest quiet. Pick a card and its lines are the thick ones, in their colours; every other line fades further.
+   Each kind has its own stroke as well as its own colour, so the three read apart without colour: follows is solid,
+   uses is dashed, made is a dash and a dot. */
 .pb-link { opacity: 0.35; transition: opacity var(--pb-fast); }
 .pb-stage.has-selection .pb-link { opacity: 0.15; }
-.pb-link.follows path { stroke: var(--pb-blue); }
+.pb-link.follows path:not(.hit) { stroke: var(--pb-blue); }
 .pb-link.follows rect { fill: var(--pb-blue); }
-.pb-link.uses path { stroke: var(--pb-green); stroke-dasharray: 4 5; }
+.pb-link.uses path:not(.hit) { stroke: var(--pb-green); stroke-dasharray: 4 5; }
 .pb-link.uses rect { fill: var(--pb-green); }
-.pb-link.made path { stroke: var(--pb-brick); }
+.pb-link.made path:not(.hit) { stroke: var(--pb-brick); stroke-dasharray: 10 3 2 3; }
 .pb-link.made rect { fill: var(--pb-brick); }
+/* A picked line is ink and solid, whatever its kind: after the kinds, at their specificity, so it wins. */
+.pb-link.picked { opacity: 1; }
+.pb-link.picked path:not(.hit) { stroke: var(--pb-ink); stroke-width: 2px; stroke-dasharray: none; }
+.pb-link.picked rect { fill: var(--pb-ink); }
 .pb-stage.has-selection .pb-link.on, .pb-link.on { opacity: 1; }
 .pb-link.on path:not(.hit) { stroke-width: 2.5px; }
 
@@ -212,10 +382,11 @@ body { background: #f5f5f4; }
 .pb-card:hover { border-color: var(--pb-ink); }
 .pb-card.on { border-color: var(--pb-ink); }
 .pb-card.lifted { z-index: 2; cursor: grabbing; border-color: var(--pb-ink); }
-.pb-card.drop { border-color: var(--pb-accent); outline: 2px solid var(--pb-accent); outline-offset: 2px; }
+/* Where a dragged picture will land: the ink edge and a 2px ink ring outside it, a change of shape, not of colour. */
+.pb-card.drop { border-color: var(--pb-ink); outline: 2px solid var(--pb-ink); outline-offset: 2px; }
 .pb-card.pb-copying { z-index: 2; border: 1px dashed var(--pb-ink); background: var(--pb-paper); pointer-events: none; }
 .pb-card.pb-copying .pb-card-head { border-bottom: 0; }
-.pb-copy-icon { flex: none; margin-right: 6px; color: var(--pb-text); }
+.pb-copy-icon { flex: none; align-self: center; margin-right: 6px; color: var(--pb-text); }
 /* Corner marks on the selection: two strips, each painting a square at either end. */
 .pb-card.on::before, .pb-card.on::after {
   content: ""; position: absolute; left: -4px; right: -4px; height: 7px; pointer-events: none;
@@ -224,22 +395,26 @@ body { background: #f5f5f4; }
 .pb-card.on::before { top: -4px; }
 .pb-card.on::after { bottom: -4px; }
 
-.pb-card-head { position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; border-bottom: 1px solid var(--pb-soft); background: var(--pb-paper); }
-.pb-card-name { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+/* The name and its mono facts share a baseline (the row aligns by baseline, the name 6 under the top); the buttons
+   stay centred. */
+.pb-card-head { position: relative; z-index: 1; flex: none; display: flex; align-items: baseline; gap: 8px; height: 28px; padding: 0 4px 0 10px; border-bottom: 1px solid var(--pb-soft); background: var(--pb-paper); }
+.pb-card-name { flex: 1; min-width: 0; margin-top: 6px; overflow: hidden; font-size: 13px; font-weight: 500; line-height: 16px; white-space: nowrap; text-overflow: ellipsis; }
 .pb-card-meta { flex: none; max-width: 55%; overflow: hidden; font-size: 11px; color: var(--pb-muted); white-space: nowrap; text-overflow: ellipsis; }
+/* Open and Delete: Enkel's icon buttons, a glyph in a 24 square, shown when the card is pointed at, picked, or has
+   the keyboard. */
 .pb-card-open {
-  flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 13px; line-height: 1;
+  flex: none; align-self: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 13px; line-height: 1;
   cursor: pointer; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast), color var(--pb-fast);
 }
-.pb-card:hover .pb-card-open, .pb-card.on .pb-card-open, .pb-card-open:focus-visible { opacity: 1; }
+.pb-card:hover .pb-card-open, .pb-card.on .pb-card-open, .pb-card:focus-within .pb-card-open, .pb-card-open:focus-visible { opacity: 1; }
 .pb-card-open:hover { background: var(--pb-row); color: var(--pb-ink); }
-/* Delete, beside Open: the same quiet button, brick when the pointer is on it. */
+/* Delete, beside Open: the same quiet button; under the pointer it says what it does in the danger colour. */
 .pb-card-x {
-  flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 15px; line-height: 1;
+  flex: none; align-self: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 16px; line-height: 1;
   cursor: pointer; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast), color var(--pb-fast);
 }
-.pb-card:hover .pb-card-x, .pb-card.on .pb-card-x, .pb-card-x:focus-visible { opacity: 1; }
-.pb-card-x:hover { background: var(--pb-brick); color: #fff; }
+.pb-card:hover .pb-card-x, .pb-card.on .pb-card-x, .pb-card:focus-within .pb-card-x, .pb-card-x:focus-visible { opacity: 1; }
+.pb-card-x:hover { background: var(--pb-danger-soft); color: var(--pb-danger); }
 
 .pb-card-body { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--pb-paper); }
 .pb-email-frame { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
@@ -257,21 +432,23 @@ body { background: #f5f5f4; }
    slides over its top edge and the frame appears. */
 .pb-picture { background: none; border-color: transparent; }
 .pb-picture .pb-card-head { position: absolute; left: -1px; right: -1px; top: -1px; border: 1px solid var(--pb-ink); border-bottom-color: var(--pb-soft); opacity: 0; transition: opacity var(--pb-fast); }
-.pb-picture:hover .pb-card-head, .pb-picture.on .pb-card-head, .pb-picture.lifted .pb-card-head { opacity: 1; }
+.pb-picture:hover .pb-card-head, .pb-picture.on .pb-card-head, .pb-picture.lifted .pb-card-head, .pb-picture:focus-within .pb-card-head { opacity: 1; }
 .pb-picture .pb-card-body { background: none; }
 .pb-picture-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .pb-picture:hover, .pb-picture.on, .pb-picture.lifted { border-color: var(--pb-ink); }
 /* The file's name under the picture, always: a board of photos is otherwise a board of anonymous thumbnails. */
 .pb-picture-name {
   position: absolute; left: 0; right: 0; top: 100%; margin-top: 5px; overflow: hidden;
-  font-family: var(--pb-mono); font-size: 10px; line-height: 12px; letter-spacing: 0; color: var(--pb-muted);
+  font-family: var(--pb-mono); font-size: 11px; line-height: 14px; letter-spacing: 0; color: var(--pb-muted);
   white-space: nowrap; text-overflow: ellipsis; pointer-events: none;
 }
 .pb-picture.on .pb-picture-name { color: var(--pb-ink); }
 
 /* A document: the kind's glyph and where it opens. */
 .pb-doc { display: flex; align-items: center; gap: 14px; height: 100%; padding: 12px 14px; }
-.pb-doc-glyph { flex: none; display: grid; place-items: center; color: var(--pb-accent); }
+/* The kind's glyph in a data colour, as the document's own app colours it (Docs blue, Sheets green, Slides amber);
+   the glyph's shape says the kind too. Never the action colour. */
+.pb-doc-glyph { flex: none; display: grid; place-items: center; color: var(--pb-blue); }
 .pb-doc-glyph.sheet { color: var(--pb-green); }
 .pb-doc-glyph.slides { color: var(--pb-amber); }
 .pb-doc-glyph.link, .pb-doc-glyph.drawing, .pb-doc-glyph.form { color: var(--pb-muted); }
@@ -284,64 +461,72 @@ body { background: #f5f5f4; }
 .pb-missing .pb-card-body { background: none; }
 .pb-card-note { padding: 10px 12px; font-size: 12px; line-height: 1.45; color: var(--pb-muted); }
 .pb-card-note p { margin: 0 0 8px; }
-.pb-link-btn { padding: 0; border: 0; background: none; color: var(--pb-accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.pb-link-btn { padding: 0; border: 0; background: none; color: var(--pb-muted); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-link-btn:hover { color: var(--pb-ink); }
-.pb-link-btn:disabled { color: var(--pb-faint); text-decoration: none; cursor: default; }
+.pb-link-btn:disabled { color: var(--pb-disabled-text); text-decoration: none; cursor: default; }
 
 /* --- groups: named regions, each a folder under assets/ ------------------------------------------------------ */
 .pb-group {
-  position: absolute; background: rgb(255 255 255 / 0.55); border: 1px solid var(--pb-card-border);
+  position: absolute; background: var(--pb-group-fill); border: 1px solid var(--pb-card-border);
   transition: background-color var(--pb-fast), border-color var(--pb-fast);
 }
-.pb-group.drop { background: var(--pb-accent-soft); border-color: var(--pb-accent); }
+/* Where dropped pictures will be filed: the selection surface inside an ink edge and a 2px ink ring, as a card. */
+.pb-group.drop { background: var(--pb-selected); border-color: var(--pb-ink); outline: 2px solid var(--pb-ink); outline-offset: 2px; }
 .pb-group.lifted { border-color: var(--pb-ink); }
+/* The name and its mono folder share a baseline, the name 8 under the top; the field that renames it sits where the
+   name's words were, and Remove stays centred. */
 .pb-group-head {
-  position: absolute; left: 0; right: 0; top: 0; height: 32px; display: flex; align-items: center; gap: 10px;
+  position: absolute; left: 0; right: 0; top: 0; height: 32px; display: flex; align-items: baseline; gap: 10px;
   padding: 0 6px 0 12px; border-bottom: 1px solid var(--pb-soft); cursor: grab; user-select: none;
 }
 .pb-group.lifted .pb-group-head { cursor: grabbing; }
-.pb-group-name { flex: none; max-width: 60%; overflow: hidden; font-size: 13px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.pb-group-name { flex: none; max-width: 60%; margin-top: 8px; overflow: hidden; font-size: 13px; font-weight: 500; line-height: 16px; white-space: nowrap; text-overflow: ellipsis; }
 .pb-group-folder { flex: 1; min-width: 0; overflow: hidden; font-size: 11px; color: var(--pb-muted); white-space: nowrap; text-overflow: ellipsis; }
 .pb-group-input {
-  flex: none; width: 55%; height: 24px; padding: 0 4px; border: 0; border-bottom: 2px solid var(--pb-ink); border-radius: 0; outline: none; background: var(--pb-paper);
+  flex: none; width: 55%; height: 24px; margin-top: 4px; padding: 0 4px; border: 0; border-bottom: 2px solid var(--pb-ink); border-radius: 0; outline: none; background: var(--pb-paper);
   font: inherit; font-size: 13px; font-weight: 500; color: var(--pb-ink);
 }
+/* Remove: Enkel's 24, 1 + 6 / 14 / 2 + 1, an edge only when it asks to be sure. */
 .pb-group-x {
-  flex: none; height: 22px; padding: 5px 6px 1px; border: 0; border-radius: 4px; background: none; color: var(--pb-muted); font: inherit; font-size: 12px; line-height: 14px;
-  cursor: pointer; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast), color var(--pb-fast);
+  flex: none; align-self: center; height: 24px; padding: 6px 8px 2px; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--pb-muted); font: inherit; font-size: 12px; line-height: 14px;
+  cursor: pointer; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast), border-color var(--pb-fast), color var(--pb-fast);
 }
-.pb-group:hover .pb-group-x, .pb-group-x.confirm, .pb-group-x:focus-visible { opacity: 1; }
+.pb-group:hover .pb-group-x, .pb-group:focus-within .pb-group-x, .pb-group-x.confirm, .pb-group-x:focus-visible { opacity: 1; }
 .pb-group-x:hover { background: var(--pb-row); color: var(--pb-ink); }
-.pb-group-x.confirm { background: var(--pb-brick); color: #fff; }
-.pb-group-empty { position: absolute; left: 12px; right: 12px; top: 44px; font-size: 12px; color: var(--pb-faint); pointer-events: none; }
+.pb-group-x.confirm, .pb-group-x.confirm:hover { background: var(--pb-danger-soft); border-color: var(--pb-danger); color: var(--pb-danger); }
+.pb-group-empty { position: absolute; left: 12px; right: 12px; top: 44px; font-size: 12px; color: var(--pb-muted); pointer-events: none; }
 .pb-group-resize { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 1px solid var(--pb-card-border); border-left: 0; border-top: 0; background: var(--pb-paper); cursor: nwse-resize; }
 .pb-group:hover .pb-group-resize { border-color: var(--pb-ink); }
 
 /* --- notes: an editor's words on a paper colour, beside the thing they are about (notes.tsx) ---------------- */
+/* Flat, like every card: one hairline, no shadow. Lifted, it takes the ink edge a card takes, and comes to the top. */
 .pb-note {
   position: absolute; z-index: 3; display: flex; flex-direction: column; min-height: 56px; padding: 0 0 10px;
-  border: 1px solid rgb(0 0 0 / 0.14); box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 6px 14px -10px rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(0 0 0 / 0.14);
   color: #26261f; font-size: 13px; line-height: 1.4; cursor: grab; user-select: none;
-  transition: border-color var(--pb-fast), box-shadow var(--pb-fast);
+  transition: border-color var(--pb-fast);
 }
 .pb-note:hover { border-color: rgb(0 0 0 / 0.35); }
 .pb-note.on { border-color: var(--pb-ink); }
-.pb-note.lifted { z-index: 4; cursor: grabbing; box-shadow: 0 2px 4px rgb(0 0 0 / 0.12), 0 14px 28px -12px rgb(0 0 0 / 0.45); }
+.pb-note.lifted { z-index: 4; cursor: grabbing; border-color: var(--pb-ink); }
 .pb-note.editing { cursor: text; user-select: text; }
 .pb-note.editing .pb-note-head { cursor: grab; }
 /* Resolved: the paper greys and the words step back, still legible, plainly done with. */
 .pb-note.resolved { filter: saturate(0.25); opacity: 0.72; }
 .pb-note.resolved .pb-note-body { color: rgb(0 0 0 / 0.55); }
 .pb-note.resolved.on, .pb-note.resolved:hover { opacity: 1; }
-.pb-note-check { width: 16px; height: 16px; margin-left: 2px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 50%; background: rgb(255 255 255 / 0.6); color: rgb(0 0 0 / 0.55); font-size: 10px; line-height: 1; cursor: pointer; }
+/* Resolve: a check, so a square (Enkel's 14), filled ink with a paper tick when done. */
+.pb-note-check { position: relative; display: inline-grid; place-items: center; width: 14px; height: 14px; margin: 0 5px; padding: 0; border: 1px solid rgb(0 0 0 / 0.62); border-radius: 0; background: rgb(255 255 255 / 0.6); color: rgb(0 0 0 / 0.62); font-size: 11px; line-height: 1; cursor: pointer; }
 .pb-note-check:hover { border-color: var(--pb-ink); color: var(--pb-ink); }
-.pb-note-check.on { background: var(--pb-ink); border-color: var(--pb-ink); color: #fff; }
-.pb-note-head { display: flex; align-items: center; justify-content: space-between; height: 24px; padding: 0 5px 0 12px; }
-.pb-note-when { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; font-family: var(--pb-mono); font-size: 10px; letter-spacing: 0; color: rgb(0 0 0 / 0.5); white-space: nowrap; text-overflow: ellipsis; }
-/* What the colour says, in a word: Idea, Go, Stop. */
-.pb-note-kind { font-family: inherit; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(0 0 0 / 0.7); }
+.pb-note-check.on { background: var(--pb-ink); border-color: var(--pb-ink); color: var(--pb-paper); }
+/* The note's chrome words (its age, a reply's time, Reply, Delete note, the section it is on) are black at 62% on
+   the paper: 4.5:1 or better on all four papers, the pinkest included. */
+.pb-note-head { display: flex; align-items: center; justify-content: space-between; height: 24px; padding: 0 0 0 12px; }
+.pb-note-when { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; font-family: var(--pb-mono); font-size: 11px; letter-spacing: 0; color: rgb(0 0 0 / 0.62); white-space: nowrap; text-overflow: ellipsis; }
+/* What the colour says, in a word: Idea, Go, Stop. An 11px uppercase kicker, in the sans. */
+.pb-note-kind { font-family: var(--pb-sans); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(0 0 0 / 0.7); }
 /* Which part of the email the note is about: a row, and a list under it that outlines each section as the pointer passes. */
-.pb-note-part { position: relative; margin: 0 12px 6px; font-size: 11px; color: rgb(0 0 0 / 0.55); }
+.pb-note-part { position: relative; margin: 0 12px 6px; font-size: 12px; color: rgb(0 0 0 / 0.62); }
 .pb-note-part-btn { display: flex; align-items: center; gap: 5px; width: 100%; padding: 2px 0; border: 0; border-bottom: 1px solid rgb(0 0 0 / 0.2); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .pb-note-part-btn:disabled { cursor: default; }
 .pb-note-part-btn:not(:disabled):hover { border-bottom-color: rgb(0 0 0 / 0.5); color: rgb(0 0 0 / 0.8); }
@@ -349,44 +534,53 @@ body { background: #f5f5f4; }
 .pb-note-part-value { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: rgb(0 0 0 / 0.78); }
 .pb-note-part-caret { flex: none; width: 6px; height: 6px; margin-right: 2px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: translateY(-2px) rotate(45deg); }
 .pb-note-parts { position: absolute; left: -12px; right: -12px; top: calc(100% + 2px); z-index: 6; margin: 0; padding: 4px 0; list-style: none; max-height: 220px; overflow-y: auto; background: var(--pb-paper); border: 1px solid var(--pb-hairline); }
-.pb-note-part-option { display: block; width: 100%; padding: 5px 12px; border: 0; background: none; color: var(--pb-text); font: inherit; font-size: 11.5px; line-height: 1.35; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-note-part-option { display: block; width: 100%; padding: 5px 12px; border: 0; background: none; color: var(--pb-text); font: inherit; font-size: 12px; line-height: 16px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pb-note-part-option:hover { background: var(--pb-row); color: var(--pb-ink); }
 .pb-note-part-option.on { color: var(--pb-ink); font-weight: 500; }
-/* The section a picked note is about, marked on its email. */
-.pb-part { position: absolute; z-index: 2; border: 2px solid var(--pb-ink); background: rgb(13 13 13 / 0.04); pointer-events: none; }
+/* The section a picked note is about, marked on its email. It is drawn on the email itself, which is the email's own
+   colours in either theme, so the mark is the light theme's ink with a paper ring outside it: it shows on a pale
+   section and on a dark one. */
+.pb-part { position: absolute; z-index: 2; border: 2px solid #0d0d0d; background: rgb(13 13 13 / 0.04); box-shadow: 0 0 0 1px #ffffff; pointer-events: none; }
 .pb-part.preview { border-style: dashed; }
 .pb-tether-drag { stroke: var(--pb-ink); stroke-dasharray: 4 3; }
-/* The pin: a dot at the note's left edge, taken hold of and dragged to a card or a section. */
+/* The pin: a handle at the note's left edge, taken hold of and dragged to a card or a section. An indicator, so a
+   filled 8px square, not a box you could tick: muted while the note is loose, ink once it is pinned, ink under the
+   pointer. The handle is 16 square around it, so there is something to take hold of; it does not grow. */
 .pb-note-pin {
-  position: absolute; left: -7px; top: 9px; z-index: 1; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--pb-paper); border: 1.5px solid rgb(0 0 0 / 0.45); cursor: crosshair; opacity: 0; transition: opacity var(--pb-fast), transform var(--pb-fast);
+  position: absolute; left: -9px; top: 7px; z-index: 1; width: 16px; height: 16px; padding: 4px; border: 0; border-radius: 0;
+  background: var(--pb-muted); background-clip: content-box; cursor: crosshair; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast);
 }
-.pb-note-pin.pinned { background: var(--pb-ink); border-color: var(--pb-ink); }
-.pb-note:hover .pb-note-pin, .pb-note.on .pb-note-pin { opacity: 1; }
-.pb-note-pin:hover { transform: scale(1.25); }
-.pb-note-tools { flex: none; display: inline-flex; align-items: center; gap: 4px; opacity: 0; transition: opacity var(--pb-fast); }
-.pb-note:hover .pb-note-tools, .pb-note.on .pb-note-tools { opacity: 1; }
-.pb-note-swatch { width: 11px; height: 11px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 50%; cursor: pointer; }
-.pb-note-swatch.on { border-color: var(--pb-ink); box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.9); }
+.pb-note-pin.pinned, .pb-note-pin:hover { background-color: var(--pb-ink); }
+.pb-note:hover .pb-note-pin, .pb-note.on .pb-note-pin, .pb-note:focus-within .pb-note-pin { opacity: 1; }
+/* The kind swatches and Resolve: shown while the note is pointed at, picked, or has the keyboard anywhere in it. Each
+   is drawn at its own size (a 12 swatch, the 14 check) in a 24 slot, and each takes the pointer across the whole slot
+   (the ::before), so the targets are 24 square, 24 apart, and never overlap. */
+.pb-note-tools { flex: none; display: inline-flex; align-items: center; gap: 0; opacity: 0; transition: opacity var(--pb-fast); }
+.pb-note:hover .pb-note-tools, .pb-note.on .pb-note-tools, .pb-note:focus-within .pb-note-tools { opacity: 1; }
+.pb-note-swatch { position: relative; width: 12px; height: 12px; margin: 0 6px; padding: 0; border: 1px solid rgb(0 0 0 / 0.3); border-radius: 0; cursor: pointer; }
+.pb-note-swatch::before { content: ""; position: absolute; inset: -7px; }
+.pb-note-check::before { content: ""; position: absolute; inset: -6px; }
+.pb-note-swatch:hover { border-color: var(--pb-ink); }
+.pb-note-swatch.on { border-color: var(--pb-ink); box-shadow: inset 0 0 0 2px var(--pb-paper); }
 /* The foot: Reply at the left, Delete at the right, both quiet words. */
 .pb-note-foot { display: flex; align-items: center; justify-content: space-between; margin: 7px 12px 0; }
-.pb-note-verb { padding: 0; border: 0; background: none; color: rgb(0 0 0 / 0.5); font: inherit; font-size: 11px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.pb-note-verb { padding: 0; border: 0; background: none; color: rgb(0 0 0 / 0.62); font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-note-verb:hover { color: var(--pb-ink); }
-.pb-note-verb-delete:hover { color: var(--pb-brick); }
+.pb-note-verb-delete:hover { color: var(--pb-danger); }
 /* The thread under the words, each reply a small block; the field to add one; and the quiet verb that opens it. */
 .pb-note-replies { display: grid; gap: 4px; margin: 6px 8px 0; padding-top: 6px; border-top: 1px solid rgb(0 0 0 / 0.12); }
-.pb-note-reply { position: relative; display: grid; gap: 1px; padding: 5px 24px 5px 7px; background: rgb(255 255 255 / 0.45); border-radius: 2px; font-size: 12px; line-height: 1.35; }
-.pb-note-reply-when { font-family: var(--pb-mono); font-size: 9.5px; letter-spacing: 0; color: rgb(0 0 0 / 0.45); }
+.pb-note-reply { position: relative; display: grid; gap: 1px; padding: 5px 28px 5px 7px; background: rgb(255 255 255 / 0.45); font-size: 12px; line-height: 1.35; }
+.pb-note-reply-when { font-family: var(--pb-mono); font-size: 11px; letter-spacing: 0; color: rgb(0 0 0 / 0.62); }
 .pb-note-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.pb-note-reply-x { position: absolute; right: 3px; top: 4px; display: inline-flex; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: none; color: rgb(0 0 0 / 0.45); cursor: pointer; opacity: 0; align-items: center; justify-content: center; }
-.pb-note-reply:hover .pb-note-reply-x { opacity: 1; }
-.pb-note-reply-x:hover { background: var(--pb-brick); color: #fff; }
+.pb-note-reply-x { position: absolute; right: 2px; top: 2px; display: inline-flex; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: none; color: rgb(0 0 0 / 0.62); cursor: pointer; opacity: 0; align-items: center; justify-content: center; }
+.pb-note-reply:hover .pb-note-reply-x, .pb-note-reply:focus-within .pb-note-reply-x, .pb-note-reply-x:focus-visible { opacity: 1; }
+.pb-note-reply-x:hover { background: var(--pb-danger-soft); color: var(--pb-danger); }
 .pb-note-reply-x .pb-glyph { margin-top: 0; }
-.pb-note-reply-field { display: block; width: 100%; padding: 5px 7px; border: 1px solid rgb(0 0 0 / 0.2); border-radius: 2px; outline: none; resize: none; background: rgb(255 255 255 / 0.7); color: inherit; font: inherit; font-size: 12px; line-height: 1.35; }
+.pb-note-reply-field { display: block; width: 100%; padding: 5px 7px; border: 1px solid rgb(0 0 0 / 0.2); border-radius: 4px; outline: none; resize: none; background: rgb(255 255 255 / 0.7); color: inherit; font: inherit; font-size: 12px; line-height: 1.35; }
 .pb-note-reply-field:focus { border-color: var(--pb-ink); }
 
 .pb-note-body, .pb-note-text { display: block; margin: 0; padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pb-note-body.empty { color: rgb(0 0 0 / 0.42); font-style: italic; }
+.pb-note-body.empty { color: rgb(0 0 0 / 0.62); font-style: italic; }
 .pb-note-text { width: 100%; min-height: 40px; border: 0; outline: none; resize: none; background: none; color: inherit; font: inherit; line-height: inherit; }
 /* The field is the note: no ring around the words while they are written. The board's focus ring stays for everything else. */
 .pb-app .pb-note-text:focus-visible, .pb-app .pb-note-reply-field:focus-visible { outline: none; }
@@ -394,16 +588,17 @@ body { background: #f5f5f4; }
 .pb-stage.dark-ground .pb-tether { stroke: rgb(255 255 255 / 0.6); }
 
 /* --- the keys sheet: paper, one hairline, mono for the keys ------------------------------------------------ */
-.pb-keys-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / 0.18); }
+.pb-keys-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: var(--pb-scrim); }
 .pb-keys { width: 460px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px); overflow-y: auto; padding: 0 0 6px; background: var(--pb-paper); border: 1px solid var(--pb-hairline); color: var(--pb-text); }
 .pb-keys header { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--pb-soft); }
 .pb-keys header b { font-size: 13px; font-weight: 500; color: var(--pb-ink); }
-.pb-keys table { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.4; }
+.pb-keys table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.4; }
 .pb-keys td { padding: 6px 14px; vertical-align: top; border-top: 1px solid var(--pb-row); }
 .pb-keys tr:first-child td { border-top: 0; }
 .pb-keys td:first-child { width: 120px; white-space: nowrap; color: var(--pb-ink); }
-.pb-keys kbd { font-family: var(--pb-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--pb-soft); background: var(--pb-row); }
-.pb-keys-or { color: var(--pb-faint); }
+/* Enkel's kbd: a small well, 4 on the corners like any label. */
+.pb-keys kbd { display: inline-block; min-width: 18px; padding: 2px 5px 0; border: 1px solid var(--pb-card-border); border-radius: 4px; background: var(--pb-field); color: var(--pb-text); font-family: var(--pb-mono); font-size: 11px; line-height: 14px; text-align: center; }
+.pb-keys-or { color: var(--pb-muted); }
 
 /* Where this page puts the shared can (app/Trash.tsx): the lower right of the canvas, clear of the status line.
    Only the placing is the board's; the drawing, the count and the shake are the same everywhere. */
@@ -412,8 +607,8 @@ body { background: #f5f5f4; }
 
 /* --- notices --------------------------------------------------------------------------------------------- */
 .pb-notice, .pb-toast {
-  position: fixed; left: 50%; top: 56px; z-index: 80; max-width: min(620px, calc(100% - 32px)); padding: 9px 14px 7px; transform: translateX(-50%);
-  background: var(--pb-ink); color: #fff; font-size: 13px; line-height: 16px; text-align: center; pointer-events: none;
+  position: fixed; left: 50%; top: calc(var(--pb-bar) + 12px); z-index: 80; max-width: min(620px, calc(100% - 32px)); padding: 10px 16px 6px; transform: translateX(-50%);
+  background: var(--pb-ink); color: var(--pb-paper); font-size: 13px; line-height: 16px; text-align: center; pointer-events: none;
 }
 .pb-empty {
   position: absolute; left: 50%; top: 50%; z-index: 4; display: grid; gap: 6px; max-width: 360px; padding: 16px 18px; transform: translate(-50%, -50%);
@@ -428,19 +623,24 @@ body { background: #f5f5f4; }
 .pb-welcome-intro { display: flex; flex-direction: column; gap: 16px; padding: 40px 32px 32px; border-right: 1px solid var(--pb-soft); }
 .pb-welcome-aside { display: flex; flex-direction: column; padding: 0; }
 .pb-eyebrow { margin: 0; font-size: 12px; letter-spacing: 0.02em; color: var(--pb-muted); }
-.pb-welcome h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; letter-spacing: -0.01em; font-weight: 400; }
+/* Enkel's display size, tracked as everything is (0.011em, never tighter); a step down to the section heading on a
+   narrow window rather than a size between steps. */
+.pb-welcome h1 { margin: 0; font-size: 40px; line-height: 1.05; letter-spacing: 0.011em; font-weight: 400; }
 .pb-lede { margin: 0; max-width: 52ch; font-size: 14px; line-height: 1.55; color: var(--pb-text); }
 .pb-foot { margin: 0; max-width: 52ch; font-size: 12px; line-height: 1.5; color: var(--pb-muted); }
 .pb-actions-row { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Enkel's 36: 1 + 11 / 16 / 7 + 1, radius 6. Filled slate iris for the one that finishes the job, outline on the
+   control edge for the rest. */
 .pb-primary, .pb-secondary {
-  display: inline-flex; align-items: center; height: 36px; padding: 11px 16px 7px; border: 1px solid var(--pb-accent); border-radius: 6px; background: var(--pb-accent); color: #fff;
+  display: inline-flex; align-items: center; height: 36px; padding: 11px 16px 7px; border: 1px solid var(--pb-accent); border-radius: 6px; background: var(--pb-accent); color: var(--pb-on-accent);
   font-size: 14px; line-height: 16px; cursor: pointer; transition: background-color var(--pb-fast), border-color var(--pb-fast), color var(--pb-fast);
 }
 .pb-primary:hover { background: var(--pb-accent-hover); border-color: var(--pb-accent-hover); }
-.pb-secondary { background: none; border-color: var(--pb-hairline); color: var(--pb-ink); }
-.pb-secondary:hover { background: var(--pb-row); }
-.pb-primary:disabled, .pb-secondary:disabled { opacity: 0.5; cursor: default; }
-.pb-warn { margin: 0; padding: 10px 12px; border-left: 2px solid var(--pb-amber); background: var(--pb-ground); color: var(--pb-text); font-size: 13px; line-height: 1.45; }
+.pb-secondary { background: none; border-color: var(--pb-control-edge); color: var(--pb-ink); }
+.pb-secondary:hover { background: var(--pb-row); border-color: var(--pb-muted); }
+.pb-primary:disabled, .pb-primary:disabled:hover { background: var(--pb-disabled-surface); border-color: var(--pb-disabled-surface); color: var(--pb-disabled-text); cursor: default; }
+.pb-secondary:disabled, .pb-secondary:disabled:hover { background: none; border-color: var(--pb-soft); color: var(--pb-disabled-text); cursor: default; }
+.pb-warn { margin: 0; padding: 10px 12px; border-left: 2px solid var(--pb-risk); background: var(--pb-ground); color: var(--pb-text); font-size: 13px; line-height: 1.45; }
 .pb-section-head { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 20px; border-bottom: 1px solid var(--pb-soft); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pb-muted); }
 .pb-section-head .pb-grow { flex: 1; }
 .pb-section-head .pb-hint { font-size: 12px; letter-spacing: 0.011em; text-transform: none; }
@@ -453,17 +653,18 @@ body { background: #f5f5f4; }
 @media (max-width: 820px) {
   .pb-welcome-page { grid-template-columns: minmax(0, 1fr); }
   .pb-welcome-intro { border-right: 0; border-bottom: 1px solid var(--pb-soft); }
+  .pb-welcome h1 { font-size: 24px; line-height: 1.15; }
 }
 
 /* --- Create a project (CreateProject.tsx) ------------------------------------------------------------------ */
-.cp-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: rgb(13 13 13 / 0.32); }
+.cp-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: var(--pb-scrim); }
 .cp-sheet {
   display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(880px, 100%); max-height: calc(100vh - 48px); overflow: hidden; color: var(--pb-ink); background: var(--pb-paper); border: 1px solid var(--pb-hairline);
 }
 .cp-head { grid-column: 1 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 16px; border-bottom: 1px solid var(--pb-hairline); }
 .cp-head .pb-eyebrow { margin-bottom: 6px; }
-.cp-head h2 { margin: 0; font-size: 24px; line-height: 1.1; letter-spacing: -0.005em; font-weight: 400; }
+.cp-head h2 { margin: 0; font-size: 24px; line-height: 1.15; letter-spacing: 0.011em; font-weight: 400; }
 .cp-close { flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--pb-muted); font-size: 13px; cursor: pointer; }
 .cp-close:hover { background: var(--pb-row); color: var(--pb-ink); }
 
@@ -473,7 +674,8 @@ body { background: #f5f5f4; }
   background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--pb-fast);
 }
 .cp-type:hover { background: var(--pb-row); }
-.cp-type.on { background: var(--pb-row); }
+/* The chosen type: the selection surface and a 2px ink marker down its left edge, so it differs from hover in shape. */
+.cp-type.on, .cp-type.on:hover { background: var(--pb-selected); }
 .cp-type.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 2px; background: var(--pb-ink); }
 .cp-type b { font-size: 14px; font-weight: 500; }
 .cp-type-blurb { grid-column: 2; font-size: 12px; line-height: 1.35; color: var(--pb-muted); }
@@ -483,12 +685,15 @@ body { background: #f5f5f4; }
 .cp-detail { display: grid; align-content: start; gap: 20px; min-height: 0; padding: 20px 24px; overflow-y: auto; }
 .cp-block { display: grid; gap: 8px; }
 .cp-label { display: grid; gap: 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pb-muted); }
+/* The name: a hairline field at 18 (Enkel's panel-title size), 36 tall as Enkel's large controls are: 9 (8, and the 1 a
+   box would spend on its top edge) / 22 / 4 + 1. */
 .cp-name {
-  width: 100%; height: 40px; padding: 11px 0 5px; border: 0; border-bottom: 1px solid var(--pb-soft); border-radius: 0; outline: none; background: none;
-  color: var(--pb-ink); font: inherit; font-size: 20px; line-height: 22px; letter-spacing: 0; text-transform: none; transition: border-color var(--pb-fast);
+  width: 100%; height: 36px; padding: 9px 0 4px; border: 0; border-bottom: 1px solid var(--pb-card-border); border-radius: 0; outline: none; background: none;
+  color: var(--pb-ink); font: inherit; font-size: 18px; line-height: 22px; letter-spacing: 0.011em; text-transform: none; transition: border-color var(--pb-fast);
 }
-.cp-name::placeholder { color: var(--pb-faint); }
-.cp-name:focus { border-bottom: 2px solid var(--pb-ink); padding-bottom: 4px; }
+.cp-name:hover { border-bottom-color: var(--pb-control-edge); }
+.cp-name::placeholder { color: var(--pb-muted); }
+.cp-name:focus { border-bottom: 2px solid var(--pb-ink); padding-bottom: 3px; }
 
 .cp-sizes {
   display: flex; align-items: flex-end; gap: 18px; min-height: 108px; padding: 16px 16px 12px; overflow-x: auto; border: 1px solid var(--pb-soft);
@@ -499,7 +704,7 @@ body { background: #f5f5f4; }
 .cp-size i { display: block; margin-bottom: 6px; background: var(--pb-paper); border: 1px solid var(--pb-card-border); }
 .cp-size.email i { padding: 7px 5px; }
 .cp-size.email s { display: block; height: 4px; margin-bottom: 4px; background: var(--pb-soft); text-decoration: none; }
-.cp-size.email s:first-child { height: 10px; background: var(--pb-accent); }
+.cp-size.email s:first-child { height: 10px; background: var(--pb-muted); }
 .cp-size b { overflow: hidden; max-width: 120px; font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
 .cp-size small { font-family: var(--pb-mono); font-size: 11px; letter-spacing: 0; color: var(--pb-muted); }
 .cp-nothing { align-self: center; margin: 0 auto; font-size: 13px; color: var(--pb-muted); }
@@ -516,9 +721,9 @@ body { background: #f5f5f4; }
 .cp-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 14px 24px 16px; border-top: 1px solid var(--pb-hairline); }
 .cp-hint { flex: 1; margin: 0; font-size: 12px; line-height: 1.45; color: var(--pb-muted); }
 .cp-hint b { color: var(--pb-ink); font-weight: 500; }
-.cp-error { flex: 1; margin: 0; padding: 8px 10px; border-left: 2px solid var(--pb-brick); background: var(--pb-ground); color: var(--pb-text); font-size: 13px; line-height: 1.4; }
+.cp-error { flex: 1; margin: 0; padding: 8px 10px; border-left: 2px solid var(--pb-danger); background: var(--pb-ground); color: var(--pb-text); font-size: 13px; line-height: 1.4; }
 .cp-foot .pb-primary, .cp-foot .pb-secondary { flex: none; }
-.cp-foot button:disabled { cursor: progress; }
+.cp-foot button:disabled, .cp-foot button:disabled:hover { cursor: progress; }
 
 @media (max-width: 760px) {
   .cp-sheet { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
@@ -528,3 +733,67 @@ body { background: #f5f5f4; }
   .cp-hint, .cp-error { flex-basis: 100%; }
 }
 
+
+/* --- what app.css draws on these pages ---------------------------------------------------------------------------
+   The trash (app/Trash.tsx) and the Canvas menu (app/CanvasMenu.tsx) are app.css's, written against its own variables.
+   On these pages they read the board's: the custom properties inherit, so they take the board's theme, light or dark.
+   app.css's accent (a blue) is ink here: slate iris fills the one button that finishes a job, never a link, a slider
+   or a segment. Then the parts Enkel does not allow are put right: a pill count, a 9px corner, a lid that overshoots,
+   a sheet with a shadow and its own navy scrim, sizes between the steps, a faded can, native round sliders. */
+.pb-app {
+  --paper: var(--pb-ground); --panel: var(--pb-paper); --sunk: var(--pb-ground); --ink: var(--pb-ink); --muted: var(--pb-muted); --faint: var(--pb-faint);
+  --line: var(--pb-card-border); --line-soft: var(--pb-soft); --accent: var(--pb-ink); --radius: 4px; --mono: var(--pb-mono);
+  --fig-surface: var(--pb-paper); --fig-ink: var(--pb-ink); --fig-ink-2: var(--pb-text); --fig-muted: var(--pb-muted); --fig-faint: var(--pb-faint);
+  --fig-hover: var(--pb-row); --fig-line: var(--pb-soft); --fig-accent: var(--pb-ink);
+}
+
+/* The can. Empty, it is still a button (it opens Recently deleted), so it stays at full strength in the muted ink:
+   the count on it is what says something is inside. On the mat it stands on paper with a card's edge. */
+.pb-app .sy-can { border-radius: 4px; }
+.pb-app .sy-can.empty { opacity: 1; }
+.pb-stage.dark-ground ~ .pb-can-at, .pb-stage.dark-ground ~ .pb-can-at.empty { background: var(--pb-paper); border-color: var(--pb-card-border); }
+.pb-app .sy-can-lid { transition: transform var(--pb-fast); }
+@media (prefers-reduced-motion: reduce) { .pb-app .sy-can-lid { transition: none; } }
+/* The count is an indicator, so a square; 11 in the mono, the smallest size the scale has. */
+.pb-app .sy-can-count, .pb-app .folder-can .sy-can-count { border-radius: 0; font-family: var(--pb-mono); font-size: 11px; }
+
+/* Recently deleted: paper, one hairline, square, on Enkel's scrim. */
+.pb-app .sy-sheet-backdrop { background: var(--pb-scrim); }
+.pb-app .sy-sheet { border-color: var(--pb-hairline); border-radius: 0; box-shadow: none; }
+.pb-app .sy-sheet-done { border-radius: 4px; }
+.pb-app .sy-trash-none { font-size: 13px; }
+/* Facts are text: muted holds 4.5:1, faint does not. */
+.pb-app .sy-trash-facts { font-family: var(--pb-mono); font-size: 11px; color: var(--pb-muted); }
+.pb-app .sy-trash-foot { font-size: 12px; }
+.pb-app .sy-trash-empty, .pb-app .cv-reset { color: var(--pb-muted); }
+.pb-app .sy-trash-empty:hover:not(:disabled), .pb-app .cv-reset:hover:not(:disabled) { color: var(--pb-ink); }
+.pb-app .sy-trash-empty:disabled, .pb-app .cv-reset:disabled { color: var(--pb-disabled-text); }
+
+/* The Canvas menu, in tools.css's controls: a paper popover on the structure hairline; a segment is a soft well with
+   the pick filled ink (28 = 1 + 2 + 22 + 2 + 1); a switch is a square knob in a square track, ink and to the right
+   when on; a slider is a hairline track and a square thumb with no fill, the figure beside it saying the value. */
+.pb-app .cv-pop { width: 360px; border-color: var(--pb-hairline); font-family: var(--pb-sans); }
+.pb-app .cv-value { font-family: var(--pb-mono); color: var(--pb-text); }
+.pb-app .cv-seg { gap: 2px; padding: 2px; border: 1px solid var(--pb-card-border); border-radius: 4px; background: var(--pb-field); }
+.pb-app .cv-seg button { height: 22px; padding: 6px 8px 2px; border: 0; border-radius: 2px; color: var(--pb-muted); font-size: 12px; line-height: 14px; white-space: nowrap; transition: background-color var(--pb-fast), color var(--pb-fast); }
+.pb-app .cv-seg button + button { border-left: 0; }
+.pb-app .cv-seg button:hover { color: var(--pb-ink); }
+.pb-app .cv-seg button.on { background: var(--pb-ink); color: var(--pb-paper); cursor: default; }
+.pb-app .cv-seg button:focus-visible { outline-offset: 1px; }
+.pb-app .cv-check { width: 26px; height: 14px; border: 1px solid var(--pb-muted); border-radius: 0; background: var(--pb-field); transition: background-color var(--pb-fast), border-color var(--pb-fast); }
+.pb-app .cv-check::after { left: 2px; top: 2px; width: 8px; height: 8px; background: var(--pb-muted); }
+.pb-app .cv-check:checked { background: var(--pb-ink); border-color: var(--pb-ink); }
+.pb-app .cv-check:checked::after { transform: translateX(12px); background: var(--pb-paper); }
+.pb-app .cv-range { -webkit-appearance: none; appearance: none; height: 16px; padding: 0; border-radius: 0; background: transparent; accent-color: auto; }
+.pb-app .cv-range::-webkit-slider-runnable-track { height: 2px; border: 0; background: var(--pb-track); }
+.pb-app .cv-range::-moz-range-track { height: 2px; border: 0; background: var(--pb-track); }
+.pb-app .cv-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 12px; height: 12px; margin-top: -5px; border: 1px solid var(--pb-ink); border-radius: 0; background: var(--pb-paper);
+  transition: background-color var(--pb-fast);
+}
+.pb-app .cv-range::-moz-range-thumb { box-sizing: border-box; width: 12px; height: 12px; border: 1px solid var(--pb-ink); border-radius: 0; background: var(--pb-paper); }
+.pb-app .cv-range:hover:not(:disabled)::-webkit-slider-thumb, .pb-app .cv-range:active::-webkit-slider-thumb, .pb-app .cv-range:focus-visible::-webkit-slider-thumb { background: var(--pb-ink); }
+.pb-app .cv-range:hover:not(:disabled)::-moz-range-thumb, .pb-app .cv-range:active::-moz-range-thumb { background: var(--pb-ink); }
+.pb-app .cv-range:disabled { opacity: 1; }
+.pb-app .cv-range:disabled::-webkit-slider-thumb { border-color: var(--pb-faint); }
+.pb-app .cv-range:disabled::-moz-range-thumb { border-color: var(--pb-faint); }

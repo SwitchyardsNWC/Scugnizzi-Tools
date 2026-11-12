@@ -1,13 +1,13 @@
 import * as React from 'react';
-/** Filled accent button — the only filled element in the system. Outline and ghost variants for secondary actions.
- *  Height is built from explicit padding (13/11 at md, 8/6 at sm) so the label's cap height reads optically centred;
+/** Filled slate-iris button — the one place chrome carries chroma. Outline and ghost variants for secondary actions.
+ *  Height is built from explicit padding (1 + 11 / 16 / 7 + 1 = 36 at md, 1 + 8 / 14 / 4 + 1 = 28 at sm) so the label's cap height reads optically centred;
  *  the label is one text run and truncates rather than pushing out of a tight column. */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** filled = #495472 with white text; outline = hairline; ghost = text only */
+  /** filled = slate iris (--action-primary) with white text; outline = --border-control edge (3:1); ghost = text only */
   variant?: 'filled' | 'outline' | 'ghost';
-  /** md = 44px tall, 21px side padding; sm = 34px tall, 10px */
+  /** md = 36px tall, 14px label, 16px side padding; sm = 28px tall, 13px label, 12px */
   size?: 'md' | 'sm';
-  /** Trailing tabular figure, 10px off the label ("Show all 38"). Never use it for a second word. */
+  /** Trailing tabular figure, 8px off the label ("Show all 38"). Never use it for a second word. */
   count?: React.ReactNode;
   /** Let a long label wrap onto a second line and grow the button instead of truncating. */
   wrap?: boolean;

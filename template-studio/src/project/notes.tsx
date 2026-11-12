@@ -109,6 +109,7 @@ export function NoteCard({ note, x, y, selected, lifted, editing, writable, onPo
       {writable && onPinDown && (
         <span
           class={`pb-note-pin ${note.on ? 'pinned' : ''}`}
+          aria-hidden="true"
           data-note-pin={note.id}
           title={note.on ? 'Pinned. Drag to another card or section, or onto the paper to unpin.' : 'Drag onto a card, or a section of an email, to pin this note there.'}
           onPointerDown={onPinDown}

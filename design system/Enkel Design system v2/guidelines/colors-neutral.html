@@ -1,2 +1,31 @@
-<!-- @dsCard group="Colors" viewport="700x150" name="Neutrals" subtitle="Near-ink for primary text · charcoal-grey secondary · graphite muted · faint for placeholders only" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:12px}.sw{flex:1;display:flex;flex-direction:column;gap:4px}.chip{height:48px;border:1px solid var(--border-card)}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div class="chip" style="background:#0d0d0d"></div><div class="lbl">Ink · 19.6:1</div><div class="lbl mut">#0d0d0d · --text-primary, --border-hairline</div></div><div class="sw"><div class="chip" style="background:#3a3a38"></div><div class="lbl">Secondary · 10.9:1</div><div class="lbl mut">#3a3a38 · --text-secondary</div></div><div class="sw"><div class="chip" style="background:#6f726e"></div><div class="lbl">Graphite · 4.9:1</div><div class="lbl mut">#6f726e · --text-muted, --link-default</div></div><div class="sw"><div class="chip" style="background:#a8aaa7"></div><div class="lbl">Faint · 2.3:1, never copy</div><div class="lbl mut">#a8aaa7 · --text-faint</div></div><div class="sw"><div class="chip" style="background:#dededc"></div><div class="lbl">Card line</div><div class="lbl mut">#dededc · --border-card · #e6e6e4 --border-muted</div></div></div></body></html>
+<!-- @dsCard group="Colors" viewport="700x270" name="Neutrals" subtitle="Near-ink primary · charcoal-grey secondary · graphite muted, 4.5:1 on the sunken page too · faint never for copy" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Neutrals</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:5px 12px 3px 0;border-bottom:1px solid var(--border-muted);text-align:left;vertical-align:middle;white-space:nowrap}
+th{font-weight:400;font-size:11px;line-height:12px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-muted);padding-top:0}
+td:last-child,th:last-child{padding-right:0;white-space:normal}
+/* Chips are the tokens themselves, so they flip with the theme; the figures beside them are that theme's. */
+.chip{display:block;width:16px;height:16px;box-sizing:border-box;border:1px solid var(--border-card)}
+.r{text-align:right}
+td.r{font-family:var(--font-mono);letter-spacing:0;font-variant-numeric:tabular-nums}
+.x{color:var(--status-blocked)}
+.mut{color:var(--text-muted)}
+.mono{font-family:var(--font-mono-detail);font-size:12px;letter-spacing:0}
+.foot{margin-top:8px;color:var(--text-muted);font-size:12px;letter-spacing:.132px}
+:root:not([data-theme="dark"]) .dk{display:none}
+:root[data-theme="dark"] .lt{display:none}
+</style></head><body>
+<table>
+<thead><tr><th></th><th>Neutral</th><th>Token</th><th class="r"><span class="lt">On white</span><span class="dk">On card</span></th><th class="r">On page</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td><span class="chip" style="background:var(--text-primary)"></span></td><td>Ink <span class="mono mut lt">#0d0d0d</span><span class="mono mut dk">#f2f2f0</span></td><td class="mono">--text-primary</td><td class="r"><span class="lt">19.44</span><span class="dk">15.53</span></td><td class="r"><span class="lt">17.82</span><span class="dk">17.22</span></td><td class="mut">copy, figures, the focus ring</td></tr>
+<tr><td><span class="chip" style="background:var(--text-secondary)"></span></td><td>Secondary <span class="mono mut lt">#3a3a38</span><span class="mono mut dk">#cfcfcc</span></td><td class="mono">--text-secondary</td><td class="r"><span class="lt">11.40</span><span class="dk">11.15</span></td><td class="r"><span class="lt">10.45</span><span class="dk">12.36</span></td><td class="mut">card titles, secondary copy</td></tr>
+<tr><td><span class="chip" style="background:var(--text-muted)"></span></td><td>Graphite <span class="mono mut lt">#666965</span><span class="mono mut dk">#9a9c99</span></td><td class="mono">--text-muted</td><td class="r"><span class="lt">5.57</span><span class="dk">6.29</span></td><td class="r"><span class="lt">5.10</span><span class="dk">6.98</span></td><td class="mut">hints, labels, placeholders, links at rest</td></tr>
+<tr><td><span class="chip" style="background:var(--text-faint)"></span></td><td>Faint <span class="mono mut lt">#a8aaa7</span><span class="mono mut dk">#5e605d</span></td><td class="mono">--text-faint</td><td class="r x"><span class="lt">2.34</span><span class="dk">2.74</span></td><td class="r x"><span class="lt">2.15</span><span class="dk">3.04</span></td><td class="mut">disabled text, strokes. Never copy</td></tr>
+<tr><td><span class="chip" style="background:var(--border-control);border-color:var(--border-control)"></span></td><td>Control edge <span class="mono mut lt">#8f918d</span><span class="mono mut dk">#666765</span></td><td class="mono">--border-control</td><td class="r"><span class="lt">3.18</span><span class="dk">3.06</span></td><td class="r"><span class="lt x">2.92</span><span class="dk">3.39</span></td><td class="mut">edge of what you press or type into</td></tr>
+<tr><td><span class="chip" style="background:var(--border-card)"></span></td><td>Card line <span class="mono mut lt">#dededc</span><span class="mono mut dk">#2a2a29</span></td><td class="mono">--border-card</td><td class="r"><span class="lt">1.35</span><span class="dk">1.21</span></td><td class="r"><span class="lt">1.23</span><span class="dk">1.34</span></td><td class="mut">card edges, decorative</td></tr>
+</tbody></table>
+<div class="foot lt">WCAG contrast against white (paper and card) and the sunken page #f5f5f4. Text needs 4.5, a control's edge 3.0; red marks a figure below its bar.</div>
+<div class="foot dk">WCAG contrast against the card #1a1a1a and the sunken page #0e0e0e. Text needs 4.5, a control's edge 3.0; red marks a figure below its bar.</div>
+</body></html>

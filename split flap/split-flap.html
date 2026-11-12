@@ -1,108 +1,116 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Split-flap board</title>
+<meta name="theme-color" content="#151515">
+<script src="../theme.js"></script>
+<link rel="stylesheet" href="../design system/Enkel Design system v2/styles.css">
+<link rel="stylesheet" href="../design system/Enkel Design system v2/tools.css">
 <style>
+  /* The board's own faces, for the canvas: content, not chrome. */
   @font-face{font-family:"FlapCondensed";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_MdCn.otf") format("opentype");font-weight:500;font-display:swap}
   @font-face{font-family:"FlapCondensed";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_BdCn.otf") format("opentype");font-weight:700;font-display:swap}
   @font-face{font-family:"FlapHelvetica";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_Roman.otf") format("opentype");font-weight:400;font-display:swap}
   @font-face{font-family:"FlapHelvetica";src:url("../design system/Enkel Design system v2/fonts/HelveticaNeueLTStd_Bd.otf") format("opentype");font-weight:700;font-display:swap}
-  :root{
-    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
-    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
-  }
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
-  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
-  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
-  .sub{margin:0 0 18px;color:var(--muted)}
-  details.panel{border-top:1px solid var(--line)}
-  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
-    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
-  details.panel>summary::-webkit-details-marker{display:none}
-  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
-    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
-  details.panel[open]>summary::before{transform:rotate(45deg)}
-  details.panel>summary:hover{color:var(--text)}
-  details.panel>summary .t{flex:1}
-  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  details.panel>.body{padding:0 0 10px}
-  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
-  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
-  .row>label{flex:0 0 78px;color:var(--muted)}
-  .row select,.row input[type=text]{flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
-  .row input[type=number]{width:72px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
-  .row input[type=checkbox]{accent-color:var(--accent)}
-  .row .wrap{display:flex;flex-wrap:wrap;gap:6px 14px;flex:1;min-width:0}
-  .row .wrap label{display:inline-flex;align-items:center;gap:6px;color:var(--text);white-space:nowrap}
-  .row .wrap label.sw{color:var(--muted)}
-  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
-  input:focus,select:focus,textarea:focus{border-color:#4a4a50;outline:none}
-  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
-  button:hover{border-color:#55555c}
-  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  button.primary:hover{filter:brightness(1.06)}
-  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
-  button.icon{padding:5px 7px;color:var(--muted)}
-  .seg{display:flex;flex:1}
-  .seg button{flex:1;border-radius:0;padding:5px 0}
-  .seg button:first-child{border-radius:5px 0 0 5px}
-  .seg button:last-child{border-radius:0 5px 5px 0}
-  .seg button.on{background:#3a3a40;color:#fff}
-  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
-  .slider label{color:var(--text)}
-  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
-  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
-  /* Messages */
-  .msg{border:1px solid var(--line);border-radius:6px;background:var(--panel2);padding:8px 10px 10px;margin:0 0 8px}
-  .msg.on{border-color:var(--accent)}
-  .msg .head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-  .msg .head .n{flex:1;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px}
-  .msg.on .head .n{color:var(--accent)}
-  .msg .head .over{color:#e0a15a;font-size:11px;font-variant-numeric:tabular-nums;cursor:help}
-  /* The message box is the board in miniature: one cell per module, the board's own colours and proportions. */
-  .msg .gridwrap{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:5px;padding:6px}
-  .msg .grid{position:absolute;top:6px;pointer-events:none;background-color:var(--flap);background-repeat:repeat;
+
+  /* Split-flap board: only what is particular to this tool. The panel, rows, sliders, segments, presets, checks, bars and
+     stage are tools.css on the Enkel tokens. Board, flap and letter colours are the work, not chrome: they stay as data. */
+
+  /* A section's state takes the room its name leaves, so a font and its size read whole. */
+  details.panel>summary .t{flex:0 0 auto}
+  details.panel>summary .v{flex:1 1 auto;min-width:0;max-width:none;text-align:right}
+
+  /* --- Messages: a list you select from. Each card holds the board in miniature. ------------------------------------- */
+  /* Geometry the script relies on (MSG_INSET = 36): card border 1 + padding 8, then the mini board's border 1 + padding 8,
+     on each side. The list has no side padding: its width is the card's outer width. */
+  #msgList{display:flex;flex-direction:column;gap:var(--spacing-8)}
+  /* A card is a container, square like the board it holds: only its field and its buttons are pressed. */
+  .msg{padding:var(--spacing-8);border:var(--border-width) solid var(--border-card);border-radius:0;background:transparent}
+  /* On the board: the selection surface, an ink edge and a 2px ink marker down the left, as a selected row anywhere. */
+  .msg.on{background:var(--surface-selected);border-color:var(--text-primary);box-shadow:inset 2px 0 0 var(--text-primary)}
+  .msg .head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-4);min-height:var(--control-height-xs);margin:0 0 var(--spacing-8)}
+  .msg .head .n{flex:1 1 auto;min-width:0;padding-top:var(--optical-nudge);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+  .msg.on .head .n{color:var(--text-primary)}
+  /* Letters that fall off the board: a line of its own under the head, in words and the risk ink, so it reads without
+     pointing at it and never squeezes the card's name. */
+  .msg .head .over{order:1;flex:1 0 100%;min-width:0;padding:0;
+    font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);font-variant-numeric:tabular-nums;color:var(--status-risk)}
+  .msg .head .over::before{content:"";display:inline-block;width:6px;height:6px;margin-right:var(--spacing-4);vertical-align:1px;background:var(--status-risk)}
+  /* On the selection surface amber words fall under 4.5:1 in the light theme: the words take the ink, the square keeps the risk. */
+  .msg.on .head .over{color:var(--text-primary)}
+  /* Where Show sits on the other cards, the card on the board says so: a square mark and the words. */
+  .msg .head .live{flex:none;padding:var(--optical-nudge) var(--spacing-8) 0;white-space:nowrap;
+    font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-primary)}
+  .msg .head .live::before{content:"";display:inline-block;width:6px;height:6px;margin-right:var(--spacing-4);vertical-align:1px;background:currentColor}
+  .msg .head button.small{flex:none;margin-right:var(--spacing-4)}
+  /* A move or a delete that can't happen stays out of the way: no hover ink, no brick, nothing that looks pressable. */
+  .msg .head button:disabled,.msg .head button:disabled:hover,.msg .head button:disabled:active{color:var(--action-disabled-text);background:transparent;border-color:transparent}
+  /* Delete says so on hover the way Reset does, in brick in its glyph, its edge and its ground, not in a tint alone. */
+  .msg .head button.icon.danger:hover:not(:disabled){color:var(--status-blocked);border-color:var(--status-blocked);background:var(--status-blocked-soft)}
+
+  /* The mini board: square like the board itself, its colours from the board's own settings (inline, from the script). */
+  .msg .gridwrap{position:relative;overflow:hidden;padding:var(--spacing-8);border:var(--border-width) solid var(--border-card);border-radius:0;
+    transition:border-color var(--duration-fast) var(--ease-standard)}
+  .msg .gridwrap:hover{border-color:var(--border-control)}
+  /* Typing into it: the field's ink edge, two pixels, so it shows on a dark board and on light paper alike. */
+  .msg .gridwrap:focus-within{border-color:var(--text-primary);box-shadow:0 0 0 var(--border-width) var(--text-primary)}
+  .msg .grid{position:absolute;top:var(--spacing-8);pointer-events:none;background-color:var(--flap);background-repeat:repeat;
     background-image:
       linear-gradient(to bottom,transparent calc(50% - .5px),var(--hinge) calc(50% - .5px) calc(50% + .5px),transparent calc(50% + .5px)),
       linear-gradient(to right,var(--gapc) 0 var(--gapw),transparent var(--gapw)),
       linear-gradient(to bottom,var(--gapc) 0 var(--gapw),transparent var(--gapw));
     background-position:0 0,calc(var(--gapw) / -2) 0,0 calc(var(--gapw) / -2)}
-  .msg textarea{position:relative;z-index:1;display:block;width:100%;height:60px;margin:0;padding:0;border:0;resize:none;background:transparent;
-    font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;scrollbar-width:none}
+  /* The text sits on the cells: size, leading, tracking and colour come from the script. Undo the field well here. */
+  .msg textarea{position:relative;z-index:1;display:block;width:100%;height:60px;min-height:0;margin:0;padding:0;border:0;border-radius:0;resize:none;
+    background:transparent;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;scrollbar-width:none;transition:none}
   .msg textarea::-webkit-scrollbar{width:0;height:0}
-  .msg textarea::placeholder{color:currentColor;opacity:.3;letter-spacing:normal}
-  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
-  .presets button small{display:block;color:var(--muted);font-size:11px}
-  .presets button.on{border-color:var(--accent);color:#fff}
-  .addrow{display:flex;gap:6px;margin-top:4px}
-  .addrow button{flex:1}
-  main{display:flex;flex-direction:column;min-width:0;min-height:0}
-  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
-  .topbar .spacer{flex:1}
-  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
-  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  /* The board's own letter colour, lighter: at .6 it holds 4.5:1 on the dark boards and on the Menu board's white flaps. */
+  .msg textarea::placeholder{color:currentColor;opacity:.6;letter-spacing:normal}
+
+  /* Play and Pause swap in place: the button keeps one width so the words beside it don't move. */
+  #playPause{flex:none;min-width:72px}
+
+  /* --- Presets: looks described in phrases, one card to a line (.presets.wide). --------------------------------------- */
+  /* The cards are a list and Reset is a button: a step more than the cards' own 8 keeps the two apart. */
+  #presets ~ .btn-row{margin-top:var(--spacing-12)}
+  /* Reset is a quiet escape hatch: its own width, never the widest button in the tool. */
+  #resetTool{flex:none}
+
+  /* --- Motion: four flip orders need the panel's whole width (.seg.fit: each segment takes its words' width). ------- */
+  .stack>.seg{flex:none}
+
+  /* A key named in a hint: tools.css lets it inherit the 16px line, and the mono's own ascent then pushes that line to 17.
+     At 12 it sits inside the line, so a line holding one keeps the pitch of the others (measured: 64 not 66 tall). */
+  .hint kbd{line-height:12px}
+
+  /* --- the bar over the stage, the stage, the export bar ------------------------------------------------------------ */
+  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .warn{color:var(--status-risk)}
+  /* Fit shrinks the board into view; any other zoom sizes the canvas inline and the stage scrolls. */
   .stage.fit{overflow:hidden}
   .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
   .stage:not(.fit){display:block}
   .stage:not(.fit) canvas{display:block;margin:0 auto}
-  canvas{box-shadow:0 24px 60px rgba(0,0,0,.65),0 2px 4px rgba(0,0,0,.5);image-rendering:auto}
-  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
-  .actions{display:flex;flex-direction:column;gap:6px}
-  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
-  .warn{color:#e0a15a}
+  /* The buttons say what they are doing while a GIF renders ("Frame 12 / 56…"): one width, so the recipe never reflows. */
+  .actions{width:184px;min-width:0}
+  /* The recipe stops on a whole line: nine lines of 18 sit inside the five buttons beside it (172), so the bar never grows. */
+  .footer pre#recipe{max-height:167px} /* 5 + 9 lines of 18: whole lines, never a sliver */
+  /* Words for a screen reader alone: what an export or a copy did, said once. */
+  .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
   @media (max-width:900px){
-    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
-    aside{max-height:50vh}
-    .footer{grid-template-columns:1fr}
-    .actions{flex-direction:row;flex-wrap:wrap}
+    /* Stacked over the stage the panel runs the window's width: the looks sit side by side. */
+    .presets.wide{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+    .actions{width:auto}
+    /* Stacked under the buttons, six whole lines, then it scrolls. */
+    .footer pre#recipe{max-height:113px}
+  }
+  @media (max-width:600px){
+    .topbar{flex-wrap:wrap;row-gap:var(--spacing-8);padding-top:var(--spacing-8);padding-bottom:var(--spacing-8)}
+    #meta{flex:1 0 100%}
   }
 </style>
 </head>
@@ -117,19 +125,19 @@
     <details class="panel" data-panel="messages" open>
       <summary><span class="t">Messages</span><span class="v" id="hint-messages"></span></summary>
       <div class="body">
-        <div id="msgList"></div>
-        <div class="addrow"><button id="addMsg">+ Message</button><button id="flipNext" class="primary">Flip to next</button><button id="reflip" title="Blank the board and flip the current message in again">Re-flip</button></div>
+        <div id="msgList" role="list" aria-label="Messages"></div>
+        <div class="addrow"><button id="addMsg">+ Message</button><button id="flipNext">Flip to next</button><button id="reflip" title="Blank the board and flip the current message in again">Re-flip</button></div>
         <div id="cycleSliders"></div>
-        <div class="row"><label></label><button id="playPause">Play</button><span class="hint" id="cycleState"></span></div>
-        <p class="hint">The highlighted message is on the board. Editing it flips the changed letters live. Cycling pauses while you type. Space flips to the next message, 1–9 jump to one.</p>
+        <div class="row"><button id="playPause">Play</button><span class="hint" id="cycleState"></span></div>
+        <p class="hint">The message marked on the board is the one showing. Editing it flips the changed letters live; cycling pauses while you type. <kbd>Space</kbd> flips to the next message, <kbd>1</kbd>–<kbd>9</kbd> jump to one.</p>
       </div>
     </details>
 
     <details class="panel" data-panel="looks" open>
       <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
-        <div class="presets" id="presets"></div>
-        <div class="row" style="margin-top:10px"><label></label><button id="resetTool" class="danger">Reset to defaults</button></div>
+        <div class="presets wide" id="presets" role="group" aria-label="Presets"></div>
+        <div class="btn-row"><button id="resetTool" class="danger">Reset to defaults</button></div>
         <p class="hint">A preset replaces the messages, board, type, motion and export settings. Reset clears everything saved for this tool.</p>
       </div>
     </details>
@@ -137,18 +145,25 @@
     <details class="panel" data-panel="board">
       <summary><span class="t">Board</span><span class="v" id="hint-board"></span></summary>
       <div class="body">
-        <div class="row"><label>Modules</label><input type="number" id="rows" min="1" max="12" step="1"> <span class="hint">rows ×</span> <input type="number" id="cols" min="4" max="48" step="1"> <span class="hint">columns</span></div>
+        <div class="row"><label for="rows">Rows</label><input type="number" id="rows" min="1" max="12" step="1"><span class="hint">1–12</span></div>
+        <div class="row"><label for="cols">Columns</label><input type="number" id="cols" min="4" max="48" step="1"><span class="hint">4–48</span></div>
         <div id="boardSliders"></div>
-        <div class="row"><label>Colours</label><div class="wrap"><label class="sw"><input type="color" id="boardColor">Board</label><label class="sw"><input type="color" id="flapColor">Flaps</label><label class="sw"><input type="color" id="letterColor">Letters</label></div></div>
-        <div class="row"><label>Header</label><input type="text" id="header" placeholder="e.g. DEPARTURES" spellcheck="false"></div>
-        <div class="row"><label>Show</label><div class="wrap"><label><input type="checkbox" id="rowNumbers"> row numbers</label><label><input type="checkbox" id="hinge"> hinge line</label><label><input type="checkbox" id="upper"> upper case</label></div></div>
+        <h3>Colours</h3>
+        <div class="row"><label for="boardColor">Board</label><input type="color" id="boardColor"><span class="hex" id="boardColorHex"></span></div>
+        <div class="row"><label for="flapColor">Flaps</label><input type="color" id="flapColor"><span class="hex" id="flapColorHex"></span></div>
+        <div class="row"><label for="letterColor">Letters</label><input type="color" id="letterColor"><span class="hex" id="letterColorHex"></span></div>
+        <h3>Details</h3>
+        <div class="row"><label for="header">Header</label><input type="text" id="header" placeholder="e.g. DEPARTURES" spellcheck="false"></div>
+        <label class="check"><input type="checkbox" id="rowNumbers"><span>Row numbers</span></label>
+        <label class="check"><input type="checkbox" id="hinge"><span>Hinge line</span></label>
+        <label class="check"><input type="checkbox" id="upper"><span>Upper case</span></label>
       </div>
     </details>
 
     <details class="panel" data-panel="type">
       <summary><span class="t">Type</span><span class="v" id="hint-type"></span></summary>
       <div class="body">
-        <div class="row"><label>Font</label><select id="fontSel"></select></div>
+        <div class="stack"><label for="fontSel">Font</label><select id="fontSel"></select></div>
         <div id="typeSliders"></div>
       </div>
     </details>
@@ -156,26 +171,27 @@
     <details class="panel" data-panel="motion">
       <summary><span class="t">Motion</span><span class="v" id="hint-motion"></span></summary>
       <div class="body">
-        <div class="row"><label>Stagger</label><div class="seg" id="staggerSeg"><button data-v="ltr">Left→right</button><button data-v="row">By row</button><button data-v="random">Random</button><button data-v="all">All at once</button></div></div>
+        <div class="stack"><span class="lab" id="staggerLab">Flip order</span><div class="seg fit" id="staggerSeg" role="group" aria-labelledby="staggerLab"><button data-v="ltr">Left→right</button><button data-v="row">By row</button><button data-v="random">Random</button><button data-v="all">All at once</button></div></div>
         <div id="motionSliders"></div>
-        <div class="row"><label>Alphabet</label><input type="text" id="alphabet" spellcheck="false"></div>
-        <div class="row"><label></label><label style="color:var(--text)"><input type="checkbox" id="blankFirst"> blank the board before each message</label></div>
+        <div class="row"><label for="alphabet">Alphabet</label><input type="text" id="alphabet" spellcheck="false"></div>
+        <label class="check"><input type="checkbox" id="blankFirst"><span>Blank the board before each message</span></label>
       </div>
     </details>
 
     <details class="panel" data-panel="export">
       <summary><span class="t">Export</span><span class="v" id="hint-export"></span></summary>
       <div class="body">
-        <div class="row"><label>GIF shows</label><div class="seg" id="modeSeg"><button data-v="flip">One flip</button><button data-v="cycle">All messages</button></div></div>
+        <div class="row"><span class="lab" id="modeLab">GIF shows</span><div class="seg" id="modeSeg" role="group" aria-labelledby="modeLab"><button data-v="flip">One flip</button><button data-v="cycle">All messages</button></div></div>
         <div id="exportSliders"></div>
-        <div class="row"><label></label><button id="fitFrames" title="Set the frame count so the whole animation fits">Fit frames</button><span class="hint" id="cycleHint"></span></div>
+        <div class="row"><button id="fitFrames" title="Set the frame count so the whole animation fits">Fit frames</button></div>
+        <p class="hint" id="cycleHint"></p>
       </div>
     </details>
 
     <details class="panel" data-panel="random">
       <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
       <div class="body">
-        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <div class="row"><label for="seed">Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
         <p class="hint">The seed drives the random stagger and each module's clatter.</p>
       </div>
     </details>
@@ -202,12 +218,13 @@
     </div>
   </main>
 </div>
+<div class="vh" id="sfStatus" role="status"></div>
 
 <script>
 // ---------- State ----------
 const DEFAULT_MESSAGES = [
   'DEPARTURES\n\n07:40  PADDINGTON      ON TIME\n07:52  CARDIFF CENTRAL  DELAYED',
-  'SCUGGNIZZI TOOLS\n\nPLATFORM 3          NOW BOARDING\nMIND THE GAP',
+  'SCUGNIZZI TOOLS\n\nPLATFORM 3          NOW BOARDING\nMIND THE GAP',
 ];
 const DEFAULTS = {
   messages: DEFAULT_MESSAGES.slice(), active: 0,
@@ -447,7 +464,8 @@ function cycleMs() {
 }
 function animationMs() { const E = state.export; return E.mode === 'cycle' ? state.messages.length * (cycleMs() + E.hold * 1000) : cycleMs(); }
 function updateHints() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // A section's state can run past its header: the whole of it is in the title.
+  const set = (id, v) => { const el = document.getElementById(id); if (el) { el.textContent = v; if (el.classList.contains('v')) el.title = v; } };
   const B = state.board, T = state.type, M = state.motion, E = state.export;
   set('hint-messages', `${state.messages.length} · showing ${state.active + 1}`);
   set('hint-board', `${B.rows} × ${B.cols}`);
@@ -456,8 +474,19 @@ function updateHints() {
   set('hint-export', `${E.frames} frames · ${E.delay * 10} ms`);
   set('hint-random', `seed ${state.seed}`);
   const need = Math.ceil(animationMs() / (E.delay * 10)) + 2;
-  set('cycleHint', E.mode === 'cycle' ? `all ${state.messages.length} messages need about ${need} frames` : `a full flip from blank needs about ${need} frames`);
+  set('cycleHint', E.mode === 'cycle' ? `All ${state.messages.length} messages need about ${need} frames.` : `A full flip from blank needs about ${need} frames.`);
+  syncPresets();
   set('hint-looks', [...(presetsEl ? presetsEl.children : [])].find(c => c.classList.contains('on'))?.firstChild.textContent || 'custom');
+}
+// A preset stays chosen while the board still looks like it: every board, type, motion and export setting it sets still
+// holds. Read from the state, so the mark survives a reload, a reset and an undo, and lets go as soon as a setting moves.
+function syncPresets() {
+  if (!presetsEl) return;
+  PRESETS.forEach((p, i) => {
+    const a = p.apply, b = presetsEl.children[i]; if (!b) return;
+    const on = ['board', 'type', 'motion', 'export'].every(k => Object.keys(a[k]).every(f => state[k] && state[k][f] === a[k][f]));
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  });
 }
 function updateRecipe() {
   const B = state.board, T = state.type, M = state.motion, E = state.export;
@@ -472,7 +501,8 @@ function updateRecipe() {
 const controls = {};
 function addSlider(parent, spec) {
   const wrap = document.createElement('div'); wrap.className = 'slider';
-  wrap.innerHTML = `<label>${spec.label}</label><output></output><input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
+  const id = 'sl-' + spec.path.replace('.', '-');   // ties the label and the figure to the track, for screen readers and clicks
+  wrap.innerHTML = `<label for="${id}">${spec.label}</label><output for="${id}"></output><input type="range" id="${id}" min="${spec.min}" max="${spec.max}" step="${spec.step}">`;
   const input = wrap.querySelector('input'), out = wrap.querySelector('output');
   const refresh = () => { const v = getPath(spec.path); input.value = v; out.textContent = spec.fmt(+v); };
   input.addEventListener('input', () => { const v = parseFloat(input.value); setPath(spec.path, v); out.textContent = spec.fmt(v); if (spec.onChange) spec.onChange(v); invalidate(); });
@@ -497,16 +527,17 @@ addSlider($('#cycleSliders'), { path: 'motion.autoAdvance', label: 'Cycle every'
 let lastCycle = 2;
 function syncPlay() {
   const on = state.motion.autoAdvance > 0; if (on) lastCycle = state.motion.autoAdvance;
+  // The label carries the state (Play / Pause), so the button is a plain button, not a toggle that also renames itself.
   $('#playPause').textContent = on ? 'Pause' : 'Play';
   $('#cycleState').textContent = on ? `next message ${state.motion.autoAdvance.toFixed(1)} s after each lands` : 'not cycling';
 }
-$('#playPause').addEventListener('click', () => { state.motion.autoAdvance = state.motion.autoAdvance > 0 ? 0 : lastCycle; controls['motion.autoAdvance'].refresh(); syncPlay(); idleSince = performance.now(); invalidate(); });
+$('#playPause').addEventListener('click', () => { state.motion.autoAdvance = state.motion.autoAdvance > 0 ? 0 : lastCycle; controls['motion.autoAdvance'].refresh(); syncPlay(); idleSince = performance.now(); invalidate(); say(state.motion.autoAdvance > 0 ? 'Cycling through the messages' : 'Cycling paused'); });
 const Es = $('#exportSliders');
 addSlider(Es, { path: 'export.frames', label: 'GIF frames', min: 6, max: 240, step: 1, fmt: fmt.int });
 addSlider(Es, { path: 'export.delay', label: 'Frame delay', min: 2, max: 20, step: 1, fmt: fmt.cs });
 addSlider(Es, { path: 'export.hold', label: 'Hold between messages', min: 0, max: 3, step: 0.1, fmt: v => v.toFixed(1) + ' s' });
 $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.export.mode = b.dataset.v; syncMode(); invalidate(); });
-function syncMode() { for (const b of $('#modeSeg').children) b.classList.toggle('on', b.dataset.v === state.export.mode); controls['export.hold'] && (document.querySelector('[data-panel=export] .slider:last-of-type').hidden = state.export.mode !== 'cycle'); }
+function syncMode() { for (const b of $('#modeSeg').children) { const on = b.dataset.v === state.export.mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); } controls['export.hold'] && (document.querySelector('[data-panel=export] .slider:last-of-type').hidden = state.export.mode !== 'cycle'); }
 // Presets and reset
 presetsEl = $('#presets');
 PRESETS.forEach((p, i) => {
@@ -524,11 +555,13 @@ for (const k in FONTS) $('#fontSel').add(new Option(FONTS[k][0], k));
 $('#fontSel').addEventListener('change', e => { state.type.font = e.target.value; invalidate(); });
 $('#rows').addEventListener('change', e => { state.board.rows = Math.max(1, Math.min(12, parseInt(e.target.value) || 1)); e.target.value = state.board.rows; mods = []; renderMessages(); settleAll(); retarget(); invalidate(); });
 $('#cols').addEventListener('change', e => { state.board.cols = Math.max(4, Math.min(48, parseInt(e.target.value) || 4)); e.target.value = state.board.cols; mods = []; settleAll(); retarget(); layoutAllMsgGrids(); invalidate(); });
-for (const id of ['boardColor', 'flapColor', 'letterColor']) $('#' + id).addEventListener('input', e => { state.board[id] = e.target.value; layoutAllMsgGrids(); invalidate(); });
+for (const id of ['boardColor', 'flapColor', 'letterColor']) $('#' + id).addEventListener('input', e => { state.board[id] = e.target.value; syncHex(); layoutAllMsgGrids(); invalidate(); });
+// Each colour's hex beside its well, so the pick reads without telling colours apart.
+function syncHex() { for (const id of ['boardColor', 'flapColor', 'letterColor']) $('#' + id + 'Hex').textContent = state.board[id]; }
 $('#header').addEventListener('input', e => { state.board.header = e.target.value; invalidate(); });
 for (const id of ['rowNumbers', 'hinge', 'upper']) $('#' + id).addEventListener('change', e => { state.board[id] = e.target.checked; if (id === 'upper') retarget(); layoutAllMsgGrids(); invalidate(); });
 $('#staggerSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.motion.stagger = b.dataset.v; syncSeg(); invalidate(); });
-function syncSeg() { for (const b of $('#staggerSeg').children) b.classList.toggle('on', b.dataset.v === state.motion.stagger); }
+function syncSeg() { for (const b of $('#staggerSeg').children) { const on = b.dataset.v === state.motion.stagger; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); } }
 $('#alphabet').addEventListener('change', e => { state.motion.alphabet = e.target.value || ' '; mods.forEach(m => { m.cur = 0; m.t = 0; }); retarget(); invalidate(); });
 $('#blankFirst').addEventListener('change', e => { state.motion.blankFirst = e.target.checked; invalidate(); });
 $('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate(); });
@@ -538,7 +571,8 @@ $('#fitFrames').addEventListener('click', () => { state.export.frames = Math.min
 
 // Messages list — each box is a scale model of the board, so what you type sits where it will flip.
 const MSG_MONO = 'ui-monospace,Menlo,Consolas,monospace';
-const MSG_INSET = 36;   // .msg padding+border (2×11) plus .gridwrap padding+border (2×7)
+const MSG_INSET = 36;   // .msg padding+border (2×9) plus .gridwrap padding+border (2×9)
+const MSG_PAD = 8;      // .gridwrap padding: where cell 0 starts, matching .msg .grid's top in the CSS
 let chRatio = 0.6, msgAvailW = 0;
 (() => { const c = document.createElement('canvas').getContext('2d'); c.font = `100px ${MSG_MONO}`; const w = c.measureText('M').width; if (w) chRatio = w / 100; })();
 // Characters that fall outside rows × cols never reach the board; trailing blanks don't count.
@@ -549,36 +583,42 @@ function offBoard(text) {
 }
 function markOverflow(el, text) {
   const n = offBoard(text), s = el.querySelector('.over');
-  s.hidden = !n; s.textContent = n + ' off';
+  s.hidden = !n; s.textContent = `${n} character${n === 1 ? '' : 's'} off the board won't flip`;
   s.title = `${n} character${n === 1 ? '' : 's'} sit outside the ${state.board.rows} × ${state.board.cols} board and will not flip`;
 }
-// Letter-spacing stretches each monospace character to one module wide, and half the slack becomes the
-// text's left inset so glyphs sit centred in their cells. Cell width is solved so inset + cols × cell
-// exactly fills the box: cw(cols + ½) = avail + glyph/2, with one pass to settle the font size first.
+// Letter-spacing stretches each monospace character to one module wide, and the text's left padding puts each glyph in
+// the middle of its cell. The grid sits centred in the box, so the board's edge is even all round. Its margin has to be
+// at least half a cell's slack, because a line's trailing letter-spacing runs that far past the last cell and must end
+// inside the box or the field scrolls sideways: so the widest cell is cw(cols + 1) = avail + glyph (half a pixel spare),
+// with two passes to settle the font size first. Cells are never wider than the board's own module proportion allows
+// under the 34px cap (four tall Countdown flaps stay tall in miniature), unless that would shrink the type below 14px.
+const MSG_CELL_H = 34;
 function cellMetrics(avail, cols) {
-  const B = state.board;
+  const B = state.board, ratio = B.mh / B.mw;
   const fit = cw => {
-    let chh = Math.min(34, cw * (B.mh / B.mw));                          // the board's own module proportion
+    const chh = Math.min(MSG_CELL_H, cw * ratio);                        // the board's own module proportion
     const size = Math.max(5.5, Math.min(20, cw / chRatio, chh * 0.95));  // fits the cell both ways
     return { size, glyph: size * chRatio, chh: Math.max(chh, size + 2) };
   };
-  const m = fit(avail / cols), cw = (avail + m.glyph / 2) / (cols + 0.5);
-  return { cw, ...fit(cw) };
+  const widest = g => Math.min((avail - 0.5 + g) / (cols + 1), Math.max(MSG_CELL_H / ratio, 14 * chRatio));
+  const m = fit(widest(fit(avail / cols).glyph));   // the type, settled for the cell it will get
+  const cw = widest(m.glyph);                       // the cell, solved for that type, so the line always fits
+  return { cw, size: m.size, glyph: m.glyph, chh: Math.max(Math.min(MSG_CELL_H, cw * ratio), m.size + 2) };
 }
 function layoutMsgGrid(wrap) {
   const B = state.board, avail = msgAvailW - MSG_INSET;
   if (!wrap || avail < 40) return;
-  const { cw, size, glyph, chh } = cellMetrics(avail, B.cols), inset = (cw - glyph) / 2;
+  const { cw, size, glyph, chh } = cellMetrics(avail, B.cols), margin = (avail - cw * B.cols) / 2, inset = (cw - glyph) / 2;
   const ta = wrap.querySelector('textarea'), grid = wrap.querySelector('.grid');
   ta.style.fontSize = size.toFixed(2) + 'px';
   ta.style.lineHeight = chh.toFixed(2) + 'px';
   ta.style.letterSpacing = (cw - glyph).toFixed(3) + 'px';
-  ta.style.paddingLeft = inset.toFixed(2) + 'px';
+  ta.style.paddingLeft = (margin + inset).toFixed(2) + 'px';
   ta.style.height = (chh * B.rows).toFixed(2) + 'px';
   ta.style.color = B.letterColor; ta.style.caretColor = B.letterColor;
   ta.style.textTransform = B.upper ? 'uppercase' : 'none';
   wrap.style.background = B.boardColor;
-  grid.style.left = '6px';   // cell 0 starts at the text origin; the inset centres the glyph inside it
+  grid.style.left = (MSG_PAD + margin).toFixed(2) + 'px';   // cell 0 starts a margin in; the inset centres the glyph inside it
   grid.style.width = (cw * B.cols).toFixed(2) + 'px';
   grid.style.height = (chh * B.rows).toFixed(2) + 'px';
   grid.style.backgroundSize = `${cw.toFixed(3)}px ${chh.toFixed(3)}px`;
@@ -593,27 +633,52 @@ function layoutAllMsgGrids() {
 }
 new ResizeObserver(es => { const w = es[0].contentRect.width; if (w && Math.abs(w - msgAvailW) > 0.5) { msgAvailW = w; layoutAllMsgGrids(); } }).observe($('#msgList'));
 
+// Where focus goes when the list re-renders: a move sets it so focus follows the message it moved.
+let msgFocus = null;
 function renderMessages() {
-  const list = $('#msgList'); list.innerHTML = '';
+  const list = $('#msgList');
+  // Re-rendering replaces every card. Focus inside the list is carried across it, so a keyboard never drops to the page:
+  // a message being typed into keeps its caret and scroll (clicking or tabbing into one flips it onto the board, which
+  // re-renders under the caret), and a pressed Show, ↑, ↓ or × hands focus to the same control, or the card's next one.
+  const a = document.activeElement, card = a && list.contains(a) ? a.closest('.msg') : null;
+  let to = card ? { i: [...list.children].indexOf(card), a: a.tagName === 'TEXTAREA' ? 'textarea' : a.dataset.a } : null;
+  if (to && msgFocus) to = { ...to, ...msgFocus };
+  msgFocus = null;
+  const keep = to && to.a === 'textarea' ? [a.selectionStart, a.selectionEnd, a.scrollTop, a.scrollLeft] : null;
+  list.innerHTML = '';
   state.messages.forEach((text, i) => {
-    const el = document.createElement('div'); el.className = 'msg' + (i === state.active ? ' on' : '');
-    el.innerHTML = `<div class="head"><span class="n">Message ${i + 1}${i === state.active ? ' · on the board' : ''}</span><span class="over" hidden></span>
-      <button class="icon" data-a="show" title="Flip this message onto the board">Show</button><button class="icon" data-a="up" title="Move up">↑</button><button class="icon" data-a="down" title="Move down">↓</button><button class="icon danger" data-a="del" title="Delete">✕</button></div>
-      <div class="gridwrap"><div class="grid"></div><textarea rows="${Math.min(8, Math.max(2, state.board.rows))}" spellcheck="false" placeholder="One line per row"></textarea></div>`;
+    // The card on the board says so in words where the others offer Show. Moves and delete that can't happen are disabled.
+    const on = i === state.active, last = state.messages.length - 1, k = i + 1;
+    const el = document.createElement('div'); el.className = 'msg' + (on ? ' on' : ''); el.setAttribute('role', 'listitem');
+    el.innerHTML = `<div class="head"><span class="n" data-a="name" tabindex="-1">Message ${k}</span><span class="over" hidden></span>${on
+        ? '<span class="live" data-a="live" tabindex="-1">On the board</span>'
+        : `<button class="small" data-a="show" title="Flip this message onto the board" aria-label="Show message ${k}">Show</button>`}<button class="icon" data-a="up" title="Move up" aria-label="Move message ${k} up"${i === 0 ? ' disabled' : ''}>↑</button><button class="icon" data-a="down" title="Move down" aria-label="Move message ${k} down"${i === last ? ' disabled' : ''}>↓</button><button class="icon danger" data-a="del" title="Delete" aria-label="Delete message ${k}"${last === 0 ? ' disabled' : ''}>×</button></div>
+      <div class="gridwrap"><div class="grid"></div><textarea rows="${Math.min(8, Math.max(2, state.board.rows))}" spellcheck="false" placeholder="One line per row" aria-label="Message ${k}${on ? ', on the board' : ''}"></textarea></div>`;
     const ta = el.querySelector('textarea'); ta.value = text;
     // The grid is painted behind the text, so it has to track the textarea's own scrolling.
     ta.addEventListener('scroll', () => { el.querySelector('.grid').style.transform = `translate(${-ta.scrollLeft}px,${-ta.scrollTop}px)`; });
     ta.addEventListener('input', () => { state.messages[i] = ta.value; markOverflow(el, ta.value); if (i === state.active) retarget(); invalidate(); });
-    ta.addEventListener('focus', () => { if (i !== state.active) showMessage(i); });
+    // A task later, so a click has put the caret where it landed before the list re-renders around it.
+    ta.addEventListener('focus', () => { if (i !== state.active) setTimeout(() => { if (i !== state.active) showMessage(i); }); });
     layoutMsgGrid(el.querySelector('.gridwrap')); markOverflow(el, text);
     el.querySelector('.head').addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a;
       if (a === 'show') showMessage(i);
       else if (a === 'del') { if (state.messages.length <= 1) return; state.messages.splice(i, 1); if (state.active >= state.messages.length) state.active = state.messages.length - 1; else if (i < state.active) state.active--; renderMessages(); retarget(); invalidate(); }
-      else { const j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= state.messages.length) return; [state.messages[i], state.messages[j]] = [state.messages[j], state.messages[i]]; if (state.active === i) state.active = j; else if (state.active === j) state.active = i; renderMessages(); invalidate(); }
+      else { const j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= state.messages.length) return; [state.messages[i], state.messages[j]] = [state.messages[j], state.messages[i]]; if (state.active === i) state.active = j; else if (state.active === j) state.active = i; msgFocus = { i: j }; renderMessages(); invalidate(); }
     });
     list.appendChild(el);
   });
+  const el = to && list.children[Math.min(to.i, list.children.length - 1)];
+  if (el) {
+    // The same control if it is still there and enabled. Show and "On the board" hold the same place, so each stands in
+    // for the other. Otherwise the card's name, which presses nothing: a repeated Enter never moves or deletes a message.
+    const twin = { show: 'live', live: 'show' }[to.a];
+    const t = (to.a === 'textarea' ? el.querySelector('textarea') : el.querySelector(`.head [data-a="${to.a}"]:not(:disabled)`))
+      || (twin && el.querySelector(`.head [data-a="${twin}"]`)) || el.querySelector('.head .n');
+    t.focus({ preventScroll: true });
+    if (keep && t.tagName === 'TEXTAREA') { t.setSelectionRange(keep[0], keep[1]); t.scrollTop = keep[2]; t.scrollLeft = keep[3]; }
+  }
 }
 $('#addMsg').addEventListener('click', () => { state.messages.push(''); renderMessages(); showMessage(state.messages.length - 1); const tas = document.querySelectorAll('#msgList textarea'); tas[tas.length - 1].focus(); });
 $('#flipNext').addEventListener('click', () => showMessage(state.active + 1));
@@ -623,7 +688,7 @@ function refreshAll() {
   for (const p in controls) controls[p].refresh();
   const B = state.board;
   $('#rows').value = B.rows; $('#cols').value = B.cols;
-  $('#boardColor').value = B.boardColor; $('#flapColor').value = B.flapColor; $('#letterColor').value = B.letterColor;
+  $('#boardColor').value = B.boardColor; $('#flapColor').value = B.flapColor; $('#letterColor').value = B.letterColor; syncHex();
   $('#header').value = B.header; $('#rowNumbers').checked = B.rowNumbers; $('#hinge').checked = B.hinge; $('#upper').checked = B.upper;
   $('#fontSel').value = state.type.font; syncSeg(); $('#alphabet').value = state.motion.alphabet; $('#blankFirst').checked = state.motion.blankFirst;
   $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
@@ -640,7 +705,10 @@ function refreshAll() {
 })();
 
 // ---------- Export ----------
-function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => btn.textContent = t, 1300); }
+// What an export or a copy did, for a screen reader: one line at the start and one at the end, never each frame of a render.
+let sayT = 0;
+function say(msg) { const s = $('#sfStatus'); clearTimeout(sayT); s.textContent = ''; sayT = setTimeout(() => { s.textContent = msg; }, 60); }
+function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; say(msg); setTimeout(() => btn.textContent = t, 1300); }
 $('#download').addEventListener('click', () => {
   settleAll(); draw();
   canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `split-flap-${canvas.width}x${canvas.height}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
@@ -719,10 +787,14 @@ function buildGif(frames, w, h, delayCs) {
 
 // Deterministic GIF, stepped at the frame delay: one flip of the current message from blank, or every
 // message in turn with a hold between them. Shared by Download and Preview.
+// One render at a time: a second would fight the first over the modules. The other GIF button rests while it runs.
+let gifBusy = false;
 async function makeGif(btn) {
+  if (gifBusy) return null;
   const label = btn.textContent, E = state.export, G = geom();
   if (G.w * G.h > 4e6) { flash(btn, 'Board too large for GIF'); return null; }
-  const active0 = state.active;
+  const active0 = state.active, other = btn.id === 'downloadGif' ? $('#previewGif') : $('#downloadGif');
+  gifBusy = true; btn.setAttribute('aria-busy', 'true'); other.disabled = true; say('Rendering the GIF');
   try {
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     ensureModules(); for (const m of mods) { m.cur = 0; m.t = 0; m.settle = 0; }
@@ -739,8 +811,9 @@ async function makeGif(btn) {
     }
     btn.textContent = 'Encoding…'; await new Promise(r => setTimeout(r, 0));
     const gif = buildGif(frames, canvas.width, canvas.height, E.delay);
+    say('GIF ready');
     return { blob: new Blob([gif], { type: 'image/gif' }), filename: `split-flap-${canvas.width}x${canvas.height}.gif`, note: `${canvas.width} × ${canvas.height} px · ${E.frames} frames at ${E.delay * 10} ms · ${(gif.length / 1024).toFixed(0)} KB` };
-  } finally { state.active = active0; settleAll(); for (let i = 0; i < mods.length; i++) mods[i].cur = mods[i].target = targetsFor(state.messages[state.active] || '')[i]; draw(); btn.textContent = label; }
+  } finally { gifBusy = false; btn.removeAttribute('aria-busy'); other.disabled = false; state.active = active0; settleAll(); for (let i = 0; i < mods.length; i++) mods[i].cur = mods[i].target = targetsFor(state.messages[state.active] || '')[i]; draw(); btn.textContent = label; }
 }
 $('#downloadGif').addEventListener('click', async () => { const g = await makeGif($('#downloadGif')); if (!g) return; const a = document.createElement('a'); a.href = URL.createObjectURL(g.blob); a.download = g.filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
 $('#previewGif').addEventListener('click', async () => { const g = await makeGif($('#previewGif')); if (g) ToolKit.showGif(g); });

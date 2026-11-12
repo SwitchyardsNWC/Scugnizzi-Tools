@@ -386,7 +386,7 @@ function StarterList({
               )}
               {row.from === 'folder' && draftFor(row) && (
                 <button
-                  class="btn primary"
+                  class="btn"
                   disabled={!writable || busy}
                   title={`Take what ${draftFor(row)} says now and make it this starter.`}
                   onClick={() => onPull(row)}

@@ -15,9 +15,12 @@ import { folderWorkspace } from '../workspace/workspace.ts';
 import { Board } from './Board.tsx';
 import { CreateProject } from './CreateProject.tsx';
 import { useInstall, watchLaunches, type InstallState, type LaunchedFile } from './launch.ts';
+import { startPageTheme } from './page-theme.ts';
 import { useProject, type Project } from './useProject.ts';
 import '../app/app.css';
 import './project.css';
+
+startPageTheme();
 
 /**
  * `?create` or `?create=<type>`: the dashboard's Create a project, landing straight on the sheet with that type
