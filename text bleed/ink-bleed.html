@@ -59,7 +59,6 @@
   #layerList .lrow>.name:focus-visible{outline:none}
   #layerList .lrow:has(>.name:focus-visible){outline:var(--border-width) solid var(--focus-ring);outline-offset:1px}
   #layerList .x:focus-visible{outline-offset:1px}
-  #layerList .x:not(:disabled):hover{color:var(--status-blocked);border-color:var(--status-blocked);background:var(--status-blocked-soft)}
   .addrow>select{flex:1;min-width:0}
   /* + Stamp… is a menu that adds, so it wears a button's edge, not a field's well. */
   select.btn{padding-left:24px;text-align:center;text-align-last:center;background-color:transparent;border-color:var(--border-control);color:var(--text-primary)}
@@ -84,15 +83,8 @@
   .warn>.sq{margin-right:var(--spacing-4)}
 
   /* --- the stage ----------------------------------------------------------------------------------------------------- */
-  /* Fit shrinks the paper into the stage; a zoom sets the canvas size inline and the stage scrolls. The drag boxes are
-     placed from the canvas's box, so the canvas carries no border or padding, only tools.css's hairline ring. */
-  /* The sheet's edge is part of judging it, and the default paper is nearly the light stage's tone, so the ring is the
-     control edge rather than the card's: it flips with the theme and still reads against a pale sheet. */
-  .stage canvas{box-shadow:0 0 0 var(--border-width) var(--border-control)}
-  .stage.fit{overflow:hidden}
-  .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
-  .stage:not(.fit){display:block}
-  .stage:not(.fit) canvas{display:block;margin:0 auto}
+  /* Zoom is tools.css's (.stage.fit). The drag boxes are placed from the canvas's box, so the canvas carries no border
+     or padding, only tools.css's control-edge ring. */
   .stage.dropping::after{content:"Drop .svg to add a stamp"}
   #overlay{position:absolute;pointer-events:none}
   /* A box is chrome over the artwork, drawn twice, ink inside paper, so it shows on light and dark sheets alike.
@@ -107,27 +99,12 @@
   .tb:hover .tag,.tb.drag .tag{display:block}
 
   /* --- the export bar ------------------------------------------------------------------------------------------------ */
-  /* Two columns of actions instead of one tall stack, so the bar is three controls high and the paper keeps the height.
-     The one that finishes the job spans both: Download PNG, or with a project open Save, whose label names the file.
-     Without a project Copy image spans the last row; with one it pairs with Preview GIF. Three rows either way, so the
-     bar keeps its height when a project opens. A label that outgrows its button (a long file name, a passing message)
-     ends in an ellipsis inside it, never over its neighbour. */
-  .actions>button{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
-  /* Copy recipe sits with what it copies, in the recipe's corner, on the recipe's first line at every width: so the
-     recipe keeps tools.css's 5px drop even where the narrow layout clears it, and the 24px button comes down 1px to
-     that baseline (measured). 5 + 6 × 18 = 113: six whole lines, then it scrolls. The button has a fixed 88, so
-     "Copied!" or "Blocked" in it never rewraps the recipe beside it. */
-  .recipe-pane{display:flex;align-items:flex-start;gap:var(--spacing-8);min-width:0}
-  .recipe-pane>pre#recipe{flex:1;min-width:0;max-height:113px;padding-top:5px}
-  .recipe-pane>#copyRecipe{flex:0 0 88px;width:88px;margin-top:1px}
-  @media (min-width:901px){
-    /* 3 × 28 + 2 × 12 = 108 of actions. The recipe beside them runs 5px into the bar's bottom padding to make its 113,
-       so the sixth line's baseline sits on Copy image's bottom edge and no line is cut. */
-    .actions{display:grid;grid-template-columns:repeat(2,128px);gap:var(--spacing-12);min-width:0}
-    #download.primary,#saveProject,#download.primary~#copyImg{grid-column:1/-1}
-    .recipe-pane{align-self:stretch;contain:size}
-    .recipe-pane>pre#recipe{align-self:stretch;max-height:none;margin-bottom:-5px}
-  }
+  /* tools.css lays it out. Save names the file it writes over, which can outrun both columns: the name ends in an
+     ellipsis inside the button, and the whole path is its title. */
+  #saveProject{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
+
+  /* --- presets ------------------------------------------------------------------------------------------------------- */
+  /* 12 under the cards, as in the other tools. */
 </style>
 </head>
 <body>
@@ -145,11 +122,11 @@
         <div class="list" id="layerList"></div>
         <div class="addrow">
           <button id="addText">+ Text</button>
-          <select id="stampSel" class="btn" aria-label="Add a stamp"><option value="">+ Stamp…</option></select>
-          <button id="rescan" class="icon" title="Re-read the assets folder" aria-label="Re-read the assets folder" aria-live="polite">⟳</button>
+          <select id="stampSel" class="btn" aria-label="Add a stamp" title="Every .svg in the assets folder. With a project open, its SVG pictures too, and they come back after a reload."><option value="">+ Stamp…</option></select>
+          <button id="rescan" class="icon" title="Re-read the assets folder after adding files" aria-label="Re-read the assets folder after adding files" aria-live="polite">⟳</button>
         </div>
         <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
-        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (⟳ after adding files), or drop an .svg onto the paper. With a project open, the SVG pictures in its assets are stamps too, and they come back after a reload.</p>
+        <p class="hint">Click a layer to edit it, drag to place it. Stamps come from <b>assets</b>, the project or a dropped .svg.</p>
       </div>
     </details>
 
@@ -169,8 +146,8 @@
           <div class="body">
             <div class="row" id="fontRow"><label for="fontSel">Font</label><select id="fontSel"></select></div>
             <div class="row" id="customFontRow" hidden><label for="customFont">Family</label><input type="text" id="customFont" placeholder="Any installed font name"></div>
-            <div class="row" id="alignRow"><label>Align</label><div class="seg" id="alignSeg" role="group" aria-label="Align"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div></div>
-            <div class="row"><label for="inkColor">Ink color</label><input type="color" id="inkColor"><span class="hex" id="inkHex"></span></div>
+            <div class="row" id="alignRow"><label>Align</label><div class="seg" id="alignSeg" role="group" aria-label="Align"><button data-v="left">Left</button><button data-v="center">Centre</button><button data-v="right">Right</button></div></div>
+            <div class="row"><label for="inkColor">Ink colour</label><input type="color" id="inkColor"><span class="hex" id="inkHex"></span></div>
             <div id="textSliders"></div>
             <div id="svgSliders"></div>
             <div id="commonSliders"></div>
@@ -196,10 +173,12 @@
     </details>
 
     <details class="panel" data-panel="looks">
-      <summary><span class="t">Looks</span><span class="v" id="hint-looks"></span></summary>
+      <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
-        <div class="presets" id="presets"></div>
-        <p class="hint">A look restyles every layer and the paper. Text, positions and canvas stay put, except Receipt, which also switches to receipt paper.</p>
+        <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+        <p class="hint">A preset restyles every layer and the paper; text and positions stay. Receipt also resizes the canvas.</p>
+        <div class="btn-row"><button id="resetTool" class="danger">Reset to defaults</button></div>
+        <p class="hint">Reset clears everything this tool saved in this browser.</p>
       </div>
     </details>
 
@@ -216,7 +195,7 @@
     <details class="panel" data-panel="paper">
       <summary><span class="t">Paper</span><span class="v" id="hint-paper"></span></summary>
       <div class="body">
-        <div class="row"><label for="paperColor">Paper color</label><input type="color" id="paperColor"><span class="hex" id="paperHex"></span></div>
+        <div class="row"><label for="paperColor">Paper colour</label><input type="color" id="paperColor"><span class="hex" id="paperHex"></span></div>
         <div id="paperSliders"></div>
       </div>
     </details>
@@ -246,11 +225,9 @@
         <button id="downloadGif" title="Six frames, each with a different random seed, looping">Download GIF</button>
         <button id="previewGif" title="Render the six frames and loop them here before saving">Preview GIF</button>
         <button id="copyImg" aria-live="polite">Copy image</button>
+        <button id="copyRecipe" aria-live="polite">Copy recipe</button>
       </div>
-      <div class="recipe-pane">
-        <pre id="recipe"></pre>
-        <button id="copyRecipe" class="small" aria-live="polite">Copy recipe</button>
-      </div>
+      <pre id="recipe" class="recipe" tabindex="0" aria-label="Recipe"></pre>
     </div>
   </main>
 </div>
@@ -326,7 +303,7 @@ const FONTS = {
   custom: ['Custom…', '']
 };
 
-// A look: `text` applies to text layers, `all` to every layer, `paper` to the sheet, `canvas` optional.
+// A preset: `text` applies to text layers, `all` to every layer, `paper` to the sheet, `canvas` optional.
 const PRESETS = [
   { name: 'Photocopied', desc: 'soft spread, light copier drift',
     text: { font: 'courier', jitter: 0.3, jitterRot: 0.6, strikeVar: 0.35 },
@@ -358,7 +335,7 @@ function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; le
 const trim0 = s => s.replace(/\.?0+$/, '');
 const fmt = {
   pt: v => trim0(v.toFixed(2)) + ' pt', pct: v => Math.round(v * 100) + '%', deg: v => v.toFixed(1) + '°',
-  int: v => String(Math.round(v)), in: v => trim0(v.toFixed(2)) + ' in', x: v => trim0(v.toFixed(2)) + '×'
+  amt: v => Math.round(v) + '%', in: v => trim0(v.toFixed(2)) + ' in', x: v => trim0(v.toFixed(2)) + '×'
 };
 function fontFamily(L) { return L.font === 'custom' ? `"${L.customFont || 'Courier New'}",monospace` : FONTS[L.font][1]; }
 function fontLabel(L) { return L.font === 'custom' ? (L.customFont || 'Courier New') : FONTS[L.font][0]; }
@@ -832,7 +809,7 @@ function updateHints() {
   if (L) {
     set('editName', layerName(L));
     set('hint-type', L.kind === 'svg' ? `${trim0(L.w.toFixed(2))} in · ${L.rotation}°` : `${fontLabel(L)} · ${trim0(L.size.toFixed(1))} pt`);
-    set('hint-bleed', `${L.bleed.master}` + (L.bleed.smudge ? ` · smudge ${pct(L.bleed.smudge)}` : ''));
+    set('hint-bleed', `${L.bleed.master}%` + (L.bleed.smudge ? ` · smudge ${pct(L.bleed.smudge)}` : ''));
     set('hint-stamp', L.stamp ? pct(L.stamp) : 'off');
     set('hint-copy', (L.copy.elong || L.copy.jitter) ? `${pct(L.copy.elong)} · ${pct(L.copy.jitter)}` : 'off');
   }
@@ -885,7 +862,7 @@ function applyZoom() {
   updateOverlay();
 }
 function updateMeta(ms) {
-  const { w, h } = canvasPx(), mp = (w * h / 1e6), sep = '  ·  ';
+  const { w, h } = canvasPx(), mp = (w * h / 1e6), sep = ' · ';
   const figs = `${w} × ${h} px${sep}${state.wIn} × ${state.hIn} in @ ${state.dpi} dpi` + (ms != null ? `${sep}${ms} ms` : '');
   const warn = mp > 3 ? 'large canvas, renders may lag' : '';
   // The figures give way on a narrow window and the warning after them stays whole; the whole line is on hover.
@@ -898,7 +875,7 @@ function updateRecipe() {
   const lines = [`Canvas ${state.wIn} × ${state.hIn} in at ${state.dpi} dpi, ${state.marginTopIn} in top margin, ${state.marginSideIn} in side margins.`];
   for (const L of state.layers) {
     const B = L.bleed, P = L.copy;
-    const what = L.kind === 'svg' ? `Stamp "${layerName(L)}" ${L.w} in wide` : `Text "${layerName(L)}" in ${fontLabel(L)} ${L.size} pt, ${L.align}-aligned, line height ${L.lineHeight}, jitter ${L.jitter} pt / ${L.jitterRot}°, strike variance ${pct(L.strikeVar)}`;
+    const what = L.kind === 'svg' ? `Stamp "${layerName(L)}" ${L.w} in wide` : `Text "${layerName(L)}" in ${fontLabel(L)} ${L.size} pt, ${L.align === 'center' ? 'centre' : L.align}-aligned, line height ${L.lineHeight}, jitter ${L.jitter} pt / ${L.jitterRot}°, strike variance ${pct(L.strikeVar)}`;
     lines.push(`${what}${L.rotation ? `, rotated ${L.rotation}°` : ''}, ink ${L.inkColor}: ${lvl(B.spread, 0.4, 1)} bleed (spread ${B.spread} pt, weight ${pct(B.weight)}, roughness ${pct(B.rough)}, softness ${B.soft} pt), ${pct(B.fade)} fade, ${pct(B.grit)} grit, ${pct(B.smudge)} smudge, ${pct(L.stamp)} stamped; photocopy ${pct(P.elong)} elongation, ${pct(P.jitter)} scan jitter.`);
   }
   lines.push(`Paper ${A.color}: ${pct(A.grain)} grain, ${pct(A.tear)} torn edge, ${pct(A.receipt)} receipt tear, ${pct(A.dust)} dust and foxing, ${pct(A.streaks)} toner streaks, ${pct(A.speckle)} toner speckle. Seed ${state.seed}.`);
@@ -949,9 +926,9 @@ function renderLayerList() {
     const row = document.createElement('div'); row.className = 'item lrow' + (on ? ' on' : ''); row.dataset.id = L.id;
     // The name is the row's button: Tab reaches it, Enter or Space picks the layer, and the chosen one is announced as
     // current, not only drawn. A click anywhere else on the row picks it too.
-    row.innerHTML = `<span class="kind ${L.kind}" aria-hidden="true">${L.kind === 'svg' ? 'S' : 'T'}</span><button type="button" class="name">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</button><button type="button" class="icon x" title="Delete layer">×</button>`;
+    row.innerHTML = `<span class="kind ${L.kind}" aria-hidden="true">${L.kind === 'svg' ? 'S' : 'T'}</span><button type="button" class="name">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</button><button type="button" class="icon danger x">×</button>`;
     if (on) row.querySelector('.name').setAttribute('aria-current', 'true');
-    const x = row.querySelector('.x'); x.setAttribute('aria-label', `Delete layer ${name}`); x.disabled = only;
+    const x = row.querySelector('.x'); x.setAttribute('aria-label', `Delete layer ${name}`); x.title = `Delete layer ${name}`; x.disabled = only;
     row.addEventListener('click', e => {
       const kb = e.detail === 0;              // pressed from the keyboard: keep the focus in the list it rebuilds
       if (e.target.classList.contains('x')) deleteLayer(L.id); else selectLayer(L.id);
@@ -971,6 +948,7 @@ function renderLayerList() {
     list.appendChild(row);
   }
   $('#delLayer').disabled = only;
+  const cur = sel(); $('#delLayer').title = cur ? `Delete layer ${layerName(cur)}` : '';
 }
 // After the list is rebuilt from the keyboard, the focus goes back to the chosen layer's row.
 function focusLayerRow() { const b = $('#layerList .lrow.on .name'); if (b) b.focus(); }
@@ -1037,7 +1015,7 @@ addSlider(Ts, { path: 'L.jitterRot', label: 'Letter tilt', min: 0, max: 4, step:
 addSlider(Ts, { path: 'L.strikeVar', label: 'Strike variance', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
 addSlider($('#svgSliders'), { path: 'L.w', label: 'Width', min: 0.2, max: 12, step: 0.05, fmt: fmt.in, dirty: ['layer'] });
 addSlider($('#commonSliders'), { path: 'L.rotation', label: 'Rotation', min: -180, max: 180, step: 0.5, fmt: fmt.deg, dirty: ['layer'] });
-addSlider($('#bleedMaster'), { path: 'L.bleed.master', label: 'Bleed', min: 0, max: 100, step: 1, fmt: fmt.int, dirty: ['layer'], onChange: applyBleedMaster, look: true });
+addSlider($('#bleedMaster'), { path: 'L.bleed.master', label: 'Bleed', min: 0, max: 100, step: 1, fmt: fmt.amt, dirty: ['layer'], onChange: applyBleedMaster, look: true });
 const Bp = $('#bleedSliders');
 addSlider(Bp, { path: 'L.bleed.spread', label: 'Spread', min: 0, max: 2.5, step: 0.05, fmt: fmt.pt, dirty: ['layer'], look: true });
 addSlider(Bp, { path: 'L.bleed.weight', label: 'Ink weight', min: 0, max: 1, step: 0.01, fmt: fmt.pct, dirty: ['layer'], look: true });
@@ -1119,7 +1097,7 @@ $('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e
 $('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate('fields'); });
 $('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
 
-// Looks
+// Presets
 const presetsEl = $('#presets');
 PRESETS.forEach((p, i) => {
   const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
@@ -1135,7 +1113,15 @@ PRESETS.forEach((p, i) => {
   presetsEl.appendChild(b);
 });
 function clearPresetHighlight() { [...presetsEl.children].forEach(c => c.classList.remove('on')); updateHints(); }
-// The chosen look and the chosen alignment are pressed buttons to a screen reader too: aria-pressed follows .on.
+// The pressed preset is read off the work whenever a whole state lands (a reload, an undo, Reset to defaults, a recipe
+// from the project), so the section names the preset the paper is actually in, or none.
+function matchPreset() {
+  const same = (o, ref) => !!o && Object.keys(ref).every(k => ref[k] && typeof ref[k] === 'object' ? same(o[k], ref[k]) : o[k] === ref[k]);
+  return PRESETS.findIndex(p => same(state.paper, p.paper) && state.layers.every(L => !L.stamp && L.inkColor === p.all.inkColor
+    && same(L.bleed, p.all.bleed) && same(L.copy, p.all.copy) && (L.kind !== 'text' || same(L, p.text))));
+}
+function syncPresetHighlight() { const i = matchPreset(); [...presetsEl.children].forEach((c, j) => c.classList.toggle('on', i === j)); }
+// The chosen preset and the chosen alignment are pressed buttons to a screen reader too: aria-pressed follows .on.
 for (const box of [presetsEl, $('#alignSeg')]) {
   const sync = () => { for (const b of box.children) b.setAttribute('aria-pressed', String(b.classList.contains('on'))); };
   new MutationObserver(sync).observe(box, { subtree: true, attributeFilter: ['class'] }); sync();
@@ -1237,17 +1223,17 @@ $('#downloadGif').addEventListener('click', async () => { const g = await makeGi
 $('#previewGif').addEventListener('click', async () => { const g = await makeGif($('#previewGif')); if (g) ToolKit.showGif(g); });
 $('#copyImg').addEventListener('click', async () => {
   const btn = $('#copyImg');
-  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied!'); }
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied'); }
   catch (e) { flash(btn, 'Clipboard blocked'); }
 });
 $('#copyRecipe').addEventListener('click', async () => {
-  // Short words, so the corner button keeps its width and the recipe beside it doesn't reflow; the sentence is the toast.
-  try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); }
-  catch (e) { flash($('#copyRecipe'), 'Blocked'); if (window.ToolKit) ToolKit.toast('Clipboard blocked by the browser'); }
+  try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied'); }
+  catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); }
 });
+$('#resetTool').addEventListener('click', () => ToolKit.reset());
 
 refreshAll();
-presetsEl.children[0].classList.add('on');
+syncPresetHighlight();
 applyZoom();
 loadAssets();
 document.fonts && document.fonts.ready.then(() => invalidate('ink'));
@@ -1263,8 +1249,9 @@ function applyState(s) {
   for (const k of Object.keys(state)) delete state[k]; Object.assign(state, s);
   nextId = Math.max(0, ...state.layers.map(l => l.id)) + 1;
   if (!state.layers.some(l => l.id === state.selected)) state.selected = state.layers[0].id;
-  refreshAll(); applyZoom(); invalidate('fields');
+  syncPresetHighlight(); refreshAll(); applyZoom(); invalidate('fields');
 }
+ToolKit.fitReadout($('#zoomSel'), canvas);
 ToolKit.init({
   tool: 'ink-bleed', version: 1,
   getState: () => JSON.parse(JSON.stringify(state, (k, v) => k.startsWith('_') ? undefined : v)),
@@ -1290,7 +1277,7 @@ ToolKit.register('down', 'Nudge layer', nudge(0, 1), { group: 'Layers', hidden: 
 ToolKit.register('shift+left', 'Nudge layer', nudge(-1, 0), { hidden: true }); ToolKit.register('shift+right', 'Nudge layer', nudge(1, 0), { hidden: true });
 ToolKit.register('shift+up', 'Nudge layer', nudge(0, -1), { hidden: true }); ToolKit.register('shift+down', 'Nudge layer', nudge(0, 1), { hidden: true });
 ToolKit.register('r', 'Reshuffle seed', () => $('#reshuffle').click(), { group: 'View' });
-PRESETS.forEach((p, i) => ToolKit.register(String(i + 1), `Look: ${p.name}`, () => presetsEl.children[i].click(), { group: 'View' }));
+PRESETS.forEach((p, i) => ToolKit.register(String(i + 1), `Preset: ${p.name}`, () => presetsEl.children[i].click(), { group: 'Presets' }));
 ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
 ToolKit.register('mod+=', 'Zoom in', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.min(ZOOMS.length - 1, i + 1)]); }, { group: 'View' });
 ToolKit.register('mod+-', 'Zoom out', () => { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, i - 1)]); }, { group: 'View' });
