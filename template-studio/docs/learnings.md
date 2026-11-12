@@ -3323,7 +3323,112 @@ arrangement, links; asked about links, underlined by default.*
 - **"Socials first" was ledger-only and named for one direction.** `socialsAt` is above or below on every type;
   absent is where the type puts them, and a ledger that said `socialsFirst` keeps them first until somebody chooses.
 
-### 3.103 The HubSpot desk
+### 3.103 Two lists of where a colour lives, and they drifted
+
+*2026-11-11. Found as a card's fill: set to `card` (#123456), then the palette entry renamed to Callout. Usage came
+back empty, the fill stayed `card`, and the export lost the card.*
+
+- **Counting and carrying were two walks.** `colorUsage` counted, `repoint` rewrote, and each knew presets, roles,
+  buttons, stripes and dividers. Neither knew a column's fill or border, a brand mark, a freeform drawing (its
+  background, every layer's paint, a run's colour), the quote bar, the rule, the image and page borders, the
+  footer's hairline and link (system and per footer), or the brand presets. So `removeColor` called a colour used
+  only by a card unused, deleted it, and the card vanished: `boxOf` draws the wrapper only when the fill resolves.
+- **One walk, two endings.** `model/color-refs.ts` is the list. Whatever it visits is counted *and* carried; a
+  field it does not visit is neither, in one place. `tests/color-refs.test.ts` puts every kind through the same
+  four questions, and a new kind without a row there is the gap this closes.
+- **Absent brand presets are the shipped ones.** The Shop sign names red whether or not a system wrote
+  `canvasType`, so the walk reads the shipped set and writes `canvasType` only when one of them changed.
+- **A rename moves no pixel.** A freeform picture's and a brand mark's hash covers their recipe, names included, so
+  a rename would have called every one stale. A picture current before a rename stays current; a replace with a
+  different hex leaves it stale, which is true.
+- **Fonts had the same hole.** `fontUsage` saw roles and the email's stack, not brand presets or a freeform layer's
+  face and runs. It takes the document now, and `removeFont` refuses while any of them names the stack.
+- **There was a third list.** Pasting a design system in (Admin) replaces the palette and repoints what named the
+  old one, from its own list in `import-system.ts`, which had no footer and no brand presets. A pasted palette
+  without red left the footer's links and the Shop sign naming nothing. It walks `walkSystem` now (2026-11-12).
+- **Not reached, named.** A freeform block linked to a Freeform app frame takes its drawing from the frame, which
+  is another document with its own palette; repointing the block is undone on the next follow.
+
+### 3.104 A box inside `.sy-rich` wore the team's table rule
+
+*2026-11-11. Found in the card starter: cards 1 and 3 drew a grey hairline inside the ink border, and the copy's cell
+came out at 16px in a 13px system. Card 2 did not.*
+
+- **`.sy-rich td` matched the compiler's own cell.** The rule (`border:1px solid #d9d8d3; font-size:16px`, head.ts) is
+  for tables the team types, and it lives in `hs-inline-css`, so HubSpot inlines it onto every match at send. A Text
+  block alone in a boxed or filled column put `sy-rich` on the outer cell, and `boxed()` drew its table inside it.
+  The canvas showed it too, so it was never a HubSpot-only surprise; it was just easy to read as part of the card.
+- **Card 2 was right because it was a stack.** A stack's outer cell carries only the gutter's class, and each block
+  sits in a row of its own inside the box (3.59). The text inset already did the same with its inner cell. A boxed
+  Text block on its own now takes the stack's shape: the words in a row inside the box, `sy-rich` on that row.
+- **The rule is: `sy-rich` never sits above a table the compiler drew.** Everything under it is the team's.
+  `tests/rich-box.test.ts` loads the compiled card starter in a DOM and checks that no box table has a `.sy-rich`
+  ancestor, that the box's cell keeps its own border and size, and that a table the team typed still gets the rule.
+- **No snapshot moved.** The block snapshots render unboxed Text, which is unchanged byte for byte. A boxed Text
+  block gains one nested table, the same one a stack row already has.
+
+### 3.105 A drag never makes a group
+
+*2026-11-12. Jared: "dragging layers had issues with items getting auto-grouped, and sometimes I could not move
+them where I needed." On the email canvas, trying to give a block its own section, pull one out of a group, and
+reorder inside one. Asked how dragging should choose, he chose: a drag never groups.*
+
+- **Three quarters of every block meant "group".** The zones from 3.59 gave a lone block an 8–18px strip at each
+  end for "a section of its own" and everything between for "into its cell". Measured on the Switchyards email,
+  a 134px paragraph was 18px, 98px, 18px. Aiming between two sections with any slack made a group.
+- **Now a block on its own has no inside.** Its halves are a section above and below. A block that already shares a
+  cell (a group, or a column of a row of columns) keeps the inside, because reordering a group or joining one that
+  exists is what a drag there is for. A new group is a selection and ⌘G, which already existed. Measured after:
+  no join zone anywhere on the Switchyards email; two drops that used to make two groups make none.
+- **Letting go where you picked it up sent the block after the footer.** The pointer over the carried block walked
+  up to the cell around it, and a lone block has none, so it fell through to "end of email". Over the carried
+  block there is now no indicator and no move.
+- **A group's own ends could not be reached from inside it.** The first and last of a cell were counted with the
+  carried block in them, so lifting the first card of a group meant the next one was never "first" and its top
+  edge never offered "out, above". `endsOf` counts without it.
+- **Space that was not a block was the end of the email.** A section's own padding, a group's padding, and the
+  page either side of the 600px column all resolved to `end`. They are now the band at that height, by halves.
+  The padding of a column in a row of columns still takes the nearer end of that column; it is a cell you can see.
+- **The decision is geometry in, a zone out** (`src/app/drop-zones.ts`), so `tests/drop-zones.test.ts` holds it
+  without a browser. `Preview.tsx` measures the document and draws the line. The sweeps were run in Chromium
+  against the Switchyards and Card emails, before and after.
+
+### 3.106 A handle, a picture that moves, and space for several blocks at once
+
+*2026-11-12. Jared: "Select multiple blocks and change their spacing together. Images are hard to grab and move.
+Maybe blocks should have a clearer handle. Make any UI/UX updates you feel will improve the usability." Asked where
+the handle goes, he chose a grip in the left margin on hover; of four extras, auto-scroll, a label on the drop line
+and drag polish.*
+
+- **An Image would not move because the browser moved it first.** Every `<img>` and `<a>` is draggable by default.
+  Press on a picture, move a few pixels, and Chromium starts its own drag of the picture, which fires
+  `pointercancel` and ended ours. The hero is a linked picture, so it was both. The canvas chrome now sets
+  `-webkit-user-drag: none` on both, and a `dragstart` outside text editing is prevented. Checked with real
+  mouse input: the hero drags and drops like any other block.
+- **Test real drags with CDP, not Playwright's mouse.** Inside this sandboxed frame, Playwright's drag interception
+  hung on every move with a button down. `Input.dispatchMouseEvent` through a CDP session is a plain mouse.
+- **The handle is in the margin, touching the block.** Six dots on white, outlined, in the 40px either side of the
+  email, beside whichever block is under the pointer, or the selected one when the pointer is elsewhere. It
+  stays put over anything that is not a block, so the pointer can cross to it, and on it the block is outlined.
+  It touches the block's left edge because a gap of a few pixels was enough for the pointer to leave the block
+  first. A click on it selects; a drag from it is the same drag as from the block. It is put into the canvas at
+  run time, like the copy in your hand, so it cannot reach the email.
+- **The drop line says what it does.** "New section", "Into group", "Move in group", "Into column", "Replace
+  picture", "End of email", in white on the accent at the line's right end. The line's width and a faint frame said
+  it before, but only to someone who had learned them.
+- **Auto-scroll, from where the pointer is on screen.** Within 56px of the canvas's top or bottom, a carried block
+  scrolls it, faster nearer the edge. The pointer is kept in the app's viewport and turned back into frame
+  coordinates every frame, because during the scroll it does not move; the email does. Inside the canvas but off
+  the email, the pointer is pinned to the email's edge, so the padding below the footer means the end of it.
+- **Escape puts it back; a drag starts any way.** Escape is caught in both documents before the app's own Escape.
+  The start threshold was five pixels *vertically*, so a block pulled sideways first never left its place.
+- **Space for several blocks is a shortcut, not a second home.** `model/multi-spacing.ts` reads and writes each
+  side through the path the block's own Spacing panel uses: the column's padding for most, the section's for a
+  block that draws its own band. A Spacer and the stripes have none and are left alone, and the panel says how many
+  of the selection a side applies to. Sides they differ on read "mixed"; the first number given wins. Two blocks in
+  one group share one column, so the group's space is set once. One drag of a dial is one undo step.
+
+### 3.107 The HubSpot desk
 
 *2026-11-11. Jared: "Create an artifact of the template studio to run in Claude that works directly with hubspot to
 manage templates. Let me know if that should be a new repo all together." Asked how much of the studio, he chose a
@@ -3356,4 +3461,3 @@ asked about writes, drafts, each confirmed; asked who opens it, just him for now
   moment before it works, so a double click on Review cannot press it. Never retried by the page: a write that times
   out may have run, so the page says to look in HubSpot first; once CREATE has answered, a poll that fails still
   reports the draft made. The draft's state lives with the page, not the tab, so one in flight survives leaving it.
-

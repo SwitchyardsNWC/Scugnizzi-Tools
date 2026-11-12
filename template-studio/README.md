@@ -38,7 +38,7 @@ build step, and its tests need no browser.
 - `src/workspace/` — the folder, via the File System Access API, with a file-picker fallback
 - `src/app/` — the editor: outline, inspector, canvas, the design panel, undo, autosave
 - `src/desk/` — the HubSpot desk: reads the portal's templates through the viewer's HubSpot connector, compares them
-  with this build, makes draft emails (learnings 1.19, 3.103). `src/model/hubl-source.ts` reads any template's HubL;
+  with this build, makes draft emails (learnings 1.19, 3.107). `src/model/hubl-source.ts` reads any template's HubL;
   `src/compile/embed.ts` writes and reads the design every export carries
 
 Adding a block type is a renderer in `src/compile/blocks/` and an entry in `src/model/catalog.ts`.
