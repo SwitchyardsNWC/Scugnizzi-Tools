@@ -3280,3 +3280,29 @@ came out at 16px in a 13px system. Card 2 did not.*
   ancestor, that the box's cell keeps its own border and size, and that a table the team typed still gets the rule.
 - **No snapshot moved.** The block snapshots render unboxed Text, which is unchanged byte for byte. A boxed Text
   block gains one nested table, the same one a stack row already has.
+
+### 3.104 A drag never makes a group
+
+*2026-11-12. Jared: "dragging layers had issues with items getting auto-grouped, and sometimes I could not move
+them where I needed." On the email canvas, trying to give a block its own section, pull one out of a group, and
+reorder inside one. Asked how dragging should choose, he chose: a drag never groups.*
+
+- **Three quarters of every block meant "group".** The zones from 3.59 gave a lone block an 8–18px strip at each
+  end for "a section of its own" and everything between for "into its cell". Measured on the Switchyards email,
+  a 134px paragraph was 18px, 98px, 18px. Aiming between two sections with any slack made a group.
+- **Now a block on its own has no inside.** Its halves are a section above and below. A block that already shares a
+  cell (a group, or a column of a row of columns) keeps the inside, because reordering a group or joining one that
+  exists is what a drag there is for. A new group is a selection and ⌘G, which already existed. Measured after:
+  no join zone anywhere on the Switchyards email; two drops that used to make two groups make none.
+- **Letting go where you picked it up sent the block after the footer.** The pointer over the carried block walked
+  up to the cell around it, and a lone block has none, so it fell through to "end of email". Over the carried
+  block there is now no indicator and no move.
+- **A group's own ends could not be reached from inside it.** The first and last of a cell were counted with the
+  carried block in them, so lifting the first card of a group meant the next one was never "first" and its top
+  edge never offered "out, above". `endsOf` counts without it.
+- **Space that was not a block was the end of the email.** A section's own padding, a group's padding, and the
+  page either side of the 600px column all resolved to `end`. They are now the band at that height, by halves.
+  The padding of a column in a row of columns still takes the nearer end of that column; it is a cell you can see.
+- **The decision is geometry in, a zone out** (`src/app/drop-zones.ts`), so `tests/drop-zones.test.ts` holds it
+  without a browser. `Preview.tsx` measures the document and draws the line. The sweeps were run in Chromium
+  against the Switchyards and Card emails, before and after.

@@ -1120,8 +1120,8 @@ export function App() {
       }
       const site = siteOf(editor.template, spot.blockId);
       if (!site) return null;
-      // Beside a block means in its column — a group, if it was alone (learnings 3.59). The canvas
-      // offers the section edges separately, so this is what the middle of a block means.
+      // Beside a block means in its column. The canvas offers it only over a block that already shares a cell, so a
+      // drag reorders a group or joins one and never makes one (learnings 3.104).
       return { kind: 'column', columnId: site.column.id, index: site.index + (spot.before ? 0 : 1) };
     },
     [editor.template],

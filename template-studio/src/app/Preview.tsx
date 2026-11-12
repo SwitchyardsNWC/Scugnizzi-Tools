@@ -4,6 +4,7 @@ import { TEXT_INSET_CLASS } from '../compile/layout.ts';
 import { fromContentEditable, sanitise } from '../model/sanitise.ts';
 import type { BlockType } from '../model/types.ts';
 import { BLOCK_ICONS, ColumnsIcon, GroupIcon } from './icons.tsx';
+import { blockZone, endsOf } from './drop-zones.ts';
 import { capture, release } from './pointer.ts';
 import { SlashMenu } from './SlashMenu.tsx';
 import { blockItem, filterItems, inlineMarkdown, markdownShortcut, slashQuery, STYLE_COMMANDS, TURN_COMMANDS, turnIdOf, type Exec, type SlashItem } from './slash.ts';
@@ -659,11 +660,15 @@ export function Preview({
    * What a pointer at these frame coordinates means. One resolver for both drags — the palette's
    * and the canvas's own — so the two cannot disagree about what a given pixel means.
    *
-   * Three zones on a block (learnings 3.59). The top and bottom edges of a column's first and last
-   * block mean a new section before or after — the line runs the full width, at the band's edge.
-   * The middle means *alongside*, in the same cell: the line is inset to the block's content, and
-   * the cell it would join is framed. A block that draws its own band has no inside, so on it the
-   * halves are the two section edges and nothing else.
+   * A drag never makes a group (`drop-zones.ts`, learnings 3.104). Over a block on its own, the
+   * halves mean a section of its own above or below — the line runs the full width, at the band's
+   * edge. Over a block that already shares a cell, the middle means *beside it in that cell*: the
+   * line is inset to the block's content and the cell is framed, and the open ends of the cell's
+   * first and last blocks still mean a section. A block that draws its own band has no inside.
+   *
+   * Over the block in your hand, nothing: no indicator, and letting go moves nothing. Anywhere
+   * else that is not a block — a section's own space, a group's padding, the page either side of
+   * the email — is the band at that height, by halves.
    */
   const probeAt = (x: number, y: number, ignore: string | null): { spot: DropSpot; hint: Hint } | null => {
     const inner = frame.current?.contentDocument;
@@ -684,52 +689,64 @@ export function Preview({
       box: false,
       ...(frameRect ? { frame: rectOf(frameRect) } : {}),
     });
+    /** A section of its own, either side of a band: the line at the band's edge, across the whole canvas. */
+    const sectionSpot = (band: HTMLElement, sectionId: string, before: boolean) => {
+      const r = band.getBoundingClientRect();
+      return { spot: { at: 'section', sectionId, before } as DropSpot, hint: line(before ? r.top : r.bottom, 0, frameWidth) };
+    };
+    const half = (band: HTMLElement) => {
+      const r = band.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    };
+    const sectionOfBand = (band: HTMLElement) => band.dataset['sySection'] ?? (band.querySelector('[data-sy-section]') as HTMLElement | null)?.dataset['sySection'] ?? null;
 
-
-    let block = under.closest('[data-sy-block]') as HTMLElement | null;
-    // A block cannot be dropped onto itself. Walking up rather than giving up means dropping onto
-    // your own block still resolves to the column around it, instead of the indicator vanishing.
-    while (block && ignore && block.dataset['syBlock'] === ignore) {
-      block = block.parentElement?.closest('[data-sy-block]') as HTMLElement | null;
-    }
-    if (block?.dataset['syBlock']) {
+    const block = under.closest('[data-sy-block]') as HTMLElement | null;
+    // The block in your hand, where it was lifted from. This used to walk up to the cell around it, and a block
+    // alone in its section has none, so it fell through to `end`: letting go where you picked it up sent the block
+    // after the footer.
+    if (block && ignore && block.dataset['syBlock'] === ignore) return null;
+    const blockId = block?.dataset['syBlock'];
+    if (block && blockId) {
       const box = block.getBoundingClientRect();
       const sectionId = block.dataset['sySection'] ?? '';
       const band = (block.closest('.hse-section') ?? block) as HTMLElement;
-      const bandBox = band.getBoundingClientRect();
-      const midway = y < box.top + box.height / 2;
-      if (block.hasAttribute('data-sy-band')) {
-        return { spot: { at: 'section', sectionId, before: midway }, hint: line(midway ? bandBox.top : bandBox.bottom, 0, frameWidth) };
-      }
       const column = block.closest('[data-sy-column]') as HTMLElement | null;
-      const siblings = column ? [...column.querySelectorAll('[data-sy-block]')] : [block];
-      const first = siblings[0] === block;
-      const last = siblings[siblings.length - 1] === block;
-      const edge = Math.min(18, Math.max(8, box.height * 0.28));
-      if (first && y < box.top + edge) return { spot: { at: 'section', sectionId, before: true }, hint: line(bandBox.top, 0, frameWidth) };
-      if (last && y > box.bottom - edge) return { spot: { at: 'section', sectionId, before: false }, hint: line(bandBox.bottom, 0, frameWidth) };
+      const siblings = column ? [...column.querySelectorAll('[data-sy-block]')].map((b) => (b as HTMLElement).dataset['syBlock'] ?? '') : [blockId];
+      const { first, last } = endsOf(siblings, blockId, ignore);
+      const zone = blockZone({
+        y,
+        top: box.top,
+        bottom: box.bottom,
+        band: block.hasAttribute('data-sy-band'),
+        grouped: Boolean(column),
+        first,
+        last,
+        onto: Boolean(onto?.includes(blockId)),
+      });
+      if (zone.kind === 'section') return sectionSpot(band, sectionId, zone.before);
+      // The block itself, when the caller allows it: boxed, rather than a line beside it.
+      if (zone.kind === 'onto') return { spot: { at: 'block', blockId, before: y < box.top + box.height / 2, onto: true }, hint: { ...rectOf(box), box: true } };
       const cell = cellOf(block);
       const content = cell ? contentBox(cell) : box;
       const host = column ?? cell ?? block;
-      // The block itself, when the caller allows it: its middle band, with the block boxed rather than a line beside it.
-      const middle = box.height * 0.3;
-      if (onto?.includes(block.dataset['syBlock']) && y > box.top + middle && y < box.bottom - middle) {
-        return { spot: { at: 'block', blockId: block.dataset['syBlock'], before: midway, onto: true }, hint: { ...rectOf(box), box: true } };
-      }
       return {
-        spot: { at: 'block', blockId: block.dataset['syBlock'], before: midway },
-        hint: line(midway ? content.top : content.bottom, content.left, content.width, host.getBoundingClientRect()),
+        spot: { at: 'block', blockId, before: zone.before },
+        hint: line(zone.before ? content.top : content.bottom, content.left, content.width, host.getBoundingClientRect()),
       };
     }
 
     const column = under.closest('[data-sy-column]') as HTMLElement | null;
     if (column?.dataset['syColumn']) {
       const box = column.getBoundingClientRect();
-      // An empty column is one big target. One with blocks in it, met in its own padding, takes
-      // the block at whichever end is nearer.
+      // An empty column is one big target.
       if (!column.querySelector('[data-sy-block]')) {
         return { spot: { at: 'column', columnId: column.dataset['syColumn'], tail: false }, hint: { ...rectOf(box), box: true } };
       }
+      // A group's own padding, in a section of its own, is the space around it rather than a way in: into a group
+      // is over its blocks. A column of a row is a cell you can see, and its padding takes the nearer end.
+      const band = column.closest('.hse-section') as HTMLElement | null;
+      const sectionId = column.dataset['sySection'];
+      if (!column.closest('.sy-row') && band && sectionId) return sectionSpot(band, sectionId, half(band));
       const tail = y > box.top + box.height / 2;
       const cell = (column.matches('table') ? cellOf(column) : column.querySelector('td.hs_padded')) as HTMLElement | null;
       const content = cell ? contentBox(cell) : box;
@@ -738,6 +755,20 @@ export function Preview({
         hint: line(tail ? content.bottom : content.top, content.left, content.width, box),
       };
     }
+
+    // A section's own space, or the page beside the email: the band at this height. This used to be `end`, so a
+    // drop a little wide of the email went after the footer.
+    const bands = [...inner.querySelectorAll('.hse-section')] as HTMLElement[];
+    for (const band of bands) {
+      const r = band.getBoundingClientRect();
+      if (y < r.top || y >= r.bottom) continue;
+      if (ignore && band.dataset['syBlock'] === ignore) return null;
+      const sectionId = sectionOfBand(band);
+      if (sectionId) return sectionSpot(band, sectionId, half(band));
+    }
+    const top = bands[0];
+    const topId = top ? sectionOfBand(top) : null;
+    if (top && topId && y < top.getBoundingClientRect().top) return sectionSpot(top, topId, true);
     return end;
   };
 
@@ -1845,8 +1876,7 @@ export function Preview({
         held.style.left = `${event.clientX - state.grabX}px`;
         held.style.top = `${event.clientY - state.grabY}px`;
       }
-      // A block cannot be dropped onto itself, and offering it as a target makes the indicator
-      // flicker under the pointer the whole way down.
+      // A block cannot be dropped onto itself: over it, there is no indicator and letting go moves nothing.
       const found = probeAt(event.clientX, event.clientY, state.blockId);
       state.spot = found?.spot ?? null;
       setHint(found?.hint ?? null);
