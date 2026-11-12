@@ -18,6 +18,16 @@ Every tool on Enkel.
   system's own sheet instead of the browser's.
 - Space and Enter on a button reached with the keyboard press it; they no longer fire the tool's shortcut instead.
 - Dashboard: the header no longer gets squeezed on a long page; words in the header share a baseline.
+- One export bar in every tool: the finishing action across two columns, the rest in pairs, Copy recipe last, the
+  recipe beside them on whole lines. HUB-MOD's Download .zip moves into it.
+- Presets is the section's name in every tool, and each ends on the same Reset to defaults. Every delete says what it
+  deletes ("Delete module", "Remove ink 2", "Delete layer Hello"). Colour rows read well, then hex, then name.
+- Image effects opens on a sample photograph, with a button to bring it back. Its zoom reads the true scale
+  ("Fit · 71%"), draws crisp at 100% and 200%, and the other tools' Fit says its scale too. Zoomed out, the work stays
+  centred in every tool; zoomed in, it scrolls to every edge.
+- The Board and the Studio library follow light and dark with the suite.
+- Lined up: the banner's words, section names and their state, the stage bar's figures and the Zoom label, and the
+  recipe's first line and the first export button each share a baseline.
 
 ## 0.9.0 · 2026-11-11
 
