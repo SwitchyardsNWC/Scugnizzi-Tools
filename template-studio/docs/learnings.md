@@ -3283,6 +3283,8 @@ back empty, the fill stayed `card`, and the export lost the card.*
   different hex leaves it stale, which is true.
 - **Fonts had the same hole.** `fontUsage` saw roles and the email's stack, not brand presets or a freeform layer's
   face and runs. It takes the document now, and `removeFont` refuses while any of them names the stack.
-- **Not reached, named.** `import-system.ts`'s `colorRefs` is a third list and still lacks the footer and the
-  brand presets. A freeform block linked to a Freeform app frame takes its drawing from the frame, which is another
-  document with its own palette; repointing the block is undone on the next follow.
+- **There was a third list.** Pasting a design system in (Admin) replaces the palette and repoints what named the
+  old one, from its own list in `import-system.ts`, which had no footer and no brand presets. A pasted palette
+  without red left the footer's links and the Shop sign naming nothing. It walks `walkSystem` now (2026-11-12).
+- **Not reached, named.** A freeform block linked to a Freeform app frame takes its drawing from the frame, which
+  is another document with its own palette; repointing the block is undone on the next follow.

@@ -4,11 +4,12 @@
 // than a text edit. Miss a reference and the thing pointing at it resolves to nothing: `colorOf` returns null
 // for a name the palette lacks, and the card, the mark or the hairline quietly loses its colour in the export.
 //
-// There used to be two lists: one in `colorUsage`, which counts, and one in `repoint`, which rewrites. They
-// drifted. Both knew presets, type roles, buttons, stripes and dividers; neither knew a card's fill, a brand
-// mark, a freeform drawing, the rich-text and image tokens, the page border, the footer's colours or the brand
-// presets. So a colour used only by a card fill read as unused, deleting it left the card naming nothing, and
-// a rename left the card on the old name. One walk with two endings is the fix: whatever this visits is
+// There used to be three lists: one in `colorUsage`, which counts, one in `repoint`, which rewrites, and one in
+// the design-system import, which repoints onto a pasted palette. They drifted. The first two knew presets, type
+// roles, buttons, stripes and dividers, and neither knew a card's fill, a brand mark, a freeform drawing, the
+// rich-text and image tokens, the page border, the footer's colours or the brand presets. The import's had no
+// footer and no brand presets. So a colour used only by a card fill read as unused, deleting it left the card
+// naming nothing, and a rename left the card on the old name. One walk is the fix: whatever this visits is
 // counted *and* carried, and a field it does not visit is neither, visibly, in one place (learnings 3.103).
 //
 // Pure. Every walk returns the same object for any part it did not change, so an untouched document is the
