@@ -2346,6 +2346,7 @@ export function App() {
             {...(patternInfo ? { patternInfo } : {})}
             multi={{
               count: selectedIds.length,
+              ids: selectedIds,
               onDelete: () => editor.removeMany(selectedIds),
               ...(selectedIds.length > 1 && groupIntoStack(editor.template, selectedIds)
                 ? {

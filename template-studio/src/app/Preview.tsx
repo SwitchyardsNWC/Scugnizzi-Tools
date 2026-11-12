@@ -264,6 +264,11 @@ interface Hint {
   height: number;
   box: boolean;
   frame?: { top: number; left: number; width: number; height: number };
+  /**
+   * What letting go here does, in words: "New section", "Into group". The line's width and the faint frame
+   * already say it, but only to someone who has learned what they mean, and not by colour to anyone.
+   */
+  label?: string;
 }
 
 /**
@@ -359,7 +364,44 @@ const CHROME = `
     box-shadow: 0 14px 30px -10px rgba(0,0,0,0.45); border-radius: 3px; overflow: hidden;
     transform: rotate(-0.6deg);
   }
+  /* Pictures and links are content here, not things to carry out of the page. Left draggable, the
+     browser took the pointer for its own image drag the moment one moved, and cancelled the block
+     drag under it — which is why an Image was the block that would not move (learnings 3.105). */
+  img, a { -webkit-user-drag: none; }
+  /* The handle: in the margin, touching the left edge of the block under the pointer, or of the
+     selected one. Put there at run time, like the copy in your hand, so it never reaches the email.
+     Its shape says what it is; the colour only says it is under the pointer. */
+  [data-sy-grip] {
+    position: absolute; z-index: 9997; width: 22px; height: 24px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none;
+    color: #5f6368; background: #ffffff; border: 1px solid #c4c7ce; border-radius: 4px 0 0 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  }
+  [data-sy-grip]:hover { color: #ffffff; background: #2b45d8; border-color: #2b45d8; }
+  [data-sy-grip] svg { display: block; pointer-events: none; }
+  html[data-sy-dragging] [data-sy-grip], html:has([data-sy-text-editing]) [data-sy-grip] { display: none; }
+  [data-sy-grip-for] { outline: 2px solid color-mix(in srgb, #2b45d8 55%, transparent); outline-offset: -2px; }
 </style>`;
+
+/** Six dots, the mark every layout tool uses for "hold here to move". */
+const GRIP_DOTS =
+  '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">' +
+  '<circle cx="2.5" cy="3" r="1.5"/><circle cx="7.5" cy="3" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/>' +
+  '<circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13" r="1.5"/><circle cx="7.5" cy="13" r="1.5"/></svg>';
+/** The handle's width, which is also how far into the margin it sits. */
+const GRIP_W = 22;
+/** How close to the canvas's top or bottom edge a carried block starts scrolling it, and how fast at the very edge. */
+const SCROLL_EDGE = 56;
+const SCROLL_MAX = 22;
+
+/** The nearest ancestor that scrolls vertically and has somewhere to go, or the page itself. */
+function scrollerOf(el: HTMLElement | null): HTMLElement | null {
+  for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
+    const overflow = getComputedStyle(n).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? null;
+}
 
 export function Preview({
   html,
@@ -417,13 +459,22 @@ export function Preview({
   const editing = useRef<{ el: HTMLElement; blockId: string; path: string; original: string; rich: boolean } | null>(null);
   const drag = useRef<{
     blockId: string;
-    y: number;
+    /** Where the press was, in frame coordinates: a drag starts once the pointer is five pixels from it, any way. */
+    x0: number;
+    y0: number;
+    /** The pointer in the app's own viewport, which stays put while auto-scroll moves the email under it. */
+    vx: number;
+    vy: number;
     active: boolean;
     spot: DropSpot | null;
     grabX: number;
     grabY: number;
     width: number;
+    /** What auto-scroll moves: the canvas's scrolling ancestor, found as the drag starts. */
+    scroller: HTMLElement | null;
   } | null>(null);
+  /** The block the hover handle is at: the last one under the pointer, kept while the pointer crosses the margin to it. */
+  const gripHover = useRef<string | null>(null);
   /** Where to draw the drop indicator, in frame coordinates. */
   const [hint, setHint] = useState<Hint | null>(null);
   /** The spacing overlay's strips, in frame coordinates. Empty when nothing is being shown. */
@@ -679,20 +730,27 @@ export function Preview({
     if (x < 0 || y < 0 || x > frameWidth || y > frameHeight) return null;
 
     const under = inner.elementFromPoint(x, y) as HTMLElement | null;
-    const end = { spot: { at: 'end' } as DropSpot, hint: { top: frameHeight - 3, left: 0, width: frameWidth, height: 3, box: false } };
+    const end = { spot: { at: 'end' } as DropSpot, hint: { top: frameHeight - 3, left: 0, width: frameWidth, height: 3, box: false, label: 'End of email' } };
     if (!under) return end;
-    const line = (top: number, left: number, width: number, frameRect?: DOMRect): Hint => ({
+    const line = (top: number, left: number, width: number, label: string, frameRect?: DOMRect): Hint => ({
       top: top - 1.5,
       left,
       width,
       height: 3,
       box: false,
+      label,
       ...(frameRect ? { frame: rectOf(frameRect) } : {}),
     });
     /** A section of its own, either side of a band: the line at the band's edge, across the whole canvas. */
     const sectionSpot = (band: HTMLElement, sectionId: string, before: boolean) => {
       const r = band.getBoundingClientRect();
-      return { spot: { at: 'section', sectionId, before } as DropSpot, hint: line(before ? r.top : r.bottom, 0, frameWidth) };
+      return { spot: { at: 'section', sectionId, before } as DropSpot, hint: line(before ? r.top : r.bottom, 0, frameWidth, 'New section') };
+    };
+    /** What landing in a cell is: back among its own group, into someone else's, or into a column of a row. */
+    const cellLabel = (column: HTMLElement | null, siblings: string[]) => {
+      const row = Boolean(column?.closest('.sy-row'));
+      if (ignore && siblings.includes(ignore)) return row ? 'Move in column' : 'Move in group';
+      return row ? 'Into column' : 'Into group';
     };
     const half = (band: HTMLElement) => {
       const r = band.getBoundingClientRect();
@@ -725,13 +783,13 @@ export function Preview({
       });
       if (zone.kind === 'section') return sectionSpot(band, sectionId, zone.before);
       // The block itself, when the caller allows it: boxed, rather than a line beside it.
-      if (zone.kind === 'onto') return { spot: { at: 'block', blockId, before: y < box.top + box.height / 2, onto: true }, hint: { ...rectOf(box), box: true } };
+      if (zone.kind === 'onto') return { spot: { at: 'block', blockId, before: y < box.top + box.height / 2, onto: true }, hint: { ...rectOf(box), box: true, label: 'Replace picture' } };
       const cell = cellOf(block);
       const content = cell ? contentBox(cell) : box;
       const host = column ?? cell ?? block;
       return {
         spot: { at: 'block', blockId, before: zone.before },
-        hint: line(zone.before ? content.top : content.bottom, content.left, content.width, host.getBoundingClientRect()),
+        hint: line(zone.before ? content.top : content.bottom, content.left, content.width, cellLabel(column, siblings), host.getBoundingClientRect()),
       };
     }
 
@@ -740,7 +798,7 @@ export function Preview({
       const box = column.getBoundingClientRect();
       // An empty column is one big target.
       if (!column.querySelector('[data-sy-block]')) {
-        return { spot: { at: 'column', columnId: column.dataset['syColumn'], tail: false }, hint: { ...rectOf(box), box: true } };
+        return { spot: { at: 'column', columnId: column.dataset['syColumn'], tail: false }, hint: { ...rectOf(box), box: true, label: 'Into column' } };
       }
       // A group's own padding, in a section of its own, is the space around it rather than a way in: into a group
       // is over its blocks. A column of a row is a cell you can see, and its padding takes the nearer end.
@@ -750,9 +808,10 @@ export function Preview({
       const tail = y > box.top + box.height / 2;
       const cell = (column.matches('table') ? cellOf(column) : column.querySelector('td.hs_padded')) as HTMLElement | null;
       const content = cell ? contentBox(cell) : box;
+      const members = [...column.querySelectorAll('[data-sy-block]')].map((b) => (b as HTMLElement).dataset['syBlock'] ?? '');
       return {
         spot: { at: 'column', columnId: column.dataset['syColumn'], tail },
-        hint: line(tail ? content.bottom : content.top, content.left, content.width, box),
+        hint: line(tail ? content.bottom : content.top, content.left, content.width, cellLabel(column, members), box),
       };
     }
 
@@ -770,6 +829,38 @@ export function Preview({
     const topId = top ? sectionOfBand(top) : null;
     if (top && topId && y < top.getBoundingClientRect().top) return sectionSpot(top, topId, true);
     return end;
+  };
+
+  /**
+   * The handle, put beside a block: in the margin, touching its left edge, level with its first line — or centred on
+   * a block too thin to hold it, like a rule or the stripes. No block, no handle.
+   *
+   * Touching rather than near, because the pointer has to cross from the block to the handle without leaving both:
+   * a gap of a few pixels between them was enough for it to jump to the selected block on the way over.
+   */
+  const placeGrip = (blockId: string | null) => {
+    const inner = frame.current?.contentDocument;
+    if (!inner?.body || plain || !onSelect || !onDropBlock) return;
+    let grip = inner.querySelector('[data-sy-grip]') as HTMLElement | null;
+    const target = blockId ? (inner.querySelector(`[data-sy-block="${CSS.escape(blockId)}"]`) as HTMLElement | null) : null;
+    if (!blockId || !target) {
+      grip?.remove();
+      return;
+    }
+    if (!grip) {
+      grip = inner.createElement('div');
+      grip.setAttribute('data-sy-grip', '');
+      grip.setAttribute('role', 'button');
+      grip.setAttribute('aria-label', 'Move this block');
+      grip.title = 'Drag to move this block. Click to select it.';
+      grip.innerHTML = GRIP_DOTS;
+      inner.body.appendChild(grip);
+    }
+    const r = target.getBoundingClientRect();
+    const h = 24;
+    grip.dataset['syGrip'] = blockId;
+    grip.style.left = `${Math.max(0, r.left - GRIP_W)}px`;
+    grip.style.top = `${r.height < h + 8 ? r.top + (r.height - h) / 2 : r.top + 4}px`;
   };
 
   /**
@@ -1055,8 +1146,30 @@ export function Preview({
     const blockAt = (target: EventTarget | null) =>
       (target as Element | null)?.closest?.('[data-sy-block]') as HTMLElement | null;
 
+    /** The handle in the margin, if that is what the pointer is on. */
+    const gripAt = (target: EventTarget | null) => (target as Element | null)?.closest?.('[data-sy-grip]') as HTMLElement | null;
+    const blockOfGrip = (grip: HTMLElement) => inner.querySelector(`[data-sy-block="${CSS.escape(grip.dataset['syGrip'] ?? '')}"]`) as HTMLElement | null;
+
+    // --- the handle, on hover ---
+    // It follows the block under the pointer and stays put over anything that is not a block, so the pointer can
+    // cross the margin to it. On the handle, its block is outlined the way hovering the block itself outlines it.
+    const hoverGrip = (target: EventTarget | null) => {
+      for (const el of inner.querySelectorAll('[data-sy-grip-for]')) el.removeAttribute('data-sy-grip-for');
+      const grip = gripAt(target);
+      if (grip) {
+        blockOfGrip(grip)?.setAttribute('data-sy-grip-for', '');
+        return;
+      }
+      const id = blockAt(target)?.dataset['syBlock'];
+      if (id && id !== gripHover.current) {
+        gripHover.current = id;
+        placeGrip(id);
+      }
+    };
+
     // --- the spacing overlay, on hover ---
     const onMouseOver = (event: MouseEvent) => {
+      if (!drag.current?.active) hoverGrip(event.target);
       if (spacingRef.current || editing.current || slashRef.current || drag.current?.active) return;
       const id = blockAt(event.target)?.dataset['syBlock'] ?? null;
       if (id === hovered.current) return;
@@ -1071,6 +1184,10 @@ export function Preview({
       if (event.relatedTarget) return;
       hovered.current = null;
       if (!spacingRef.current) setSpaces([]);
+      // Off the canvas, the handle goes back to the selected block, or away.
+      for (const el of inner.querySelectorAll('[data-sy-grip-for]')) el.removeAttribute('data-sy-grip-for');
+      gripHover.current = null;
+      if (!drag.current?.active) placeGrip(selectedRef.current);
     };
 
     const onClick = (event: MouseEvent) => {
@@ -1080,11 +1197,14 @@ export function Preview({
       setMenu(null);
       setTypeMenu(null);
       if (editing.current) return;
-      const found = blockAt(event.target);
+      // A click on the handle that never became a drag selects its block.
+      const grip = gripAt(event.target);
+      const found = grip ? blockOfGrip(grip) : blockAt(event.target);
       if (found?.dataset['syBlock'] && found.dataset['sySection']) {
         onSelect(found.dataset['syBlock'], found.dataset['sySection'], event.shiftKey);
         return;
       }
+      if (grip) return;
       // Not on a block: the gap between columns, an empty slot, a group's padding. That is the
       // row itself, and clicking it selects the row — which used to take a trip to Layers.
       const sectionId = sectionAt(event.target);
@@ -1767,7 +1887,45 @@ export function Preview({
     /** The translucent copy that follows the pointer. Removed by `clearDrag`, always. */
     const carry = () => inner.querySelector('[data-sy-carry]') as HTMLElement | null;
 
+    // --- auto-scroll: a block carried to the canvas's top or bottom edge scrolls it ---
+    //
+    // The pointer stays still on the screen while the email moves under it, so the loop works from where the pointer
+    // is in the app's viewport and turns that back into frame coordinates every frame. Without it, a block could only
+    // go as far as the canvas showed at the moment it was picked up.
+    let scrollLoop = 0;
+    const stopScroll = () => {
+      cancelAnimationFrame(scrollLoop);
+      scrollLoop = 0;
+    };
+    /** Pixels a frame, negative upward; zero away from the edges. Faster the nearer the edge. */
+    const scrollSpeed = (): number => {
+      const state = drag.current;
+      if (!state?.active || !state.scroller) return 0;
+      const s = state.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : state.scroller.getBoundingClientRect();
+      const top = s.top + SCROLL_EDGE - state.vy;
+      const bottom = state.vy - (s.bottom - SCROLL_EDGE);
+      if (top > 0 && state.scroller.scrollTop > 0) return -Math.ceil((Math.min(top, SCROLL_EDGE) / SCROLL_EDGE) * SCROLL_MAX);
+      if (bottom > 0 && state.scroller.scrollTop + state.scroller.clientHeight < state.scroller.scrollHeight) return Math.ceil((Math.min(bottom, SCROLL_EDGE) / SCROLL_EDGE) * SCROLL_MAX);
+      return 0;
+    };
+    const edgeScroll = () => {
+      if (scrollLoop || !scrollSpeed()) return;
+      const step = () => {
+        const speed = scrollSpeed();
+        const state = drag.current;
+        if (!speed || !state?.scroller) {
+          scrollLoop = 0;
+          return;
+        }
+        state.scroller.scrollTop += speed;
+        follow();
+        scrollLoop = requestAnimationFrame(step);
+      };
+      scrollLoop = requestAnimationFrame(step);
+    };
+
     const clearDrag = () => {
+      stopScroll();
       rootOf(inner)?.removeAttribute('data-sy-dragging');
       carry()?.remove();
       for (const el of inner.querySelectorAll('[data-sy-lifted]')) el.removeAttribute('data-sy-lifted');
@@ -1775,15 +1933,60 @@ export function Preview({
       setHint(null);
     };
 
+    /**
+     * The carried copy follows the pointer, and the place under it is resolved again. Read from the pointer's place in
+     * the app's viewport, so it is right whether the pointer moved or the canvas scrolled under it.
+     */
+    const follow = () => {
+      const state = drag.current;
+      const el = frame.current;
+      if (!state?.active || !el) return;
+      const f = el.getBoundingClientRect();
+      // Inside the canvas but off the email — the padding round it, below the footer once the canvas has scrolled to
+      // its end — means the nearest edge of the email, not nowhere. Outside the canvas, nowhere.
+      const s = state.scroller && state.scroller !== document.scrollingElement ? state.scroller.getBoundingClientRect() : null;
+      const inPane = !s || (state.vx >= s.left && state.vx <= s.right && state.vy >= s.top && state.vy <= s.bottom);
+      const pin = (v: number, size: number) => (inPane ? Math.min(Math.max(v, 1), size - 1) : v);
+      const x = pin(state.vx - f.left, f.width);
+      const y = pin(state.vy - f.top, f.height);
+      const held = carry();
+      if (held) {
+        held.style.left = `${x - state.grabX}px`;
+        held.style.top = `${y - state.grabY}px`;
+      }
+      // A block cannot be dropped onto itself: over it, there is no indicator and letting go moves nothing.
+      const found = probeAt(x, y, state.blockId);
+      state.spot = found?.spot ?? null;
+      setHint(found?.hint ?? null);
+    };
+
+    // Escape puts the block back: no move, nothing in the history. Caught first, in both documents, so the app's own
+    // Escape (deselect) does not also run under it.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !drag.current?.active) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearDrag();
+    };
+
+    const onDragStart = (event: DragEvent) => {
+      // The browser's own drag of a picture or a link, which would cancel ours (see CHROME). Text being edited keeps
+      // its own.
+      if (!editing.current) event.preventDefault();
+    };
+
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0 || editing.current || !onDropBlock) return;
-      const found = blockAt(event.target);
+      const grip = gripAt(event.target);
+      const found = grip ? blockOfGrip(grip) : blockAt(event.target);
       const blockId = found?.dataset['syBlock'];
       if (!blockId || !found) return;
+      // Pressing the handle is only ever the start of a move: no text selection under it.
+      if (grip) event.preventDefault();
 
       // On the selected freeform surface the pointer belongs to the surface: a layer under it
       // moves, and with the pen down anything under it is drawn on. Neither starts a block drag.
-      const svg = blockId === selectedRef.current && (drawingRef.current || surfaceRef.current.onMoveLayer) ? (found.querySelector('svg[data-sy-freeform]') as SVGSVGElement | null) : null;
+      const svg = !grip && blockId === selectedRef.current && (drawingRef.current || surfaceRef.current.onMoveLayer) ? (found.querySelector('svg[data-sy-freeform]') as SVGSVGElement | null) : null;
       if (svg && svg.contains(event.target as Node)) {
         const rect = svg.getBoundingClientRect();
         const scale = (Number(svg.getAttribute('width')) || rect.width) / (rect.width || 1);
@@ -1813,16 +2016,22 @@ export function Preview({
         }
       }
       const box = found.getBoundingClientRect();
+      const f = frame.current?.getBoundingClientRect();
       drag.current = {
         blockId,
-        y: event.clientY,
+        x0: event.clientX,
+        y0: event.clientY,
+        vx: (f?.left ?? 0) + event.clientX,
+        vy: (f?.top ?? 0) + event.clientY,
         active: false,
         spot: null,
         // Where inside the block it was grabbed, so the copy stays under the same point of the
-        // pointer rather than snapping its corner to the cursor.
-        grabX: event.clientX - box.left,
-        grabY: event.clientY - box.top,
+        // pointer rather than snapping its corner to the cursor. From the handle, that point is
+        // just inside the block's corner, so the copy hangs off the pointer the way the block did.
+        grabX: grip ? -6 : event.clientX - box.left,
+        grabY: grip ? Math.min(16, event.clientY - box.top) : event.clientY - box.top,
         width: box.width,
+        scroller: null,
       };
     };
 
@@ -1850,9 +2059,15 @@ export function Preview({
       }
       const state = drag.current;
       if (!state) return;
+      const f = frame.current?.getBoundingClientRect();
+      state.vx = (f?.left ?? 0) + event.clientX;
+      state.vy = (f?.top ?? 0) + event.clientY;
       if (!state.active) {
-        if (Math.abs(event.clientY - state.y) < 5) return;
+        // Five pixels in any direction. Vertical only used to be the rule, so a block pulled sideways first never
+        // left its place.
+        if (Math.hypot(event.clientX - state.x0, event.clientY - state.y0) < 5) return;
         state.active = true;
+        state.scroller = scrollerOf(frame.current);
         rootOf(inner)?.setAttribute('data-sy-dragging', '');
         // The overlay would sit under the copy in your hand and over the target; neither helps.
         hovered.current = null;
@@ -1871,15 +2086,8 @@ export function Preview({
         }
       }
 
-      const held = carry();
-      if (held) {
-        held.style.left = `${event.clientX - state.grabX}px`;
-        held.style.top = `${event.clientY - state.grabY}px`;
-      }
-      // A block cannot be dropped onto itself: over it, there is no indicator and letting go moves nothing.
-      const found = probeAt(event.clientX, event.clientY, state.blockId);
-      state.spot = found?.spot ?? null;
-      setHint(found?.hint ?? null);
+      follow();
+      edgeScroll();
     };
 
     const onPointerUp = () => {
@@ -1914,8 +2122,18 @@ export function Preview({
     inner.addEventListener('pointermove', onPointerMove);
     inner.addEventListener('pointerup', onPointerUp);
     inner.addEventListener('pointercancel', clearDrag);
+    inner.addEventListener('dragstart', onDragStart);
+    inner.addEventListener('keydown', onEscape, true);
+    window.addEventListener('keydown', onEscape, true);
+    // The handle where it belongs as soon as the document is there: on the selected block, until the pointer says otherwise.
+    gripHover.current = null;
+    placeGrip(selectedRef.current);
 
     return () => {
+      stopScroll();
+      inner.removeEventListener('dragstart', onDragStart);
+      inner.removeEventListener('keydown', onEscape, true);
+      window.removeEventListener('keydown', onEscape, true);
       inner.removeEventListener('mouseover', onMouseOver);
       inner.removeEventListener('mouseout', onMouseOut);
       inner.removeEventListener('click', onClick);
@@ -1943,8 +2161,8 @@ export function Preview({
   // The measuring helpers above read refs and the live document, and the callbacks the app hands in are rebuilt
   // every render. The effects below read them all through `live`, the latest render's copies, so each effect's
   // dependency list holds only what it responds to, and a keystroke elsewhere in the app does not re-resolve a drop.
-  const live = useRef({ probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited });
-  live.current = { probeAt, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited };
+  const live = useRef({ probeAt, placeGrip, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited });
+  live.current = { probeAt, placeGrip, measureRows, measureDividers, measureSpacing, measurePadding, paintPadding, idOfBand, onProbe, onAutoEdited };
   const openVariantsRef = useRef(openVariants);
   openVariantsRef.current = openVariants;
   const autoMenuRef = useRef(onAutoMenu);
@@ -1973,6 +2191,13 @@ export function Preview({
   useEffect(() => {
     setDividers(live.current.measureDividers(selectedSection ?? null));
   }, [ready, doc, height, selectedSection]);
+
+  // The handle, put back after anything that moves blocks or replaces the document: on the block under the pointer
+  // if there is one, else on the selected block.
+  useEffect(() => {
+    if (drag.current?.active) return;
+    live.current.placeGrip(gripHover.current ?? selected ?? null);
+  }, [ready, doc, height, selected]);
 
   // A menu is about a row as it was; a changed document closes it. Escape and a click anywhere
   // outside it do too. The type menu takes the arrow keys and Enter while it is up.
@@ -2132,7 +2357,9 @@ export function Preview({
         <div
           class={`sy-hint ${hint.box ? 'box' : ''}`}
           style={{ top: `${hint.top}px`, left: `${hint.left}px`, width: `${hint.width}px`, height: `${hint.height}px` }}
-        />
+        >
+          {hint.label && <span class={`sy-hint-label ${!hint.box && hint.top < 22 ? 'below' : ''}`}>{hint.label}</span>}
+        </div>
       )}
       {selBar && !slash && (
         // Over the selection, while rich text is edited: what the words wear, and the few marks a hand reaches for.

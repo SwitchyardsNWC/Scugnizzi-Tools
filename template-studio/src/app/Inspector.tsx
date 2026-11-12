@@ -21,6 +21,7 @@ import type { Editor } from './useEditor.ts';
 import { Dial } from './Dial.tsx';
 import { nameOf, PresetSlot } from './ColorSlot.tsx';
 import { InheritDial } from './InheritDial.tsx';
+import { readSide, setSide, SIDES, type Side } from '../model/multi-spacing.ts';
 import { hasEffects, stackSummary } from '../model/effects.ts';
 
 // The inspector, generated from the catalog.
@@ -52,7 +53,7 @@ export interface InspectorProps {
   editor: Editor;
   patternInfo?: PatternInfo;
   /** More than one block is selected. The panel is about the run, not about any one of them. */
-  multi?: { count: number; onDelete(): void; onGroup?(): void };
+  multi?: { count: number; ids?: string[]; onDelete(): void; onGroup?(): void };
   /**
    * The Spacing panel is being worked — the pointer is over it, or a dial in it has focus — so
    * the canvas can draw the numbers being changed. See Preview's `spacing`.
@@ -103,7 +104,8 @@ export function Inspector({ editor, onRasterise, rasterising, patternInfo, multi
   const found = resolve(template, selection);
 
   if (selection.kind === 'template' || !found.section) return <NothingSelected />;
-  if (multi && multi.count > 1) return <MultiPanel count={multi.count} onDelete={multi.onDelete} {...(multi.onGroup ? { onGroup: multi.onGroup } : {})} />;
+  if (multi && multi.count > 1)
+    return <MultiPanel editor={editor} count={multi.count} ids={multi.ids ?? []} onDelete={multi.onDelete} {...(multi.onGroup ? { onGroup: multi.onGroup } : {})} />;
 
   const row = found.section.rows[0];
   const split = (row?.columns.length ?? 0) > 1;
@@ -1137,7 +1139,76 @@ function PresetField({ control, editor }: { control: Control; editor: Editor }) 
  * More than one block is selected. There is nothing to edit about a run; what there is to do with
  * one is move it, copy it and delete it, and the keys do those.
  */
-function MultiPanel({ count, onDelete, onGroup }: { count: number; onDelete(): void; onGroup?(): void }) {
+const SIDE_LABELS: Record<Side, string> = { above: 'Space above', below: 'Space below', left: 'Space left', right: 'Space right' };
+
+/**
+ * The space around every selected block, set once (Jared: "select multiple blocks and change their spacing
+ * together"). Each block keeps it where its own Spacing panel does — `multi-spacing.ts` — so this is a shortcut, not
+ * a second place space lives. A side the blocks disagree on says so, and the first number given wins for all of them.
+ */
+function MultiSpacing({ editor, ids }: { editor: Editor; ids: string[] }) {
+  const [open, setOpen] = useState(true);
+  const ds = designSystemOf(editor.template);
+  const reads = SIDES.map((side) => ({ side, ...readSide(editor.template, ids, side) })).filter((r) => r.count > 0);
+  if (reads.length === 0) return null;
+  const most = Math.max(...reads.map((r) => r.count));
+  const set = (side: Side, value: number | null) =>
+    editor.commit(`${SIDE_LABELS[side]}, ${ids.length} blocks`, setSide(editor.template, ids, side, value), { coalesce: `multi-space:${side}:${ids.join(',')}` });
+  return (
+    <section class={`panel ${open ? 'open' : ''}`}>
+      <button
+        class="panel-head"
+        aria-expanded={open}
+        title="The same space on every selected block. Each keeps it where its own Spacing panel does: a block in a group sets the group's. A side they differ on says mixed until you give it a number."
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span class="caret" aria-hidden="true">
+          {open ? '▾' : '▸'}
+        </span>
+        Spacing
+      </button>
+      {open && (
+      <div class="panel-body">
+      <div class="controls">
+        {most < ids.length && (
+          <p class="hint">
+            Applies to {most} of {ids.length}: a Spacer is its own height, and the stripes have no space to set.
+          </p>
+        )}
+        {reads.map(({ side, value, mixed }) => {
+          const label = mixed ? `${SIDE_LABELS[side]} · mixed` : SIDE_LABELS[side];
+          const title = mixed ? 'The selected blocks differ here. Set a number and they all take it.' : undefined;
+          if (side === 'left' || side === 'right') {
+            return (
+              <InheritDial
+                key={side}
+                label={label}
+                value={typeof value === 'number' ? value : null}
+                inherited={ds.pagePadding}
+                inheritedName="Design › Page padding"
+                onChange={(v) => set(side, v)}
+                min={0}
+                max={120}
+                suffix="px"
+                zero="None"
+                {...(title ? { title } : {})}
+              />
+            );
+          }
+          return (
+            <div key={side} class="field wide">
+              <Dial label={label} value={typeof value === 'number' ? value : 0} onChange={(v) => set(side, v)} min={0} max={200} suffix="px" {...(title ? { title } : {})} />
+            </div>
+          );
+        })}
+      </div>
+      </div>
+      )}
+    </section>
+  );
+}
+
+function MultiPanel({ editor, count, ids, onDelete, onGroup }: { editor: Editor; count: number; ids: string[]; onDelete(): void; onGroup?(): void }) {
   return (
     <div class="inspector">
       <nav class="crumbs">
@@ -1147,6 +1218,7 @@ function MultiPanel({ count, onDelete, onGroup }: { count: number; onDelete(): v
         Selected together. <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> move the run, <kbd>⌘C</kbd> copies it, <kbd>⌫</kbd> deletes it. Shift-click or{' '}
         <kbd>⇧↑</kbd> <kbd>⇧↓</kbd> to change what is in it.
       </p>
+      {ids.length > 1 && <MultiSpacing editor={editor} ids={ids} />}
       <div class="controls">
         {onGroup && (
           <div class="field wide">

@@ -3306,3 +3306,38 @@ reorder inside one. Asked how dragging should choose, he chose: a drag never gro
 - **The decision is geometry in, a zone out** (`src/app/drop-zones.ts`), so `tests/drop-zones.test.ts` holds it
   without a browser. `Preview.tsx` measures the document and draws the line. The sweeps were run in Chromium
   against the Switchyards and Card emails, before and after.
+
+### 3.105 A handle, a picture that moves, and space for several blocks at once
+
+*2026-11-12. Jared: "Select multiple blocks and change their spacing together. Images are hard to grab and move.
+Maybe blocks should have a clearer handle. Make any UI/UX updates you feel will improve the usability." Asked where
+the handle goes, he chose a grip in the left margin on hover; of four extras, auto-scroll, a label on the drop line
+and drag polish.*
+
+- **An Image would not move because the browser moved it first.** Every `<img>` and `<a>` is draggable by default.
+  Press on a picture, move a few pixels, and Chromium starts its own drag of the picture, which fires
+  `pointercancel` and ended ours. The hero is a linked picture, so it was both. The canvas chrome now sets
+  `-webkit-user-drag: none` on both, and a `dragstart` outside text editing is prevented. Checked with real
+  mouse input: the hero drags and drops like any other block.
+- **Test real drags with CDP, not Playwright's mouse.** Inside this sandboxed frame, Playwright's drag interception
+  hung on every move with a button down. `Input.dispatchMouseEvent` through a CDP session is a plain mouse.
+- **The handle is in the margin, touching the block.** Six dots on white, outlined, in the 40px either side of the
+  email, beside whichever block is under the pointer, or the selected one when the pointer is elsewhere. It
+  stays put over anything that is not a block, so the pointer can cross to it, and on it the block is outlined.
+  It touches the block's left edge because a gap of a few pixels was enough for the pointer to leave the block
+  first. A click on it selects; a drag from it is the same drag as from the block. It is put into the canvas at
+  run time, like the copy in your hand, so it cannot reach the email.
+- **The drop line says what it does.** "New section", "Into group", "Move in group", "Into column", "Replace
+  picture", "End of email", in white on the accent at the line's right end. The line's width and a faint frame said
+  it before, but only to someone who had learned them.
+- **Auto-scroll, from where the pointer is on screen.** Within 56px of the canvas's top or bottom, a carried block
+  scrolls it, faster nearer the edge. The pointer is kept in the app's viewport and turned back into frame
+  coordinates every frame, because during the scroll it does not move; the email does. Inside the canvas but off
+  the email, the pointer is pinned to the email's edge, so the padding below the footer means the end of it.
+- **Escape puts it back; a drag starts any way.** Escape is caught in both documents before the app's own Escape.
+  The start threshold was five pixels *vertically*, so a block pulled sideways first never left its place.
+- **Space for several blocks is a shortcut, not a second home.** `model/multi-spacing.ts` reads and writes each
+  side through the path the block's own Spacing panel uses: the column's padding for most, the section's for a
+  block that draws its own band. A Spacer and the stripes have none and are left alone, and the panel says how many
+  of the selection a side applies to. Sides they differ on read "mixed"; the first number given wins. Two blocks in
+  one group share one column, so the group's space is set once. One drag of a dial is one undo step.
