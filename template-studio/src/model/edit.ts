@@ -12,14 +12,15 @@
 
 import {
   theme as themeTokens,
+  DEFAULT_CANVAS_TYPE,
   DEFAULT_DESIGN_SYSTEM,
   firstPreset,
-  type ColorRef,
   type DesignSystem,
   type ThemeTokens,
 } from './design-system.ts';
 import { canStack, createBlock, createSection, sectionFor } from './catalog.ts';
-import { pictureHash } from './freeform.ts';
+import { describeUses, walkDocument, walkSystem, type CountedKind, type RefVisit } from './color-refs.ts';
+import { isRendered, pictureHash } from './freeform.ts';
 import { fieldName, sequentialIds } from './ids.ts';
 import type { Block, BlockType, Column, Lock, Row, Section, Template } from './types.ts';
 
@@ -302,9 +303,9 @@ function recolor(template: Template, ds: DesignSystem): Template {
 
 // --- the palette ------------------------------------------------------------------------------------
 //
-// A colour is referenced by *name* from three places — background presets, type roles and button
-// variants (learnings 3.12) — which is what makes renaming one a real operation rather than a text
-// edit. Miss a reference and the thing pointing at it silently resolves to nothing.
+// A colour is referenced by *name* (learnings 3.12), from the design system and from the document,
+// which is what makes renaming one a real operation rather than a text edit. Where it can be named
+// is one list, in color-refs.ts; everything here goes through it (learnings 3.103).
 
 /**
  * Every place a colour name is referenced, so the panel can say what deleting one would break.
@@ -312,34 +313,20 @@ function recolor(template: Template, ds: DesignSystem): Template {
  * The document counts, not only the design system. Stripes name a palette colour like everything
  * else, and the reason that matters is the bug this was written for: the standard email paints
  * three stripes in the bright red, and while the block held a raw hex the palette reported that
- * colour as used by nothing and offered to delete it.
+ * colour as used by nothing and offered to delete it. A card's fill was the same bug again.
  */
 export function colorUsage(ds: DesignSystem, name: string, template?: Template): string[] {
-  const used: string[] = [];
-  for (const [key, theme] of Object.entries(ds.themes)) {
-    for (const slot of ['band', 'container', 'text', 'link'] as const) {
-      if (theme[slot] === name) used.push(`${key} preset · ${slot}`);
-    }
-  }
-  for (const [key, role] of Object.entries(ds.type)) {
-    if (role.color === name) used.push(`${key} · colour`);
-  }
-  for (const [key, button] of Object.entries(ds.buttons)) {
-    for (const slot of ['fill', 'ink', 'border'] as const) {
-      if (button[slot] === name) used.push(`${key} button · ${slot}`);
-    }
-  }
-  if (template) {
-    let stripes = 0;
-    let dividers = 0;
-    for (const block of allBlocks(template)) {
-      if (block.type === 'stripes') stripes += block.stripes.filter((s) => s.color === name).length;
-      if (block.type === 'divider' && block.color === name) dividers += 1;
-    }
-    if (stripes) used.push(stripes === 1 ? '1 stripe' : `${stripes} stripes`);
-    if (dividers) used.push(dividers === 1 ? '1 divider' : `${dividers} dividers`);
-  }
-  return used;
+  const listed: string[] = [];
+  const counted = new Map<CountedKind, Set<string>>();
+  const see: RefVisit = (ref, site) => {
+    if (ref !== name) return ref;
+    if ('label' in site) listed.push(site.label);
+    else counted.set(site.count, (counted.get(site.count) ?? new Set()).add(site.id));
+    return ref;
+  };
+  walkSystem(ds, see);
+  if (template) walkDocument(template, see);
+  return describeUses(listed, counted);
 }
 
 /** A name that is safe as an object key and readable in a panel. */
@@ -359,6 +346,36 @@ export function addColor(template: Template, label: string, value: string): Temp
 }
 
 /**
+ * Points every reference to `from` at `to`, across the design system and the document.
+ *
+ * Renaming and replacing are the same walk with a different ending, and keeping them apart is how
+ * one of them ends up missing stripes. Missing one leaves its owner naming a colour nothing defines,
+ * which renders as no colour at all: a card with no fill, a mark in the text colour, not an error.
+ *
+ * `samePixels` says the new name paints what the old one did, which is always true of a rename. A
+ * freeform drawing or a brand mark is a picture whose hash covers its recipe, names included; when
+ * only the name moved, a picture that was current stays current rather than asking to be drawn
+ * again for nothing. When the colour really changes, the picture is stale, and the checks say so.
+ */
+function repoint(
+  template: Template,
+  ds: DesignSystem,
+  from: string,
+  to: string,
+  samePixels: boolean,
+): { template: Template; ds: DesignSystem } {
+  const swap: RefVisit = (ref) => (ref === from ? to : ref);
+  const settle = (before: Block, after: Block): Block =>
+    samePixels &&
+    (before.type === 'freeform' || before.type === 'brand') &&
+    (after.type === 'freeform' || after.type === 'brand') &&
+    isRendered(before)
+      ? { ...after, renderedHash: pictureHash(after) }
+      : after;
+  return { template: walkDocument(template, swap, settle), ds: walkSystem(ds, swap) };
+}
+
+/**
  * Renames a colour, carrying every reference with it.
  *
  * The rename is the whole operation. A palette entry that changed name while three presets kept
@@ -366,65 +383,12 @@ export function addColor(template: Template, label: string, value: string): Temp
  * null for an unknown name, so the failure is a section that quietly loses its background rather
  * than an error anybody sees.
  */
-/**
- * Points every reference to `from` at `to`, across the design system and the document.
- *
- * The one place that knows where a colour can be named. Renaming and replacing are the same walk
- * with a different ending, and keeping them apart is how one of them ends up missing stripes.
- */
-function repoint(
-  template: Template,
-  ds: DesignSystem,
-  from: string,
-  to: string,
-): { template: Template; ds: DesignSystem } {
-  const swap = (ref: ColorRef): ColorRef => (ref === from ? to : ref);
-
-  const themes = Object.fromEntries(
-    Object.entries(ds.themes).map(([name, t]) => [
-      name,
-      { ...t, band: swap(t.band), container: swap(t.container), text: swap(t.text), link: swap(t.link) },
-    ]),
-  );
-  const type = Object.fromEntries(
-    Object.entries(ds.type).map(([name, t]) => [name, t.color === from ? { ...t, color: to } : t]),
-  );
-  const buttons = Object.fromEntries(
-    Object.entries(ds.buttons).map(([name, b]) => [
-      name,
-      { ...b, fill: swap(b.fill), ink: swap(b.ink), border: swap(b.border) },
-    ]),
-  );
-
-  // Stripes and dividers name a colour like everything else, so this has to walk the document as
-  // well as the system. Missing one leaves a block pointing at a name nothing defines, which renders
-  // as no line at all — a missing rule, not an error.
-  const sections = template.sections.map((section) => ({
-    ...section,
-    rows: section.rows.map((row) => ({
-      ...row,
-      columns: row.columns.map((column) => ({
-        ...column,
-        blocks: column.blocks.map((block) => {
-          if (block.type === 'stripes') {
-            return { ...block, stripes: block.stripes.map((s) => (s.color === from ? { ...s, color: to } : s)) };
-          }
-          if (block.type === 'divider' && block.color === from) return { ...block, color: to };
-          return block;
-        }),
-      })),
-    })),
-  }));
-
-  return { template: { ...template, sections }, ds: { ...ds, themes, type, buttons } };
-}
-
 export function renameColor(template: Template, from: string, to: string): Template {
   const ds = designSystemOf(template);
   if (from === to || !ds.colors[from]) return template;
   const key = colorKey(to, Object.keys(ds.colors).filter((k) => k !== from));
 
-  const moved = repoint(template, ds, from, key);
+  const moved = repoint(template, ds, from, key, true);
   // Rebuilt in order rather than spread, so the palette keeps the order somebody arranged it in.
   const colors: Record<string, string> = {};
   for (const [k, v] of Object.entries(ds.colors)) colors[k === from ? key : k] = v;
@@ -450,7 +414,9 @@ export function removeColor(template: Template, name: string, replacement?: stri
   const used = colorUsage(ds, name, template).length > 0;
   if (used && (!replacement || !ds.colors[replacement] || replacement === name)) return template;
 
-  const moved = replacement ? repoint(template, ds, name, replacement) : { template, ds };
+  // Two palette entries can hold one hex, and then a replace moves no pixel either.
+  const samePixels = (r: string) => ds.colors[r]?.toLowerCase() === ds.colors[name]?.toLowerCase();
+  const moved = replacement ? repoint(template, ds, name, replacement, samePixels(replacement)) : { template, ds };
   const colors = { ...moved.ds.colors };
   delete colors[name];
 
@@ -594,12 +560,33 @@ export function materialiseFolderSystem(
 // panel offered no way to add one. A name rather than a stack on each role (learnings 3.12) is what
 // makes adding one safe: the role keeps saying `mono`, and the stack behind it can be tuned once.
 
-/** The type roles that name a font, so the panel can say what removing one would touch. */
-export function fontUsage(ds: DesignSystem, key: string): string[] {
+/**
+ * Everything that names a font, so the panel can say what removing one would touch: type roles, the
+ * email's own stack, brand presets, and, given the document, freeform text and notes.
+ *
+ * Brand presets are read as the system has them, which for one that never set any is the shipped
+ * set: Display serif names `georgia` whether or not anybody wrote `canvasType`. A layer counts once
+ * however many of its runs name the font.
+ */
+export function fontUsage(ds: DesignSystem, key: string, template?: Template): string[] {
   const used = Object.entries(ds.type)
     .filter(([, role]) => role.font === key)
     .map(([name]) => name);
   if (ds.fonts[key] && ds.fontStack === ds.fonts[key]) used.push('the email’s font');
+  for (const [name, preset] of Object.entries(ds.canvasType ?? DEFAULT_CANVAS_TYPE)) {
+    if (preset.font === key) used.push(`${preset.label || name} brand preset`);
+  }
+  if (template) {
+    let layers = 0;
+    for (const block of allBlocks(template)) {
+      if (block.type !== 'freeform') continue;
+      for (const layer of block.layers) {
+        if (layer.kind !== 'text' && layer.kind !== 'sticky') continue;
+        if (layer.font === key || layer.styles?.some((run) => run.font === key)) layers += 1;
+      }
+    }
+    if (layers) used.push(layers === 1 ? '1 freeform layer' : `${layers} freeform layers`);
+  }
   return used;
 }
 
@@ -613,13 +600,13 @@ export function addFont(template: Template, label: string, stack: string): Templ
 }
 
 /**
- * Removes a stack. Refused while a role names it — a role whose font resolves to nothing falls
- * back to the email's default silently, which is a change nobody asked for in a place nobody is
- * looking. Point the roles elsewhere first; the panel says which ones.
+ * Removes a stack. Refused while anything names it — a role, a brand preset or a freeform layer
+ * whose font resolves to nothing falls back to the email's default silently, which is a change
+ * nobody asked for in a place nobody is looking. Point them elsewhere first; `fontUsage` says which.
  */
 export function removeFont(template: Template, key: string): Template {
   const ds = designSystemOf(template);
-  if (!ds.fonts[key] || fontUsage(ds, key).length > 0) return template;
+  if (!ds.fonts[key] || fontUsage(ds, key, template).length > 0) return template;
   const fonts = { ...ds.fonts };
   delete fonts[key];
   return { ...template, ds: { ...ds, fonts } };
