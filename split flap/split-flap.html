@@ -97,7 +97,7 @@
   /* The buttons say what they are doing while a GIF renders ("Frame 12 / 56…"): one width, so the recipe never reflows. */
   .actions{width:184px;min-width:0}
   /* The recipe stops on a whole line: nine lines of 18 sit inside the five buttons beside it (172), so the bar never grows. */
-  .footer pre#recipe{max-height:162px}
+  .footer pre#recipe{max-height:167px} /* 5 + 9 lines of 18: whole lines, never a sliver */
   /* Words for a screen reader alone: what an export or a copy did, said once. */
   .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
@@ -106,7 +106,7 @@
     .presets.wide{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
     .actions{width:auto}
     /* Stacked under the buttons, six whole lines, then it scrolls. */
-    .footer pre#recipe{max-height:108px}
+    .footer pre#recipe{max-height:113px}
   }
   @media (max-width:600px){
     .topbar{flex-wrap:wrap;row-gap:var(--spacing-8);padding-top:var(--spacing-8);padding-bottom:var(--spacing-8)}
@@ -224,7 +224,7 @@
 // ---------- State ----------
 const DEFAULT_MESSAGES = [
   'DEPARTURES\n\n07:40  PADDINGTON      ON TIME\n07:52  CARDIFF CENTRAL  DELAYED',
-  'SCUGGNIZZI TOOLS\n\nPLATFORM 3          NOW BOARDING\nMIND THE GAP',
+  'SCUGNIZZI TOOLS\n\nPLATFORM 3          NOW BOARDING\nMIND THE GAP',
 ];
 const DEFAULTS = {
   messages: DEFAULT_MESSAGES.slice(), active: 0,

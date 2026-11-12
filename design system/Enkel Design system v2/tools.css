@@ -290,7 +290,7 @@ button.drop{width:100%;white-space:normal;font:inherit;font-size:var(--text-capt
 .actions>button{justify-content:flex-start;width:100%}
 .actions.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))} /* four or more exports: two columns, the primary across both */
 .actions.two>.primary{grid-column:1/-1}
-pre.recipe,pre#recipe{margin:0;padding-top:5px;max-height:96px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
+pre.recipe,pre#recipe{margin:0;padding-top:5px;max-height:95px; /* 5 + 5 lines of 18 */overflow:auto;white-space:pre-wrap;color:var(--text-muted);
   font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:18px;letter-spacing:0}
 
 /* --- small parts --------------------------------------------------------------------------------------------------------- */
