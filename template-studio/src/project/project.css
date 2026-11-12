@@ -113,6 +113,9 @@ body { background: #f5f5f4; }
   --pb-dot: rgb(242 242 240 / 0.3);
   --pb-dot-major: rgb(242 242 240 / 0.46);
   --pb-group-fill: rgb(21 21 21 / 0.6);
+  /* The board's ink, for a note: its own --pb-ink stays the light theme's, so where it meets this dark ground (a picked
+     note's ring, its pin) it reads this. Unset in light, where the note's ink already shows on the ground. */
+  --pb-ground-ink: var(--pb-ink);
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -151,6 +154,7 @@ body { background: #f5f5f4; }
     --pb-dot: rgb(242 242 240 / 0.3);
     --pb-dot-major: rgb(242 242 240 / 0.46);
     --pb-group-fill: rgb(21 21 21 / 0.6);
+    --pb-ground-ink: var(--pb-ink);
     color-scheme: dark;
   }
 }
@@ -187,7 +191,7 @@ body { background: #f5f5f4; }
 .pb-hint { overflow: hidden; text-overflow: ellipsis; }
 .pb-count { flex: none; color: var(--pb-text); }
 .pb-status { display: inline-flex; align-items: baseline; gap: 8px; color: var(--pb-text); }
-.pb-status > .pb-dot { align-self: center; }
+.pb-status > .pb-dot { align-self: center; margin: 0; } /* the margin: app.css's bare .view-only gives this dot 10px on top */
 /* A link in words: Enkel's link, graphite to ink, underlined so it does not lean on colour. */
 .pb-inline { padding: 0; border: 0; background: none; color: var(--pb-muted); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-inline:hover { color: var(--pb-ink); }
@@ -225,7 +229,11 @@ body { background: #f5f5f4; }
 .pb-zoom button:not(.pct) { width: 26px; padding: 0; justify-content: center; }
 .pb-zoom button:not(.pct) .pb-glyph { margin-top: 0; }
 .pb-zoom button + button { border-left: 1px solid var(--pb-soft); }
-.pb-zoom .pct { min-width: 58px; justify-content: center; font-size: 12px; color: var(--pb-ink); }
+.pb-zoom .pct { min-width: 58px; justify-content: center; align-items: baseline; gap: 0; font-size: 12px; color: var(--pb-ink); }
+/* The figure is 12px mono, the bar's words 13px sans, and each centred in its own box puts them on different baselines.
+   So the figure stands on a 13px line of the sans, an empty one (a zero-width space) where the bar's words are: it
+   shares their baseline whatever faces the system falls back to. */
+.pb-zoom .pct::before { content: "\200b"; font-family: var(--pb-sans); font-size: 13px; }
 .pb-zoom button:disabled, .pb-zoom button:disabled:hover { color: var(--pb-disabled-text); background: none; cursor: default; }
 .pb-actions { display: inline-flex; align-items: center; gap: 2px; }
 
@@ -323,8 +331,7 @@ body { background: #f5f5f4; }
     linear-gradient(to right, var(--pb-mat-line) 1px, transparent 1px), linear-gradient(to bottom, var(--pb-mat-line) 1px, transparent 1px);
 }
 /* On a mat shown strongly the ground is dark: lines keep their colours and their strokes but lighten. Only the drawn
-   line takes them, never its wide hit twin (path.hit), which stays invisible. A group is still paper on the mat: its
-   head goes opaque so its name and folder read at full strength, and the words in it stay the page's. */
+   line takes them, never its wide hit twin (path.hit), which stays invisible. */
 .pb-stage.dark-ground .pb-link { opacity: 0.55; }
 .pb-stage.dark-ground.has-selection .pb-link { opacity: 0.25; }
 .pb-stage.dark-ground .pb-link.follows path:not(.hit) { stroke: #aebcf0; }
@@ -335,8 +342,11 @@ body { background: #f5f5f4; }
 .pb-stage.dark-ground .pb-link.made rect { fill: #f2b39f; }
 .pb-stage.dark-ground .pb-link.picked path:not(.hit) { stroke: #fff; }
 .pb-stage.dark-ground .pb-link.picked rect { fill: #fff; }
-.pb-stage.dark-ground .pb-group-head { background: var(--pb-paper); }
-.pb-stage.dark-ground .pb-group-empty { color: var(--pb-text); }
+/* The mat is green at any strength, so what is written on the board stands on paper there, whatever the dial: a group's
+   head, a missing file's card, the name under a picture (a chip as wide as the name). */
+.pb-under-mat ~ .pb-world .pb-group-head, .pb-under-mat ~ .pb-world .pb-missing { background: var(--pb-paper); }
+.pb-under-mat ~ .pb-world .pb-group-empty { color: var(--pb-text); }
+.pb-under-mat ~ .pb-world .pb-picture-name { right: auto; max-width: 100%; padding: 0 4px; background: var(--pb-paper); }
 .pb-stage.panning { cursor: grabbing; }
 .pb-stage.hand, .pb-stage.hand .pb-card, .pb-stage.hand .pb-group-head, .pb-stage.hand .pb-group-resize { cursor: grab; }
 .pb-stage.panning .pb-card, .pb-stage.panning .pb-group-head, .pb-stage.hand.panning, .pb-stage.hand.panning .pb-card { cursor: grabbing; }
@@ -433,7 +443,7 @@ body { background: #f5f5f4; }
 .pb-picture { background: none; border-color: transparent; }
 .pb-picture .pb-card-head { position: absolute; left: -1px; right: -1px; top: -1px; border: 1px solid var(--pb-ink); border-bottom-color: var(--pb-soft); opacity: 0; transition: opacity var(--pb-fast); }
 .pb-picture:hover .pb-card-head, .pb-picture.on .pb-card-head, .pb-picture.lifted .pb-card-head, .pb-picture:focus-within .pb-card-head { opacity: 1; }
-.pb-picture .pb-card-body { background: none; }
+.pb-picture .pb-card-body { background: none; overflow: visible; } /* visible: the name hangs below it */
 .pb-picture-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .pb-picture:hover, .pb-picture.on, .pb-picture.lifted { border-color: var(--pb-ink); }
 /* The file's name under the picture, always: a board of photos is otherwise a board of anonymous thumbnails. */
@@ -451,7 +461,7 @@ body { background: #f5f5f4; }
 .pb-doc-glyph { flex: none; display: grid; place-items: center; color: var(--pb-blue); }
 .pb-doc-glyph.sheet { color: var(--pb-green); }
 .pb-doc-glyph.slides { color: var(--pb-amber); }
-.pb-doc-glyph.link, .pb-doc-glyph.drawing, .pb-doc-glyph.form { color: var(--pb-muted); }
+.pb-doc-glyph.link, .pb-doc-glyph.drawing, .pb-doc-glyph.form { color: var(--pb-muted); cursor: inherit; } /* app.css's bare .link would point */
 .pb-doc-text { display: grid; gap: 4px; min-width: 0; }
 .pb-doc-kind { font-size: 13px; color: var(--pb-text); }
 .pb-doc-host { overflow: hidden; font-size: 11px; color: var(--pb-muted); white-space: nowrap; text-overflow: ellipsis; }
@@ -509,6 +519,8 @@ body { background: #f5f5f4; }
 .pb-note:hover { border-color: rgb(0 0 0 / 0.35); }
 .pb-note.on { border-color: var(--pb-ink); }
 .pb-note.lifted { z-index: 4; cursor: grabbing; border-color: var(--pb-ink); }
+/* On a dark ground the ink edge is dark against dark, so picked or lifted it is ringed in the board's ink as well. */
+.pb-note.on, .pb-note.lifted { outline: 1px solid var(--pb-ground-ink, transparent); outline-offset: 0; }
 .pb-note.editing { cursor: text; user-select: text; }
 .pb-note.editing .pb-note-head { cursor: grab; }
 /* Resolved: the paper greys and the words step back, still legible, plainly done with. */
@@ -550,7 +562,9 @@ body { background: #f5f5f4; }
   position: absolute; left: -9px; top: 7px; z-index: 1; width: 16px; height: 16px; padding: 4px; border: 0; border-radius: 0;
   background: var(--pb-muted); background-clip: content-box; cursor: crosshair; opacity: 0; transition: opacity var(--pb-fast), background-color var(--pb-fast);
 }
-.pb-note-pin.pinned, .pb-note-pin:hover { background-color: var(--pb-ink); }
+/* Pinned and under the pointer it is the board's ink: most of it stands on the ground beside the note. */
+.pb-note-pin.pinned, .pb-note-pin:hover { background-color: var(--pb-ground-ink, var(--pb-ink)); }
+.pb-app .pb-note-pin:focus-visible { outline-color: var(--pb-ground-ink, var(--pb-ink)); }
 .pb-note:hover .pb-note-pin, .pb-note.on .pb-note-pin, .pb-note:focus-within .pb-note-pin { opacity: 1; }
 /* The kind swatches and Resolve: shown while the note is pointed at, picked, or has the keyboard anywhere in it. Each
    is drawn at its own size (a 12 swatch, the 14 check) in a 24 slot, and each takes the pointer across the whole slot
@@ -580,7 +594,7 @@ body { background: #f5f5f4; }
 .pb-note-reply-field:focus { border-color: var(--pb-ink); }
 
 .pb-note-body, .pb-note-text { display: block; margin: 0; padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pb-note-body.empty { color: rgb(0 0 0 / 0.62); font-style: italic; }
+.pb-note-body.empty { margin: 0; color: rgb(0 0 0 / 0.62); font-size: inherit; font-style: italic; } /* app.css's bare .empty is 12px with a margin */
 .pb-note-text { width: 100%; min-height: 40px; border: 0; outline: none; resize: none; background: none; color: inherit; font: inherit; line-height: inherit; }
 /* The field is the note: no ring around the words while they are written. The board's focus ring stays for everything else. */
 .pb-app .pb-note-text:focus-visible, .pb-app .pb-note-reply-field:focus-visible { outline: none; }
@@ -603,6 +617,7 @@ body { background: #f5f5f4; }
 /* Where this page puts the shared can (app/Trash.tsx): the lower right of the canvas, clear of the status line.
    Only the placing is the board's; the drawing, the count and the shake are the same everywhere. */
 .pb-can-at { position: absolute; right: 14px; bottom: 40px; z-index: 6; }
+.pb-app .pb-can-at { margin: 0; } /* app.css's bare .empty would lift an empty can 8px above a full one */
 
 
 /* --- notices --------------------------------------------------------------------------------------------- */
@@ -774,6 +789,11 @@ body { background: #f5f5f4; }
    when on; a slider is a hairline track and a square thumb with no fill, the figure beside it saying the value. */
 .pb-app .cv-pop { width: 360px; border-color: var(--pb-hairline); font-family: var(--pb-sans); }
 .pb-app .cv-value { font-family: var(--pb-mono); color: var(--pb-text); }
+/* A value (12px mono) and its label (13px sans) on one baseline: both lines 16 tall and centred alike, the value
+   standing on an empty 13px line of the sans, as the zoom's figure does. */
+.pb-app .cv-label { line-height: 16px; }
+.pb-app .cv-value { display: flex; justify-content: flex-end; align-items: baseline; height: 16px; line-height: 16px; }
+.pb-app .cv-value::before { content: "\200b"; font-family: var(--pb-sans); font-size: 13px; }
 .pb-app .cv-seg { gap: 2px; padding: 2px; border: 1px solid var(--pb-card-border); border-radius: 4px; background: var(--pb-field); }
 .pb-app .cv-seg button { height: 22px; padding: 6px 8px 2px; border: 0; border-radius: 2px; color: var(--pb-muted); font-size: 12px; line-height: 14px; white-space: nowrap; transition: background-color var(--pb-fast), color var(--pb-fast); }
 .pb-app .cv-seg button + button { border-left: 0; }
