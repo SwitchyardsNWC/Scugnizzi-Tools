@@ -1,2 +1,21 @@
 <!-- @dsCard group="Colors" viewport="700x170" name="Source & freshness" subtitle="Where a row comes from; whether a live section is current" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:48px;border:1px solid #000;display:flex}.chip i{flex:1}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div class="chip"><i style="background:#2c2222"></i><i style="background:#eeeeed"></i></div><div class="lbl">Warehouse</div><div class="lbl mut">#2c2222 / #eeeeed · --source-warehouse</div></div><div class="sw"><div class="chip"><i style="background:#000000"></i><i style="background:#ffffff"></i></div><div class="lbl">Purchase</div><div class="lbl mut">#000000 / #ffffff · --source-purchase</div></div><div class="sw"><div class="chip"><i style="background:#495472"></i><i style="background:#e2e5ec"></i></div><div class="lbl">Build (in-house)</div><div class="lbl mut">#495472 / #e2e5ec · --source-build</div></div><div class="sw"><div class="chip" style="border:0;gap:5px"><i style="background:#5b6b4e"></i><i style="background:#a8782a"></i><i style="background:#2c2222"></i></div><div class="lbl">Live · Stale · Frozen</div><div class="lbl mut">--fresh-*</div></div></div></body></html>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Source and freshness</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.2fr);gap:16px}
+.sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* Tokens, so the chips flip; the figures under them are that theme's. */
+.chip{height:48px;display:flex;box-sizing:border-box;border:1px solid var(--border-card);margin-bottom:4px}
+.chip i{flex:1}
+.chip.f{gap:4px;border:0}
+.lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hex{color:var(--text-muted);font-family:var(--font-mono-detail);font-size:12px;line-height:16px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root:not([data-theme="dark"]) .dk{display:none}
+:root[data-theme="dark"] .lt{display:none}
+</style></head><body><div class="row">
+<div class="sw"><div class="chip"><i style="background:var(--source-warehouse)"></i><i style="background:var(--source-warehouse-soft)"></i></div><div class="lbl">Warehouse</div><div class="hex"><span class="lt">#2c2222 / #eeeeed</span><span class="dk">#cfcfcc / #222222</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--source-purchase)"></i><i style="background:var(--source-purchase-soft)"></i></div><div class="lbl">Purchase</div><div class="hex"><span class="lt">#000000 / #ffffff</span><span class="dk">#f2f2f0 / #151515</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--source-build)"></i><i style="background:var(--source-build-soft)"></i></div><div class="lbl">Build (in-house)</div><div class="hex"><span class="lt">#495472 / #e2e5ec</span><span class="dk">#8b98c9 / #1e2233</span></div></div>
+<div class="sw"><div class="chip f"><i style="background:var(--fresh-live)"></i><i style="background:var(--fresh-stale)"></i><i style="background:var(--fresh-frozen)"></i></div><div class="lbl">Live · stale · frozen</div><div class="hex"><span class="lt">#5b6b4e #8a6222 #2c2222</span><span class="dk">#8fb082 #d9a54c #cfcfcc</span></div></div>
+</div>
+<p style="margin-top:16px;max-width:none;color:var(--text-muted);font-size:12px;letter-spacing:.132px">Words on a solid source ink take --source-on-ink, which turns dark with the theme.</p>
+</body></html>

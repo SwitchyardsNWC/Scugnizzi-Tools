@@ -1,2 +1,13 @@
 <!-- @dsCard group="Colors" viewport="700x150" name="Paper & Ink" subtitle="The two poles of the system" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:64px;border:1px solid var(--color-ink-black)}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div class="chip" style="background:#ffffff"></div><div class="lbl">Paper White</div><div class="lbl mut">#ffffff · --color-paper-white</div></div><div class="sw"><div class="chip" style="background:#000000"></div><div class="lbl">Ink Black</div><div class="lbl mut">#000000 · --color-ink-black</div></div></div></body></html>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Paper and ink</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:flex;gap:16px}
+.sw{flex:1;display:flex;flex-direction:column;gap:4px}
+/* The poles themselves don't flip; the edge round them does, so each keeps an outline on either page. */
+.chip{height:64px;box-sizing:border-box;border:1px solid var(--border-control);margin-bottom:4px}
+.mut{color:var(--text-muted)}
+.hex{font-family:var(--font-mono-detail);font-size:12px;letter-spacing:0}
+</style></head><body><div class="row">
+<div class="sw"><div class="chip" style="background:var(--color-paper-white)"></div><div>Paper white</div><div class="mut"><span class="hex">#ffffff</span> · --color-paper-white</div></div>
+<div class="sw"><div class="chip" style="background:var(--color-ink-black)"></div><div>Ink black</div><div class="mut"><span class="hex">#000000</span> · --color-ink-black</div></div>
+</div></body></html>

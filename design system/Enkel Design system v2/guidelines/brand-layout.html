@@ -1,2 +1,25 @@
-<!-- @dsCard group="Brand" viewport="700x200" name="Layout" subtitle="Fixed 200px left rail · 1200px max content · hairlines, not fills" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:64px;border:1px solid var(--color-ink-black)}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div style="display:grid;grid-template-columns:100px 1fr;gap:16px;height:150px"><div style="border-right:1px solid #000;padding-right:10px;font-size:15px;display:flex;flex-direction:column;gap:10px"><span>art-ventory_</span><span>All works</span><span class="mut">Artists</span><span class="mut">Loans</span></div><div style="display:flex;flex-direction:column;gap:10px"><div style="font-size:30px;line-height:1.1">All works</div><div style="border-top:1px solid #b2b4b1;height:21px"></div><div style="border-top:1px solid #b2b4b1;height:21px"></div><div style="border-top:1px solid #b2b4b1;height:21px"></div></div></div></body></html>
+<!-- @dsCard group="Brand" viewport="700x200" name="Layout" subtitle="200px paper rail · sunken page, paper cards · 1440px max content · ink for structure, soft lines inside" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Layout</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+/* The shell at a quarter of its size: proportions and lines are real, the type is legible. */
+.shell{display:grid;grid-template-columns:120px minmax(0,1fr);height:166px;border:1px solid var(--border-card)}
+.rail{display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--surface-paper);border-right:1px solid var(--border-hairline)}
+.wm{font-size:14px;line-height:16px;letter-spacing:.154px;margin-bottom:4px}
+.rail span{color:var(--text-muted)}
+.rail .on{color:var(--text-primary)}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;background:var(--surface-sunken)}
+.head{display:flex;align-items:baseline;gap:12px;padding:10px 12px 8px;background:var(--surface-paper);border-bottom:1px solid var(--border-hairline)}
+.head b{font-weight:400;font-size:16px;line-height:20px;letter-spacing:.176px}
+.head i{font-style:normal;color:var(--text-muted)}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px}
+.card{background:var(--surface-card);border:1px solid var(--border-card);padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.card .t{color:var(--text-secondary);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .v{font-family:var(--font-mono);font-size:20px;line-height:24px;letter-spacing:0}
+.card .r{border-top:1px solid var(--border-muted);height:8px}
+</style></head><body>
+<div class="shell">
+<div class="rail"><span class="wm on">switchyards_</span><span class="on">Overview</span><span>Clubs</span><span>Projects</span><span>Warehouse</span></div>
+<div class="main"><div class="head"><b>Overview</b><i>6 of 9 projects on track</i></div>
+<div class="cards"><div class="card"><span class="t">Occupancy</span><span class="v">78 %</span><div class="r"></div></div><div class="card"><span class="t">Open items</span><span class="v">14</span><div class="r"></div></div><div class="card"><span class="t">Spend</span><span class="v">$412k</span><div class="r"></div></div></div></div>
+</div>
+</body></html>

@@ -1,2 +1,26 @@
 <!-- @dsCard group="Colors" viewport="700x170" name="Data" subtitle="Six series colours for bars and sparklines, plus up / down / flat for deltas. The only saturated colour in the system." -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:12px}.sw{flex:1;display:flex;flex-direction:column;gap:4px}.chip{height:40px}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted);font-family:var(--font-mono);font-size:12px;letter-spacing:0}</style></head><body><div class="row"><div class="sw"><div class="chip" style="background:var(--data-1)"></div><div class="lbl">Series 1 · primary</div><div class="lbl mut">#4a5fa5</div></div><div class="sw"><div class="chip" style="background:var(--data-2)"></div><div class="lbl">2 · revenue / good</div><div class="lbl mut">#5b8a5e</div></div><div class="sw"><div class="chip" style="background:var(--data-3)"></div><div class="lbl">3 · warn</div><div class="lbl mut">#ba832c</div></div><div class="sw"><div class="chip" style="background:var(--data-4)"></div><div class="lbl">4 · bad</div><div class="lbl mut">#b8412b</div></div><div class="sw"><div class="chip" style="background:var(--data-5)"></div><div class="lbl">5 · neutral</div><div class="lbl mut">#7a7d79</div></div><div class="sw"><div class="chip" style="background:var(--data-6)"></div><div class="lbl">6 · secondary</div><div class="lbl mut">#3e7d7a</div></div></div><div class="row" style="margin-top:12px;align-items:center"><span class="lbl" style="color:var(--delta-up);font-family:var(--font-mono)">▲ +4.2%</span><span class="lbl" style="color:var(--delta-down);font-family:var(--font-mono)">▼ −2.6%</span><span class="lbl" style="color:var(--delta-flat);font-family:var(--font-mono)">■ 0.0%</span><span class="lbl" style="color:var(--text-muted)">Track: --data-track. Series 1 is always the default bar / line; 3 and 4 flag rows, never decorate.</span></div></body></html>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Data</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+.chip{height:32px;margin-bottom:2px}
+.lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The chips are the tokens, so they flip; the figures under them are that theme's. */
+.hex{color:var(--text-muted);font-family:var(--font-mono-detail);font-size:12px;letter-spacing:0}
+.deltas{display:flex;gap:16px;align-items:baseline;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-muted)}
+.d{font-family:var(--font-mono);letter-spacing:0;white-space:nowrap}
+.note{color:var(--text-muted);font-size:12px;letter-spacing:.132px;min-width:0}
+:root:not([data-theme="dark"]) .dk{display:none}
+:root[data-theme="dark"] .lt{display:none}
+</style></head><body>
+<div class="row">
+<div class="sw"><div class="chip" style="background:var(--data-1)"></div><div class="lbl">1 · primary</div><div class="hex"><span class="lt">#4a5fa5</span><span class="dk">#7e92d6</span></div></div>
+<div class="sw"><div class="chip" style="background:var(--data-2)"></div><div class="lbl">2 · good</div><div class="hex"><span class="lt">#5b8a5e</span><span class="dk">#86b389</span></div></div>
+<div class="sw"><div class="chip" style="background:var(--data-3)"></div><div class="lbl">3 · warn</div><div class="hex"><span class="lt">#ba832c</span><span class="dk">#dba64d</span></div></div>
+<div class="sw"><div class="chip" style="background:var(--data-4)"></div><div class="lbl">4 · bad</div><div class="hex"><span class="lt">#b8412b</span><span class="dk">#e0705a</span></div></div>
+<div class="sw"><div class="chip" style="background:var(--data-5)"></div><div class="lbl">5 · neutral</div><div class="hex"><span class="lt">#7a7d79</span><span class="dk">#8f928e</span></div></div>
+<div class="sw"><div class="chip" style="background:var(--data-6)"></div><div class="lbl">6 · secondary</div><div class="hex"><span class="lt">#3e7d7a</span><span class="dk">#67a9a5</span></div></div>
+</div>
+<div class="deltas"><span class="d" style="color:var(--delta-up)">▲ +4.2%</span><span class="d" style="color:var(--delta-down)">▼ −2.6%</span><span class="d" style="color:var(--delta-flat)">■ 0.0%</span>
+<span class="note">Empty bar: --data-track. Series 1 is the default bar and line; 3 and 4 flag the row that matters, never decorate.</span></div>
+</body></html>

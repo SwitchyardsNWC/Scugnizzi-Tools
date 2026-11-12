@@ -1,2 +1,18 @@
-<!-- @dsCard group="Colors" viewport="700x150" name="Accent" subtitle="The only chromatic voice — filled surfaces only" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:64px;border:1px solid var(--color-ink-black)}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div class="chip" style="background:#495472"></div><div class="lbl">Slate Iris</div><div class="lbl mut">#495472 · --color-slate-iris</div></div><div class="sw"><div class="chip" style="background:#495472;border:0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px">Add work</div><div class="lbl">Filled button</div><div class="lbl mut">text #ffffff · radius 0</div></div></div></body></html>
+<!-- @dsCard group="Colors" viewport="700x150" name="Accent" subtitle="Slate iris: the only chroma in chrome, and there it only fills" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Accent</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* The chips are the tokens, so they flip; the figures under them are that theme's. */
+.chip{height:56px;margin-bottom:4px}
+.btn{align-self:flex-start;display:inline-flex;box-sizing:border-box;margin:10px 0 14px;padding:11px 16px 7px;font-size:14px;line-height:16px;letter-spacing:.154px;
+  color:var(--action-primary-text);background:var(--action-primary);border:1px solid var(--action-primary);border-radius:var(--radius-buttons)}
+.mut{color:var(--text-muted)}
+.hex{font-family:var(--font-mono-detail);font-size:12px;letter-spacing:0}
+:root:not([data-theme="dark"]) .dk{display:none}
+:root[data-theme="dark"] .lt{display:none}
+</style></head><body><div class="row">
+<div class="sw"><div class="chip" style="background:var(--action-primary)"></div><div>Slate iris</div><div class="mut"><span class="hex lt">#495472</span><span class="hex dk">#5a67a0</span> · --action-primary</div></div>
+<div class="sw"><div class="chip" style="background:var(--action-primary-hover)"></div><div>Hover, darker in both themes</div><div class="mut"><span class="hex lt">#3f4862</span><span class="hex dk">#4f5b93</span> · --action-primary-hover</div></div>
+<div class="sw"><span class="btn">Add work</span><div>Filled button, once per view</div><div class="mut">white text <span class="lt">7.52 : 1</span><span class="dk">5.41 : 1</span> · radius 6</div></div>
+</div></body></html>

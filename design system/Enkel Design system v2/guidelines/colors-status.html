@@ -1,2 +1,21 @@
 <!-- @dsCard group="Colors" viewport="700x170" name="Status" subtitle="Five states — solid ink + soft ground. Muted so the page stays quiet." -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:48px;border:1px solid #000;display:flex}.chip i{flex:1}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div class="chip"><i style="background:#5b6b4e"></i><i style="background:#e8ece3"></i></div><div class="lbl">Done / on track</div><div class="lbl mut">#5b6b4e / #e8ece3 · moss</div></div><div class="sw"><div class="chip"><i style="background:#495472"></i><i style="background:#e2e5ec"></i></div><div class="lbl">In progress</div><div class="lbl mut">#495472 / #e2e5ec · slate iris</div></div><div class="sw"><div class="chip"><i style="background:#a8782a"></i><i style="background:#f3ead6"></i></div><div class="lbl">At risk</div><div class="lbl mut">#a8782a / #f3ead6 · amber</div></div><div class="sw"><div class="chip"><i style="background:#8a3b2e"></i><i style="background:#f1e0dc"></i></div><div class="lbl">Blocked</div><div class="lbl mut">#8a3b2e / #f1e0dc · brick</div></div><div class="sw"><div class="chip"><i style="background:#b2b4b1"></i><i style="background:#eeeeed"></i></div><div class="lbl">Not started</div><div class="lbl mut">#b2b4b1 / #eeeeed · fossil</div></div></div></body></html>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Status</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}
+.sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* Ink and soft ground, both tokens, so the chip flips; the figures under it are that theme's. */
+.chip{height:48px;display:flex;box-sizing:border-box;border:1px solid var(--border-card);margin-bottom:4px}
+.chip i{flex:1}
+.lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hex{color:var(--text-muted);font-family:var(--font-mono-detail);font-size:12px;letter-spacing:0;white-space:nowrap}
+:root:not([data-theme="dark"]) .dk{display:none}
+:root[data-theme="dark"] .lt{display:none}
+</style></head><body><div class="row">
+<div class="sw"><div class="chip"><i style="background:var(--status-done)"></i><i style="background:var(--status-done-soft)"></i></div><div class="lbl">Done · moss</div><div class="hex"><span class="lt">#5b6b4e / #e8ece3</span><span class="dk">#8fb082 / #1e261a</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--status-progress)"></i><i style="background:var(--status-progress-soft)"></i></div><div class="lbl">In progress · slate</div><div class="hex"><span class="lt">#495472 / #e2e5ec</span><span class="dk">#8b98c9 / #1e2233</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--status-risk)"></i><i style="background:var(--status-risk-soft)"></i></div><div class="lbl">At risk · amber</div><div class="hex"><span class="lt">#8a6222 / #f3ead6</span><span class="dk">#d9a54c / #2c2413</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--status-blocked)"></i><i style="background:var(--status-blocked-soft)"></i></div><div class="lbl">Blocked · brick</div><div class="hex"><span class="lt">#8a3b2e / #f1e0dc</span><span class="dk">#dc7a64 / #301b16</span></div></div>
+<div class="sw"><div class="chip"><i style="background:var(--status-notstarted)"></i><i style="background:var(--status-notstarted-soft)"></i></div><div class="lbl">Not started</div><div class="hex"><span class="lt">#666965 / #eeeeed</span><span class="dk">#9a9c99 / #222222</span></div></div>
+</div>
+<p style="margin-top:16px;max-width:none;color:var(--text-muted);font-size:12px;letter-spacing:.132px">Each ink holds 4.5 : 1 on the card and on its own soft ground, in both themes.</p>
+</body></html>
