@@ -1,196 +1,264 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HUB-MOD</title>
+<meta name="theme-color" content="#151515">
+<script src="../theme.js"></script>
+<link rel="stylesheet" href="../design system/Enkel Design system v2/styles.css">
+<link rel="stylesheet" href="../design system/Enkel Design system v2/tools.css">
 <style>
-  /* The mini tools' shared dark palette (riso.html), so this sits beside the others without a seam. */
-  :root{
-    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30; --line2:#3a3a40;
-    --text:#e8e5df; --muted:#8f8c86; --faint:#5e5d59; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
-    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  }
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-  .app{display:grid;grid-template-columns:288px minmax(0,1fr) 320px;height:calc(100vh - var(--tool-banner,0px))}
-  aside{background:var(--panel);overflow-y:auto;min-width:0}
-  aside.left{border-right:1px solid var(--line)}
-  aside.right{border-left:1px solid var(--line)}
-  .mono{font-family:var(--mono)}
+  /* HUB-MOD: only what is particular to this tool. The panel, panes, rows, fields, buttons, segments, checks, the module
+     list and the stage are tools.css on the Enkel tokens. The email in the preview frame is the work, not chrome: the
+     paper behind it, its grounds, and the selection drawn over it inside the frame stay as the compiler makes them. */
 
-  /* Panels and rows, as in riso.html */
-  .pane{padding:14px 16px;border-bottom:1px solid var(--line)}
-  .pane-head{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
-  .pane-head .t{flex:1}
-  .pane-head .n{font-family:var(--mono);font-weight:400;letter-spacing:0;text-transform:none}
-  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
-  .sub{margin:0;color:var(--muted)}
-  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
-  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
-  .row>label,.row>.lab{flex:0 0 92px;color:var(--muted)}
-  .row>.ctl{flex:1;min-width:0;display:flex;gap:6px;align-items:center}
-  .stack{display:flex;flex-direction:column;gap:4px;margin:8px 0}
-  .stack>label{color:var(--muted)}
-  input[type=text],input[type=url],input[type=number],select,textarea{width:100%;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px/1.4 inherit;font-family:inherit}
-  input[type=number]{width:72px;flex:0 0 72px}
-  textarea{resize:vertical;min-height:64px;font-family:var(--mono);font-size:12px}
-  select{appearance:none;-webkit-appearance:none;padding-right:22px;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238f8c86' stroke-width='1.5'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 8px center}
-  input:focus,select:focus,textarea:focus{border-color:#55555c;outline:none}
-  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--text);outline-offset:1px}
-  input[type=checkbox]{accent-color:var(--accent);margin:0}
-  .check{display:flex;align-items:flex-start;gap:8px;margin:7px 0;cursor:pointer}
-  .check input{margin-top:2px}
-  .check span{flex:1}
-  .check small{display:block;color:var(--muted);font-size:11.5px}
-  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
-  button:hover{border-color:#55555c}
-  button:disabled{opacity:.45;cursor:not-allowed;border-color:var(--line)}
-  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  button.primary:hover{filter:brightness(1.06)}
-  button.ghost{background:transparent;border-color:transparent;color:var(--muted)}
-  button.ghost:hover{color:var(--text);border-color:var(--line)}
-  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
-  button.icon{padding:2px 6px;min-width:24px;font-family:var(--mono);font-size:12px;line-height:18px}
-  .seg{display:inline-flex}
-  .stack>.seg{display:flex}
-  .stack>.seg button{flex:1;padding-left:4px;padding-right:4px}
-  .seg button{border-radius:0;margin-left:-1px}
-  .seg button:first-child{border-radius:5px 0 0 5px;margin-left:0}
-  .seg button:last-child{border-radius:0 5px 5px 0}
-  /* "On" is carried by weight, an inset rule and a fill — never colour alone. */
-  .seg button.on{background:#3a3a40;color:#fff;font-weight:600;box-shadow:inset 0 -2px 0 var(--text)}
+  /* --- the frame: a rail of modules and parts, the work, the inspector ------------------------------------------------ */
+  .app{grid-template-columns:var(--tool-rail-width) minmax(0,1fr) var(--tool-panel-width)}
+  .app>aside{padding:0}                                   /* both panels are stacks of .pane, which carry their own inset */
+  .pane>:last-child{margin-bottom:0}
+  .pane-head+.hint,.stack>.hint{margin-top:0}
   .grow{flex:1}
+  .pane-head{align-items:baseline}                       /* the caps title and the mono count share a baseline (tools.css centres them) */
+  .intro{padding-top:0;padding-bottom:0}
+  .intro .panel-title{padding-top:0}
+  .intro .panel-sub{margin:var(--spacing-4) 0 0}
 
-  /* ---- Library ---- */
-  .lib{display:flex;flex-direction:column;gap:2px;margin:0 0 8px}
-  .lib button.item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border-color:transparent;padding:5px 8px}
-  .lib button.item:hover{background:var(--panel2)}
-  .lib button.item.on{background:var(--panel2);border-color:var(--line2);font-weight:600}
-  .lib button.item.on::before{content:"▸";color:var(--text)}
-  .lib button.item:not(.on)::before{content:"";width:7px}
-  .lib .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
-  .lib .ct{font-family:var(--mono);font-size:11px;color:var(--muted)}
-  .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+  /* --- modules ------------------------------------------------------------------------------------------------------- */
+  .lib .item{width:100%;text-align:left}                 /* a <button>: its words start at the left like any list row */
+  .lib .item .meta{padding-top:0}                        /* the mono sits lower in its line: no nudge puts it on the name's baseline */
+  .btnrow{display:flex;align-items:center;gap:var(--spacing-8);margin-top:var(--spacing-8)}
+  /* Open and Save are quiet: their words sit on the panel's edge, the same line as the list and the buttons above. */
+  .btnrow.quiet{gap:var(--spacing-8);margin-top:var(--spacing-4);margin-left:calc(var(--spacing-12) * -1)}
 
-  /* ---- Outline ---- */
-  .outline{display:flex;flex-direction:column}
-  .orow{display:flex;align-items:center;gap:6px;min-height:30px;padding:3px 6px;border:1px solid transparent;border-radius:5px;cursor:pointer;position:relative}
-  .orow:hover{background:var(--panel2)}
-  .orow.on{background:#26272c;border-color:var(--sel)}
-  .orow.on .ttl{font-weight:600}
-  .orow .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
-  .orow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .orow .tag{font-family:var(--mono);font-size:10px;letter-spacing:.3px;padding:0 5px;border-radius:3px;line-height:16px;white-space:nowrap}
-  .tag.field{border:1px solid var(--text);color:var(--text)}
-  .tag.fixed{border:1px dashed var(--faint);color:var(--muted)}
-  .orow .acts{display:none;gap:2px}
-  .orow:hover .acts,.orow.on .acts{display:inline-flex}
-  .orow:hover .tag,.orow.on .tag{display:none}
-  .orow .acts button{padding:0 5px;min-width:20px;line-height:18px;font-size:11px;background:transparent;border-color:transparent;color:var(--muted)}
-  .orow .acts button:hover{color:var(--text);border-color:var(--line2)}
-  .ohead{display:flex;align-items:center;gap:6px;padding:6px 6px 2px;font-size:11px;color:var(--muted);font-family:var(--mono)}
-  .ohead .grow{border-top:1px dotted var(--line2)}
-  .oadd{align-self:flex-start;margin:2px 0 4px;padding:2px 8px;font-size:12px;color:var(--muted);background:transparent;border:1px dashed var(--line2)}
-  .oadd:hover{color:var(--text);border-color:var(--muted)}
-  .oempty{padding:6px 8px;color:var(--faint);font-size:12px;font-style:italic}
-  .nest{margin-left:14px;padding-left:8px;border-left:1px solid var(--line2);display:flex;flex-direction:column}
-  .orow.dragging{opacity:.4}
-  .orow.drop-before{box-shadow:inset 0 2px 0 var(--text)}
-  .orow.drop-after{box-shadow:inset 0 -2px 0 var(--text)}
-  .oempty.drop-in{outline:2px dashed var(--text);outline-offset:-2px;color:var(--text)}
+  /* --- parts: the outline ------------------------------------------------------------------------------------------- */
+  #outline>div,.nest{display:flex;flex-direction:column;gap:2px}
+  .orow{display:flex;align-items:center;gap:var(--spacing-8);min-height:32px;padding:0 var(--spacing-4);cursor:pointer;position:relative;
+    border:var(--border-width) solid transparent;border-radius:var(--radius-controls);
+    transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard)}
+  .orow:hover{background:var(--surface-row-hover);border-color:var(--border-card)}
+  /* Selected: the selection surface, an ink edge and a 2px ink marker down the left, as on every list in the suite. */
+  .orow.on{background:var(--surface-selected);border-color:var(--text-primary);box-shadow:inset 2px 0 0 var(--text-primary)}
+  .orow:focus-visible{outline-offset:1px}               /* the ring sits in the 2px between rows */
+  .orow .ttl{flex:1;min-width:0;padding-top:var(--optical-nudge);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .orow .tag,.auto,.issue .lv{flex:none;min-height:18px;padding-top:1px}
+  .orow .acts{display:none;flex:none}
+  .orow:hover .acts,.orow.on .acts{display:flex}
+  .orow:hover .tag,.orow.on .tag{display:none}          /* the glyph keeps saying field or fixed while the buttons show */
+  .orow.dragging{opacity:.5}
+  .orow.drop-before{box-shadow:inset 0 2px 0 var(--text-primary)}
+  .orow.drop-after{box-shadow:inset 0 -2px 0 var(--text-primary)}
+  .orow.on.drop-before{box-shadow:inset 2px 0 0 var(--text-primary),inset 0 2px 0 var(--text-primary)}
+  .orow.on.drop-after{box-shadow:inset 2px 0 0 var(--text-primary),inset 0 -2px 0 var(--text-primary)}
+  /* A part's type in a small square. Its edge says what the team gets, like the tag beside it: solid ink, a field they
+     edit; dashed, fixed; dotted, a container that holds parts. Shape carries it, so it reads without colour. */
+  /* Boxed mono at 11 in an 18 box: 1 + 1 / 14 / 2 + 1 puts its caps on the box's middle and its baseline on the row's. */
+  .glyph{flex:0 0 24px;width:24px;height:18px;padding-top:1px;overflow:hidden;text-align:center;white-space:nowrap;
+    font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:14px;letter-spacing:0;color:var(--text-muted);
+    border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+  .glyph.field{border-color:var(--text-secondary);color:var(--text-primary)}
+  .glyph.fixed{border-style:dashed;border-color:var(--border-control)}
+  .glyph.group{border-style:dotted;border-color:var(--border-control)}   /* a container: dotted, so all three kinds have a drawn edge */
+  .tag.field{border-color:var(--text-secondary);color:var(--text-primary)}
+  .tag.fixed{border-style:dashed;border-color:var(--border-control)}
+  .ohead{display:flex;align-items:center;gap:var(--spacing-8);padding:var(--spacing-8) var(--spacing-4) 2px;
+    font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:14px;letter-spacing:0;color:var(--text-muted)}
+  .ohead .grow{border-top:var(--border-width) solid var(--border-muted)}
+  .nest{margin-left:var(--spacing-12);padding-left:var(--spacing-8);border-left:var(--border-width) solid var(--border-card)}
+  .nest>.nest{margin-left:0;padding-left:0;border-left:0}   /* a column's list sits under its own head, not indented twice */
+  .oadd{align-self:flex-start;min-height:var(--control-height-xs);margin:2px 0 var(--spacing-4);padding:var(--control-pad-xs);
+    font-size:var(--text-caption);color:var(--text-secondary);border-style:dashed}
+  .oempty{padding:var(--spacing-4) var(--spacing-8);font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
+  .oempty.drop-in{color:var(--text-primary);background:var(--surface-row-hover);outline:var(--border-width) dashed var(--text-primary);outline-offset:-1px}
 
-  /* ---- Centre ---- */
-  main{display:flex;flex-direction:column;min-width:0;background:#0e0e0f}
-  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-  .bar .lbl{color:var(--muted);font-size:11.5px}
-  .bar.sub{padding:6px 14px;gap:8px;background:#161618}
-  .bar.sub .seg button{padding:3px 9px;font-size:12px}
-  .checks-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px}
-  .checks-pill .mark{font-family:var(--mono);font-weight:700}
-  .stage{flex:1;overflow:auto;position:relative}
-  .canvas{display:flex;justify-content:center;padding:28px 24px 64px}
-  .device{background:#fff;box-shadow:0 0 0 1px var(--line2);transition:width .18s}
-  .device iframe{display:block;border:0;width:100%;height:200px}
-  .device-note{text-align:center;color:var(--muted);font-size:11.5px;margin:10px 0 0;font-family:var(--mono)}
-  .dark-note{max-width:620px;margin:0 auto 12px;padding:8px 12px;border:1px dashed var(--line2);color:var(--muted);font-size:12px;text-align:center}
+  /* --- checks -------------------------------------------------------------------------------------------------------- */
+  .issues{display:flex;flex-direction:column;gap:var(--spacing-8)}
+  .issue{width:100%;min-height:0;justify-content:flex-start;align-items:baseline;gap:var(--spacing-8);padding:var(--spacing-8);
+    text-align:left;white-space:normal;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);border-color:var(--border-card)}
+  .issue>span:last-child{flex:1;min-width:0}
+  /* Error and warning differ three ways: the word, a filled or an outlined badge, a solid or a dashed edge. */
+  .issue.error,.issue.error:hover{border-color:var(--status-blocked)}
+  .issue.warning{border-style:dashed;border-color:var(--border-control)}
+  /* The badge and the 'auto' chip are tags: .tag's 5px sides and its radius. */
+  .issue .lv{padding-left:5px;padding-right:5px;font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:14px;letter-spacing:0;
+    border:var(--border-width) solid currentColor;border-radius:var(--radius-tags-sm)}
+  .issue.error .lv{color:var(--surface-paper);background:var(--status-blocked);border-color:var(--status-blocked)}
+  .issue.warning .lv{color:var(--status-risk)}
+  .ok{font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
+  .sys{font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:16px;letter-spacing:0;color:var(--text-muted);overflow-wrap:anywhere}
 
-  /* Code */
-  .code{display:grid;grid-template-columns:200px minmax(0,1fr);height:100%}
-  .files{border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px;background:var(--panel)}
-  .files button{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;border-color:transparent;font-family:var(--mono);font-size:12px}
-  .files button.on{background:var(--panel2);border-color:var(--line2);font-weight:700}
-  .files button.on::after{content:"◂"}
-  .files .sz{color:var(--muted);font-weight:400}
-  .files .sep{border-top:1px solid var(--line);margin:8px 4px}
+  /* --- the bars over the stage --------------------------------------------------------------------------------------- */
+  /* The views are navigation, so they look like it: words on the bar, the open one in ink over a 2px ink rule that sits
+     on the bar's own edge. The preview's settings below are segments, a different thing that looks different. */
+  .tabs{display:flex;align-self:stretch;gap:var(--spacing-16);margin:0 0 -1px calc(var(--spacing-4) * -1)}
+  /* 13 / 16 / 11 fills the 40px bar and puts the words on the Download button's baseline (measured, not a scale step). */
+  .topbar .tabs button{min-height:0;padding:13px 4px 11px;font-size:var(--text-body);line-height:16px;letter-spacing:var(--tracking-body);
+    color:var(--text-muted);background:transparent;border:0;border-radius:0}
+  .topbar .tabs button:hover{color:var(--text-primary);background:transparent}
+  .topbar .tabs button[aria-selected="true"]{color:var(--text-primary);box-shadow:inset 0 -2px 0 var(--text-primary);cursor:default}
+  .topbar .tabs button:focus-visible{outline-offset:-2px}
+  .zipnote{font-family:var(--font-helveticaneue);font-size:var(--text-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis}
+  /* 5 + 28 + 6 + 1 = 40: the 28px segments in the 40px bar, the odd pixel under them. A wrapped line keeps the rhythm:
+     28 tall, 8 apart. */
+  .subbar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-8) var(--spacing-16);min-height:var(--tool-bar-height);
+    padding:5px var(--spacing-16) 6px;background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card)}
+  .vgroup{display:inline-flex;align-items:baseline;gap:var(--spacing-8);min-width:0}
+  .vgroup>.lab{font-size:var(--text-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted);white-space:nowrap}
+  .subbar .seg.inline button{padding-left:var(--spacing-8);padding-right:var(--spacing-8)}
+  /* The theme's own ground beside its name. Both sit on the words' baseline, so the button's baseline is the words' (an
+     empty box first would put it at the box's foot) and the chip stands at cap height. */
+  .seg .swatch{margin:0}
+  #themeSeg button>*{align-self:baseline}
+
+  /* --- the stage ----------------------------------------------------------------------------------------------------- */
+  .stage{display:block;padding:0}
+  .canvas{display:flex;padding:var(--spacing-24) var(--spacing-16) var(--spacing-32)}
+  .canvas>div{margin:0 auto}                              /* centred while it fits, from the left when it does not */
+  .device{margin:0 auto;background:#fff;box-shadow:0 0 0 var(--border-width) var(--border-card)}   /* the paper behind the email: content */
+  .device iframe{display:block;width:100%;height:200px;border:0}
+  .device-note{margin:var(--spacing-8) 0 0;text-align:center;font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:16px;letter-spacing:0;color:var(--text-muted)}
+  .dark-note{max-width:600px;margin:0 auto var(--spacing-12);padding:var(--spacing-8) var(--spacing-12);font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);
+    color:var(--text-secondary);background:var(--surface-paper);border:var(--border-width) solid var(--border-card)}
+  .dark-note .mono{font-family:var(--font-mono-detail);font-size:var(--text-micro)}
+
+  /* --- code ---------------------------------------------------------------------------------------------------------- */
+  .code{display:grid;grid-template-columns:var(--sidebar-width) minmax(0,1fr);height:100%}
+  .files{display:flex;flex-direction:column;gap:2px;min-height:0;overflow-y:auto;padding:var(--spacing-12) var(--spacing-8);
+    background:var(--surface-paper);border-right:var(--border-width) solid var(--border-card)}
+  .files button{width:100%;justify-content:space-between;padding-left:var(--spacing-8);padding-right:var(--spacing-8);border-color:transparent;
+    font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0}
+  .files button:hover{border-color:var(--border-card)}
+  .files button.on,.files button.on:hover{background:var(--surface-selected);border-color:var(--text-primary);box-shadow:inset 2px 0 0 var(--text-primary)}
+  .files .sz{color:var(--text-muted)}
+  .files .sep{margin:var(--spacing-8) var(--spacing-4);border-top:var(--border-width) solid var(--border-muted)}
+  .files .hint{margin:0;padding:0 var(--spacing-8)}
+  .hint .mono{font-family:var(--font-mono-detail);font-size:var(--text-micro)}
   .codepane{display:flex;flex-direction:column;min-width:0;min-height:0}
-  .codehead{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
-  .codehead .path{flex:1;font-family:var(--mono);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  pre.src{margin:0;padding:12px 16px 40px;overflow:auto;flex:1;font:12px/1.55 var(--mono);color:#d6d3cc;white-space:pre;tab-size:2;counter-reset:ln}
+  .codehead{flex:none;display:flex;align-items:center;gap:var(--spacing-8);min-height:var(--tool-bar-height);padding:0 var(--spacing-8) 0 var(--spacing-16);
+    background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card)}
+  .codehead .path{flex:1;min-width:0;padding-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted)}
+  pre.src{flex:1;min-height:0;margin:0;padding:var(--spacing-12) var(--spacing-16) var(--spacing-32) 0;overflow:auto;white-space:pre;tab-size:2;counter-reset:ln;
+    font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:18px;letter-spacing:0;color:var(--text-secondary)}
   pre.src .ln{display:block}
-  pre.src .ln::before{counter-increment:ln;content:counter(ln);display:inline-block;width:34px;margin-right:12px;text-align:right;color:var(--faint);user-select:none}
-  .hubl{color:#e7c37f}
-  .cmt{color:#7f8a80;font-style:italic}
+  pre.src .ln::before{counter-increment:ln;content:counter(ln);display:inline-block;width:40px;margin-right:var(--spacing-16);text-align:right;color:var(--text-muted);user-select:none}
+  /* HubL stands out by lightness and a fill, comments by tone and slant: no hue, so it reads for every eye. */
+  .hubl{color:var(--text-primary);background:var(--surface-selected)}
+  .cmt{color:var(--text-muted);font-style:italic}
 
-  /* Steps (Design Manager by hand) */
-  .steps{max-width:860px;margin:0 auto;padding:24px 28px 80px}
-  .steps h2{font-size:15px;font-weight:600;margin:28px 0 8px}
+  /* --- hand build ---------------------------------------------------------------------------------------------------- */
+  .steps{max-width:880px;margin:0 auto;padding:var(--spacing-24) var(--spacing-32) var(--spacing-32)}
+  .steps h2{margin:var(--spacing-32) 0 var(--spacing-8);font-size:var(--text-subheading);line-height:20px;letter-spacing:var(--tracking-subheading);color:var(--text-primary)}
   .steps h2:first-child{margin-top:0}
-  .steps p{color:#cfcbc4;margin:6px 0;max-width:72ch}
-  .steps ol{padding-left:20px;margin:8px 0}
-  .steps li{margin:4px 0}
-  .steps code{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 4px}
-  .ftable{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.5px}
-  .ftable th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--line2);padding:6px 8px}
-  .ftable td{border-bottom:1px solid var(--line);padding:7px 8px;vertical-align:top}
-  .ftable td.ck{width:28px}
-  .ftable tr.child td:nth-child(2){padding-left:26px}
-  .ftable tr.child td:nth-child(2)::before{content:"↳ ";color:var(--muted)}
-  .ftable tr.done td{color:var(--faint);text-decoration:line-through}
+  .steps p{max-width:72ch;margin:var(--spacing-8) 0;line-height:20px;color:var(--text-secondary)}
+  .steps p.hint{margin:var(--spacing-16) 0 var(--spacing-4);line-height:16px;color:var(--text-muted)}
+  .steps ol{max-width:72ch;margin:var(--spacing-8) 0;padding-left:var(--spacing-24);color:var(--text-secondary)}
+  .steps li{margin:var(--spacing-4) 0;line-height:20px}
+  .steps b{font-weight:400;color:var(--text-primary)}
+  .steps code{padding:1px 4px 0;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-primary);
+    background:var(--surface-card);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+  .steps a{color:var(--text-primary);text-decoration:underline;text-decoration-color:var(--border-control);text-underline-offset:3px}
+  .steps a:hover{text-decoration-color:var(--text-primary)}
+  .cmd{display:flex;align-items:center;gap:var(--spacing-8);margin:var(--spacing-8) 0 var(--spacing-4);padding:var(--spacing-4) var(--spacing-4) var(--spacing-4) var(--spacing-12);
+    background:var(--surface-card);border:var(--border-width) solid var(--border-card)}
+  .cmd code{flex:1;min-width:0;padding:1px 0 0;background:none;border:0;white-space:pre-wrap;word-break:break-all}
+  .steps .cmd+.hint{margin:0 0 var(--spacing-12)}
+  .ftable{width:100%;margin:var(--spacing-12) 0;border-collapse:collapse;font-size:var(--text-meta);line-height:18px}
+  .ftable th{padding:var(--spacing-8) var(--spacing-8) var(--spacing-4);text-align:left;font-weight:400;font-size:var(--text-micro);line-height:14px;letter-spacing:var(--tracking-micro);
+    text-transform:uppercase;color:var(--text-muted);border-bottom:var(--border-width) solid var(--border-hairline)}
+  .ftable td{padding:var(--spacing-8);vertical-align:top;color:var(--text-primary);border-bottom:var(--border-width) solid var(--border-muted)}
+  .ftable td code{white-space:nowrap}
+  .ftable td.ck{width:36px;padding:0}
+  /* The whole cell ticks. 10 = 8 + (18 − 14) / 2: the box on the middle of the row's first 18px line. */
+  .ftable td.ck label{display:flex;justify-content:center;padding:10px var(--spacing-8) var(--spacing-8);cursor:pointer}
+  .ftable tr.child td:nth-child(2){padding-left:var(--spacing-24)}
+  .ftable tr.child td:nth-child(2)::before{content:"↳ ";color:var(--text-muted)}
+  .ftable tr.done td{color:var(--text-muted);text-decoration:line-through}
   .ftable tr.done td.ck{text-decoration:none}
-  .cmd{display:flex;align-items:center;gap:8px;margin:6px 0;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:6px 6px 6px 10px}
-  .cmd code{flex:1;background:none;border:0;padding:0;white-space:pre-wrap;word-break:break-all}
 
-  /* Inspector */
-  .insp-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
-  .insp-head .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  /* --- inspector ----------------------------------------------------------------------------------------------------- */
+  /* Beside the stage its rule continues the bars' (--bars-h is theirs, kept by syncBars); elsewhere it is 56. */
+  .insp-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:var(--spacing-8);min-height:56px;padding:var(--spacing-8) var(--spacing-12) var(--spacing-8) var(--panel-pad);
+    background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card)}
   .insp-head .t{flex:1;min-width:0}
-  .insp-head .t b{display:block;font-size:13px}
-  .insp-head .t span{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .insp-head .acts{display:flex;gap:2px}
-  .namefield{display:flex;gap:6px;align-items:center}
-  .namefield input{font-family:var(--mono)}
-  .auto{font-size:10.5px;font-family:var(--mono);color:var(--muted);border:1px dashed var(--faint);border-radius:3px;padding:0 4px;white-space:nowrap}
-  .items{display:flex;flex-direction:column;gap:8px;margin:8px 0}
-  .itemcard{border:1px solid var(--line2);border-radius:6px;padding:8px 10px;background:var(--panel2)}
-  .itemcard .ih{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11.5px;color:var(--muted);font-family:var(--mono)}
-  .itemcard input,.itemcard textarea{background:var(--bg)}
-  .issues{display:flex;flex-direction:column;gap:6px}
-  .issue{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border:1px solid var(--line2);border-radius:5px;font-size:12px;cursor:pointer}
-  .issue:hover{background:var(--panel2)}
-  .issue .lv{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:0 5px;border-radius:3px;line-height:16px;margin-top:1px}
-  .issue.error{border-style:solid;border-color:#7a3a3a}
-  .issue.error .lv{background:#f0b0b0;color:#2a0f0f}
-  .issue.warning{border-style:dashed}
-  .issue.warning .lv{border:1px solid var(--accent);color:var(--accent)}
-  .ok{color:var(--muted);font-size:12px}
-  .swatch{display:inline-block;width:12px;height:12px;border:1px solid var(--line2);vertical-align:-2px;margin-right:4px}
+  .insp-head .t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;font-size:var(--text-body);line-height:18px;letter-spacing:var(--tracking-body);color:var(--text-primary)}
+  .insp-head .t .in{font-style:normal;color:var(--text-muted)}
+  .insp-head .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:16px;letter-spacing:0;color:var(--text-muted)}
+  .insp-head .t span.prose{font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}   /* words, not a path */
+  .insp-head .acts{display:flex;flex:none}
+  .insp-head .acts [data-act="del"]{margin-left:var(--spacing-4)}   /* the one that destroys stands a step apart */
+  .row>.ctl>select,.row>.ctl>input[type=text],.row>.ctl>input[type=url]{flex:1;min-width:0}
+  .row>.ctl>.hint{margin:0;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* A note on one row's control, under the control rather than squeezed beside it. */
+  .row+.row-note{margin:calc(var(--spacing-4) * -1) 0 var(--spacing-8);padding-left:calc(var(--row-label-width) + var(--spacing-8))}
+  .namefield{display:flex;align-items:center;gap:var(--spacing-8)}
+  /* A HubL name is code, so it stays mono; 6 / 6 instead of 8 / 4 lifts the 12px mono onto the 'auto' tag's baseline. */
+  .namefield input{flex:1;padding-top:6px;padding-bottom:6px;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0}
+  .hint.mono{font-family:var(--font-mono-detail);font-size:var(--text-micro);overflow-wrap:anywhere}
+  .auto{padding-left:5px;padding-right:5px;font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:14px;letter-spacing:0;white-space:nowrap;
+    color:var(--text-muted);border:var(--border-width) dashed var(--border-control);border-radius:var(--radius-tags-sm)}
+  textarea{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0}
+  ol.hint{margin:var(--spacing-8) 0 0;padding-left:var(--spacing-16)}
+  ol.hint li{margin:2px 0}
+  .hint .tag{min-height:16px;padding:1px 4px 0;line-height:12px;overflow:visible}   /* visible: an inline-block that clips sits its bottom on the baseline */
+  /* A theme's ground as a chip: wider than tall, so beside a checkbox it reads as a colour, not a second box. Its foot
+     sits on the baseline and it is 9 tall, the 13px Helvetica Neue's cap height (any taller pushes a segment's words
+     down a pixel). The hex says it for an eye that can't. */
+  .swatch{display:inline-block;flex:none;width:16px;height:9px;margin:0 var(--spacing-4);vertical-align:baseline;border:var(--border-width) solid var(--border-control)}
+  .check .hex{font-family:var(--font-mono-detail);font-size:var(--text-micro);letter-spacing:0;color:var(--text-muted)}
+  .items{display:flex;flex-direction:column;gap:var(--spacing-8);margin:var(--spacing-12) 0}
+  .itemcard{padding:var(--spacing-4) var(--spacing-8) var(--spacing-12) var(--spacing-12);border:var(--border-width) solid var(--border-card)}
+  .itemcard .ih{display:flex;align-items:center;min-height:28px;font-size:var(--text-caption);letter-spacing:var(--tracking-caption);color:var(--text-secondary)}
+  .itemcard .ih>span:first-child{padding-top:var(--optical-nudge)}
+  .itemcard .ih [data-item-act="del"]{margin-left:var(--spacing-4)}
+  .itemcard .stack{margin:var(--spacing-8) var(--spacing-4) 0 0}
 
-  /* Menus and toasts */
-  .menu{position:fixed;z-index:200;min-width:220px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
-  .menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:transparent;border-color:transparent;padding:6px 8px}
-  .menu button:hover{background:var(--panel2)}
-  .menu button:focus{background:var(--panel2);outline:2px solid var(--text);outline-offset:-2px}
-  .menu button .glyph{flex:0 0 26px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
-  .menu button small{display:block;color:var(--muted);font-size:11px}
-  .menu .sep{border-top:1px solid var(--line);margin:4px 0}
-  .menu .mh{padding:6px 8px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
-  .sys{font-size:11px;color:var(--muted);font-family:var(--mono)}
-  @media (max-width:1180px){ .app{grid-template-columns:260px minmax(0,1fr) 290px} }
+  /* --- the add-part and new-module menu ---------------------------------------------------------------------------- */
+  .menu{position:fixed;z-index:200;min-width:240px;max-width:min(320px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow-y:auto;scrollbar-width:thin;
+    padding:var(--spacing-4);background:var(--surface-card);border:var(--border-width) solid var(--border-hairline)}
+  .menu button{width:100%;min-height:0;justify-content:flex-start;align-items:baseline;gap:var(--spacing-8);padding:var(--spacing-8) var(--spacing-8) var(--spacing-4);text-align:left;white-space:normal;line-height:18px;
+    border:0;border-radius:2px}
+  .menu button:hover,.menu button:focus-visible{background:var(--surface-row-hover)}
+  .menu button:focus-visible{outline-offset:-1px}
+  .menu button>span:last-child{flex:1;min-width:0}
+  .menu button small{display:block;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+  .menu .sep{margin:var(--spacing-4) 0;border-top:var(--border-width) solid var(--border-muted)}
+  .menu .mh{padding:var(--spacing-8) var(--spacing-8) var(--spacing-4);font-size:var(--text-micro);line-height:14px;letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+
+  /* --- narrower windows -------------------------------------------------------------------------------------------- */
+  /* Three columns need 280 + 320 + the 720px desktop box + 2 × 16 = 1352. Narrower, the inspector goes under the rail:
+     one column of panels, the preview at its full width beside it. The rail and the inspector get half each, and the
+     rail leads with Parts and Checks (placeModules moves Modules after them), so the part you edit below stays in view. */
+  /* Three columns: the rail's title band and the inspector's head are as tall as the bars over the stage, their words
+     centred in it, so one rule runs across the window under all three. */
+  @media (min-width:1352px){
+    .insp-head{min-height:var(--bars-h,80px)}
+    .intro{display:flex;flex-direction:column;justify-content:center;min-height:var(--bars-h,80px)}
+  }
+  @media (max-width:1351px){
+    .app{grid-template-columns:var(--tool-rail-width) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"rail main" "insp main"}
+    .app>aside.left{grid-area:rail}
+    .app>main{grid-area:main}
+    .app>aside.right{grid-area:insp;border-left:0;border-right:var(--border-width) solid var(--border-hairline);border-top:var(--border-width) solid var(--border-hairline)}
+    .intro{display:none}                                  /* the banner already names the tool */
+    .canvas{padding-left:var(--spacing-12);padding-right:var(--spacing-12)}
+  }
+  /* Below 1024 a 280 panel column would clip the email, so the work goes on top at the full width and the two panels
+     sit side by side under it; the page scrolls. */
+  @media (max-width:1023px){
+    .app{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(480px,calc(100vh - var(--tool-banner,0px) - 160px)) auto;grid-template-areas:"main main" "rail insp";height:auto}
+    /* The page scrolls, not the panels, so the inspector's head pins to the window while its long body goes by. */
+    .app>aside{max-height:none;overflow:visible;border-bottom:0;border-top:var(--border-width) solid var(--border-hairline)}
+    .app>aside.left{border-right:var(--border-width) solid var(--border-hairline)}
+    .app>aside.right{border-left:0;border-right:0}
+  }
+  @media (max-width:640px){
+    .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "rail" "insp"}
+    .app>aside.left{border-right:0}
+    .code{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+    .files{max-height:160px;border-right:0;border-bottom:var(--border-width) solid var(--border-card)}
+  }
 </style>
 </head>
 <body>
@@ -199,26 +267,27 @@
 <script src="compile.js"></script>
 
 <div class="app">
-  <aside class="left">
-    <div class="pane">
-      <h1>HUB-MOD</h1>
-      <p class="sub">HubSpot custom email modules on the Switchyards system.</p>
+  <aside class="left" aria-label="Modules and parts">
+    <div class="pane intro">
+      <h1 class="panel-title">HUB-MOD</h1>
+      <p class="panel-sub">HubSpot custom email modules on the Switchyards system.</p>
     </div>
-    <div class="pane">
+    <div class="pane" id="paneModules">
       <div class="pane-head"><span class="t">Modules</span><span class="n" id="libCount"></span></div>
-      <div class="lib" id="lib"></div>
+      <div class="lib list" id="lib"></div>
       <div class="btnrow">
-        <button id="btnNew" title="Start a module from a Switchyards starter or a blank one (N)">New…</button>
-        <button id="btnDup" title="Copy this module">Duplicate</button>
-        <button id="btnDel" class="danger" title="Delete this module. ⌘Z brings it back.">Delete</button>
+        <button type="button" id="btnNew" aria-haspopup="menu" aria-expanded="false" title="Start a module from a Switchyards starter or a blank one (N)">New…</button>
+        <button type="button" id="btnDup" title="Copy this module">Duplicate</button>
+        <span class="spacer"></span>
+        <button type="button" id="btnDel" class="danger" title="Delete this module. ⌘Z brings it back.">Delete</button>
       </div>
-      <div class="btnrow" style="margin-top:6px">
-        <button class="ghost" id="btnOpenFile" title="Open a .hubmod.json design file someone sent you">Open file…</button>
-        <button class="ghost" id="btnSaveFile" title="Save this module's design as a .hubmod.json file to share or keep">Save file</button>
+      <div class="btnrow quiet">
+        <button type="button" class="ghost" id="btnOpenFile" title="Open a .hubmod.json design file someone sent you">Open file…</button>
+        <button type="button" class="ghost" id="btnSaveFile" title="Save this module's design as a .hubmod.json file to share or keep">Save file</button>
         <input type="file" id="fileIn" accept=".json,.hubmod.json,application/json" hidden>
       </div>
     </div>
-    <div class="pane">
+    <div class="pane" id="paneParts">
       <div class="pane-head"><span class="t">Parts</span><span class="n" id="fieldCount"></span></div>
       <div class="outline" id="outline"></div>
     </div>
@@ -226,59 +295,65 @@
       <div class="pane-head"><span class="t">Checks</span><span class="n" id="checkCount"></span></div>
       <div class="issues" id="issues"></div>
     </div>
-    <div class="pane"><div class="sys" id="sysNote"></div></div>
+    <div class="pane" id="paneSys"><div class="sys" id="sysNote"></div></div>
   </aside>
 
   <main>
-    <div class="bar">
-      <div class="seg" id="tabs">
-        <button data-tab="design" title="The module as the email shows it (D)">Design</button>
-        <button data-tab="code" title="The files HubSpot gets (C)">Code</button>
-        <button data-tab="steps" title="Building it by hand in Design Manager, field by field (B)">Hand build</button>
+    <div class="topbar">
+      <div class="tabs" id="tabs" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="tabDesign" aria-controls="designBar viewDesign" data-tab="design" title="The module as the email shows it (D)">Design</button>
+        <button type="button" role="tab" id="tabCode" aria-controls="viewCode" data-tab="code" title="The files HubSpot gets (C)">Code</button>
+        <button type="button" role="tab" id="tabSteps" aria-controls="viewSteps" data-tab="steps" title="Building it by hand in Design Manager, field by field (B)">Hand build</button>
       </div>
-      <span class="grow"></span>
-      <button class="primary" id="btnZip" title="Download the .module folder as a zip, for hs cms upload (⌘S)">Download .zip</button>
+      <span class="spacer"></span>
+      <span class="zipnote" id="zipNote" hidden></span>
+      <button type="button" class="primary" id="btnZip" title="Download the .module folder as a zip, for hs cms upload (⌘S)">Download .zip</button>
     </div>
-    <div class="bar sub" id="designBar">
-        <span class="seg" id="device">
-          <button data-device="desktop" title="Desktop width">Desktop</button>
-          <button data-device="phone" title="A 375px phone; the mobile rules apply">Phone</button>
-        </span>
-        <span class="seg" id="content">
-          <button data-content="filled" title="Every field holds its default">Filled</button>
-          <button data-content="empty" title="Fields that hide when empty are blank, so you can see what collapses (E)">Empty</button>
-        </span>
-        <span class="seg" id="clientSeg">
-          <button data-client="all" title="A client that keeps the module's style block: Apple Mail, iOS Mail, Outlook.com">Style block on</button>
-          <button data-client="gmail" title="Gmail strips a style block in the body. What is inline still holds (G)">Gmail</button>
-        </span>
-        <span class="seg" id="darkSeg">
-          <button data-dark="0" title="Light">Light</button>
-          <button data-dark="1" title="Applies this module's dark-mode layer unconditionally (K)">Dark override</button>
-        </span>
-        <span class="seg" id="themeSeg"></span>
+    <div class="subbar" id="designBar" role="group" aria-label="Design preview settings">
+      <span class="vgroup"><span class="lab" id="labDevice">Device</span>
+        <span class="seg inline" id="device" role="group" aria-labelledby="labDevice">
+          <button type="button" data-device="desktop" title="Desktop width (P)">Desktop</button>
+          <button type="button" data-device="phone" title="A 375px phone; the mobile rules apply (P)">Phone</button>
+        </span></span>
+      <span class="vgroup"><span class="lab" id="labContent">Fields</span>
+        <span class="seg inline" id="content" role="group" aria-labelledby="labContent">
+          <button type="button" data-content="filled" title="Every field holds its default (E)">Filled</button>
+          <button type="button" data-content="empty" title="Fields that hide when empty are blank, so you can see what collapses (E)">Empty</button>
+        </span></span>
+      <span class="vgroup"><span class="lab" id="labClient">Client</span>
+        <span class="seg inline" id="clientSeg" role="group" aria-labelledby="labClient">
+          <button type="button" data-client="all" title="A client that keeps the module's style block: Apple Mail, iOS Mail, Outlook.com (G)">Style block on</button>
+          <button type="button" data-client="gmail" title="Gmail strips a style block in the body. What is inline still holds (G)">Gmail</button>
+        </span></span>
+      <span class="vgroup"><span class="lab" id="labDark">Email dark mode</span>
+        <span class="seg inline" id="darkSeg" role="group" aria-labelledby="labDark">
+          <button type="button" data-dark="0" title="The email as a reader in light mode sees it (K)">Off</button>
+          <button type="button" data-dark="1" title="Applies this module's dark-mode layer unconditionally (K)">On</button>
+        </span></span>
+      <span class="vgroup" id="themeGroup"><span class="lab" id="labTheme">Theme</span>
+        <span class="seg inline" id="themeSeg" role="group" aria-labelledby="labTheme"></span></span>
     </div>
 
     <div class="stage" id="stage">
-      <div id="viewDesign">
+      <div id="viewDesign" role="tabpanel" aria-labelledby="tabDesign">
         <div class="canvas"><div>
           <div class="dark-note" id="darkNote" hidden></div>
-          <div class="device" id="deviceBox"><iframe id="frame" title="Module preview" scrolling="no"></iframe></div>
+          <div class="device" id="deviceBox"><iframe id="frame" title="Module preview" scrolling="no" tabindex="-1"></iframe></div>
           <div class="device-note" id="deviceNote"></div>
         </div></div>
       </div>
-      <div id="viewCode" class="code" hidden>
+      <div id="viewCode" class="code" role="tabpanel" aria-labelledby="tabCode" hidden>
         <div class="files" id="fileList"></div>
         <div class="codepane">
-          <div class="codehead"><span class="path" id="codePath"></span><button id="btnCopy" title="Copy this file">Copy</button></div>
-          <pre class="src" id="codeSrc"></pre>
+          <div class="codehead"><span class="path" id="codePath"></span><button type="button" id="btnCopy" title="Copy this file">Copy</button></div>
+          <pre class="src" id="codeSrc" tabindex="0" aria-label="File contents"></pre>
         </div>
       </div>
-      <div id="viewSteps" class="steps" hidden></div>
+      <div id="viewSteps" class="steps" role="tabpanel" aria-labelledby="tabSteps" hidden></div>
     </div>
   </main>
 
-  <aside class="right" id="inspector"></aside>
+  <aside class="right" id="inspector" aria-label="Inspector"></aside>
 </div>
 
 <script>
@@ -476,21 +551,24 @@ function refresh(opts = {}) {
 function renderLibrary() {
   $('#libCount').textContent = String(state.order.length);
   $('#lib').innerHTML = state.order.map(id => {
-    const m = state.library[id];
-    return `<button class="item${id === state.openId ? ' on' : ''}" data-id="${esc(id)}" title="${esc(m.description || m.name)}"><span class="nm">${esc(m.name)}</span><span class="ct">${H.countFields(m)}f</span></button>`;
+    const m = state.library[id], n = H.countFields(m), on = id === state.openId;
+    return `<button type="button" class="item${on ? ' on' : ''}" data-id="${esc(id)}" title="${esc(m.description || m.name)}"${on ? ' aria-current="true"' : ''}><span class="name">${esc(m.name)}</span><span class="meta">${n} field${n === 1 ? '' : 's'}</span></button>`;
   }).join('');
 }
 
 function renderBar() {
-  $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
-  $$('#device button').forEach(b => b.classList.toggle('on', b.dataset.device === ui.device));
-  $$('#content button').forEach(b => b.classList.toggle('on', (b.dataset.content === 'empty') === ui.empty));
-  $$('#darkSeg button').forEach(b => b.classList.toggle('on', (b.dataset.dark === '1') === ui.dark));
-  $$('#clientSeg button').forEach(b => b.classList.toggle('on', (b.dataset.client === 'gmail') === ui.gmail));
+  // The tabs say which is open to a screen reader too; only the open one is in the Tab order (arrows move along).
+  $$('#tabs button').forEach(b => { const on = b.dataset.tab === ui.tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+  const press = (sel, test) => $$(sel).forEach(b => { const on = test(b); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  press('#device button', b => b.dataset.device === ui.device);
+  press('#content button', b => (b.dataset.content === 'empty') === ui.empty);
+  press('#darkSeg button', b => (b.dataset.dark === '1') === ui.dark);
+  press('#clientSeg button', b => (b.dataset.client === 'gmail') === ui.gmail);
   const d = doc();
   const ts = $('#themeSeg');
   ts.hidden = d.themes.length < 2;
-  ts.innerHTML = d.themes.filter(t => SYS.themes[t]).map(t => `<button data-theme="${t}" class="${t === ui.theme ? 'on' : ''}" title="Preview the ${esc(SYS.themes[t].label)} theme the team can pick"><span class="swatch" style="background:${SYS.themes[t].bg}"></span>${esc(SYS.themes[t].label)}</button>`).join('');
+  $('#themeGroup').hidden = ts.hidden;   // the group's label goes with it
+  ts.innerHTML = d.themes.filter(t => SYS.themes[t]).map(t => `<button type="button" data-theme="${t}" class="${t === ui.theme ? 'on' : ''}" aria-pressed="${t === ui.theme}" title="Preview the ${esc(SYS.themes[t].label)} theme the team can pick"><span class="swatch" style="background:${SYS.themes[t].bg}"></span><span>${esc(SYS.themes[t].label)}</span></button>`).join('');
   $('#designBar').hidden = ui.tab !== 'design';
   $('#viewDesign').hidden = ui.tab !== 'design';
   $('#viewCode').hidden = ui.tab !== 'code';
@@ -498,6 +576,8 @@ function renderBar() {
   const errs = issues.filter(i => i.level === 'error').length;
   const z = $('#btnZip'); z.disabled = errs > 0;
   z.title = errs ? `Fix ${errs} error${errs > 1 ? 's' : ''} under Checks first: HubSpot would refuse this module, or the team would get a broken one` : 'Download the .module folder as a zip, for hs cms upload (⌘S)';
+  // A disabled button's tooltip is easy to miss, so why it is off is said beside it.
+  const zn = $('#zipNote'); zn.hidden = !errs; zn.textContent = errs ? `Fix ${errs} error${errs > 1 ? 's' : ''} under Checks first` : '';
 }
 
 // ---- outline ----
@@ -505,12 +585,20 @@ function renderOutline() {
   const d = doc();
   $('#fieldCount').textContent = `${H.countFields(d)} fields`;
   const box = $('#outline');
+  const keep = box.contains(document.activeElement);   // the keyboard was in the list: it stays there through the rebuild
   box.innerHTML = '';
-  box.appendChild(outlineList(d.parts, null, null));
+  box.appendChild(outlineList(d.parts, null, null, 1));
+  // One stop in the Tab order: the selected row, or the first. The arrow keys step from there (stepSel).
+  const stop = $('.orow.on', box) || $('.orow', box);
+  if (stop) { stop.tabIndex = 0; if (keep) stop.focus(); }
 }
-function outlineList(list, owner, col) {
+// A tree to a screen reader: each row a treeitem with its name, its kind, its level and whether it is selected. The
+// selection follows the arrow keys (stepSel), as a single-select tree's does.
+function outlineList(list, owner, col, level) {
   const wrap = document.createElement('div'); wrap.className = owner ? 'nest' : '';
   wrap._list = list; wrap._owner = owner;
+  if (owner) { wrap.setAttribute('role', 'group'); wrap.setAttribute('aria-label', col ? `Column ${owner.cols.indexOf(col) + 1}` : owner.label || H.TYPES[owner.type].label); }
+  else { wrap.setAttribute('role', 'tree'); wrap.setAttribute('aria-label', 'Parts'); }
   if (!list.length) {
     const empty = document.createElement('div'); empty.className = 'oempty';
     empty.textContent = owner ? 'Empty. Add a part, or drag one here.' : 'No parts yet.';
@@ -520,24 +608,31 @@ function outlineList(list, owner, col) {
   list.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = `orow${p.id === ui.sel ? ' on' : ''}`; row.dataset.id = p.id; row.draggable = true;
+    row.tabIndex = -1;
     row._list = list; row._index = i; row._owner = owner;
     const t = H.TYPES[p.type];
-    const tag = t.container ? '' : H.isEditable(p) ? `<span class="tag field" title="The team edits this in HubSpot">field</span>` : `<span class="tag fixed" title="Fixed: the team cannot change it">fixed</span>`;
-    row.innerHTML = `<span class="glyph">${esc(H.glyph(p))}</span><span class="ttl" title="${esc(H.title(p))}">${esc(H.title(p))}</span>${tag}
-      <span class="acts"><button data-a="up" title="Move up (⌥↑)">↑</button><button data-a="down" title="Move down (⌥↓)">↓</button><button data-a="dup" title="Duplicate (⌘D)">⧉</button><button data-a="del" title="Delete (⌫)">✕</button></span>`;
+    const kind = t.container ? '' : H.isEditable(p) ? 'field' : 'fixed';
+    row.setAttribute('role', 'treeitem'); row.setAttribute('aria-selected', String(p.id === ui.sel));
+    row.setAttribute('aria-level', String(level)); row.setAttribute('aria-setsize', String(list.length)); row.setAttribute('aria-posinset', String(i + 1));
+    row.setAttribute('aria-label', `${H.title(p)}, ${kind || (p.type === 'repeat' ? 'repeating group' : 'layout')}`);
+    const tag = kind === 'field' ? `<span class="tag field" title="The team edits this in HubSpot">field</span>` : kind === 'fixed' ? `<span class="tag fixed" title="Fixed: the team cannot change it">fixed</span>` : '';
+    const nm = esc(H.title(p));
+    row.innerHTML = `<span class="glyph ${kind || 'group'}" aria-hidden="true">${esc(H.glyph(p))}</span><span class="ttl" title="${nm}">${nm}</span>${tag}
+      <span class="acts"><button type="button" class="icon" data-a="up" title="Move up (⌥↑)" aria-label="Move ${nm} up"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="icon" data-a="down" title="Move down (⌥↓)" aria-label="Move ${nm} down"${i === list.length - 1 ? ' disabled' : ''}>↓</button><button type="button" class="icon" data-a="dup" title="Duplicate (⌘D)" aria-label="Duplicate ${nm}">⧉</button><button type="button" class="icon danger" data-a="del" title="Delete (⌫)" aria-label="Delete ${nm}">✕</button></span>`;
     wrap.appendChild(row);
     if (p.type === 'columns') {
-      const n = document.createElement('div'); n.className = 'nest';
+      const n = document.createElement('div'); n.className = 'nest'; n.setAttribute('role', 'group'); n.setAttribute('aria-label', 'Columns');
       p.cols.forEach((c, ci) => {
-        n.insertAdjacentHTML('beforeend', `<div class="ohead"><span>Column ${ci + 1} · ${c.w}%</span><span class="grow"></span></div>`);
-        n.appendChild(outlineList(c.parts, p, c));
+        n.insertAdjacentHTML('beforeend', `<div class="ohead" aria-hidden="true"><span>Column ${ci + 1} · ${c.w}%</span><span class="grow"></span></div>`);
+        n.appendChild(outlineList(c.parts, p, c, level + 1));
       });
       wrap.appendChild(n);
     }
-    if (p.type === 'repeat') wrap.appendChild(outlineList(p.parts, p, null));
+    if (p.type === 'repeat') wrap.appendChild(outlineList(p.parts, p, null, level + 1));
   });
-  const add = document.createElement('button'); add.className = 'oadd'; add.textContent = owner ? '+ Add part' : '+ Add part';
+  const add = document.createElement('button'); add.type = 'button'; add.className = 'oadd'; add.textContent = owner ? (owner.type === 'repeat' ? '+ Add to group' : '+ Add to column') : '+ Add part';
   add.title = owner ? (owner.type === 'repeat' ? `Add a part to each ${owner.itemLabel || 'item'}` : 'Add a part to this column') : 'Add a part to the module';
+  add.setAttribute('aria-haspopup', 'menu'); add.setAttribute('aria-expanded', 'false');
   add.addEventListener('click', e => { e.stopPropagation(); addMenu(e.currentTarget, list, owner); });
   wrap.appendChild(add);
   return wrap;
@@ -547,31 +642,50 @@ function addMenu(anchor, list, owner, index) {
   const types = Object.entries(H.TYPES).filter(([k]) => H.canHold(owner, { type: k }));
   const leaf = types.filter(([, t]) => !t.container), cont = types.filter(([, t]) => t.container);
   const item = ([k, t]) => `<button data-type="${k}"><span class="glyph">${esc(t.glyph)}</span><span>${esc(t.label)}<small>${esc(t.blurb)}</small></span></button>`;
-  menu(anchor, `${leaf.map(item).join('')}${cont.length ? `<div class="sep"></div>${cont.map(item).join('')}` : ''}`, b => addPart(b.dataset.type, list, index));
+  // After a pick the focus goes to the new part's row, where the keyboard carries on.
+  menu(anchor, `${leaf.map(item).join('')}${cont.length ? `<div class="sep"></div>${cont.map(item).join('')}` : ''}`, b => { addPart(b.dataset.type, list, index); $('#outline .orow.on')?.focus(); }, 'Add a part');
 }
 function starterMenu(anchor) {
-  menu(anchor, `<div class="mh">Start from</div>${H.STARTERS.map(s => `<button data-id="${s.id}"><span>${esc(s.name)}<small>${esc(s.blurb)}</small></span></button>`).join('')}`, b => newModule(b.dataset.id));
+  menu(anchor, `<div class="mh">Start from</div>${H.STARTERS.map(s => `<button data-id="${s.id}"><span>${esc(s.name)}<small>${esc(s.blurb)}</small></span></button>`).join('')}`, b => newModule(b.dataset.id), 'New module');
 }
-let menuEl = null;
-function menu(anchor, html, pick) {
+// The menu keeps its keys: ↑ ↓ Home End move in it and never reach the part shortcuts behind it. Escape and Tab close it
+// and hand the focus back to what opened it; a pick leaves it on what the pick made, or on the opener.
+let menuEl = null, menuBack = null;
+function menu(anchor, html, pick, label) {
   closeMenu();
+  menuBack = anchor;
   menuEl = document.createElement('div'); menuEl.className = 'menu'; menuEl.innerHTML = html;
+  menuEl.setAttribute('role', 'menu'); if (label) menuEl.setAttribute('aria-label', label);
+  if (anchor.hasAttribute('aria-haspopup')) anchor.setAttribute('aria-expanded', 'true');
+  $$('button', menuEl).forEach(b => { b.type = 'button'; b.setAttribute('role', 'menuitem'); });
+  $$('.sep', menuEl).forEach(s => s.setAttribute('role', 'separator'));
   document.body.appendChild(menuEl);
   const r = anchor.getBoundingClientRect(), mh = menuEl.offsetHeight;
   menuEl.style.left = `${Math.min(r.left, innerWidth - menuEl.offsetWidth - 8)}px`;
   menuEl.style.top = `${r.bottom + 4 + mh > innerHeight ? Math.max(8, r.top - mh - 4) : r.bottom + 4}px`;
-  menuEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; closeMenu(); pick(b); });
+  menuEl.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const back = menuBack; closeMenu(); pick(b);
+    const a = document.activeElement; if ((!a || a === document.body) && back && back.isConnected) back.focus();
+  });
   menuEl.querySelector('button')?.focus();
   menuEl.addEventListener('keydown', e => {
     const bs = $$('button', menuEl), i = bs.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
-    if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); }
+    const j = { ArrowDown: (i + 1) % bs.length, ArrowUp: (i - 1 + bs.length) % bs.length, Home: 0, End: bs.length - 1 }[e.key];
+    if (j != null) { e.preventDefault(); e.stopPropagation(); bs[j].focus(); return; }
+    if (e.key === 'Escape') { e.stopPropagation(); closeMenu(true); }
+    if (e.key === 'Tab') closeMenu(true);   // back on the opener, so Tab carries on from there
   });
   setTimeout(() => document.addEventListener('pointerdown', outside), 0);
 }
 function outside(e) { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }
-function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('pointerdown', outside); } }
+function closeMenu(refocus) {
+  if (!menuEl) return;
+  const back = menuBack;
+  menuEl.remove(); menuEl = null; menuBack = null; document.removeEventListener('pointerdown', outside);
+  if (back && back.hasAttribute('aria-expanded')) back.setAttribute('aria-expanded', 'false');
+  if (refocus && back && back.isConnected) back.focus();
+}
 
 // Outline clicks and drags
 $('#outline').addEventListener('click', e => {
@@ -579,6 +693,10 @@ $('#outline').addEventListener('click', e => {
   const a = e.target.closest('button[data-a]');
   if (a) { e.stopPropagation(); ({ up: () => movePart(row.dataset.id, -1), down: () => movePart(row.dataset.id, 1), dup: () => duplicatePart(row.dataset.id), del: () => removePart(row.dataset.id) })[a.dataset.a](); return; }
   select(row.dataset.id);
+});
+// A row reached with the keyboard selects on Enter or Space, as a click does. ↑ ↓ already step through the parts.
+$('#outline').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('orow')) { e.preventDefault(); select(e.target.dataset.id); }
 });
 let dragId = null;
 $('#outline').addEventListener('dragstart', e => { const row = e.target.closest('.orow'); if (!row) return; dragId = row.dataset.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
@@ -602,7 +720,13 @@ $('#outline').addEventListener('drop', e => {
 });
 
 function select(id) {
-  ui.sel = id; renderOutline(); renderInspector(); paintSelection();
+  ui.sel = id; renderOutline(); renderInspector(); paintSelection(); revealRow();
+}
+/** A part picked in the preview or under Checks: its row scrolls into view in the panel, never the window. */
+function revealRow() {
+  const row = $('#outline .orow.on'), sc = row && row.closest('aside'); if (!sc || sc.scrollHeight <= sc.clientHeight) return;
+  const r = row.getBoundingClientRect(), s = sc.getBoundingClientRect();
+  if (r.top < s.top) sc.scrollTop -= s.top - r.top + 8; else if (r.bottom > s.bottom) sc.scrollTop += r.bottom - s.bottom + 8;
 }
 
 // ---- checks ----
@@ -610,7 +734,7 @@ function renderIssues() {
   const errs = issues.filter(i => i.level === 'error').length, warns = issues.length - errs;
   $('#checkCount').textContent = issues.length ? `${errs} error${errs === 1 ? '' : 's'} · ${warns} warning${warns === 1 ? '' : 's'}` : 'clear';
   $('#issues').innerHTML = issues.length
-    ? issues.map((x, i) => `<div class="issue ${x.level}" data-i="${i}" title="${x.partId ? 'Select the part' : ''}"><span class="lv">${x.level === 'error' ? '✕ ERROR' : '! WARN'}</span><span>${esc(x.msg)}</span></div>`).join('')
+    ? issues.map((x, i) => `<button type="button" class="issue ${x.level}" data-i="${i}" title="${x.partId ? 'Select the part' : 'Show the module'}"><span class="lv">${x.level === 'error' ? '✕ ERROR' : '! WARN'}</span><span>${esc(x.msg)}</span></button>`).join('')
     : `<p class="ok">✓ Nothing to fix. This module is ready for HubSpot.</p>`;
 }
 $('#issues').addEventListener('click', e => { const el = e.target.closest('.issue'); if (!el) return; const x = issues[+el.dataset.i]; if (x && x.partId) { ui.tab = 'design'; saveUi(); renderBar(); select(x.partId); } else if (x) { ui.sel = null; renderOutline(); renderInspector(); paintSelection(); } });
@@ -634,13 +758,14 @@ function shell() {
   img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none}
   .email{margin:0 auto;padding:24px 0}
   [data-hm]{cursor:pointer}
-  [data-hm]:hover{outline:1px dashed rgba(59,130,246,.75);outline-offset:-1px}
-  [data-hm].hm-sel{outline:2px solid #3b82f6 !important;outline-offset:-2px}
-  #hmtag{position:absolute;z-index:9;pointer-events:none;font:600 10px/16px "IBM Plex Mono",Menlo,monospace;color:#fff;background:#1d4ed8;padding:0 6px;border-radius:0 0 3px 0;white-space:nowrap}
+  [data-hm]:hover{outline:1px dashed #767676;outline-offset:-1px}
+  [data-hm].hm-sel:hover{outline:none}
+  #hmbox{position:absolute;z-index:8;pointer-events:none;box-sizing:border-box;border:2px solid #0d0d0d;box-shadow:inset 0 0 0 1px #fff,0 0 0 1px #fff}
+  #hmtag{position:absolute;z-index:9;pointer-events:none;font:11px/16px "IBM Plex Mono",Menlo,monospace;color:#fff;background:#0d0d0d;padding:0 6px;white-space:nowrap}
   .hm-ph{display:block;background:#d9d6cf;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 8px,transparent 8px 16px);color:#6b6862;font:12px/1.3 "IBM Plex Mono",Menlo,monospace;text-align:center}
 </style>
 <style id="mod"></style><style id="dark"></style></head>
-<body><div class="email" id="email"></div><div id="hmtag" hidden></div></body></html>`;
+<body><div class="email" id="email"></div><div id="hmbox" hidden></div><div id="hmtag" hidden></div></body></html>`;
 }
 frame.addEventListener('load', () => {
   frameReady = true;
@@ -685,7 +810,7 @@ function paintPreview() {
   note.hidden = !(ui.dark || ui.gmail);
   note.innerHTML = ui.gmail
     ? `Gmail view: the module's style block is gone, as Gmail strips it. Everything inline holds, and columns still stack on a phone. Rich text keeps its rules on the expectation that HubSpot inlines them at send, which one test send has to confirm. ${ui.dark ? 'Gmail’s apps ignore every dark-mode rule and invert as they like; nothing can preview that.' : 'No phone font sizes, no dark-mode rules.'}`
-    : 'Dark override: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. It is not what Gmail’s apps do; they invert as they like and nothing can preview that.';
+    : 'Email dark mode: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. It is not what Gmail’s apps do; they invert as they like and nothing can preview that.';
   const t = SYS.themes[ui.theme];
   $('#deviceNote').textContent = `${phone ? `${PHONE}px phone${ui.gmail ? '' : ' · phone rules on'}` : `${d.width}px ${d.width === 600 ? 'email body' : 'column'}`} · ${t ? t.label : ''} theme · ${ui.empty ? 'optional fields empty' : 'defaults filled in'}`;
   paintSelection(); fit();
@@ -708,18 +833,20 @@ function fit() {
 function paintSelection() {
   const fd = frame.contentDocument; if (!fd || !frameReady) return;
   fd.querySelectorAll('.hm-sel').forEach(el => el.classList.remove('hm-sel'));
-  const tag = fd.getElementById('hmtag'); tag.hidden = true;
+  // The selection is tool chrome drawn over the email, not part of it: an ink box with a paper ring inside and out, so
+  // it shows on cream, on navy and in the email's dark mode alike, and a tag in the same ink.
+  const tag = fd.getElementById('hmtag'), box = fd.getElementById('hmbox'); tag.hidden = true; box.hidden = true;
   if (!ui.sel) return;
   const el = fd.querySelector(`[data-hm="${CSS.escape(ui.sel)}"]`); if (!el) return;
   el.classList.add('hm-sel');
   const p = locate(ui.sel)?.part; if (!p) return;
   const r = el.getBoundingClientRect(), sx = fd.defaultView.scrollX, sy = fd.defaultView.scrollY;
+  Object.assign(box.style, { left: `${r.left + sx}px`, top: `${r.top + sy}px`, width: `${r.width}px`, height: `${r.height}px` }); box.hidden = false;
   tag.textContent = `${H.TYPES[p.type].label}${H.isEditable(p) ? ` · ${H.fieldPath(doc(), p)}` : ' · fixed'}`;
   tag.hidden = false;
   const above = r.top + sy - tag.offsetHeight;
   tag.style.left = `${Math.max(0, r.left + sx)}px`;
   tag.style.top = `${above >= 0 ? above : r.top + sy}px`;
-  tag.style.borderRadius = above >= 0 ? '3px 3px 0 0' : '0 0 3px 0';
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -731,7 +858,7 @@ function renderCode() {
   const d = doc(), files = built.files;
   if (!files.some(f => f.path === ui.file)) ui.file = 'module.html';
   $('#fileList').innerHTML = files.map(f => `<button data-file="${esc(f.path)}" class="${f.path === ui.file ? 'on' : ''}" title="${esc(f.note || '')}"><span>${esc(f.path)}</span><span class="sz">${H.size(f.text)}</span></button>`).join('')
-    + `<div class="sep"></div><div class="hint" style="padding:0 6px">Folder <span class="mono">${esc(d.slug)}.module/</span><br>${files.length} files · ${H.size(files.map(f => f.text).join(''))}<br><br>No module.css or module.js: HubSpot refuses both on an email module, so the styles live inside module.html.</div>`;
+    + `<div class="sep"></div><div class="hint">Folder <span class="mono">${esc(d.slug)}.module/</span><br>${files.length} files · ${H.size(files.map(f => f.text).join(''))}<br><br>No module.css or module.js: HubSpot refuses both on an email module, so the styles live inside module.html.</div>`;
   const f = files.find(x => x.path === ui.file);
   $('#codePath').textContent = `${d.slug}.module/${f.path}`;
   $('#codeSrc').innerHTML = highlight(f.text, f.path);
@@ -775,10 +902,10 @@ function renderSteps() {
   const done = ui.done[d.id] || {};
   const row = (f, i) => {
     const key = f.path;
-    return `<tr class="${f.child ? 'child' : ''}${done[key] ? ' done' : ''}"><td class="ck"><input type="checkbox" data-k="${esc(key)}" ${done[key] ? 'checked' : ''} aria-label="Done: ${esc(f.label)}"></td>
+    return `<tr class="${f.child ? 'child' : ''}${done[key] ? ' done' : ''}"><td class="ck"><label><input type="checkbox" data-k="${esc(key)}" ${done[key] ? 'checked' : ''} aria-label="Done: ${esc(f.label)}"></label></td>
       <td>${esc(f.label)}</td><td>${esc(f.uiType)}</td><td><code>${esc(f.name)}</code></td><td>${f.settings.map(esc).join('<br>')}</td></tr>`;
   };
-  const cmd = c => `<div class="cmd"><code>${esc(c.cmd)}</code><button data-copy="${esc(c.cmd)}" title="Copy the command">Copy</button></div><p class="hint" style="margin:0 0 10px">${esc(c.note)}</p>`;
+  const cmd = c => `<div class="cmd"><code>${esc(c.cmd)}</code><button type="button" data-copy="${esc(c.cmd)}" title="Copy the command">Copy</button></div><p class="hint">${esc(c.note)}</p>`;
   $('#viewSteps').innerHTML = `
     <h2>Route A · HubSpot CLI (exact, fastest)</h2>
     <p>Download the zip, unzip it, and upload the folder. The fields arrive exactly as designed, defaults and all. The zip cannot go through Design Manager's own upload: that takes single files, not a module.</p>
@@ -801,7 +928,7 @@ $('#viewSteps').addEventListener('change', e => {
 });
 $('#viewSteps').addEventListener('click', async e => {
   const b = e.target.closest('button[data-copy]'); if (b) { try { await navigator.clipboard.writeText(b.dataset.copy); ToolKit.toast('Copied'); } catch (x) { ToolKit.toast('Copy blocked: select the line instead'); } return; }
-  const t = e.target.closest('[data-goto]'); if (t) { ui.tab = 'code'; ui.file = t.dataset.goto; saveUi(); renderBar(); renderCode(); }
+  const t = e.target.closest('[data-goto]'); if (t) { e.preventDefault(); ui.tab = 'code'; ui.file = t.dataset.goto; saveUi(); renderBar(); renderCode(); }
 });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -814,12 +941,33 @@ function renderInspector() {
   const d = doc(); if (!d) return;
   const r = ui.sel ? locate(ui.sel) : null;
   insp.innerHTML = r ? partInspector(d, r) : moduleInspector(d);
+  linkLabels(insp);
   syncInspectorHead();
+}
+/** Each row's and stack's label names its control, so a click on the words focuses it and a screen reader reads it. */
+let labelSeq = 0;
+function linkLabels(root) {
+  for (const l of $$('.row>label, .stack>label', root)) {
+    if (l.htmlFor || l.querySelector('input,select,textarea')) continue;
+    const box = l.parentElement, inRow = box.classList.contains('row');
+    const c = inRow ? $(':scope>.ctl input, :scope>.ctl select, :scope>.ctl textarea, :scope>.ctl .seg', box)
+      : $(':scope>input, :scope>select, :scope>textarea, :scope>.namefield>input, :scope>.seg', box);
+    if (!c) continue;
+    if (c.classList.contains('seg')) { l.id = `hmLab${++labelSeq}`; c.setAttribute('role', 'group'); c.setAttribute('aria-labelledby', l.id); }
+    else { if (!c.id) c.id = `hmCtl${++labelSeq}`; l.htmlFor = c.id; }
+  }
+  // A field with no label of its own (the default text under "Default content") is named by its section.
+  for (const c of $$('input:not([type=checkbox]), select, textarea', root)) {
+    if ((c.labels && c.labels.length) || c.hasAttribute('aria-label')) continue;
+    const t = c.closest('.pane') && $('.pane-head .t', c.closest('.pane')); if (t) c.setAttribute('aria-label', t.textContent);
+  }
 }
 function syncInspectorHead() {
   const r = ui.sel ? locate(ui.sel) : null;
   if (!r) { const d = doc(); const sh = $('#slugHead', insp); if (sh && d) sh.textContent = `${d.slug}.module`; const cw = $('#cwHint', insp); if (cw && d) cw.textContent = `${H.contentWidth(d, SYS)}px`; return; }
-  const s = $('.insp-head .t span', insp); if (s) s.textContent = H.isEditable(r.part) ? H.fieldPath(doc(), r.part) : (H.TYPES[r.part.type].container ? H.TYPES[r.part.type].blurb : 'fixed: the team cannot change it');
+  // A field or a group says its HubL path, in mono; anything else says what it is, in words.
+  const s = $('.insp-head .t span', insp);
+  if (s) { const path = H.isEditable(r.part) || r.part.type === 'repeat'; s.textContent = path ? H.fieldPath(doc(), r.part) : H.TYPES[r.part.type].container ? 'Layout only' : 'Fixed, not editable'; s.classList.toggle('prose', !path); }
   const nm = $('[data-k="name"]', insp); if (nm && document.activeElement !== nm) nm.value = r.part.name || '';
   const ph = $('#pathHint', insp);
   if (ph) { const p = r.part; ph.textContent = p.type === 'repeat' ? `{% for item in ${H.fieldPath(doc(), p)} %}` : `${H.fieldPath(doc(), p)}${H.hasLink(p) ? `, ${H.fieldPath(doc(), p, '_link')}` : ''}`; }
@@ -832,7 +980,7 @@ const txt = (k, v, ph = '') => `<input type="text" data-k="${k}" value="${esc(v)
 const num = (k, v, min, max, step = 1) => `<input type="number" data-k="${k}" data-t="num" value="${esc(v)}" min="${min}" max="${max}" step="${step}">`;
 const sel = (k, v, opts, t = '') => `<select data-k="${k}"${t ? ` data-t="${t}"` : ''}>${opts.map(([val, lab]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(lab)}</option>`).join('')}</select>`;
 const chk = (k, v, label, help = '') => `<label class="check"><input type="checkbox" data-k="${k}" data-t="bool" ${v ? 'checked' : ''}><span>${esc(label)}${help ? `<small>${esc(help)}</small>` : ''}</span></label>`;
-const segs = (k, v, opts, t = '') => `<span class="seg">${opts.map(([val, lab, title]) => `<button type="button" data-seg="${k}"${t ? ` data-t="${t}"` : ''} data-v="${esc(val)}" class="${String(val) === String(v) ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${esc(lab)}</button>`).join('')}</span>`;
+const segs = (k, v, opts, t = '') => `<span class="seg">${opts.map(([val, lab, title]) => `<button type="button" data-seg="${k}"${t ? ` data-t="${t}"` : ''} data-v="${esc(val)}" class="${String(val) === String(v) ? 'on' : ''}" aria-pressed="${String(val) === String(v)}"${title ? ` title="${esc(title)}"` : ''}>${esc(lab)}</button>`).join('')}</span>`;
 const pane = (title, body, n = '') => `<div class="pane"><div class="pane-head"><span class="t">${esc(title)}</span>${n ? `<span class="n">${esc(n)}</span>` : ''}</div>${body}</div>`;
 const colorOpts = () => [['text', 'Theme text'], ['accent', 'Theme accent'], ...Object.entries(SYS.colors).map(([k, v]) => [k, `${SYS.colorNames[k] || k} · ${v}`])];
 const alignSeg = (v, k = 'align') => segs(k, v, [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']]);
@@ -846,8 +994,8 @@ function moduleInspector(d) {
     <div class="stack" title="The folder name, and so the module's path in Design Manager. Lower case, digits and hyphens."><label>Folder</label><div class="namefield">${txt('m.slug', d.slug)}<span class="auto" id="slugAuto"${d.slugAuto ? '' : ' hidden'}>auto</span></div></div>
     <div class="stack"><label>Note for the library</label>${txt('m.description', d.description, 'What it is for, in a line')}</div>`)}
   ${pane('Themes', `
-    <p class="hint" style="margin-top:0">The Switchyards themes this module can wear. Tick more than one and the team gets a choice in HubSpot; the first ticked is the default.</p>
-    ${themes.map(([k, t]) => `<label class="check"><input type="checkbox" data-theme-allow="${k}" ${d.themes.includes(k) ? 'checked' : ''}><span><span class="swatch" style="background:${t.bg}"></span>${esc(t.label)}<small>${esc(`${SYS.colorNames[t.bgToken] || t.bgToken} ground, ${SYS.colorNames[t.textToken] || t.textToken} text, ${t.button} button`)}</small></span></label>`).join('')}
+    <p class="hint">The Switchyards themes this module can wear. Tick more than one and the team gets a choice in HubSpot; the first ticked is the default.</p>
+    ${themes.map(([k, t]) => `<label class="check"><input type="checkbox" data-theme-allow="${k}" ${d.themes.includes(k) ? 'checked' : ''}><span>${esc(t.label)}<span class="swatch" style="background:${t.bg}" aria-hidden="true"></span><span class="hex">${esc(String(t.bg).toLowerCase())}</span><small>${esc(`${SYS.colorNames[t.bgToken] || t.bgToken} ground, ${SYS.colorNames[t.textToken] || t.textToken} text, ${t.button} button`)}</small></span></label>`).join('')}
     ${d.themes.length > 1 ? row('Default', sel('m.themeDefault', d.themes[0], d.themes.map(t => [t, (SYS.themes[t] || { label: `${t} (missing)` }).label])), 'What a new copy of the module starts as') : ''}
     ${d.themes.filter(t => !SYS.themes[t]).map(t => `<label class="check"><input type="checkbox" data-theme-allow="${esc(t)}" checked><span>${esc(t)}<small>Not in the design system any more. Untick it.</small></span></label>`).join('')}`)}
   ${pane('Space', `
@@ -857,18 +1005,18 @@ function moduleInspector(d) {
     ${row('Made for', sel('m.width', d.width, [[600, 'Full width · 600px'], [300, 'Half column · 300px']], 'num'), 'A drag-and-drop email is 600px wide. Images size against this; dropped somewhere narrower, everything shrinks to fit.')}
     <p class="hint">Content width <span class="mono" id="cwHint">${H.contentWidth(d, SYS)}px</span>. The module is fluid: in a narrower column it shrinks, and its columns stack.</p>`)}
   ${pane('Style blocks', `
-    <p class="hint" style="margin-top:0">Everything that has to hold is inline. These two blocks add what cannot be: HubSpot's editor warns about style tags in the body, and the email still saves and sends.</p>
+    <p class="hint">Everything that has to hold is inline. These two blocks add what cannot be: HubSpot's editor warns about style tags in the body, and the email still saves and sends.</p>
     ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links inside rich text. HubSpot is expected to inline this block at send; one test send has to confirm it.')}
     ${chk('m.css.sheet', d.css.sheet, 'Phone and dark-mode rules', 'Phone font sizes and the dark layers. Apple Mail and Outlook.com read them; Gmail strips them.')}`)}
   ${pane('In HubSpot', `
-    <p class="hint" style="margin-top:0">Select a part to set what the team can edit. Parts tagged <span class="tag field" style="font-family:var(--mono);font-size:10px;padding:0 4px">field</span> become fields in the editor sidebar, in this order:</p>
-    <ol class="hint" style="padding-left:18px">${(built ? built.steps.fields : []).filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
+    <p class="hint">Select a part to set what the team can edit. Parts tagged <span class="tag field">field</span> become fields in the editor sidebar, in this order:</p>
+    <ol class="hint">${(built ? built.steps.fields : []).filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
 }
 
 function partInspector(d, r) {
   const p = r.part, T = H.TYPES[p.type], rep = repeatOf(p.id);
-  const head = `<div class="insp-head"><span class="glyph">${esc(H.glyph(p))}</span><span class="t"><b>${esc(T.label)}${rep ? ` <span style="display:inline;font-weight:400;color:var(--muted)">in ${esc(rep.label)}</span>` : ''}</b><span></span></span>
-    <span class="acts"><button class="icon" data-act="up" title="Move up (⌥↑)">↑</button><button class="icon" data-act="down" title="Move down (⌥↓)">↓</button><button class="icon" data-act="dup" title="Duplicate (⌘D)">⧉</button><button class="icon danger" data-act="del" title="Delete (⌫)">✕</button><button class="icon" data-act="close" title="Back to the module (Esc)">↰</button></span></div>`;
+  const head = `<div class="insp-head"><span class="glyph">${esc(H.glyph(p))}</span><span class="t"><b>${esc(T.label)}${rep ? ` <em class="in">in ${esc(rep.label)}</em>` : ''}</b><span></span></span>
+    <span class="acts"><button type="button" class="icon" data-act="up" title="Move up (⌥↑)" aria-label="Move up">↑</button><button type="button" class="icon" data-act="down" title="Move down (⌥↓)" aria-label="Move down">↓</button><button type="button" class="icon" data-act="dup" title="Duplicate (⌘D)" aria-label="Duplicate">⧉</button><button type="button" class="icon danger" data-act="del" title="Delete (⌫)" aria-label="Delete this part">✕</button><button type="button" class="icon" data-act="close" title="Back to the module (Esc)" aria-label="Back to the module">↰</button></span></div>`;
   let body = '';
   if (p.type === 'columns') body = columnsInspector(p);
   else if (p.type === 'repeat') body = repeatInspector(p);
@@ -879,7 +1027,7 @@ function partInspector(d, r) {
 function contentPane(p, rep) {
   const editable = H.isEditable(p);
   const title = editable ? (rep ? `Default for new ${rep.itemLabel || 'item'}s` : 'Default content') : 'Content';
-  const hint = editable ? `<p class="hint" style="margin-top:0">What the field holds when the team drops the module in. They replace it.${rep ? ` Each ${esc(rep.itemLabel || 'item')}'s own copy is under ${esc(rep.label)}.` : ''}</p>` : '';
+  const hint = editable ? `<p class="hint">What the field holds when the team drops the module in. They replace it.${rep ? ` Each ${esc(rep.itemLabel || 'item')}'s own copy is under ${esc(rep.label)}.` : ''}</p>` : '';
   let b = '';
   switch (p.type) {
     case 'eyebrow': case 'heading': case 'text':
@@ -922,25 +1070,25 @@ function stylePane(p, rep) {
   let b = '';
   switch (p.type) {
     case 'eyebrow': case 'heading': case 'text':
-      b = row('Style', sel('style', p.style, styleOpts)) + row('Colour', sel('color', p.color, colorOpts()), 'Theme colours follow the theme the team picks; a named colour stays put') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+      b = row('Style', sel('style', p.style, styleOpts)) + row('Colour', sel('color', p.color, colorOpts()), 'Theme colours follow the theme the team picks; a named colour stays put') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break;
     case 'richtext':
-      b = row('Size', sel('style', p.style, styleOpts.filter(([k]) => ['body', 'small'].includes(k)))) + row('Colour', sel('color', p.color, colorOpts())) + row('Links', sel('linkColor', p.linkColor, colorOpts())) + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+      b = row('Size', sel('style', p.style, styleOpts.filter(([k]) => ['body', 'small'].includes(k)))) + row('Colour', sel('color', p.color, colorOpts())) + row('Links', sel('linkColor', p.linkColor, colorOpts())) + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break;
     case 'image': {
       const max = H.slotWidth(doc(), SYS, p.id);
-      b = row('Width', num('width', p.width, 40, max) + `<span class="hint" style="margin:0">px of ${max}</span>`, 'The display width. HubSpot reports the uploaded file\'s own width; the module never uses it (learnings 1.6a).')
-        + `<div class="row"><label></label><div class="ctl"><button type="button" data-fill="1" title="As wide as its column">Fill ${max}px</button></div></div>`
+      b = row('Width', num('width', p.width, 40, max) + `<span class="hint">px of ${max}</span>`, 'The display width. HubSpot reports the uploaded file\'s own width; the module never uses it (learnings 1.6a).')
+        + `<div class="row"><span class="lab"></span><div class="ctl"><button type="button" data-fill="1" title="As wide as its column">Fill ${max}px</button></div></div>`
         + row('Align', alignSeg(p.align)) + chk('phoneFull', p.phoneFull, 'Full width on phones', 'Stretches to the screen on a phone')
-        + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint" style="margin:0">px · square in Outlook</span>')
-        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break; }
+        + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint">px</span>') + '<p class="hint row-note">Square in Outlook on Windows.</p>'
+        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break; }
     case 'button':
-      b = row('Follow theme', chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does'), '')
+      b = chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does')
         + (p.themed ? '' : row('Variant', segs('variant', p.variant, Object.entries(SYS.buttons).map(([k, v]) => [k, v.label, `${SYS.colorNames[v.fillToken] || v.fillToken} fill, ${SYS.colorNames[v.inkToken] || v.inkToken} label, ${v.radius}px corners`]))))
         + row('Align', alignSeg(p.align)) + chk('full', p.full, 'Full width', 'The button spans its column') + chk('phoneFull', p.phoneFull, 'Full width on phones')
-        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+        + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break;
     case 'divider':
-      b = row('Colour', sel('color', p.color, colorOpts())) + row('Thickness', num('thickness', p.thickness, 1, 12) + '<span class="hint" style="margin:0">px</span>') + row('Length', num('length', p.length, 5, 100) + '<span class="hint" style="margin:0">%</span>') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint" style="margin:0">px</span>'); break;
+      b = row('Colour', sel('color', p.color, colorOpts())) + row('Thickness', num('thickness', p.thickness, 1, 12) + '<span class="hint">px</span>') + row('Length', num('length', p.length, 5, 100) + '<span class="hint">%</span>') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break;
     case 'spacer':
-      b = row('Height', num('height', p.height, 4, 200) + '<span class="hint" style="margin:0">px</span>') + row('On phones', num('phoneHeight', p.phoneHeight, 0, 200) + '<span class="hint" style="margin:0">px · 0 = same</span>'); break;
+      b = row('Height', num('height', p.height, 4, 200) + '<span class="hint">px</span>') + row('On phones', num('phoneHeight', p.phoneHeight, 0, 200) + '<span class="hint">px</span>') + '<p class="hint row-note">0 keeps the height above.</p>'; break;
   }
   return pane('Style', b);
 }
@@ -951,10 +1099,10 @@ function columnsInspector(p) {
   return pane('Columns', `
     ${row('Count', segs('count', p.cols.length, [[2, 'Two'], [3, 'Three']], 'num'))}
     <div class="stack"><label>Split</label>${segs('split', cur, splits)}</div>
-    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
+    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint">px</span>')}
     ${row('Line up', segs('valign', p.valign, [['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']]))}
     ${chk('stack', p.stack, 'Stack on phones', 'One under the other when the email is narrower than the design, in every client, Gmail included. Off, they stay side by side.')}
-    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
+    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint">px</span>')}
     <p class="hint">${p.stack ? 'Stacking needs no style block: each column is as wide as its share or the screen, whichever is less. Outlook on Windows gets a plain table.' : 'A plain table: the columns keep their shares at every width.'} Columns are layout only; their parts' fields sit in the module's list in reading order.</p>`)
     + pane('Swap', `<button type="button" data-swap="1" title="Reverse the column order">Swap columns</button>`);
 }
@@ -963,7 +1111,7 @@ function repeatInspector(p) {
   const kids = allParts(p.parts).filter(H.isEditable);
   const items = p.items.map((it, i) => `<div class="itemcard" data-item="${i}">
       <div class="ih"><span>${esc(p.itemLabel || 'Item')} ${i + 1}</span><span class="grow"></span>
-        <button class="icon" data-item-act="up" data-i="${i}" title="Move up">↑</button><button class="icon" data-item-act="down" data-i="${i}" title="Move down">↓</button><button class="icon danger" data-item-act="del" data-i="${i}" title="Remove">✕</button></div>
+        <button type="button" class="icon" data-item-act="up" data-i="${i}" title="Move up" aria-label="Move ${esc(p.itemLabel || 'item')} ${i + 1} up"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="icon" data-item-act="down" data-i="${i}" title="Move down" aria-label="Move ${esc(p.itemLabel || 'item')} ${i + 1} down"${i === p.items.length - 1 ? ' disabled' : ''}>↓</button><button type="button" class="icon danger" data-item-act="del" data-i="${i}" title="Remove" aria-label="Remove ${esc(p.itemLabel || 'item')} ${i + 1}">✕</button></div>
       ${kids.map(k => itemControl(p, it, i, k)).join('') || '<span class="hint">No editable parts inside yet.</span>'}
     </div>`).join('');
   return pane('Repeating group', `
@@ -976,10 +1124,10 @@ function repeatInspector(p) {
   `) + pane('Layout', `
     ${row('Arrange', segs('layout', p.layout, [['list', 'List', 'One under another'], ['grid', 'Grid', 'Side by side, in rows']]))}
     ${p.layout === 'grid' ? row('Per row', segs('perRow', p.perRow, [[2, 'Two'], [3, 'Three']], 'num')) + chk('stack', p.stack, 'One per row on phones', 'In every client, Gmail included. Off, the rows keep their count at any width.') : ''}
-    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint" style="margin:0">px</span>')}
+    ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint">px</span>')}
     ${p.layout === 'list' ? chk('rule', p.rule, 'Rule between items', 'A hairline in the theme accent') : ''}
-    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint" style="margin:0">px</span>')}
-  `) + pane(`${p.itemLabel || 'Item'}s it starts with`, `<p class="hint" style="margin-top:0">The defaults a new copy of the module holds. The team adds and removes their own, ${p.min}–${p.max}.</p><div class="items">${items}</div>
+    ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint">px</span>')}
+  `) + pane(`${p.itemLabel || 'Item'}s it starts with`, `<p class="hint">The defaults a new copy of the module holds. The team adds and removes their own, ${p.min}–${p.max}.</p><div class="items">${items}</div>
     <button type="button" data-item-act="add" ${p.items.length >= p.max ? 'disabled' : ''}>+ Add ${esc((p.itemLabel || 'item').toLowerCase())}</button>`, String(p.items.length));
 }
 function itemControl(rep, it, i, k) {
@@ -1074,7 +1222,30 @@ insp.addEventListener('click', e => {
 // ---------------------------------------------------------------------------------------------------------------
 
 function setTab(t) { ui.tab = t; saveUi(); renderBar(); if (t === 'design') paintPreview(); if (t === 'code') renderCode(); if (t === 'steps') renderSteps(); }
+// The inspector's head is as tall as the bars over the stage (the top bar and the design bar, or the code bar), so its
+// rule runs on from theirs, a wrapped design bar included.
+function syncBars() {
+  const second = !$('#designBar').hidden ? $('#designBar') : !$('#viewCode').hidden ? $('.codehead') : null;
+  document.documentElement.style.setProperty('--bars-h', `${$('.topbar').offsetHeight + (second ? second.offsetHeight : 40)}px`);
+}
+new ResizeObserver(syncBars).observe($('.topbar'));
+new ResizeObserver(syncBars).observe($('#designBar'));
+new ResizeObserver(syncBars).observe($('.codehead'));
+// Between 1024 and 1351 the inspector shares the rail's column, so the rail leads with Parts and Checks and the module
+// list follows them. Moved in the page, not by CSS order, so Tab goes the way the eye does.
+const railMQ = matchMedia('(min-width:1024px) and (max-width:1351px)');
+function placeModules() { const m = $('#paneModules'), before = railMQ.matches ? $('#paneSys') : $('#paneParts'); if (m.nextElementSibling !== before) before.before(m); }
+railMQ.addEventListener('change', placeModules); placeModules();
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
+// The tab list's own keys: ← → Home End move between the views and open the one they land on.
+$('#tabs').addEventListener('keydown', e => {
+  const tabs = $$('#tabs button'), i = tabs.indexOf(e.target); if (i < 0) return;
+  const j = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[e.key];
+  if (j == null) return;
+  e.preventDefault(); setTab(tabs[j].dataset.tab); tabs[j].focus();
+});
+// A focused code pane keeps ↑ ↓ for scrolling instead of handing them to the part shortcuts.
+$('#codeSrc').addEventListener('keydown', e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.stopPropagation(); });
 $('#device').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.device = b.dataset.device; saveUi(); renderBar(); paintPreview(); });
 $('#content').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.empty = b.dataset.content === 'empty'; saveUi(); renderBar(); paintPreview(); });
 $('#darkSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.dark = b.dataset.dark === '1'; saveUi(); renderBar(); paintPreview(); });
@@ -1123,7 +1294,7 @@ ToolKit.register('c', 'Code view', () => setTab('code'), { group: 'View' });
 ToolKit.register('b', 'Hand-build steps', () => setTab('steps'), { group: 'View' });
 ToolKit.register('p', 'Desktop or phone', () => { ui.device = ui.device === 'phone' ? 'desktop' : 'phone'; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
 ToolKit.register('e', 'Filled or empty fields', () => { ui.empty = !ui.empty; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
-ToolKit.register('k', 'Dark override', () => { ui.dark = !ui.dark; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
+ToolKit.register('k', 'Email dark mode, on or off', () => { ui.dark = !ui.dark; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
 ToolKit.register('g', 'Gmail view: no style block', () => { ui.gmail = !ui.gmail; saveUi(); renderBar(); paintPreview(); }, { group: 'View' });
 ToolKit.register('n', 'New module', () => starterMenu($('#btnNew')), { group: 'Module' });
 ToolKit.register('a', 'Add a part', () => { const r = ui.sel && locate(ui.sel); if (r) addMenu($('.orow.on') || $('#outline .oadd'), r.list, r.owner, r.index + 1); else addMenu($('#outline > div > .oadd'), doc().parts, null); }, { group: 'Parts' });
