@@ -47,8 +47,16 @@
   const theme = document.createElement('span'); theme.className = 'tb-theme'; theme.setAttribute('role', 'radiogroup'); theme.setAttribute('aria-label', 'Colour mode');
   theme.innerHTML = '<button type="button" role="radio" data-t="light">Light</button><button type="button" role="radio" data-t="dark">Dark</button>';
   el.appendChild(theme);
-  const paint = () => { const t = window.ScugnizziTheme ? window.ScugnizziTheme.get() : 'dark'; theme.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.t === t))); };
+  // A radio group: one Tab stop on the picked mode, the arrows move the pick (tool-kit leaves them to a focused radio).
+  const paint = () => { const t = window.ScugnizziTheme ? window.ScugnizziTheme.get() : 'dark'; theme.querySelectorAll('button').forEach(b => { const on = b.dataset.t === t; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }); };
   theme.addEventListener('click', e => { const b = e.target.closest('button'); if (b && window.ScugnizziTheme) window.ScugnizziTheme.set(b.dataset.t); });
+  theme.addEventListener('keydown', e => {
+    const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+    if (!step || e.altKey || e.ctrlKey || e.metaKey || !window.ScugnizziTheme) return;
+    e.preventDefault();
+    const bs = [...theme.querySelectorAll('button')], next = bs[(bs.indexOf(document.activeElement) + step + bs.length) % bs.length];
+    window.ScugnizziTheme.set(next.dataset.t); next.focus();
+  });
   const wire = () => { paint(); window.ScugnizziTheme.onChange(paint); };
   const base = new URL(home, location.href);
   if (window.ScugnizziTheme) wire();

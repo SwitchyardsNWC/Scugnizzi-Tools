@@ -67,37 +67,24 @@
   .msg textarea{position:relative;z-index:1;display:block;width:100%;height:60px;min-height:0;margin:0;padding:0;border:0;border-radius:0;resize:none;
     background:transparent;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;scrollbar-width:none;transition:none}
   .msg textarea::-webkit-scrollbar{width:0;height:0}
-  .msg textarea::placeholder{color:currentColor;opacity:.5;letter-spacing:normal}
+  /* The board's own letter colour, lighter: at .6 it holds 4.5:1 on the dark boards and on the Menu board's white flaps. */
+  .msg textarea::placeholder{color:currentColor;opacity:.6;letter-spacing:normal}
 
   /* Play and Pause swap in place: the button keeps one width so the words beside it don't move. */
   #playPause{flex:none;min-width:72px}
-  /* A 12px hint beside a button's 13px words: as beside a label, two pixels of nudge put the two on one baseline. */
-  .row>button ~ .hint{padding-top:2px}
 
-  /* --- Presets: looks described in phrases, so one card to a line, read from the top. ------------------------------- */
-  .presets{grid-template-columns:minmax(0,1fr)}
-  .presets>button{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding-right:24px}
+  /* --- Presets: looks described in phrases, one card to a line (.presets.wide). --------------------------------------- */
+  /* The cards are a list and Reset is a button: a step more than the cards' own 8 keeps the two apart. */
   #presets ~ .btn-row{margin-top:var(--spacing-12)}
   /* Reset is a quiet escape hatch: its own width, never the widest button in the tool. */
   #resetTool{flex:none}
 
-  /* --- Board -------------------------------------------------------------------------------------------------------- */
-  /* A 12px range beside a 13px label: two pixels of nudge, not four, put the two on one baseline. */
-  .row>label ~ .hint{padding-top:2px}
-  /* A colour's hex beside its well: the pick never rests on the colour alone. */
-  .hex{font-family:var(--font-mono-detail);letter-spacing:0}
-  /* The mono's taller ascent already drops it to the label's baseline: without the sans nudge the two line up. */
-  .row>label ~ .hex{padding-top:0}
-  /* Boards run near-black and letters near-white: the chip takes the control edge, so either shows on either paper. */
-  .row>input[type=color]::-webkit-color-swatch{border-color:var(--border-control)}
-  .row>input[type=color]::-moz-color-swatch{border-color:var(--border-control)}
-
-  /* --- Motion: four flip orders need the panel's whole width, and each segment takes its words' width. ------------- */
+  /* --- Motion: four flip orders need the panel's whole width (.seg.fit: each segment takes its words' width). ------- */
   .stack>.seg{flex:none}
-  #staggerSeg button{flex:1 1 auto;padding-left:var(--spacing-4);padding-right:var(--spacing-4)}
 
-  /* A key named in a hint sits inside the 16px line, so a line holding one keeps the same pitch as the others. */
-  .hint kbd{display:inline;padding:0 4px;line-height:12px}
+  /* A key named in a hint: tools.css lets it inherit the 16px line, and the mono's own ascent then pushes that line to 17.
+     At 12 it sits inside the line, so a line holding one keeps the pitch of the others (measured: 64 not 66 tall). */
+  .hint kbd{line-height:12px}
 
   /* --- the bar over the stage, the stage, the export bar ------------------------------------------------------------ */
   #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -108,14 +95,15 @@
   .stage:not(.fit){display:block}
   .stage:not(.fit) canvas{display:block;margin:0 auto}
   /* The buttons say what they are doing while a GIF renders ("Frame 12 / 56…"): one width, so the recipe never reflows. */
-  .actions{flex:none;width:184px;min-width:0}
+  .actions{width:184px;min-width:0}
   /* The recipe stops on a whole line: nine lines of 18 sit inside the five buttons beside it (172), so the bar never grows. */
   .footer pre#recipe{max-height:162px}
   /* Words for a screen reader alone: what an export or a copy did, said once. */
   .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
   @media (max-width:900px){
-    .presets{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+    /* Stacked over the stage the panel runs the window's width: the looks sit side by side. */
+    .presets.wide{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
     .actions{width:auto}
     /* Stacked under the buttons, six whole lines, then it scrolls. */
     .footer pre#recipe{max-height:108px}
@@ -148,7 +136,7 @@
     <details class="panel" data-panel="looks" open>
       <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
-        <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+        <div class="presets wide" id="presets" role="group" aria-label="Presets"></div>
         <div class="btn-row"><button id="resetTool" class="danger">Reset to defaults</button></div>
         <p class="hint">A preset replaces the messages, board, type, motion and export settings. Reset clears everything saved for this tool.</p>
       </div>
@@ -161,9 +149,9 @@
         <div class="row"><label for="cols">Columns</label><input type="number" id="cols" min="4" max="48" step="1"><span class="hint">4–48</span></div>
         <div id="boardSliders"></div>
         <h3>Colours</h3>
-        <div class="row"><label for="boardColor">Board</label><input type="color" id="boardColor"><span class="hint hex" id="boardColorHex"></span></div>
-        <div class="row"><label for="flapColor">Flaps</label><input type="color" id="flapColor"><span class="hint hex" id="flapColorHex"></span></div>
-        <div class="row"><label for="letterColor">Letters</label><input type="color" id="letterColor"><span class="hint hex" id="letterColorHex"></span></div>
+        <div class="row"><label for="boardColor">Board</label><input type="color" id="boardColor"><span class="hex" id="boardColorHex"></span></div>
+        <div class="row"><label for="flapColor">Flaps</label><input type="color" id="flapColor"><span class="hex" id="flapColorHex"></span></div>
+        <div class="row"><label for="letterColor">Letters</label><input type="color" id="letterColor"><span class="hex" id="letterColorHex"></span></div>
         <h3>Details</h3>
         <div class="row"><label for="header">Header</label><input type="text" id="header" placeholder="e.g. DEPARTURES" spellcheck="false"></div>
         <label class="check"><input type="checkbox" id="rowNumbers"><span>Row numbers</span></label>
@@ -183,7 +171,7 @@
     <details class="panel" data-panel="motion">
       <summary><span class="t">Motion</span><span class="v" id="hint-motion"></span></summary>
       <div class="body">
-        <div class="stack"><span class="lab" id="staggerLab">Flip order</span><div class="seg" id="staggerSeg" role="group" aria-labelledby="staggerLab"><button data-v="ltr">Left→right</button><button data-v="row">By row</button><button data-v="random">Random</button><button data-v="all">All at once</button></div></div>
+        <div class="stack"><span class="lab" id="staggerLab">Flip order</span><div class="seg fit" id="staggerSeg" role="group" aria-labelledby="staggerLab"><button data-v="ltr">Left→right</button><button data-v="row">By row</button><button data-v="random">Random</button><button data-v="all">All at once</button></div></div>
         <div id="motionSliders"></div>
         <div class="row"><label for="alphabet">Alphabet</label><input type="text" id="alphabet" spellcheck="false"></div>
         <label class="check"><input type="checkbox" id="blankFirst"><span>Blank the board before each message</span></label>
@@ -598,33 +586,39 @@ function markOverflow(el, text) {
   s.hidden = !n; s.textContent = `${n} character${n === 1 ? '' : 's'} off the board won't flip`;
   s.title = `${n} character${n === 1 ? '' : 's'} sit outside the ${state.board.rows} × ${state.board.cols} board and will not flip`;
 }
-// Letter-spacing stretches each monospace character to one module wide, and half the slack becomes the
-// text's left inset so glyphs sit centred in their cells. Cell width is solved so inset + cols × cell
-// exactly fills the box: cw(cols + ½) = avail + glyph/2, with one pass to settle the font size first.
+// Letter-spacing stretches each monospace character to one module wide, and the text's left padding puts each glyph in
+// the middle of its cell. The grid sits centred in the box, so the board's edge is even all round. Its margin has to be
+// at least half a cell's slack, because a line's trailing letter-spacing runs that far past the last cell and must end
+// inside the box or the field scrolls sideways: so the widest cell is cw(cols + 1) = avail + glyph (half a pixel spare),
+// with two passes to settle the font size first. Cells are never wider than the board's own module proportion allows
+// under the 34px cap (four tall Countdown flaps stay tall in miniature), unless that would shrink the type below 14px.
+const MSG_CELL_H = 34;
 function cellMetrics(avail, cols) {
-  const B = state.board;
+  const B = state.board, ratio = B.mh / B.mw;
   const fit = cw => {
-    let chh = Math.min(34, cw * (B.mh / B.mw));                          // the board's own module proportion
+    const chh = Math.min(MSG_CELL_H, cw * ratio);                        // the board's own module proportion
     const size = Math.max(5.5, Math.min(20, cw / chRatio, chh * 0.95));  // fits the cell both ways
     return { size, glyph: size * chRatio, chh: Math.max(chh, size + 2) };
   };
-  const m = fit(avail / cols), cw = (avail + m.glyph / 2) / (cols + 0.5);
-  return { cw, ...fit(cw) };
+  const widest = g => Math.min((avail - 0.5 + g) / (cols + 1), Math.max(MSG_CELL_H / ratio, 14 * chRatio));
+  const m = fit(widest(fit(avail / cols).glyph));   // the type, settled for the cell it will get
+  const cw = widest(m.glyph);                       // the cell, solved for that type, so the line always fits
+  return { cw, size: m.size, glyph: m.glyph, chh: Math.max(Math.min(MSG_CELL_H, cw * ratio), m.size + 2) };
 }
 function layoutMsgGrid(wrap) {
   const B = state.board, avail = msgAvailW - MSG_INSET;
   if (!wrap || avail < 40) return;
-  const { cw, size, glyph, chh } = cellMetrics(avail, B.cols), inset = (cw - glyph) / 2;
+  const { cw, size, glyph, chh } = cellMetrics(avail, B.cols), margin = (avail - cw * B.cols) / 2, inset = (cw - glyph) / 2;
   const ta = wrap.querySelector('textarea'), grid = wrap.querySelector('.grid');
   ta.style.fontSize = size.toFixed(2) + 'px';
   ta.style.lineHeight = chh.toFixed(2) + 'px';
   ta.style.letterSpacing = (cw - glyph).toFixed(3) + 'px';
-  ta.style.paddingLeft = inset.toFixed(2) + 'px';
+  ta.style.paddingLeft = (margin + inset).toFixed(2) + 'px';
   ta.style.height = (chh * B.rows).toFixed(2) + 'px';
   ta.style.color = B.letterColor; ta.style.caretColor = B.letterColor;
   ta.style.textTransform = B.upper ? 'uppercase' : 'none';
   wrap.style.background = B.boardColor;
-  grid.style.left = MSG_PAD + 'px';   // cell 0 starts at the text origin; the inset centres the glyph inside it
+  grid.style.left = (MSG_PAD + margin).toFixed(2) + 'px';   // cell 0 starts a margin in; the inset centres the glyph inside it
   grid.style.width = (cw * B.cols).toFixed(2) + 'px';
   grid.style.height = (chh * B.rows).toFixed(2) + 'px';
   grid.style.backgroundSize = `${cw.toFixed(3)}px ${chh.toFixed(3)}px`;

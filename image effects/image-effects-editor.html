@@ -15,11 +15,12 @@
 
   /* The drop zone is tools.css's button.drop. While a file is over it the script adds .over beside .drag-over, so it
      takes the shared look. Its key is written in the line's own sans, as in the specimen: a mono O in a chip reads as
-     a zero. */
+     a zero. The section's state is the file's name, and says nothing until there is one (the script shows it). */
   #filename{display:none}
 
   /* Looks: tools.css's preset cards, Original across the top because it is "none". The script marks the chosen one .on
-     (and aria-pressed) beside its own .active, so the ink edge and the square are the shared ones. */
+     (and aria-pressed) beside its own .active, so the ink edge and the square are the shared ones. A chosen card's edge
+     is 2px, so its focus ring stands 1px further off to keep a clear gap; the note under the cards takes 12, as Riso's. */
   .presets>button:first-child{grid-column:1/-1}
   .presets>button.on:focus-visible{outline-offset:3px}
   .presets + .hint{margin-top:var(--spacing-12)}
@@ -28,7 +29,7 @@
      controls side by side, never one inside the other, so turning an effect on never folds its section. */
   .fx{border-top:var(--border-width) solid var(--border-muted)}
   .fx-head{display:flex;align-items:stretch;gap:var(--spacing-8);min-height:var(--panel-section-height)}
-  .fx-sum{flex:1;min-width:0;justify-content:flex-start;gap:var(--spacing-8);min-height:var(--panel-section-height);padding:2px 0 0;
+  .fx-sum{flex:1;min-width:0;justify-content:flex-start;min-height:var(--panel-section-height);padding:2px 0 0;
     border:0;border-radius:0;background:transparent;text-align:left;
     font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
   .fx-sum:hover,.fx-sum:active{background:transparent;color:var(--text-primary)}
@@ -36,11 +37,14 @@
   .fx.open .fx-sum::before{margin-top:-5px;transform:rotate(45deg)}
   .fx-sum .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .fx.enabled .fx-sum{color:var(--text-primary)}
-  /* The switch with its word: the whole strip is the target, header-high. On is ink with the knob right and says On. */
+  /* The switch with its word: the whole strip is the target, header-high. On is ink with the knob right and says On.
+     Measured at 4x: the word's baseline meets the name's (23px down the header) with no nudge, and the switch rides
+     1px above centre so its middle meets the words' middle. */
   .fx-on{display:flex;align-items:center;gap:var(--spacing-8);padding:0 0 0 var(--spacing-8);cursor:pointer;
     font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted);transition:color var(--duration-fast) var(--ease-standard)}
   .fx-on:hover,.fx.enabled .fx-on{color:var(--text-primary)}
-  .fx-state{min-width:20px;padding-top:2px;text-align:right}
+  .fx-state{min-width:20px;text-align:right}
+  .fx-on>.switch{margin-bottom:2px}
   .fx>.body{display:none;padding:0 0 var(--spacing-16)}
   .fx.open>.body{display:block}
   /* Off, an effect's controls stay live but step down one ink, so it reads that moving them changes nothing yet while
@@ -55,18 +59,11 @@
   .fx:not(.enabled)>.body input[type=range]:focus-visible::-webkit-slider-thumb{background:var(--text-muted)}
   .fx:not(.enabled)>.body input[type=range]:hover::-moz-range-thumb,.fx:not(.enabled)>.body input[type=range]:active::-moz-range-thumb{background:var(--text-muted)}
 
-  /* A colour: the well, then its hex. The well is the script's swatch, painted inline with the colour; the native
-     picker sits over it, invisible, so a click opens it. The colour fills only the chip inside the well (the inline
-     background would otherwise reach the edge), with a hairline round it so white on paper still has an edge. */
-  .color-swatch{position:relative;flex:0 0 var(--swatch-size);width:var(--swatch-size);height:var(--swatch-size);padding:3px;
-    border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls);background-clip:content-box!important;cursor:pointer;
-    transition:border-color var(--duration-fast) var(--ease-standard)}
-  .color-swatch:hover{border-color:var(--border-control)}
-  .color-swatch::after{content:"";position:absolute;inset:3px;border:var(--border-width) solid var(--border-muted);pointer-events:none}
-  .color-swatch input[type=color]{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);padding:0;border:0;opacity:0;cursor:pointer}
-  .color-swatch:has(input:focus-visible){outline:var(--border-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}
-  /* The mono face sits its baseline 2px lower than the sans at the same nudge, so the hex drops the nudge. */
-  .row>.hex{padding-top:0;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary);user-select:all}
+  /* A colour: tools.css's colour well, then its hex (tools.css's .hex). The script still paints its #swatch-* wrapper
+     inline; the wrapper draws no box, so the well, its chip hairline, hover and focus ring are the shared ones. The hex
+     is selectable in one click, to copy. */
+  .color-swatch{display:contents}
+  .row>.hex{user-select:all}
 
   /* The bar over the stage: the picture's size on the left, zoom on the right. tools.css drops the bar's mono figures
      2px to the buttons' label baseline; the hint is sans, so it takes the buttons' full 4px nudge to share Fit's
@@ -92,10 +89,8 @@
   /* Dragging a file over the stage: tools.css draws its "Drop an image" frame for .drag-over (the script adds
      .dropping beside it too), and the empty-state target steps aside for it rather than showing through. */
   .stage.drag-over .empty-drop{visibility:hidden}
-  /* A note while a frame renders, in the stage's corner. */
-  .processing{display:none;position:absolute;top:var(--spacing-12);right:var(--spacing-12);min-height:18px;padding:3px 5px 0;
-    font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;color:var(--text-muted);
-    background:var(--surface-paper);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+  /* A note while a frame renders, in the stage's corner: tools.css's .tag, on paper so it reads over the picture. */
+  .processing{display:none;position:absolute;top:var(--spacing-12);right:var(--spacing-12);background:var(--surface-paper)}
 
   /* The prompt is something to read and copy, so it is the secondary ink, not the muted one. */
   #promptText{color:var(--text-secondary)}
@@ -267,7 +262,7 @@
     <div class="stage" id="canvasContainer">
       <button type="button" class="empty-drop" id="dropPlaceholder" aria-keyshortcuts="O"><span class="t">Drop an image here</span><span>or click to choose one · O</span></button>
       <canvas id="canvas"></canvas>
-      <div class="processing" id="processing">rendering…</div>
+      <div class="processing tag" id="processing">rendering…</div>
     </div>
     <div class="footer">
       <div class="actions">

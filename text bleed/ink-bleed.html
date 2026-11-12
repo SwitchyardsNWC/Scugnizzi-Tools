@@ -48,7 +48,8 @@
   /* Each row is a .list .item: the chosen one is ink-edged with the 2px marker. Its kind is a lettered square, T or S.
      4px between rows, so a focus ring outside one row never meets the next row's edge. */
   #layerList{gap:var(--spacing-4)}
-  #layerList .kind{flex:0 0 18px;width:18px;height:18px;padding-top:3px;text-align:center;
+  /* 1 + 2 + 13 line: the letter's baseline meets the name's and its cap sits 4px from either edge (measured). */
+  #layerList .kind{flex:0 0 18px;width:18px;height:18px;padding-top:2px;text-align:center;
     font-family:var(--font-mono-detail);font-size:11px;line-height:13px;letter-spacing:0;color:var(--text-secondary);
     border:var(--border-width) solid var(--border-control);border-radius:2px}
   /* The name is the row's button (what Tab reaches and Enter picks), set as the plain line it was: no edge, no fill. */
@@ -70,9 +71,6 @@
   .addrow>button.icon:hover,.line>button.icon:hover{border-color:var(--text-muted)}
 
   /* --- rows ---------------------------------------------------------------------------------------------------------- */
-  /* A colour's value is written beside its swatch, so it can be read, not only seen. */
-  /* A mono's baseline sits lower than the sans's in the same box, so it takes no optical nudge to meet the label's. */
-  .row>.hex{padding-top:0;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary)}
   /* Size names run long ("Social square · 1080 × 1080 px"), so the canvas picks sit under their labels at full width. */
   .stack>.line{display:flex;align-items:center;gap:var(--spacing-8)}
   .stack>.line>select{flex:1;min-width:0}
@@ -115,21 +113,20 @@
      bar keeps its height when a project opens. A label that outgrows its button (a long file name, a passing message)
      ends in an ellipsis inside it, never over its neighbour. */
   .actions>button{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
-  /* Copy recipe sits with what it copies, in the recipe's corner. */
+  /* Copy recipe sits with what it copies, in the recipe's corner, on the recipe's first line at every width: so the
+     recipe keeps tools.css's 5px drop even where the narrow layout clears it, and the 24px button comes down 1px to
+     that baseline (measured). 5 + 6 × 18 = 113: six whole lines, then it scrolls. The button has a fixed 88, so
+     "Copied!" or "Blocked" in it never rewraps the recipe beside it. */
   .recipe-pane{display:flex;align-items:flex-start;gap:var(--spacing-8);min-width:0}
-  .recipe-pane>pre#recipe{flex:1;min-width:0;max-height:108px}
-  .recipe-pane>#copyRecipe{flex:none;min-width:80px}
+  .recipe-pane>pre#recipe{flex:1;min-width:0;max-height:113px;padding-top:5px}
+  .recipe-pane>#copyRecipe{flex:0 0 88px;width:88px;margin-top:1px}
   @media (min-width:901px){
-    /* 3 × 28 + 2 × 12 = 108: the recipe beside it, at 18px a line, shows six whole lines and scrolls for the rest. */
+    /* 3 × 28 + 2 × 12 = 108 of actions. The recipe beside them runs 5px into the bar's bottom padding to make its 113,
+       so the sixth line's baseline sits on Copy image's bottom edge and no line is cut. */
     .actions{display:grid;grid-template-columns:repeat(2,128px);gap:var(--spacing-12);min-width:0}
     #download.primary,#saveProject,#download.primary~#copyImg{grid-column:1/-1}
     .recipe-pane{align-self:stretch;contain:size}
-    .recipe-pane>pre#recipe{align-self:stretch;max-height:none}
-  }
-  /* Stacked on a narrow window the page scrolls, so the stage gets a height of its own: without one, Fit has nothing to
-     fit a tall sheet into and a receipt draws at full size. */
-  @media (max-width:900px){
-    .stage{flex:none;height:60vh}
+    .recipe-pane>pre#recipe{align-self:stretch;max-height:none;margin-bottom:-5px}
   }
 </style>
 </head>

@@ -15,11 +15,12 @@
   /* Bars keep their height: in a flex column they would otherwise give it up to a long page. */
   .shell-header,.section-head,footer{flex:none}
   .spacer{flex:1}
-  .shell-header{height:var(--shell-header-height);box-sizing:border-box;display:flex;align-items:center;gap:var(--spacing-24);padding:0 var(--spacing-24);
+  /* Every word in the bar shares one baseline, whatever its size. The 28 switch is the tallest thing above it, so the
+     top padding places the row: 14 above the switch, 13 below it to the hairline, all on whole pixels. */
+  .shell-header{height:var(--shell-header-height);box-sizing:border-box;display:flex;align-items:baseline;gap:var(--spacing-24);padding:14px var(--spacing-24) 0;
     background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-hairline)}
   .wordmark{font-size:var(--text-heading-sm);line-height:1;letter-spacing:var(--tracking-heading-sm);color:var(--text-primary);text-decoration:none;white-space:nowrap}
   .wordmark:hover{color:var(--text-primary)}
-  /* Words in the bar share a baseline, whatever their size; the bar centres the group. */
   .lockup{display:flex;align-items:baseline;gap:var(--spacing-24);min-width:0}
   .lockup:last-child{gap:var(--spacing-16)}
   .shell-header .tagline{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -30,6 +31,7 @@
     font-size:var(--text-meta);line-height:var(--control-line-sm);letter-spacing:var(--tracking-meta);transition:background-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
   .theme button:hover{color:var(--text-primary)}
   .theme button[aria-checked="true"]{background:var(--text-primary);color:var(--surface-paper);cursor:default}
+  .theme button:focus-visible{outline-offset:1px} /* inside the track, as tools.css does for .seg */
   main{flex:1;width:100%;box-sizing:border-box;padding:0}
 
   /* Section heads: an uppercase index entry and a count, over a soft rule. */
@@ -38,7 +40,10 @@
   .section-head>*{white-space:nowrap}
   .section-head .n{font-family:var(--font-mono);letter-spacing:0}
   .section-head .hint{text-transform:none;font-size:var(--text-caption);letter-spacing:var(--tracking-caption)}
-  .dot{width:8px;height:8px;background:var(--status-notstarted);flex:0 0 8px}
+  /* In a centred row the mono's deeper ascent sets a figure 1px under the caps beside it, and the 8px square 1.5px under
+     their baseline. Negative top margins lift them (by half, since the row centres) without making the row taller. */
+  .section-head .n,.kicker .n{margin-top:-2px}
+  .dot{width:8px;height:8px;margin-top:-3px;background:var(--status-notstarted);flex:0 0 8px}
   .dot.live,.dot.open{background:var(--status-done)}
   .dot.ask{background:var(--status-risk)}
   .arrow{opacity:0;color:var(--text-primary);transition:opacity var(--duration-fast) var(--ease-standard);font-family:var(--font-helveticaneue)}
@@ -61,17 +66,18 @@
   .hub-intro{display:flex;flex-direction:column;gap:var(--spacing-16);min-width:0;padding:var(--spacing-32) var(--spacing-24) var(--spacing-24);border-right:var(--border-width) solid var(--border-card)}
   .hub-eyebrow{font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted)}
   .hub-title{margin:0;font-size:var(--text-display);line-height:var(--leading-display);letter-spacing:var(--tracking-display);font-weight:400;color:var(--text-primary);overflow-wrap:anywhere}
-  .hub-sub{display:flex;flex-wrap:wrap;gap:0 var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted)}
+  .hub-sub{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted)}
   .hub-sub .mono{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0}
   .lede{font-size:var(--text-body);line-height:var(--leading-prose);color:var(--text-secondary);max-width:52ch}
-  .note{font-size:var(--text-meta);line-height:var(--leading-prose-tight);color:var(--text-muted);max-width:52ch}
+  .note{font-size:var(--text-meta);line-height:var(--leading-prose-tight);letter-spacing:var(--tracking-meta);color:var(--text-muted);max-width:52ch}
   .actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-8) var(--spacing-12);padding-top:var(--spacing-8)}
 
   .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:var(--border-width) solid var(--border-muted);border-bottom:var(--border-width) solid var(--border-muted)}
   .stat{display:flex;flex-direction:column;gap:var(--spacing-8);padding:var(--spacing-12) var(--spacing-12) var(--spacing-12) 0;color:inherit;text-decoration:none;transition:background-color var(--duration-fast) var(--ease-standard)}
   .stat + .stat{padding-left:var(--spacing-12);border-left:var(--border-width) solid var(--border-muted)}
   .stat:hover{background:var(--surface-row-hover);color:inherit}
-  .stat .label{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-secondary)}
+  /* The kind square stands on the label's baseline, as a ■ would, rather than centring 2px below it. */
+  .stat .label{display:flex;align-items:baseline;gap:var(--spacing-8);font-size:var(--text-meta);line-height:var(--leading-meta);letter-spacing:var(--tracking-meta);color:var(--text-secondary)}
   .stat .value{font-family:var(--font-mono);font-size:var(--text-stat);line-height:var(--leading-stat);letter-spacing:var(--tracking-stat);color:var(--text-primary)}
   .sq{width:8px;height:8px;flex:0 0 8px}
   .sq.email{background:var(--data-1)} .sq.frame{background:var(--data-6)} .sq.picture{background:var(--data-5)}
@@ -82,9 +88,12 @@
   .hub-field{position:relative;flex:1;min-height:300px;background:var(--surface-sunken);border:var(--border-width) solid var(--border-card);transition:border-color var(--duration-fast) var(--ease-standard)}
   .hub-board:hover .hub-field{border-color:var(--border-hairline)}
   .hub-board:hover .arrow{opacity:1}
+  /* A drill area is a cell with neighbours: its focus ring sits inside it, as on the tool cards. */
+  .hub-board:focus-visible,.type:focus-visible{outline-offset:-3px}
   .hub-field svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-  .hub-field .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--text-meta);color:var(--text-muted);max-width:none}
-  .hub-board-foot{display:flex;align-items:center;gap:var(--spacing-12);padding-top:var(--spacing-12);font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
+  .hub-field .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--text-meta);letter-spacing:var(--tracking-meta);color:var(--text-muted);max-width:none}
+  /* A mono path and the sans arrow after it: one baseline, not two centred boxes a pixel apart. */
+  .hub-board-foot{display:flex;align-items:baseline;gap:var(--spacing-12);padding-top:var(--spacing-12);font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
   .hub-board-foot .path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .map *{vector-effect:non-scaling-stroke}
   .map .group{fill:none;stroke:var(--text-faint)}
@@ -98,7 +107,7 @@
   .map .k-email{fill:var(--data-1)} .map .k-frame{fill:var(--data-6)} .map .k-picture{fill:var(--data-5)}
   .map .follows{fill:none;stroke:var(--data-6);stroke-width:1.5}
   .map .uses{fill:none;stroke:var(--data-5);stroke-width:1.25}
-  .map .made{fill:none;stroke:var(--data-2);stroke-width:1.25}
+  .map .made{fill:none;stroke:var(--data-2);stroke-width:1.25} /* dash-dot, as on the board: the kinds read apart without colour */
   .map .end-follows{fill:var(--data-6)} .map .end-uses{fill:var(--data-5)} .map .end-made{fill:var(--data-2)}
 
   /* Start from a type: one row, each type drawn as the shapes it starts with, at their true proportions. */
@@ -112,6 +121,7 @@
   .type:hover .arrow{opacity:1}
   .type .shape{height:48px;display:flex;align-items:flex-end}
   .type .shape svg{max-width:100%;height:auto;display:block}
+  .sil,.sil-text{shape-rendering:crispEdges}
   .type .text{display:flex;flex-direction:column;gap:var(--spacing-4);min-width:0}
   .type .name{display:flex;align-items:baseline;gap:var(--spacing-8);font-size:var(--text-subheading);line-height:var(--leading-subheading);letter-spacing:var(--tracking-subheading);color:var(--text-primary)}
   .type .count{font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:0;color:var(--text-muted)}
@@ -139,11 +149,11 @@
   .kicker .n{font-family:var(--font-mono);letter-spacing:0}
   .tool h2{margin:0;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);letter-spacing:var(--tracking-heading-sm);font-weight:400;color:var(--text-primary)}
   .tool p{font-size:var(--text-meta);line-height:var(--leading-prose-tight);letter-spacing:var(--tracking-meta);color:var(--text-secondary);max-width:none}
-  .meta{margin-top:auto;padding-top:var(--spacing-12);display:flex;align-items:center;gap:var(--spacing-12);border-top:var(--border-width) solid var(--border-muted);
+  .meta{margin-top:auto;padding-top:var(--spacing-12);display:flex;align-items:baseline;gap:var(--spacing-12);border-top:var(--border-width) solid var(--border-muted);
     font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:0}
   .meta .path{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   footer{padding:var(--spacing-16) var(--spacing-24);border-top:var(--border-width) solid var(--border-hairline);background:var(--surface-paper);
-    display:flex;gap:var(--spacing-24);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:var(--tracking-caption)}
+    display:flex;align-items:baseline;gap:var(--spacing-24);font-size:var(--text-caption);line-height:var(--leading-caption);color:var(--text-muted);letter-spacing:var(--tracking-caption)}
   footer .mono{font-family:var(--font-mono-detail);letter-spacing:0}
   footer .version{color:var(--text-muted);text-decoration:none}
   footer .version:hover{color:var(--text-primary)}
@@ -159,7 +169,7 @@
     .type .shape{order:2;flex:0 0 36%;height:auto;justify-content:flex-end;align-items:center}
   }
   @media (max-width:767px){
-    .shell-header,.section-head{padding:0 var(--gutter-phone)}
+    .shell-header,.section-head{padding-left:var(--gutter-phone);padding-right:var(--gutter-phone)}
     .shell-header .tagline,.section-head .hint,.section-head .wide{display:none}
     .hub-intro{padding:var(--spacing-24) var(--gutter-phone)}
     .hub-board{padding:var(--gutter-phone)}
@@ -216,11 +226,19 @@
 <script src="version.js"></script>
 <script>
 document.getElementById('suite-version').textContent = 'v' + (window.SCUGNIZZI_VERSION || '?');
-// The colour-mode switch in the header: theme.js keeps the pick, for this page and every tool.
+// The colour-mode switch in the header: theme.js keeps the pick, for this page and every tool. A radio group is one
+// stop on Tab, at the picked mode; the arrow keys move the pick.
 (function () {
-  const el = document.getElementById('theme'), T = window.ScugnizziTheme;
-  const paint = () => el.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.t === T.get())));
+  const el = document.getElementById('theme'), T = window.ScugnizziTheme, buttons = [...el.querySelectorAll('button')];
+  const paint = () => buttons.forEach((b) => { const on = b.dataset.t === T.get(); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
   el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) T.set(b.dataset.t); });
+  el.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+    if (!step || e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    const next = buttons[(buttons.indexOf(document.activeElement) + step + buttons.length) % buttons.length];
+    T.set(next.dataset.t); next.focus();
+  });
   T.onChange(paint); paint();
 })();
 </script>
@@ -303,19 +321,23 @@ document.getElementById('tool-count').textContent = String(TOOLS.length).padStar
 
 // --- project types ----------------------------------------------------------------------------------------------
 
-/** The shapes a type starts with, side by side at one height: an email as a page of lines, each frame at its size. */
-function typeShapes(type) {
-  const H = 40, GAP = 6, parts = [];
+/**
+ * The shapes a type starts with, side by side at one height H: an email as a page of lines, each frame at its size.
+ * Every coordinate is a whole pixel (strokes on the half), so the 1px lines stay crisp at any height.
+ */
+function typeShapes(type, H = 40) {
+  const k = H / 40, GAP = Math.max(4, Math.round(6 * k)), parts = [];
   let x = 0;
   const shape = (w, inner = '') => { parts.push(`<rect class="sil" x="${x + 0.5}" y="0.5" width="${w - 1}" height="${H - 1}"/>${inner}`); x += w + GAP; };
   for (let i = 0; i < type.emails; i += 1) {
-    const w = 26, lines = [9, 15, 21, 27].map((y, j) => `<line class="sil-text" x1="${x + 5}" y1="${y}" x2="${x + w - (j === 3 ? 11 : 5)}" y2="${y}"/>`).join('');
+    const w = Math.round(26 * k), pad = Math.round(5 * k), short = Math.round(11 * k), top = Math.round(9 * k), step = Math.max(2, Math.round(6 * k));
+    const lines = [0, 1, 2, 3].map((j) => `<line class="sil-text" x1="${x + pad}" y1="${top + j * step + 0.5}" x2="${x + w - (j === 3 ? short : pad)}" y2="${top + j * step + 0.5}"/>`).join('');
     shape(w, lines);
   }
   for (const [fw, fh] of type.frames) shape(Math.round((H * fw) / fh));
   if (!parts.length) { parts.push(`<rect class="sil" x="0.5" y="0.5" width="${H - 1}" height="${H - 1}" stroke-dasharray="3 3"/>`); x = H + GAP; }
   const W = x - GAP;
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${parts.join('')}</svg>`;
+  return { W, svg: `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${parts.join('')}</svg>` };
 }
 
 const types = document.getElementById('types');
@@ -323,7 +345,7 @@ for (const t of TYPES) {
   const a = document.createElement('a'); a.className = 'type'; a.href = `${PROJECT}?create=${t.id}`;
   const made = [t.emails && plural(t.emails, 'email'), t.frames.length && plural(t.frames.length, 'frame')].filter(Boolean).join(' · ') || 'folders only';
   a.innerHTML = `
-    <div class="shape">${typeShapes(t)}</div>
+    <div class="shape">${typeShapes(t).svg}</div>
     <div class="text">
       <div class="name"><span>${t.name}</span><span class="spacer"></span><span class="arrow">→</span></div>
       <span class="count">${made}</span>
@@ -331,6 +353,20 @@ for (const t of TYPES) {
     </div>`;
   types.appendChild(a);
 }
+// Where the widest type does not fit at 40 (five across under ~1360px, a phone), every type is drawn at the tallest
+// whole-pixel height the widest one fits, so the row keeps one height instead of each shrinking on its own.
+let shapeHeight = 40;
+function fitShapes() {
+  const room = Math.floor(Math.min(...[...types.querySelectorAll('.shape')].map((s) => s.getBoundingClientRect().width)));
+  if (!room) return;
+  let H = 40;
+  while (H > 16 && Math.max(...TYPES.map((t) => typeShapes(t, H).W)) > room) H -= 1;
+  if (H === shapeHeight) return;
+  shapeHeight = H;
+  types.querySelectorAll('.shape').forEach((s, i) => { s.innerHTML = typeShapes(TYPES[i], H).svg; });
+}
+fitShapes();
+try { new ResizeObserver(fitShapes).observe(types); } catch { /* the shapes keep their first drawing */ }
 
 // --- reading the project ----------------------------------------------------------------------------------------
 //
@@ -616,7 +652,8 @@ function drawMap(board) {
     if (!a || !b) return '';
     const p = anchor(a, b), q = anchor(b, a), mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
     const c1 = p.across ? `${mx} ${p.y}` : `${p.x} ${my}`, c2 = q.across ? `${mx} ${q.y}` : `${q.x} ${my}`;
-    const dash = l.kind === 'uses' ? ` stroke-dasharray="${4 * unit} ${3 * unit}"` : '';
+    // Each kind has its own stroke as well as its colour, as on the board: follows solid, uses dashed, made dash-dot.
+    const dash = l.kind === 'uses' ? ` stroke-dasharray="${4 * unit} ${3 * unit}"` : l.kind === 'made' ? ` stroke-dasharray="${10 * unit} ${3 * unit} ${2 * unit} ${3 * unit}"` : '';
     ends.push(`<rect class="end-${l.kind}" x="${q.x - e / 2}" y="${q.y - e / 2}" width="${e}" height="${e}"/>`);
     return `<path class="${l.kind}" d="M${p.x} ${p.y}C${c1} ${c2} ${q.x} ${q.y}"${dash}/>`;
   }).join('');
@@ -665,6 +702,10 @@ const STATES = {
   gone: ['ask', 'Folder not found'], 'view-only': ['ask', 'Open · view only'], ready: ['open', 'Open'],
 };
 
+// What the hub last wrote. A look that finds nothing new (every time this tab comes back) leaves the region alone,
+// so a screen reader does not read it out again and a focused button keeps its focus.
+let hubShown = null;
+
 function renderHub() {
   const { status, dir, data } = hub;
   const [dot, label] = STATES[status];
@@ -674,22 +715,23 @@ function renderHub() {
   const now = document.getElementById('hub-now');
   const folder = dir ? esc(dir.name) : '';
   const pitch = `<p class="lede">A project is a folder, and everything in it lands on one board: the emails from Template Studio, the frames from Freeform, the pictures they use, and lines showing what is made from what.</p>`;
+  let html = '';
 
-  if (status === 'loading') now.innerHTML = '';
+  if (status === 'loading') html = '';
   else if (status === 'unsupported') {
-    now.innerHTML = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
+    html = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
       <p class="note">Opening a folder needs Chrome or Edge on a computer.</p>
       <div class="actions"><a class="btn outline" href="${PROJECT}">Open the board</a></div>`;
   } else if (status === 'none') {
-    now.innerHTML = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
+    html = `<h1 class="hub-title">One folder for every tool.</h1>${pitch}
       <p class="note">Any folder works, including one Google Drive for desktop or Dropbox keeps in sync. When Chrome asks, choose “Edit files”.</p>
       <div class="actions"><a class="btn filled" href="${PROJECT}?create">Create a project</a><a class="btn outline" href="${PROJECT}">Open a folder</a></div>`;
   } else if (status === 'asking') {
-    now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
+    html = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
       <p class="note">Chrome wants one click before it opens this folder again. After that, the tools find it on their own.</p>
       <div class="actions"><button class="btn filled" type="button" data-act="allow">Reopen ${folder}</button><a class="btn ghost" href="${PROJECT}">Open a different folder</a></div>`;
   } else if (status === 'gone') {
-    now.innerHTML = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
+    html = `<p class="hub-eyebrow">Last open</p><h1 class="hub-title">${folder}</h1>
       <p class="note">This folder could not be read. It may have been moved, renamed or deleted. Open it again on the board, where it is now, or start another.</p>
       <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board</a><a class="btn outline" href="${PROJECT}?create">Create a project</a></div>`;
   } else {
@@ -701,13 +743,14 @@ function renderHub() {
       `<span class="mono">${folder}/</span>`,
     ].filter(Boolean).join('<span>·</span>');
     const stat = (kind, label, n) => `<a class="stat" href="${PROJECT}"><span class="label"><span class="sq ${kind}"></span>${label}</span><span class="value">${n}</span></a>`;
-    now.innerHTML = `<p class="hub-eyebrow">Open project</p><h1 class="hub-title">${esc(data.name)}</h1>
+    html = `<p class="hub-eyebrow">Open project</p><h1 class="hub-title">${esc(data.name)}</h1>
       <div class="hub-sub">${sub}</div>
       <div class="stats">${stat('email', 'Emails', data.emails.length)}${stat('frame', 'Frames', data.frames.length)}${stat('picture', 'Pictures', data.pictures.length)}</div>
       ${status === 'view-only' ? '<p class="note">Chrome opened this folder view-only. Allow editing so the tools can save into it.</p>' : ''}
       <div class="actions"><a class="btn filled" href="${PROJECT}">Open the board →</a>${status === 'view-only' ? '<button class="btn outline" type="button" data-act="allow">Allow editing</button>' : ''}
         <a class="btn ghost" href="template-studio/dist/index.html">Template Studio</a><a class="btn ghost" href="template-studio/dist/freeform.html">Freeform</a></div>`;
   }
+  if (html !== hubShown) { now.innerHTML = html; hubShown = html; }
 
   const open = status === 'ready' || status === 'view-only';
   drawMap(status === 'loading' ? null : open ? data : EXAMPLE);

@@ -170,7 +170,7 @@
     #tk-help .foot button:hover,#tk-gif .btns button:hover,#tk-ask .foot button:hover{background:${v('surface-row-hover', '#222222')}}
     #tk-ask .foot button.danger{border-color:${v('status-blocked', '#dc7a64')};color:${v('status-blocked', '#dc7a64')}}
     #tk-ask .foot button.primary{background:${v('action-primary', '#5a67a0')};border-color:${v('action-primary', '#5a67a0')};color:${v('action-primary-text', '#ffffff')}}
-    #tk-ask .foot button.primary:hover{background:${v('action-primary-hover', '#6b78b3')};border-color:${v('action-primary-hover', '#6b78b3')}}
+    #tk-ask .foot button.primary:hover{background:${v('action-primary-hover', '#4f5b93')};border-color:${v('action-primary-hover', '#4f5b93')}}
     #tk-help .foot button.danger:hover,#tk-ask .foot button.danger:hover{border-color:${v('status-blocked', '#dc7a64')};color:${v('status-blocked', '#dc7a64')};background:${v('status-blocked-soft', '#301b16')}}
     #tk-help button:focus-visible,#tk-gif button:focus-visible,#tk-ask button:focus-visible{outline:1px solid ${v('focus-ring', '#f2f2f0')};outline-offset:2px}
     #tk-gif .sheet{max-width:100%;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center}
@@ -178,7 +178,7 @@
     #tk-gif .meta{color:${v('text-muted', '#9a9c99')};font:12px/1.4 ${MONO};letter-spacing:0}
     #tk-gif .btns{display:flex;gap:8px}
     #tk-gif .btns button.primary{background:${v('action-primary', '#5a67a0')};border-color:${v('action-primary', '#5a67a0')};color:${v('action-primary-text', '#ffffff')}}
-    #tk-gif .btns button.primary:hover{background:${v('action-primary-hover', '#6b78b3')};border-color:${v('action-primary-hover', '#6b78b3')}}
+    #tk-gif .btns button.primary:hover{background:${v('action-primary-hover', '#4f5b93')};border-color:${v('action-primary-hover', '#4f5b93')}}
     #tk-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1001;box-sizing:border-box;width:max-content;max-width:min(480px,calc(100vw - 32px));min-height:32px;padding:9px 12px 5px;
       background:${v('text-primary', '#f2f2f0')};color:${v('surface-paper', '#151515')};font:13px/16px ${SANS};letter-spacing:.143px;
       opacity:0;transition:opacity 120ms linear;pointer-events:none}

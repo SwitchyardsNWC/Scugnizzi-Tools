@@ -15,52 +15,41 @@
   /* A section that opens on a sub-heading: the summary above is already its space. */
   details.panel>.body>h3:first-child{margin-top:var(--spacing-4)}
 
-  /* A shortcut chip inside a control. The chip is 18 in a 28 button: pulled up 4 so its box sits on the true middle
-     and the button keeps its height. In the drop zone's 12px line it is pulled in the same way, so the line stays put. */
+  /* A shortcut chip inside a control. A button is a flex box, so the chip in it is a block 18 tall in a 14 line: pulled
+     up 4 so its box sits on the true middle and the button keeps its 28 (without it, Shuffle grows to 30). In the drop
+     zone's 12px line the chip stays inline on the words' baseline, its line no taller than theirs, so the zone keeps the
+     70 of every other drop zone. */
   button kbd{margin-top:-4px}
-  .drop kbd{margin:-4px 0 -2px 4px;vertical-align:1px}
+  .drop kbd{margin-left:var(--spacing-4);line-height:14px}
 
-  /* Inks: a row per drum. The chip is the ink itself, square, on the control edge so black still shows on dark paper. */
+  /* Inks: a row per drum. The chip is the ink itself, square, on the control edge so black still shows on dark paper.
+     No trailing button, so the figure stands 12 in from the edge, where a remove glyph's centre would be. */
   .irow{padding-right:var(--spacing-12)}
   .irow .sw{flex:0 0 12px;width:12px;height:12px;border:var(--border-width) solid var(--border-control)}
-  /* The figure is mono 12 beside the sans 13 name, whose baseline sits 2 lower in the same line: lifted 2, its box still
-     22 tall, so the name and the figure read as one line. */
-  .irow .meta{padding-top:2px;padding-bottom:2px}
-  /* Focus rings the row in the 2px gutter between rows, clear of the selected row's ink edge and of its neighbour. */
-  .irow:focus-visible{outline-offset:1px}
 
-  /* The drum colours: nine squares to a row, each the size of the Custom well, so the eighteen make two full rows edge to
-     edge. The control edge keeps black and light grey visible on either paper. Chosen is the 2px ink ring; chosen and
-     focused adds a hairline ring outside it. */
+  /* The drum colours: nine squares to a row, each the size of the Custom well (28, not the shared 24), so the eighteen
+     make two full rows edge to edge. Chosen is the shared 2px ink ring. */
   .swatches{grid-template-columns:repeat(9,var(--swatch-size));justify-content:space-between}
-  .swatches>button{width:var(--swatch-size);height:var(--swatch-size);min-height:var(--swatch-size);border-color:var(--border-control)}
-  .swatches>button:focus-visible{outline-offset:3px}
-  .swatches>button.on:focus-visible{outline:var(--border-width-focus) solid var(--text-primary);outline-offset:1px;
-    box-shadow:0 0 0 4px var(--surface-paper),0 0 0 5px var(--focus-ring)}
+  .swatches>button{width:var(--swatch-size);height:var(--swatch-size);min-height:var(--swatch-size)}
   /* Pointing at a drum, or arrowing to it, names it at the end of its heading: a preview, kept apart from the readout
      beside the Custom well, which always names the chosen ink. */
   .drum-head{display:flex;align-items:baseline;gap:var(--spacing-8)}
   .drum-head>.hint{margin:0 0 0 auto;line-height:1;white-space:nowrap}   /* a 12 line inside the heading's, so it never grows it */
 
-  /* A colour's name and its hex beside its well: the pick never rests on the colour alone. The readout takes the label's
-     22 box (an 18 line, the mono hex kept inside it); its 12px words ride 1 higher in that line than the label's 13, so it
-     is lifted 1 (3 over 1 in place of 4 over 0) to share the label's baseline. The chip inside the well takes the control
-     edge, as the drums do, so black on the dark panel and white on the light one still show as a colour. */
-  .hex{font-family:var(--font-mono-detail);letter-spacing:0;line-height:1}
-  #inkName,#paperName{line-height:18px;padding-top:3px;padding-bottom:1px}
-  #inkColor::-webkit-color-swatch,#paper::-webkit-color-swatch{border-color:var(--border-control)}
-  #inkColor::-moz-color-swatch,#paper::-moz-color-swatch{border-color:var(--border-control)}
+  /* A colour's name and its hex beside its well: the pick never rests on the colour alone. The readout is the shared
+     row hint; the mono hex inside it takes a 12 line so its taller ascent doesn't grow the hint's line and drop the
+     words off the label's baseline. */
+  .hex{line-height:1}
 
-  /* Presets: two cards to a row, each name over two lines of its description, read from the top (a button centres its
-     contents, which floats a short card's text in a tall row). The whole sentence is the card's words for a screen reader
-     and its tooltip. The name keeps 4 clear of the chosen mark (8 in, 6 wide: 18); the description runs under the mark to
-     the card's own 10. A saved card's name keeps clear of its delete target (24, 4 in) and of the chosen mark, which sits
-     4 to the left of it on the ×'s centre line, since the × holds the corner (32 + 6 + 4 = 42). */
-  .presets>button{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding-right:18px}
-  .presets>button small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;margin-right:-8px}
+  /* Presets: two cards to a row, each name over its whole description, read from the top. The name keeps 4 clear of the
+     chosen mark (8 in, 6 wide: 18; the shared 20 wraps "Pink & blue poster"); the description runs under the mark to the
+     card's own 10. A saved card's name keeps clear of its delete target (24, the icon size, 4 in) and of the chosen mark,
+     which stays on a saved card, 4 to the left of the × on its centre line, since the × holds the corner (32 + 6 + 4). */
+  .presets>button{padding-right:18px}
+  .presets>button small{margin-right:-8px}
   .presets>button.saved{padding-right:42px}
   .presets>button.saved small{margin-right:-32px}
-  .presets>button .x{top:4px;right:4px;width:24px;height:24px}
+  .presets>button .x{width:24px;height:24px}
   .presets>button.saved.on::before{display:block;top:13px;right:32px}
   #presets + .row{margin-top:var(--spacing-12)}
   #presets ~ .btn-row{margin-top:var(--spacing-16)}
@@ -79,9 +68,10 @@
   /* The bar over the stage: the figures give way before the views and the zoom do. */
   #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
 
-  /* The recipe: its first line 5 down, on the baseline of the first button's label, and only whole lines in view, so
-     none is cut through: seven beside four actions (5 + 7 × 18 = 131, under their 136), nine beside five (167, under 172). */
-  pre#recipe{padding-top:5px;max-height:131px}
+  /* The recipe: its first line 5 down (shared), on the baseline of the first button's label, and only whole lines in
+     view, so none is cut through: seven beside four actions (5 + 7 × 18 = 131, under their 136), nine beside five (167,
+     under 172). */
+  pre#recipe{max-height:131px}
   @media (min-width:901px){
     .footer:has(#backToFreeform:not([hidden])) pre#recipe,.footer:has(#saveProject:not([hidden])) pre#recipe{max-height:167px}
   }
@@ -91,11 +81,14 @@
   @media (max-width:900px){
     .presets{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
     .swatches{grid-template-columns:repeat(auto-fill,var(--swatch-size));justify-content:start}
-    /* The recipe sits under the actions here, not beside them: no baseline to meet, so no offset; still whole lines. */
-    pre#recipe{padding-top:0;max-height:126px}
+    /* The recipe sits under the actions here (the shared layer drops its offset): still whole lines, seven of them. */
+    pre#recipe{max-height:126px}
   }
+  /* A phone: the figures take a line of their own, and the views and the zoom wrap under them from the left, so a zoom
+     pushed to a third line never sits under a right-aligned segment. */
   @media (max-width:600px){
     .topbar{flex-wrap:wrap;row-gap:var(--spacing-8);padding-top:var(--spacing-8);padding-bottom:var(--spacing-8)}
+    .topbar .spacer{display:none}
     #meta{flex:1 0 100%}
   }
 </style>
@@ -314,19 +307,38 @@ function render() {
   if (state.view === 'composite') {
     setSize(w, h); ctx.putImageData(composite(covs), 0, 0);
   } else if (state.view === 'separations') {
-    const gap = 12, W = w * state.inks.length + gap * (state.inks.length - 1);
-    setSize(W, h + 28); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, W, h + 28);
+    // Each separation is named under it as the ink list names it: a 12 chip on the control edge and 12px secondary
+    // words in a 28 band, sized for the scale the canvas is shown at, so they read at 12 however far Fit shrinks it.
+    const n = state.inks.length, gap = 12, W = w * n + gap * (n - 1);
+    const s = shownScale(W, h + Math.round(28 / shownScale(W, h + 28))), u = v => Math.max(1, Math.round(v / s));
+    setSize(W, h + u(28)); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const edge = cssVar('--border-control'), words = cssVar('--text-secondary'), mid = h + u(14);
+    ctx.font = `${u(12)}px ${getComputedStyle(document.body).fontFamily}`; ctx.textBaseline = 'middle';
     state.inks.forEach((ink, k) => {
       const x = k * (w + gap); ctx.putImageData(separationImage(covs[k]), x, 0);
-      ctx.fillStyle = ink.color; ctx.fillRect(x, h + 8, 12, 12);
-      ctx.fillStyle = '#cfcfcc'; ctx.font = '12px -apple-system,Helvetica,Arial,sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(`${k + 1} · ${inkName(ink.color)}`, x + 18, h + 14);
+      ctx.fillStyle = edge; ctx.fillRect(x, mid - u(6), u(12), u(12));
+      ctx.fillStyle = ink.color; ctx.fillRect(x + u(1), mid - u(6) + u(1), u(12) - 2 * u(1), u(12) - 2 * u(1));
+      ctx.fillStyle = words; ctx.fillText(`${k + 1} · ${inkName(ink.color)}`, x + u(20), mid, Math.max(1, w - u(20)));
     });
   } else {
-    const gap = 12; setSize(w * 2 + gap, h); ctx.fillStyle = '#0f0f10'; ctx.fillRect(0, 0, w * 2 + gap, h);
+    const gap = 12; setSize(w * 2 + gap, h); ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(srcCanvas, 0, 0); ctx.putImageData(composite(covs), w + gap, 0);
   }
   updateMeta(Math.round(performance.now() - t0));
 }
+// The views that lay pictures side by side leave their gutters clear, so the stage shows through in either theme. Their
+// words take the theme's colours and the scale they are shown at, so those views draw again when either changes.
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function shownScale(W, H) {
+  if (state.zoom !== 'fit') return parseFloat(state.zoom) || 1;
+  const st = $('#stage'), cs = getComputedStyle(st);
+  const aw = st.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = st.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  return Math.max(0.05, Math.min(1, aw / W, ah / H));
+}
+function redrawView() { if (state.view === 'separations' && !pending) pending = requestAnimationFrame(render); }
+window.addEventListener('resize', redrawView);
+if (window.ScugnizziTheme) ScugnizziTheme.onChange(redrawView);
+if (document.fonts) document.fonts.ready.then(redrawView);
 function setSize(w, h) { if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; applyZoom(); } }
 function applyZoom() {
   const z = state.zoom, stage = $('#stage');
@@ -417,7 +429,7 @@ function applyLook(apply, key) {
 function renderPresets() {
   presetsEl.innerHTML = '';
   PRESETS.forEach((p, i) => {
-    const b = document.createElement('button'); b.innerHTML = `${p.name}<small title="${escHtml(p.desc)}">${p.desc}</small>`;
+    const b = document.createElement('button'); b.innerHTML = `${p.name}<small>${p.desc}</small>`;
     b.classList.toggle('on', activePreset === `b${i}`); b.setAttribute('aria-pressed', String(activePreset === `b${i}`));
     b.addEventListener('click', () => applyLook(p.apply, `b${i}`));
     presetsEl.appendChild(b);
@@ -426,7 +438,7 @@ function renderPresets() {
     const b = document.createElement('button'); b.className = 'saved'; b.classList.toggle('on', activePreset === p.id); b.setAttribute('aria-pressed', String(activePreset === p.id));
     // The × is a target for the pointer; the keyboard deletes with Delete on the card (a button can't hold a button).
     const about = `saved to the project · ${p.inks.map(i => escHtml(inkName(i.color || ''))).join(' + ')}`;
-    b.innerHTML = `${escHtml(p.name)}<small title="${about}">${about}</small><span class="x" aria-hidden="true" title="Delete this preset">×</span>`;
+    b.innerHTML = `${escHtml(p.name)}<small>${about}</small><span class="x" aria-hidden="true" title="Delete this preset">×</span>`;
     b.setAttribute('aria-keyshortcuts', 'Delete');
     b.addEventListener('click', e => {
       if (e.target.closest('.x')) { deletePreset(p, b, false); return; }
@@ -550,7 +562,7 @@ $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('butto
 function syncView() { for (const b of $('#viewSeg').children) { b.classList.toggle('on', b.dataset.v === state.view); b.setAttribute('aria-pressed', String(b.dataset.v === state.view)); } }
 $('#seed').addEventListener('change', e => { state.seed = Math.max(1, parseInt(e.target.value) || 1); e.target.value = state.seed; invalidate(); });
 $('#reshuffle').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = state.seed; invalidate(); });
-$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); });
+$('#zoomSel').addEventListener('change', e => { state.zoom = e.target.value; applyZoom(); redrawView(); });
 $('#drop').addEventListener('click', () => $('#file').click());
 $('#drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#file').click(); } });
 $('#file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
@@ -609,7 +621,7 @@ const handoff = (() => {
 
 // ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
 const ZOOMS = ['fit', '0.5', '1', '2'];
-function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); redrawView(); }
 // A hand-off starts from the settings Freeform sent, never from the last session's. ToolKit restores saved
 // state once the document has loaded, which is after the hand-off below has been applied, so a session's
 // saved state would quietly overwrite it: a screen tuned to 2 px in Freeform came back 4.5 px here.
