@@ -49,7 +49,6 @@
   /* A move or a delete that can't happen stays out of the way: no hover ink, no brick, nothing that looks pressable. */
   .msg .head button:disabled,.msg .head button:disabled:hover,.msg .head button:disabled:active{color:var(--action-disabled-text);background:transparent;border-color:transparent}
   /* Delete says so on hover the way Reset does, in brick in its glyph, its edge and its ground, not in a tint alone. */
-  .msg .head button.icon.danger:hover:not(:disabled){color:var(--status-blocked);border-color:var(--status-blocked);background:var(--status-blocked-soft)}
 
   /* The mini board: square like the board itself, its colours from the board's own settings (inline, from the script). */
   .msg .gridwrap{position:relative;overflow:hidden;padding:var(--spacing-8);border:var(--border-width) solid var(--border-card);border-radius:0;
@@ -73,40 +72,28 @@
   /* Play and Pause swap in place: the button keeps one width so the words beside it don't move. */
   #playPause{flex:none;min-width:72px}
 
-  /* --- Presets: looks described in phrases, one card to a line (.presets.wide). --------------------------------------- */
-  /* The cards are a list and Reset is a button: a step more than the cards' own 8 keeps the two apart. */
-  #presets ~ .btn-row{margin-top:var(--spacing-12)}
-  /* Reset is a quiet escape hatch: its own width, never the widest button in the tool. */
-  #resetTool{flex:none}
+  /* --- Presets: tools.css's cards, one to a line (.presets.wide). 12 under the cards, as in the other tools; Reset
+     stands 16 clear of the words above it. ------------------------------------------------------------------------- */
 
   /* --- Motion: four flip orders need the panel's whole width (.seg.fit: each segment takes its words' width). ------- */
   .stack>.seg{flex:none}
 
   /* A key named in a hint: tools.css lets it inherit the 16px line, and the mono's own ascent then pushes that line to 17.
-     At 12 it sits inside the line, so a line holding one keeps the pitch of the others (measured: 64 not 66 tall). */
-  .hint kbd{line-height:12px}
+     At 12 it sits inside the line, so a line holding one keeps the pitch of the others (measured: the Messages hint is
+     32 tall, 34 with inherit). */
 
-  /* --- the bar over the stage, the stage, the export bar ------------------------------------------------------------ */
-  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
-  .warn{color:var(--status-risk)}
-  /* Fit shrinks the board into view; any other zoom sizes the canvas inline and the stage scrolls. */
-  .stage.fit{overflow:hidden}
-  .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
-  .stage:not(.fit){display:block}
-  .stage:not(.fit) canvas{display:block;margin:0 auto}
-  /* The buttons say what they are doing while a GIF renders ("Frame 12 / 56…"): one width, so the recipe never reflows. */
-  .actions{width:184px;min-width:0}
-  /* The recipe stops on a whole line: nine lines of 18 sit inside the five buttons beside it (172), so the bar never grows. */
-  .footer pre#recipe{max-height:167px} /* 5 + 9 lines of 18: whole lines, never a sliver */
+  /* --- the bar over the stage, the stage ------------------------------------------------------------------------------ */
+  /* On a narrow bar the figures give way (their whole line is on hover); the warning after them never does. */
+  #meta{display:flex;align-items:baseline;gap:var(--spacing-12);min-width:0}
+  #meta>.figs{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .warn{flex:none;color:var(--status-risk)}
+  .warn>.sq{margin-right:var(--spacing-4)}
   /* Words for a screen reader alone: what an export or a copy did, said once. */
   .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
   @media (max-width:900px){
-    /* Stacked over the stage the panel runs the window's width: the looks sit side by side. */
+    /* Stacked over the stage the panel runs the window's width: the presets sit side by side, as Riso's do. */
     .presets.wide{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
-    .actions{width:auto}
-    /* Stacked under the buttons, six whole lines, then it scrolls. */
-    .footer pre#recipe{max-height:113px}
   }
   @media (max-width:600px){
     .topbar{flex-wrap:wrap;row-gap:var(--spacing-8);padding-top:var(--spacing-8);padding-bottom:var(--spacing-8)}
@@ -129,7 +116,7 @@
         <div class="addrow"><button id="addMsg">+ Message</button><button id="flipNext">Flip to next</button><button id="reflip" title="Blank the board and flip the current message in again">Re-flip</button></div>
         <div id="cycleSliders"></div>
         <div class="row"><button id="playPause">Play</button><span class="hint" id="cycleState"></span></div>
-        <p class="hint">The message marked on the board is the one showing. Editing it flips the changed letters live; cycling pauses while you type. <kbd>Space</kbd> flips to the next message, <kbd>1</kbd>–<kbd>9</kbd> jump to one.</p>
+        <p class="hint">Typing flips the board live and holds the cycle. <kbd>Space</kbd> flips to the next message, <kbd>1</kbd>–<kbd>9</kbd> to one.</p>
       </div>
     </details>
 
@@ -137,8 +124,9 @@
       <summary><span class="t">Presets</span><span class="v" id="hint-looks"></span></summary>
       <div class="body">
         <div class="presets wide" id="presets" role="group" aria-label="Presets"></div>
+        <p class="hint">A preset replaces the messages, board, type, motion and export settings.</p>
         <div class="btn-row"><button id="resetTool" class="danger">Reset to defaults</button></div>
-        <p class="hint">A preset replaces the messages, board, type, motion and export settings. Reset clears everything saved for this tool.</p>
+        <p class="hint">Reset clears everything this tool saved in this browser.</p>
       </div>
     </details>
 
@@ -214,7 +202,7 @@
         <button id="copyImg">Copy image</button>
         <button id="copyRecipe">Copy recipe</button>
       </div>
-      <pre id="recipe"></pre>
+      <pre id="recipe" class="recipe" tabindex="0" aria-label="Recipe"></pre>
     </div>
   </main>
 </div>
@@ -273,7 +261,8 @@ const $ = s => document.querySelector(s);
 const getPath = p => p.split('.').reduce((o, k) => o[k], state);
 const setPath = (p, v) => { const ks = p.split('.'); let o = state; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; };
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const fmt = { px: v => Math.round(v) + ' px', pct: v => Math.round(v * 100) + '%', ms: v => Math.round(v) + ' ms', int: v => String(Math.round(v)), x: v => (+v).toFixed(2) + '×', cs: v => (v * 10) + ' ms' };
+// px keeps a half step: radius and letter spacing move by 0.5, and "3 px" for 2.5 would misreport the board.
+const fmt = { px: v => +(+v).toFixed(1) + ' px', pct: v => Math.round(v * 100) + '%', ms: v => Math.round(v) + ' ms', int: v => String(Math.round(v)), x: v => (+v).toFixed(2) + '×', cs: v => (v * 10) + ' ms' };
 const fontCSS = () => FONTS[state.type.font] || FONTS.condensed;
 const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const shade = (hex, f) => { const [r, g, b] = hexToRgb(hex); return `rgb(${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)})`; };
@@ -450,7 +439,13 @@ function applyZoom() {
   if (z === 'fit') { stage.classList.add('fit'); canvas.style.width = ''; canvas.style.height = ''; }
   else { stage.classList.remove('fit'); canvas.style.width = canvas.width * parseFloat(z) + 'px'; canvas.style.height = canvas.height * parseFloat(z) + 'px'; }
 }
-function updateMeta() { const G = geom(), B = state.board; $('#meta').innerHTML = `${B.rows} × ${B.cols} modules &nbsp;·&nbsp; ${G.w} × ${G.h} px` + (G.w * G.h > 4e6 ? ' &nbsp;<span class="warn">too large for GIF</span>' : ''); }
+// The stage bar, in the suite's order: the output in px, then the board's own figure. The board draws every frame it
+// moves, so there is no one render time to give.
+function updateMeta() {
+  const G = geom(), B = state.board, sep = ' · ', figs = `${G.w} × ${G.h} px${sep}${B.rows} × ${B.cols} modules`, warn = G.w * G.h > 4e6 ? 'too large for GIF' : '';
+  $('#meta').innerHTML = `<span class="figs">${figs}</span>` + (warn ? `<span class="warn"><span class="sq"></span>${warn}</span>` : '');
+  $('#meta').title = figs + (warn ? sep + warn : '');
+}
 function cycleMs() {
   // Longest module journey for the current message: stagger delay plus steps × step time.
   ensureModules(); const M = state.motion, B = state.board, A = alphabet().length, t = targetsFor(state.messages[state.active] || '');
@@ -462,6 +457,8 @@ function cycleMs() {
   }
   return worst + 300;
 }
+// The flip orders in the words of their segments, for the Motion state and the recipe.
+const ORDER = { ltr: 'left→right', row: 'by row', random: 'random', all: 'all at once' };
 function animationMs() { const E = state.export; return E.mode === 'cycle' ? state.messages.length * (cycleMs() + E.hold * 1000) : cycleMs(); }
 function updateHints() {
   // A section's state can run past its header: the whole of it is in the title.
@@ -470,7 +467,7 @@ function updateHints() {
   set('hint-messages', `${state.messages.length} · showing ${state.active + 1}`);
   set('hint-board', `${B.rows} × ${B.cols}`);
   set('hint-type', `${fontCSS()[0]} · ${Math.round(T.size * 100)}%`);
-  set('hint-motion', `${M.stepMs} ms · ${{ ltr: 'left→right', row: 'by row', random: 'random', all: 'all at once' }[M.stagger]}`);
+  set('hint-motion', `${M.stepMs} ms · ${ORDER[M.stagger]}`);
   set('hint-export', `${E.frames} frames · ${E.delay * 10} ms`);
   set('hint-random', `seed ${state.seed}`);
   const need = Math.ceil(animationMs() / (E.delay * 10)) + 2;
@@ -488,11 +485,13 @@ function syncPresets() {
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
   });
 }
+// The recipe in the panel's words: the flip order as its segment names it, and the blank flap said rather than quoted,
+// so the line never breaks on a lone opening quote.
 function updateRecipe() {
-  const B = state.board, T = state.type, M = state.motion, E = state.export;
+  const B = state.board, T = state.type, M = state.motion, E = state.export, A = M.alphabet;
   $('#recipe').textContent = [
     `Split-flap board, ${B.rows} rows × ${B.cols} columns, modules ${B.mw} × ${B.mh} px with ${B.gap} px gaps${B.header.trim() ? `, header "${B.header}"` : ''}${B.rowNumbers ? ', row numbers' : ''}. Board ${B.boardColor}, flaps ${B.flapColor}, letters ${B.letterColor}${B.hinge ? ', hinge line' : ''}.`,
-    `Type: ${fontCSS()[0]} at ${Math.round(T.size * 100)}% of module height, letter spacing ${T.spacing} px. Motion: ${M.stepMs} ms per flap, stagger ${M.stagger} at ${M.staggerMs} ms, clatter ${Math.round(M.clatter * 100)}%, bounce ${Math.round(M.bounce * 100)}%${M.blankFirst ? ', blank between messages' : ''}. Alphabet "${M.alphabet}".`,
+    `Type: ${fontCSS()[0]} at ${Math.round(T.size * 100)}% of module height, letter spacing ${T.spacing} px. Motion: ${M.stepMs} ms per flap, flip order ${ORDER[M.stagger]}${M.stagger === 'all' ? '' : `, stagger ${M.staggerMs} ms`}, clatter ${Math.round(M.clatter * 100)}%, bounce ${Math.round(M.bounce * 100)}%${M.blankFirst ? ', blank between messages' : ''}. Alphabet: ${A.startsWith(' ') ? `blank, then "${A.slice(1)}"` : `"${A}"`}.`,
     `${state.messages.length} message${state.messages.length === 1 ? '' : 's'}, showing ${state.active + 1}. GIF ${E.frames} frames at ${E.delay * 10} ms. Seed ${state.seed}.`,
   ].join('\n');
 }
@@ -517,7 +516,7 @@ addSlider(Bs, { path: 'board.radius', label: 'Corner radius', min: 0, max: 12, s
 const Ts = $('#typeSliders');
 addSlider(Ts, { path: 'type.size', label: 'Size', min: 0.3, max: 1.1, step: 0.01, fmt: fmt.pct });
 addSlider(Ts, { path: 'type.spacing', label: 'Letter spacing', min: -4, max: 8, step: 0.5, fmt: fmt.px });
-addSlider(Ts, { path: 'type.baseline', label: 'Baseline nudge', min: -0.15, max: 0.15, step: 0.005, fmt: v => Math.round(v * 100) + '%' });
+addSlider(Ts, { path: 'type.baseline', label: 'Baseline nudge', min: -0.15, max: 0.15, step: 0.005, fmt: v => +(v * 100).toFixed(1) + '%' });
 const Ms = $('#motionSliders');
 addSlider(Ms, { path: 'motion.stepMs', label: 'Time per flap', min: 15, max: 250, step: 1, fmt: fmt.ms });
 addSlider(Ms, { path: 'motion.staggerMs', label: 'Stagger', min: 0, max: 120, step: 1, fmt: fmt.ms });
@@ -652,7 +651,7 @@ function renderMessages() {
     const el = document.createElement('div'); el.className = 'msg' + (on ? ' on' : ''); el.setAttribute('role', 'listitem');
     el.innerHTML = `<div class="head"><span class="n" data-a="name" tabindex="-1">Message ${k}</span><span class="over" hidden></span>${on
         ? '<span class="live" data-a="live" tabindex="-1">On the board</span>'
-        : `<button class="small" data-a="show" title="Flip this message onto the board" aria-label="Show message ${k}">Show</button>`}<button class="icon" data-a="up" title="Move up" aria-label="Move message ${k} up"${i === 0 ? ' disabled' : ''}>↑</button><button class="icon" data-a="down" title="Move down" aria-label="Move message ${k} down"${i === last ? ' disabled' : ''}>↓</button><button class="icon danger" data-a="del" title="Delete" aria-label="Delete message ${k}"${last === 0 ? ' disabled' : ''}>×</button></div>
+        : `<button class="small" data-a="show" title="Flip this message onto the board" aria-label="Show message ${k}">Show</button>`}<button class="icon" data-a="up" title="Move message ${k} up" aria-label="Move message ${k} up"${i === 0 ? ' disabled' : ''}>↑</button><button class="icon" data-a="down" title="Move message ${k} down" aria-label="Move message ${k} down"${i === last ? ' disabled' : ''}>↓</button><button class="icon danger" data-a="del" title="Delete message ${k}" aria-label="Delete message ${k}"${last === 0 ? ' disabled' : ''}>×</button></div>
       <div class="gridwrap"><div class="grid"></div><textarea rows="${Math.min(8, Math.max(2, state.board.rows))}" spellcheck="false" placeholder="One line per row" aria-label="Message ${k}${on ? ', on the board' : ''}"></textarea></div>`;
     const ta = el.querySelector('textarea'); ta.value = text;
     // The grid is painted behind the text, so it has to track the textarea's own scrolling.
@@ -715,9 +714,9 @@ $('#download').addEventListener('click', () => {
 });
 $('#copyImg').addEventListener('click', async () => {
   settleAll(); draw();
-  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash($('#copyImg'), 'Copied!'); } catch (e) { flash($('#copyImg'), 'Clipboard blocked'); }
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash($('#copyImg'), 'Copied'); } catch (e) { flash($('#copyImg'), 'Clipboard blocked'); }
 });
-$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
+$('#copyRecipe').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); } });
 
 // GIF encoder, lifted from Ink bleed (median-cut palette + LZW).
 function medianCutPalette(hist, maxColors) {
@@ -821,6 +820,7 @@ $('#previewGif').addEventListener('click', async () => { const g = await makeGif
 // ---------- Shortcuts, undo/redo, local storage (shared kit) ----------
 const ZOOMS = ['fit', '0.5', '1', '2'];
 function setZoom(z) { state.zoom = z; $('#zoomSel').value = z; applyZoom(); }
+ToolKit.fitReadout($('#zoomSel'), canvas);
 ToolKit.init({
   tool: 'split-flap', version: 1,
   getState: () => JSON.parse(JSON.stringify(state)),
