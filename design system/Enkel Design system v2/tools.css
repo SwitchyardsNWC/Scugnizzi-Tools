@@ -72,8 +72,9 @@ details.panel>summary .v{position:relative;top:-1px;max-width:60%;overflow:hidde
 details.panel>.body{padding:0 0 var(--spacing-16)}
 /* A plain section without the disclosure, for panels that never collapse. */
 .pane{padding:var(--spacing-16) var(--panel-pad);border-bottom:var(--border-width) solid var(--border-muted)}
-.pane-head{display:flex;align-items:center;gap:var(--spacing-8);margin:0 0 var(--spacing-12);
-  font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
+/* Name, count and state on one baseline; a 14 line keeps what follows on whole pixels. */
+.pane-head{display:flex;align-items:baseline;gap:var(--spacing-8);margin:0 0 var(--spacing-12);
+  font-size:var(--text-micro);line-height:14px;letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
 .pane-head .t{flex:1;min-width:0}
 /* A bare count is a figure, in mono; a state in words reads as a section's .v does: sans, 12, secondary. */
 .pane-head .n{font-family:var(--font-mono);letter-spacing:0;text-transform:none;font-size:var(--text-caption)}
@@ -92,6 +93,9 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 .row>.hint{margin:0;padding-top:2px}
 .row>.mono,.row>.hex,.row>span.mono,.row>span.hex{padding-top:0}
 .hex{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary);white-space:nowrap}
+/* A colour row is label, well, readout: the well is the control and stays put, the readout after it (hex first, then
+   the name) runs on and ends in an ellipsis when it is long. */
+.row>.hex{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* A note under a row's control, lined up with the control rather than the label. */
 .row-note{margin:calc(var(--spacing-4) * -1) 0 var(--spacing-8) calc(var(--row-label-width) + var(--spacing-8));font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
 .stack>.hint{margin-top:0}
@@ -108,6 +112,8 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 .hint code,.hint kbd{font-family:var(--font-mono-detail);font-size:11px;letter-spacing:0}
 /* A shortcut chip inside a line of words or a button keeps that line's pitch: inline, no extra height. */
 .hint kbd,button kbd,.drop kbd{display:inline;min-width:0;padding:0 4px;line-height:inherit;vertical-align:baseline}
+/* In a hint the mono's own ascent would grow the 16 line by a pixel; a 12 line keeps it 16 (the chip still draws 16). */
+.hint kbd,.hint code,.hint .mono{line-height:12px}
 
 /* --- buttons ------------------------------------------------------------------------------------------------------------- */
 /* 28 tall from padding, never centring: 1 + 8 / 14 / 4 + 1. An outline on the control edge; ink when it matters. */
@@ -132,6 +138,9 @@ button.danger:hover,.button.danger:hover{border-color:var(--status-blocked);colo
 button.icon,.button.icon{flex:none;width:var(--control-height-xs);min-width:var(--control-height-xs);min-height:var(--control-height-xs);height:var(--control-height-xs);padding:0;
   border-color:transparent;color:var(--text-muted);font-family:var(--font-helveticaneue);font-size:var(--text-meta);line-height:1}
 button.icon:hover,.button.icon:hover{border-color:var(--border-control);color:var(--text-primary)}
+/* A × that deletes: muted at rest, since a column of them would shout, and brick when you point at it. Its title and
+   label name what it deletes ("Delete layer Hello"). */
+button.icon.danger:hover:not(:disabled),.button.icon.danger:hover{border-color:var(--status-blocked);color:var(--status-blocked);background:var(--status-blocked-soft)}
 button.small,.button.small{min-height:var(--control-height-xs);padding:var(--control-pad-xs);font-size:var(--text-caption);line-height:var(--control-line-sm)}
 button:disabled,button[aria-disabled="true"],.button[aria-disabled="true"]{color:var(--action-disabled-text);border-color:var(--border-muted);background:transparent;cursor:default}
 button.primary:disabled,button.primary[aria-disabled="true"]{background:var(--action-disabled-surface);border-color:var(--action-disabled-surface);color:var(--action-disabled-text)}
@@ -236,6 +245,9 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 .presets>button .x{position:absolute;top:4px;right:4px;width:20px;height:20px;display:grid;place-items:center;color:var(--text-muted);font-size:var(--text-meta);line-height:1;border-radius:2px}
 .presets>button .x:hover{color:var(--status-blocked);background:var(--status-blocked-soft)}
 .presets>button.on.saved::before{display:none}
+/* 12 from the cards to what follows them; Reset to defaults stands 16 clear, at the end of the section. */
+.presets+*{margin-top:var(--spacing-12)}
+.presets~.btn-row{margin-top:var(--spacing-16)}
 
 /* --- lists you select from ----------------------------------------------------------------------------------------------- */
 /* Layers, inks, messages, modules. A row on the soft hairline; the selected one takes the selection surface and a 2px ink
@@ -266,13 +278,12 @@ button.drop{width:100%;white-space:normal;font:inherit;font-size:var(--text-capt
 
 /* --- the bar over the stage ---------------------------------------------------------------------------------------------- */
 /* Figures about the work in mono, its views on the right. */
-/* 40 = 1 + 38 + the 1px edge: the top pixel keeps a centred 28 or 24 on whole pixels. Mono figures drop 1px to the
-   label baseline of the Zoom select and segments beside them (measured in three tools). */
+/* 40 = 1 + 38 + the 1px edge: the top pixel keeps a centred 28 or 24 on whole pixels, and puts the mono figures on
+   the baseline of the Zoom label and select beside them (glyph bottoms measured at 4x in four tools). */
 .topbar{flex:none;display:flex;align-items:center;gap:var(--spacing-12);min-height:var(--tool-bar-height);padding:1px var(--spacing-16) 0;
   background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card);
   font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
 .topbar .spacer{flex:1}
-.topbar>span:not(.spacer){padding-top:1px}
 .topbar label{display:inline-flex;align-items:baseline;gap:var(--spacing-8);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
 .topbar button,.topbar select{font-family:var(--font-helveticaneue)}
 .topbar select{width:auto}
@@ -281,7 +292,13 @@ button.drop{width:100%;white-space:normal;font:inherit;font-size:var(--text-capt
 /* --- the stage ---------------------------------------------------------------------------------------------------------- */
 /* Sunken and flat. The work sits on it in a hairline, not a shadow, so its own edges and colours are what you judge.
    The hairline is the control edge (3:1), so white paper on the light stage and black paper on the dark one keep it. */
-.stage{flex:1;min-height:0;position:relative;overflow:auto;padding:var(--spacing-32);display:flex;align-items:center;justify-content:center;background:var(--surface-sunken)}
+.stage{flex:1;min-height:0;position:relative;overflow:auto;padding:var(--spacing-32);display:flex;align-items:safe center;justify-content:safe center;background:var(--surface-sunken)}
+/* Zoom. Fit (.fit) shrinks the work into view and never enlarges it; any other zoom sizes the canvas inline and the
+   stage scrolls. Safe centring: centred while the work is smaller than the stage, from the padding once it is larger,
+   so the scroll reaches every edge. The Zoom select names Fit's scale (ToolKit.fitReadout): "Fit · 71%". */
+.stage.fit{overflow:hidden}
+.stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
+.stage>canvas{flex:none}
 .stage canvas,.stage .work{box-shadow:0 0 0 var(--border-width) var(--border-control)}
 .stage.dropping>*,.stage.drag-over>*{pointer-events:none}
 .stage.dropping::after,.stage.drag-over::after{content:"Drop an image";position:absolute;inset:var(--spacing-12);display:flex;align-items:center;justify-content:center;pointer-events:none;
@@ -298,8 +315,9 @@ button.drop{width:100%;white-space:normal;font:inherit;font-size:var(--text-capt
 .actions>button{justify-content:flex-start;width:100%;min-width:0}
 .actions>button.primary,.actions>.wide{grid-column:1/-1}
 /* contain:size keeps a long recipe from stretching the bar: the actions set its height, the recipe scrolls. Its first
-   line sits on the first action's label (5 = the button's 1 + 8 top, less the line's 4 of leading). */
-pre.recipe,pre#recipe{align-self:stretch;contain:size;min-height:0;margin:0;padding-top:5px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
+   line sits on the first action's label (5 = the button's 1 + 8 top, less the line's 4 of leading). The clear 5 at the
+   foot ends the scrollport on a whole line: 100 - 5 - 5 = 90 = 5 lines of 18; four rows, 136 - 10 = 7 lines. */
+pre.recipe,pre#recipe{align-self:stretch;contain:size;min-height:0;margin:0;padding-top:5px;border-bottom:5px solid transparent;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
   font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:18px;letter-spacing:0}
 
 /* --- small parts --------------------------------------------------------------------------------------------------------- */
@@ -307,7 +325,7 @@ kbd{display:inline-block;min-width:18px;padding:2px 5px 0;font-family:var(--font
   color:var(--text-secondary);background:var(--surface-field);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
 .tag{display:inline-block;max-width:100%;min-height:18px;padding:1px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   color:var(--text-muted);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
-.hint .tag,p .tag{overflow:visible;vertical-align:baseline}
+.hint .tag,p .tag{overflow:visible;vertical-align:baseline;margin-top:-2px} /* 18 tall in a 16 line: it may stand proud, not push the line */
 .empty{color:var(--text-muted);font-size:var(--text-meta)}
 .sq{display:inline-block;flex:none;width:8px;height:8px;background:currentColor}
 
@@ -322,9 +340,9 @@ input[type=text]:focus-visible,input[type=number]:focus-visible,input[type=url]:
   .app{grid-template-columns:1fr;grid-template-rows:auto minmax(60vh,1fr);height:auto;min-height:calc(100vh - var(--tool-banner,0px))}
   aside{max-height:50vh;border-right:0;border-bottom:var(--border-width) solid var(--border-hairline)}
   .footer{grid-template-columns:1fr}
-  .actions{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));min-height:0}
+  .actions{grid-template-columns:repeat(auto-fit,minmax(var(--export-col),1fr));min-height:0}
   .actions>button.primary,.actions>.wide{grid-column:auto}
   .stage{flex:none;height:60vh}
-  pre.recipe,pre#recipe{contain:none;max-height:95px;padding-top:0} /* 5 lines of 18, plus 5 */
+  pre.recipe,pre#recipe{contain:none;max-height:95px;padding-top:0} /* less the clear 5 at the foot: 5 lines of 18 */
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}

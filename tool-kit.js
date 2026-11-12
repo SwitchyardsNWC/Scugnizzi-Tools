@@ -55,7 +55,7 @@
   // Asks on the system's own sheet rather than the browser's grey box, then clears. Returns a promise of whether it did.
   async function reset() {
     if (!cfg) return false;
-    if (!(await ask({ title: 'Reset this tool?', body: 'Every setting goes back to its default, and the work saved in this browser is cleared.', ok: 'Reset tool', danger: true }))) return false;
+    if (!(await ask({ title: 'Reset this tool?', body: 'Every setting goes back to its default, and the work saved in this browser is cleared.', ok: 'Reset to defaults', danger: true }))) return false;
     try { for (const k of Object.keys(localStorage)) if (k.startsWith(`scuggnizzi.${cfg.tool}.`)) localStorage.removeItem(k); } catch (e) {}
     if (cfg.onReset) cfg.onReset();
     if (cfg.defaults && cfg.setState) { const s = JSON.stringify(cfg.defaults()); hist = [s]; idx = 0; apply(s); }
@@ -215,7 +215,7 @@
     let h = `<div class="sheet"><h2>Shortcuts</h2><p class="sub">${title} · the same keys work in every Scugnizzi tool.</p>`;
     for (const [g, rows] of groups) { h += `<h3>${g}</h3>`; for (const [c, l] of rows) h += `<div class="row"><span>${l}</span><kbd>${pretty(c)}</kbd></div>`; }
     h += `<div class="foot"><span>${cfg && cfg.getState ? 'Work is kept in this browser and comes back on reload.' : 'Nothing to save on this page.'}</span>`;
-    if (cfg && cfg.getState) h += `<button class="danger" data-a="reset">Reset tool</button>`;
+    if (cfg && cfg.getState) h += `<button class="danger" data-a="reset">Reset to defaults</button>`;
     h += `<button data-a="close">Close</button></div></div>`;
     helpEl.innerHTML = h;
     helpEl.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => b.dataset.a === 'reset' ? (toggleHelp(false), reset()) : toggleHelp(false)));
@@ -254,7 +254,7 @@
     }
     register('?', 'Show shortcuts', () => toggleHelp(), { group: 'Everywhere' });
     register('esc', 'Close, or leave the field', () => { if (gifEl && !gifEl.hidden) hideGif(); else if (helpEl && !helpEl.hidden) toggleHelp(false); else if (document.activeElement) document.activeElement.blur(); }, { group: 'Everywhere', always: true });
-    if (cfg.getState) register('mod+alt+r', 'Reset tool', reset, { group: 'Everywhere' });
+    if (cfg.getState) register('mod+alt+r', 'Reset to defaults', reset, { group: 'Everywhere' });
     const go = () => {
       ensureUI();
       if (cfg.getState) {
@@ -265,5 +265,22 @@
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
   }
-  window.ToolKit = { init, commit, flush, undo, redo, reset, ask, register, saveAux, loadAux, help: toggleHelp, toast, showGif, hideGif, get canUndo() { return idx > 0; }, get canRedo() { return idx < hist.length - 1; } };
+  // Zoom: the Fit option names the scale Fit shows ("Fit · 71%"), as Image effects does, so 100% always means one canvas
+  // pixel to one CSS pixel and you can see how far Fit has shrunk the work. Read off the canvas while the stage is
+  // fitted; kept when you zoom away, so the menu says what Fit would give.
+  function fitReadout(select, canvas) {
+    const opt = select && select.querySelector('option[value="fit"]'), stage = canvas && canvas.closest('.stage');
+    if (!opt || !stage) return;
+    const read = () => {
+      if (!stage.classList.contains('fit') || !canvas.width) return;
+      const w = canvas.getBoundingClientRect().width;
+      if (w) opt.textContent = `Fit · ${Math.round((w / canvas.width) * 100)}%`;
+    };
+    new ResizeObserver(read).observe(canvas);
+    new MutationObserver(read).observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
+    new MutationObserver(read).observe(stage, { attributes: true, attributeFilter: ['class'] });
+    read();
+  }
+
+  window.ToolKit = { init, fitReadout, commit, flush, undo, redo, reset, ask, register, saveAux, loadAux, help: toggleHelp, toast, showGif, hideGif, get canUndo() { return idx > 0; }, get canRedo() { return idx < hist.length - 1; } };
 })();
