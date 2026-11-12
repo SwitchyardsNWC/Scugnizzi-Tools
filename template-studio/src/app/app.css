@@ -172,10 +172,15 @@ body {
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
 
-.app { display: flex; flex-direction: column; height: 100%; }
+/* The Board and the library load this file too, for the trash and the Canvas menu, and their own markup carries some
+   of the same class names: a note's .empty body, a link card's .link glyph, a .view-only status dot, a library tag
+   whose class is "app". So the rules for the editor's and Freeform's words reach only inside those two roots, which
+   render straight into #app. :where() adds no weight: each rule keeps the specificity of the bare class it was. */
+:where(#app) > .app { display: flex; flex-direction: column; height: 100%; }
 .grow { flex: 1; }
 .muted { color: var(--faint); font-weight: 400; font-size: 11px; }
-.empty, .hint { color: var(--faint); font-size: 12px; margin: 0 0 8px; }
+.hint { color: var(--faint); font-size: 12px; margin: 0 0 8px; }
+:where(#app > .app) .empty { color: var(--faint); font-size: 12px; margin: 0 0 8px; }
 .pad { padding: 14px; }
 
 /* --- top bar ---------------------------------------------------------------------------------- */
@@ -215,7 +220,7 @@ body {
 .btn.chip.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
 
 .group { display: flex; gap: 4px; }
-.link { font: inherit; font-size: 12px; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
+:where(#app > .app) .link { font: inherit; font-size: 12px; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
 
 /* --- panes ------------------------------------------------------------------------------------ */
 
@@ -1751,13 +1756,15 @@ button.phone-row { cursor: pointer; }
 .starter .icon { flex: none; color: var(--faint); }
 .starter:hover .icon { color: var(--muted); }
 
-.view-only { display: grid; gap: 6px; margin-top: 10px; }
+:where(#app > .app) .view-only { display: grid; gap: 6px; margin-top: 10px; }
 .banner .btn { margin-left: 10px; }
 
 /* Opening another folder is the last thing in the panel, under a rule: it is not one of the files,
    and it is the one control here that throws away what is on screen. */
 .pane-foot { margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
-.templates-pane .empty, .assets-pane .empty { line-height: 1.5; margin-bottom: 12px; }
+/* The words, not the can: the can in the folder head is .empty too while nothing is in it, and this 12 under it held
+   the head's rule and the list 9.5 px lower until the first delete. */
+.templates-pane p.empty, .assets-pane p.empty { line-height: 1.5; margin-bottom: 12px; }
 .templates-pane code, .assets-pane code {
   font-family: var(--mono); font-size: 10.5px; padding: 1px 4px; border-radius: 3px;
   background: var(--panel); color: var(--muted);
@@ -2233,9 +2240,12 @@ button.phone-row { cursor: pointer; }
 
 /* --- the Canvas menu (CanvasMenu.tsx): the dials for how the canvases move and draw ---------------------------- */
 .cv-menu { position: relative; display: inline-flex; }
+/* --cv-sans is the menu's face, and a page that wants its own sets this rather than font-family, so a value's strut
+   (below) stays in the face its label is in. */
 .cv-pop {
+  --cv-sans: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 340px; max-width: calc(100vw - 24px); padding: 0;
-  background: var(--fig-surface); color: var(--fig-ink); border: 1px solid var(--fig-ink); font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  background: var(--fig-surface); color: var(--fig-ink); border: 1px solid var(--fig-ink); font-family: var(--cv-sans);
   font-size: 13px; letter-spacing: 0.011em; text-align: left; white-space: normal; cursor: default;
 }
 .cv-menu.pill .cv-pop { border-color: var(--fig-line); border-radius: 8px; box-shadow: var(--fig-shadow); overflow: hidden; }
@@ -2245,9 +2255,18 @@ button.phone-row { cursor: pointer; }
 .cv-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 2px 14px; cursor: pointer; }
 .cv-row:hover { background: var(--fig-hover); }
 .cv-row.off { color: var(--fig-faint); cursor: default; }
-.cv-label { flex: none; width: 96px; }
+/* A label (13px sans) and its value (12px mono) on one baseline, whatever faces the system falls back to. Each centred
+   in its own box would put them on their own faces' baselines, which differ. So both are 16 tall and centred alike,
+   and the value's line is an empty 13px line of the label's face (a zero-width space), 16 tall as the label's is. The
+   value's own words take no height on it (line-height 0), so however tall the mono stands, that line and its baseline
+   stay the label's, and the words sit on it. */
+.cv-label { flex: none; width: 96px; line-height: 16px; }
 .cv-grow { flex: 1; }
-.cv-value { flex: none; min-width: 56px; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0; color: var(--fig-ink-2); font-variant-numeric: tabular-nums; }
+.cv-value {
+  flex: none; min-width: 56px; height: 16px; text-align: right;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; line-height: 0; letter-spacing: 0; color: var(--fig-ink-2); font-variant-numeric: tabular-nums;
+}
+.cv-value::before { content: "\200b"; font-family: var(--cv-sans); font-size: 13px; line-height: 16px; }
 .cv-row.off .cv-value { color: var(--fig-faint); }
 .cv-check { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border: 1px solid var(--fig-ink); background: var(--fig-surface); position: relative; cursor: pointer; }
 .cv-check::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; background: var(--fig-faint); transition: transform 120ms linear, background-color 120ms linear; }

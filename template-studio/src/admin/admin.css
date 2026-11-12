@@ -43,14 +43,13 @@
 
 /* Where a row comes from: this folder, or the app. A fact, quietly: Enkel's label, 22 = 1 + 5 / 14 / 1 + 1, 4 on the
    corners, at the 12px floor. This folder's in ink, the app's soft. Its line starts where the buttons' lines do, and
-   its 12px words stand on an empty 13px line (a zero-width space) so they share the buttons' baseline in any face.
-   From .ad-app, and the display set here, because the app's tag has the class "app", which app.css lays out. */
-.ad-app .ad-tag {
-  flex: none; display: inline-flex; flex-direction: row; align-items: baseline; height: 22px; padding: 5px 6px 1px;
+   its 12px words stand on an empty 13px line (a zero-width space) so they share the buttons' baseline in any face. */
+.ad-tag {
+  flex: none; display: inline-flex; align-items: baseline; height: 22px; padding: 5px 6px 1px;
   border: 1px solid var(--pb-soft); border-radius: 4px; font-size: 12px; line-height: 14px; color: var(--pb-muted); white-space: nowrap;
 }
-.ad-app .ad-tag::before { content: "\200b"; font-size: 13px; }
-.ad-app .ad-tag.folder { border-color: var(--pb-ink); color: var(--pb-ink); }
+.ad-tag::before { content: "\200b"; font-size: 13px; }
+.ad-tag.folder { border-color: var(--pb-ink); color: var(--pb-ink); }
 
 /* --- the form ---------------------------------------------------------------------------------------------------- */
 .ad-form { display: grid; gap: 12px; padding: 16px 0 4px; }

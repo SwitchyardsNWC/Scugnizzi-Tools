@@ -191,7 +191,7 @@ body { background: #f5f5f4; }
 .pb-hint { overflow: hidden; text-overflow: ellipsis; }
 .pb-count { flex: none; color: var(--pb-text); }
 .pb-status { display: inline-flex; align-items: baseline; gap: 8px; color: var(--pb-text); }
-.pb-status > .pb-dot { align-self: center; margin: 0; } /* the margin: app.css's bare .view-only gives this dot 10px on top */
+.pb-status > .pb-dot { align-self: center; }
 /* A link in words: Enkel's link, graphite to ink, underlined so it does not lean on colour. */
 .pb-inline { padding: 0; border: 0; background: none; color: var(--pb-muted); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .pb-inline:hover { color: var(--pb-ink); }
@@ -461,7 +461,7 @@ body { background: #f5f5f4; }
 .pb-doc-glyph { flex: none; display: grid; place-items: center; color: var(--pb-blue); }
 .pb-doc-glyph.sheet { color: var(--pb-green); }
 .pb-doc-glyph.slides { color: var(--pb-amber); }
-.pb-doc-glyph.link, .pb-doc-glyph.drawing, .pb-doc-glyph.form { color: var(--pb-muted); cursor: inherit; } /* app.css's bare .link would point */
+.pb-doc-glyph.link, .pb-doc-glyph.drawing, .pb-doc-glyph.form { color: var(--pb-muted); }
 .pb-doc-text { display: grid; gap: 4px; min-width: 0; }
 .pb-doc-kind { font-size: 13px; color: var(--pb-text); }
 .pb-doc-host { overflow: hidden; font-size: 11px; color: var(--pb-muted); white-space: nowrap; text-overflow: ellipsis; }
@@ -594,7 +594,7 @@ body { background: #f5f5f4; }
 .pb-note-reply-field:focus { border-color: var(--pb-ink); }
 
 .pb-note-body, .pb-note-text { display: block; margin: 0; padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pb-note-body.empty { margin: 0; color: rgb(0 0 0 / 0.62); font-size: inherit; font-style: italic; } /* app.css's bare .empty is 12px with a margin */
+.pb-note-body.empty { color: rgb(0 0 0 / 0.62); font-style: italic; }
 .pb-note-text { width: 100%; min-height: 40px; border: 0; outline: none; resize: none; background: none; color: inherit; font: inherit; line-height: inherit; }
 /* The field is the note: no ring around the words while they are written. The board's focus ring stays for everything else. */
 .pb-app .pb-note-text:focus-visible, .pb-app .pb-note-reply-field:focus-visible { outline: none; }
@@ -617,7 +617,6 @@ body { background: #f5f5f4; }
 /* Where this page puts the shared can (app/Trash.tsx): the lower right of the canvas, clear of the status line.
    Only the placing is the board's; the drawing, the count and the shake are the same everywhere. */
 .pb-can-at { position: absolute; right: 14px; bottom: 40px; z-index: 6; }
-.pb-app .pb-can-at { margin: 0; } /* app.css's bare .empty would lift an empty can 8px above a full one */
 
 
 /* --- notices --------------------------------------------------------------------------------------------- */
@@ -787,13 +786,8 @@ body { background: #f5f5f4; }
 /* The Canvas menu, in tools.css's controls: a paper popover on the structure hairline; a segment is a soft well with
    the pick filled ink (28 = 1 + 2 + 22 + 2 + 1); a switch is a square knob in a square track, ink and to the right
    when on; a slider is a hairline track and a square thumb with no fill, the figure beside it saying the value. */
-.pb-app .cv-pop { width: 360px; border-color: var(--pb-hairline); font-family: var(--pb-sans); }
+.pb-app .cv-pop { width: 360px; border-color: var(--pb-hairline); --cv-sans: var(--pb-sans); }
 .pb-app .cv-value { font-family: var(--pb-mono); color: var(--pb-text); }
-/* A value (12px mono) and its label (13px sans) on one baseline: both lines 16 tall and centred alike, the value
-   standing on an empty 13px line of the sans, as the zoom's figure does. */
-.pb-app .cv-label { line-height: 16px; }
-.pb-app .cv-value { display: flex; justify-content: flex-end; align-items: baseline; height: 16px; line-height: 16px; }
-.pb-app .cv-value::before { content: "\200b"; font-family: var(--pb-sans); font-size: 13px; }
 .pb-app .cv-seg { gap: 2px; padding: 2px; border: 1px solid var(--pb-card-border); border-radius: 4px; background: var(--pb-field); }
 .pb-app .cv-seg button { height: 22px; padding: 6px 8px 2px; border: 0; border-radius: 2px; color: var(--pb-muted); font-size: 12px; line-height: 14px; white-space: nowrap; transition: background-color var(--pb-fast), color var(--pb-fast); }
 .pb-app .cv-seg button + button { border-left: 0; }
