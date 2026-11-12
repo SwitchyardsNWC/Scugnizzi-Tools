@@ -8,8 +8,9 @@
 --panel-pad:16px;
 --panel-section-height:40px; /* a collapsible section's header row, the same 40 as the dashboard's section heads */
 --row-label-width:80px;
-/* The edge of an outline button or a hovered field: firmer than a card's hairline, softer than ink. */
---border-control:#c4c5c2;
+/* The edge of anything you press or type into: firmer than a card's hairline, softer than ink, 3:1 against the panel
+   so a field or an outline button reads as a control without leaning on its fill. */
+--border-control:#8f918d;
 /* Controls at panel density. 28 = 1 + 8 / 14 / 4 + 1, top = bottom + 4 (--optical-nudge), the same build as the dashboard's 36. */
 --control-height-xs:24px;
 --control-pad-sm:8px 12px 4px; /* @kind other */
@@ -27,6 +28,6 @@
    not only :root, so a var() of a var() resolves against the theme it sits in. */
 :root,[data-theme]{--surface-field:var(--surface-sunken)}
 [data-theme="dark"]{
---border-control:#454543;
+--border-control:#666765;
 --control-track:#4a4a48;
 }

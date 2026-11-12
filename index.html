@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="design system/Enkel Design system v2/styles.css">
 <style>
   /* Enkel: sunken page, paper cards, one soft hairline, no shadow, no radius on containers. Words in the sans, figures in mono. */
-  body{background:var(--surface-sunken);display:flex;flex-direction:column;min-height:100vh}
+  body{background:var(--surface-sunken);display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
   /* Bars keep their height: in a flex column they would otherwise give it up to a long page. */
   .shell-header,.section-head,footer{flex:none}
   .spacer{flex:1}
@@ -38,20 +38,20 @@
   .section-head>*{white-space:nowrap}
   .section-head .n{font-family:var(--font-mono);letter-spacing:0}
   .section-head .hint{text-transform:none;font-size:var(--text-caption);letter-spacing:var(--tracking-caption)}
-  .dot{width:8px;height:8px;background:var(--delta-flat);flex:0 0 8px}
+  .dot{width:8px;height:8px;background:var(--status-notstarted);flex:0 0 8px}
   .dot.live,.dot.open{background:var(--status-done)}
   .dot.ask{background:var(--status-risk)}
   .arrow{opacity:0;color:var(--text-primary);transition:opacity var(--duration-fast) var(--ease-standard);font-family:var(--font-helveticaneue)}
 
   /* Buttons. 36 tall from padding, never centring: 1 + 11 / 16 line / 7 + 1. */
-  .btn{display:inline-flex;align-items:center;gap:var(--spacing-8);box-sizing:border-box;max-width:100%;min-height:var(--control-height);padding:11px 16px 7px;
+  .btn{display:inline-block;vertical-align:middle;box-sizing:border-box;max-width:100%;min-height:var(--control-height);padding:11px 16px 7px;
     border:var(--border-width) solid transparent;border-radius:var(--radius-buttons);background:transparent;cursor:pointer;text-decoration:none;
     font-size:var(--text-body);line-height:var(--control-line);letter-spacing:var(--tracking-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
   .btn.filled{background:var(--action-primary);border-color:var(--action-primary);color:var(--action-primary-text)}
   .btn.filled:hover{background:var(--action-primary-hover);border-color:var(--action-primary-hover);color:var(--action-primary-text)}
-  .btn.outline{border-color:var(--border-hairline);color:var(--text-primary)}
-  .btn.outline:hover{background:var(--surface-row-hover);color:var(--text-primary)}
+  .btn.outline{border-color:var(--border-control);color:var(--text-primary)}
+  .btn.outline:hover{background:var(--surface-row-hover);border-color:var(--text-muted);color:var(--text-primary)}
   .btn.ghost{padding-left:0;padding-right:0;color:var(--text-muted)}
   .btn.ghost:hover{color:var(--text-primary)}
 
@@ -77,7 +77,7 @@
   .sq.email{background:var(--data-1)} .sq.frame{background:var(--data-6)} .sq.picture{background:var(--data-5)}
 
   /* The board, in miniature: board.json drawn to scale. A drill card, so its border deepens to ink on hover. */
-  .hub-board{display:flex;flex-direction:column;min-width:0;padding:var(--spacing-24);color:inherit;text-decoration:none}
+  .hub-board{display:flex;flex-direction:column;min-width:0;padding:var(--spacing-32) var(--spacing-24) var(--spacing-24);color:inherit;text-decoration:none}
   .hub-board:hover{color:inherit}
   .hub-field{position:relative;flex:1;min-height:300px;background:var(--surface-sunken);border:var(--border-width) solid var(--border-card);transition:border-color var(--duration-fast) var(--ease-standard)}
   .hub-board:hover .hub-field{border-color:var(--border-hairline)}
@@ -122,17 +122,19 @@
 
   /* ---- Tools: one clean grid. No gaps; hairlines shared between neighbours (each card draws right/bottom). ---- */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0}
-  .tool{display:flex;flex-direction:column;background:var(--surface-card);border-right:var(--border-width) solid var(--border-card);border-bottom:var(--border-width) solid var(--border-card);color:inherit;text-decoration:none;
-    box-shadow:inset 0 0 0 0 var(--border-hairline);transition:box-shadow var(--duration-fast) var(--ease-standard)}
-  .tool:hover{box-shadow:inset 0 0 0 1px var(--border-hairline)}
-  .tool:hover .arrow{opacity:1}
-  .mark{height:160px;display:flex;align-items:center;justify-content:center;background:var(--surface-sunken);border-bottom:var(--border-width) solid var(--border-muted);overflow:hidden}
+  .tool{display:flex;flex-direction:column;min-width:0;background:var(--surface-card);border-right:var(--border-width) solid var(--border-card);border-bottom:var(--border-width) solid var(--border-card);color:inherit;text-decoration:none;
+    outline:var(--border-width) solid transparent;outline-offset:-1px;transition:outline-color var(--duration-fast) var(--ease-standard)}
+  a.tool:hover{outline-color:var(--text-primary)}
+  a.tool:hover .arrow{opacity:1}
+  a.tool:focus-visible{outline:var(--border-width) solid var(--focus-ring);outline-offset:-3px}
+  .mark{flex:none;height:160px;display:flex;align-items:center;justify-content:center;background:var(--surface-sunken);border-bottom:var(--border-width) solid var(--border-muted);overflow:hidden}
   .mark span{font-size:var(--text-display);line-height:var(--leading-display);letter-spacing:var(--tracking-display);color:var(--text-primary);white-space:nowrap}
   .tool.placeholder{background:transparent}
   .tool.placeholder .mark{background:transparent}
-  .tool.placeholder .mark span,.tool.placeholder h2{color:var(--text-faint)}
+  .tool.placeholder .mark span{color:var(--text-faint)}
+  .tool.placeholder h2{color:var(--text-muted)}
   .tool.placeholder p{color:var(--text-muted)}
-  .body{padding:var(--card-padding);display:flex;flex-direction:column;gap:var(--spacing-8);flex:1}
+  .body{padding:var(--card-padding) var(--spacing-24);display:flex;flex-direction:column;gap:var(--spacing-8);flex:1;min-width:0}
   .kicker{display:flex;align-items:center;gap:var(--spacing-8);font-size:var(--text-micro);line-height:var(--leading-micro);letter-spacing:var(--tracking-micro);text-transform:uppercase;color:var(--text-muted)}
   .kicker .n{font-family:var(--font-mono);letter-spacing:0}
   .tool h2{margin:0;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);letter-spacing:var(--tracking-heading-sm);font-weight:400;color:var(--text-primary)}
@@ -162,8 +164,12 @@
     .hub-intro{padding:var(--spacing-24) var(--gutter-phone)}
     .hub-board{padding:var(--gutter-phone)}
     .type{padding:var(--card-padding) var(--gutter-phone)}
-    .grid{grid-template-columns:1fr}
+    .grid{grid-template-columns:minmax(0,1fr)}
+    .body{padding:var(--card-padding) var(--gutter-phone)}
     .tool p{font-size:var(--text-meta-mobile)}
+    .shell-header .count{display:none}
+    footer{flex-wrap:wrap;gap:var(--spacing-8) var(--spacing-16);padding:var(--spacing-16) var(--gutter-phone)}
+    footer .wide{display:none}
   }
 </style>
 </head>
@@ -201,9 +207,9 @@
 
   <footer>
     <span>Interface on the Enkel design system</span>
-    <span class="mono">node serve.js · localhost:8770</span>
+    <span class="mono wide">node serve.js · localhost:8770</span>
     <span class="spacer"></span>
-    <span>Press <span class="mono">?</span> for shortcuts</span>
+    <span class="wide">Press <span class="mono">?</span> for shortcuts</span>
     <a class="mono version" id="suite-version" href="CHANGELOG.md" title="What changed, newest first"></a>
   </footer>
 

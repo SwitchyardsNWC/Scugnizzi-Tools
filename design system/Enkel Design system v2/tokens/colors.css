@@ -20,7 +20,7 @@ color-scheme:light;
 /* text */
 --text-primary:#0d0d0d;
 --text-secondary:#3a3a38;
---text-muted:#6f726e;
+--text-muted:#666965; /* graphite, a step darker than --color-graphite so it holds 4.5:1 on the sunken page and on a hovered row */
 --text-faint:#a8aaa7;
 --text-on-accent:#ffffff;
 /* lines — structure (rail, header) is ink; everything inside a card is soft */
@@ -34,13 +34,13 @@ color-scheme:light;
 --action-primary-text:#ffffff;
 --action-disabled-text:#a8aaa7;
 --action-disabled-surface:#ededec;
---link-default:#6f726e;
+--link-default:#666965;
 --link-hover:#0d0d0d;
 --focus-ring:#0d0d0d;
 /* data — the one place colour gets to be clear. Series 1 is always the primary bar / line. */
---data-1:#4a5fa5;--data-2:#5b8a5e;--data-3:#c48a2e;--data-4:#b8412b;--data-5:#7a7d79;--data-6:#3e7d7a;
+--data-1:#4a5fa5;--data-2:#5b8a5e;--data-3:#ba832c;--data-4:#b8412b;--data-5:#7a7d79;--data-6:#3e7d7a;
 --data-track:#e9e9e7;
---delta-up:#2f7a44;--delta-down:#b8412b;--delta-flat:#6f726e;
+--delta-up:#2f7a44;--delta-down:#b8412b;--delta-flat:#666965;
 }
 [data-theme="dark"]{
 color-scheme:dark;
@@ -62,7 +62,7 @@ color-scheme:dark;
 --border-card:#2a2a29;
 --border-muted:#242423;
 --action-primary:#5a67a0;
---action-primary-hover:#6b78b3;
+--action-primary-hover:#4f5b93; /* hover darkens in both themes; white on it 6.46:1 */
 --action-disabled-text:#5e605d;
 --action-disabled-surface:#232323;
 --link-default:#9a9c99;

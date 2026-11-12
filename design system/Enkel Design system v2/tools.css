@@ -33,7 +33,7 @@
 [hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;background:var(--surface-sunken);color:var(--text-primary);
-  font-size:var(--text-meta);line-height:1.35;letter-spacing:var(--tracking-em)}
+  font-size:var(--text-meta);line-height:18px;letter-spacing:var(--tracking-em)}
 h1,h2,h3,h4{margin:0;font-weight:400}
 p{max-width:none}
 .mono{font-family:var(--font-mono);letter-spacing:0;font-variant-numeric:tabular-nums}
@@ -47,8 +47,8 @@ aside.right,aside + main + aside{border-right:0;border-left:var(--border-width) 
 main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface-sunken)}
 
 /* The panel opens with the tool's name and one line on what it does. */
-aside > h1,.panel-title{padding-top:20px;font-size:var(--text-heading-sm);line-height:var(--leading-heading-sm);color:var(--text-primary)}
-aside > .sub,.panel-sub{margin:4px 0 20px;font-size:var(--text-meta);line-height:var(--leading-prose-tight);color:var(--text-muted)}
+aside > h1,.panel-title{padding-top:20px;font-size:var(--text-heading-sm);line-height:24px;color:var(--text-primary)}
+aside > .sub,.panel-sub{margin:4px 0 20px;font-size:var(--text-meta);line-height:18px;color:var(--text-muted)}
 
 /* Scrollbars: thin, on the soft hairline, so a long panel doesn't carry a grey slab down its side. */
 aside,.stage,.scroll,pre,textarea{scrollbar-width:thin;scrollbar-color:var(--border-control) transparent}
@@ -92,7 +92,7 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 .addrow>button,.btn-row>button{flex:1;min-width:0}
 
 /* Words under a control. 12px muted, a sentence at most two lines long. */
-.hint{margin:var(--spacing-8) 0 0;font-size:var(--text-caption);line-height:1.4;letter-spacing:var(--tracking-caption);color:var(--text-muted);max-width:none}
+.hint{margin:var(--spacing-8) 0 0;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted);max-width:none}
 .hint b,.hint strong{font-weight:400;color:var(--text-secondary)}
 .hint code,.hint kbd{font-family:var(--font-mono-detail);font-size:11px;letter-spacing:0}
 
@@ -143,8 +143,8 @@ input[type=text]:hover,input[type=number]:hover,input[type=url]:hover,input[type
 input[type=text]:focus,input[type=number]:focus,input[type=url]:focus,input[type=search]:focus,input[type=email]:focus,input:not([type]):focus,select:focus,textarea:focus{border-color:var(--text-primary)}
 /* Figures in a field stay in the sans, with tabular digits: a mono beside sans labels lands on a different baseline. */
 input[type=number]{width:72px;flex:0 0 72px;font-variant-numeric:tabular-nums}
-input::placeholder,textarea::placeholder{color:var(--text-faint)}
-textarea{display:block;width:100%;height:auto;min-height:72px;padding:8px;line-height:1.45;resize:vertical}
+input::placeholder,textarea::placeholder{color:var(--text-muted)} /* placeholders are text: muted holds 4.5:1, faint does not */
+textarea{display:block;width:100%;height:auto;min-height:72px;padding:8px;line-height:18px;resize:vertical}
 /* The chevron is drawn in the muted ink, so it flips with the theme. */
 select{appearance:none;-webkit-appearance:none;padding-right:24px;cursor:pointer;text-overflow:ellipsis;
   background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);
@@ -168,7 +168,7 @@ input[type=checkbox]:disabled,input[type=radio]:disabled{border-color:var(--bord
 .check{display:flex;align-items:flex-start;gap:var(--spacing-8);margin:var(--spacing-8) 0;cursor:pointer;color:var(--text-primary)}
 .check>input{margin-top:1px}
 .check>span{flex:1;min-width:0}
-.check small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:1.4;color:var(--text-muted)}
+.check small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
 /* An on/off switch: a square knob in a square track. On is ink with the knob at the right, so position says it too. */
 input[type=checkbox].switch{flex:0 0 26px;width:26px;height:14px;border-color:var(--text-muted);background:var(--surface-field)}
 input[type=checkbox].switch::after{content:"";position:absolute;left:2px;top:2px;width:8px;height:8px;border:0;transform:none;background:var(--text-muted)}
@@ -210,8 +210,8 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 /* --- presets ------------------------------------------------------------------------------------------------------------- */
 /* Cards you pick a look from: a name and one line on what it is. Chosen: an ink edge two pixels thick and a square mark. */
 .presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--spacing-8)}
-.presets>button{position:relative;display:block;width:100%;min-height:0;padding:9px 10px 9px;text-align:left;white-space:normal;line-height:1.3;border-color:var(--border-card)}
-.presets>button small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:1.35;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+.presets>button{position:relative;display:block;width:100%;min-height:0;padding:10px 10px 8px;text-align:left;white-space:normal;line-height:16px;border-color:var(--border-card)}
+.presets>button small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
 .presets>button.on{border-color:var(--text-primary);box-shadow:inset 0 0 0 var(--border-width) var(--text-primary);background:var(--surface-row-hover)}
 .presets>button.on::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;background:var(--text-primary)}
 .presets>button.saved{padding-right:28px}
@@ -233,10 +233,10 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 .item .meta{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
 
 /* --- drop zone ----------------------------------------------------------------------------------------------------------- */
-.drop{display:block;padding:var(--spacing-16);text-align:center;color:var(--text-muted);font-size:var(--text-caption);line-height:1.4;cursor:pointer;
+.drop{display:block;padding:var(--spacing-16);text-align:center;color:var(--text-muted);font-size:var(--text-caption);line-height:16px;cursor:pointer;
   background:var(--surface-field);border:var(--border-width) dashed var(--border-control);border-radius:var(--radius-controls);
   transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
-.drop b{display:block;margin-bottom:2px;font-weight:400;font-size:var(--text-meta);color:var(--text-primary)}
+.drop b{display:block;margin-bottom:2px;font-weight:400;font-size:var(--text-meta);line-height:18px;color:var(--text-primary)}
 .drop:hover,.drop.over{border-color:var(--text-primary);border-style:solid;color:var(--text-secondary);background:var(--surface-row-hover)}
 
 /* --- the bar over the stage ---------------------------------------------------------------------------------------------- */
@@ -263,7 +263,7 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 .actions{display:flex;flex-direction:column;gap:var(--spacing-8);min-width:168px}
 .actions>button{justify-content:flex-start;width:100%}
 pre.recipe,pre#recipe{margin:0;max-height:96px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
-  font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:1.5;letter-spacing:0}
+  font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:18px;letter-spacing:0}
 
 /* --- small parts --------------------------------------------------------------------------------------------------------- */
 kbd{display:inline-block;min-width:18px;padding:2px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;text-align:center;
@@ -275,7 +275,8 @@ kbd{display:inline-block;min-width:18px;padding:2px 5px 0;font-family:var(--font
 
 /* --- focus -------------------------------------------------------------------------------------------------------------- */
 :focus-visible{outline:var(--border-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}
-.seg button:focus-visible,.item:focus-visible{outline-offset:-1px}
+/* On a filled segment the ring sits in the 2px gutter round it, so it shows against the well, not ink on ink. */
+.seg button:focus-visible{outline-offset:1px}
 input[type=text]:focus-visible,input[type=number]:focus-visible,input[type=url]:focus-visible,input[type=search]:focus-visible,input:not([type]):focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
 
 /* --- narrow windows ----------------------------------------------------------------------------------------------------- */
