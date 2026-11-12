@@ -13,17 +13,13 @@
      drop zone, bars, stage and export bar are tools.css on the Enkel tokens. The swatch colours, the picture and the
      preset hexes are the work, not chrome: they stay as data. */
 
-  /* The drop zone is a real button; its words never take the pointer, so a drag across them doesn't flicker. While a
-     file is over it the script adds .over beside .drag-over, so it takes the shared look. The key is written in the
-     line's own sans, as in the specimen: a mono O in a chip reads as a zero. */
-  .drop{width:100%;white-space:normal}
-  .drop *{pointer-events:none}
+  /* The drop zone is tools.css's button.drop. While a file is over it the script adds .over beside .drag-over, so it
+     takes the shared look. Its key is written in the line's own sans, as in the specimen: a mono O in a chip reads as
+     a zero. */
   #filename{display:none}
 
-  /* Looks: five cards, two to a row, Original across the top because it is "none". Read from the top, room on the
-     right for the chosen mark. The script marks the chosen one .on beside its own .active, so the ink edge and the
-     square are the shared ones. */
-  .presets>button{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding-right:24px}
+  /* Looks: tools.css's preset cards, Original across the top because it is "none". The script marks the chosen one .on
+     (and aria-pressed) beside its own .active, so the ink edge and the square are the shared ones. */
   .presets>button:first-child{grid-column:1/-1}
   .presets>button.on:focus-visible{outline-offset:3px}
   .presets + .hint{margin-top:var(--spacing-12)}
@@ -72,14 +68,12 @@
   /* The mono face sits its baseline 2px lower than the sans at the same nudge, so the hex drops the nudge. */
   .row>.hex{padding-top:0;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary);user-select:all}
 
-  /* The bar over the stage: the picture's size on the left, zoom on the right. Its border takes 1 of its 40, so 1 on
-     top as well keeps the 24px buttons on whole pixels. Words carry the buttons' 4px nudge so they share Fit's
-     baseline; the mono figures, whose face sits lower, take half of it. The zoom figure keeps its width as it changes. */
-  .topbar{padding-top:1px}
+  /* The bar over the stage: the picture's size on the left, zoom on the right. tools.css drops the bar's mono figures
+     2px to the buttons' label baseline; the hint is sans, so it takes the buttons' full 4px nudge to share Fit's
+     baseline, and the zoom figure inside its group takes the mono 2px. The zoom figure keeps its width as it changes. */
   .topbar .zoom{display:flex;align-items:center;gap:var(--spacing-4)}
-  .topbar .zoom-hint{padding-top:var(--optical-nudge);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
-  #imgInfo,#zoomLevel{padding-top:2px}
-  #zoomLevel{min-width:40px;text-align:center;color:var(--text-secondary)}
+  .topbar>span.zoom-hint{padding-top:var(--optical-nudge);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
+  #zoomLevel{min-width:40px;padding-top:2px;text-align:center;color:var(--text-secondary)}
   .zoom:has(button:disabled) #zoomLevel{color:var(--action-disabled-text)}
   #imgInfo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -95,17 +89,16 @@
   .empty-drop:hover{border-style:solid;border-color:var(--text-primary);background:var(--surface-row-hover);color:var(--text-secondary)}
   .empty-drop .t{font-size:var(--text-subheading);line-height:24px;color:var(--text-primary)}
   .empty-drop *{pointer-events:none}
-  /* Dragging a file over the stage: the script adds .dropping beside .drag-over, so tools.css draws its frame, and
-     the empty-state target steps aside for it rather than showing through. */
-  .stage.dropping .empty-drop{visibility:hidden}
+  /* Dragging a file over the stage: tools.css draws its "Drop an image" frame for .drag-over (the script adds
+     .dropping beside it too), and the empty-state target steps aside for it rather than showing through. */
+  .stage.drag-over .empty-drop{visibility:hidden}
   /* A note while a frame renders, in the stage's corner. */
   .processing{display:none;position:absolute;top:var(--spacing-12);right:var(--spacing-12);min-height:18px;padding:3px 5px 0;
     font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;color:var(--text-muted);
     background:var(--surface-paper);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
 
-  /* The prompt is something to read and copy, so it is the secondary ink, not the muted one. Its first line drops 5 so
-     it reads on the same baseline as Download PNG beside it (a 12px mono line against a 28px button's 13px words). */
-  #promptText{padding-top:5px;color:var(--text-secondary)}
+  /* The prompt is something to read and copy, so it is the secondary ink, not the muted one. */
+  #promptText{color:var(--text-secondary)}
 
   /* Narrow: the panel goes over the stage at the window's width, so the five looks sit in one row. The frame keeps the
      window's height as it does wide: the panel takes the top 40% and scrolls in itself, the stage gives way, and so the
@@ -113,11 +106,10 @@
   @media (max-width:900px){
     .app{height:calc(100vh - var(--tool-banner,0px));height:calc(100dvh - var(--tool-banner,0px));min-height:0;grid-template-rows:minmax(0,40vh) minmax(0,1fr)}
     aside{max-height:none}
-    .stage{padding:var(--spacing-16)}
+    .stage{flex:1;height:auto;padding:var(--spacing-16)}
     .presets{grid-template-columns:repeat(5,minmax(0,1fr))}
     .presets>button:first-child{grid-column:auto}
-    .topbar .zoom-hint{display:none}
-    #promptText{padding-top:0}
+    .topbar>span.zoom-hint{display:none}
   }
   @media (max-width:600px){
     .presets{grid-template-columns:repeat(2,minmax(0,1fr))}
