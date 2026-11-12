@@ -18,12 +18,10 @@
      a zero. The section's state is the file's name, and says nothing until there is one (the script shows it). */
   #filename{display:none}
 
-  /* Looks: tools.css's preset cards, Original across the top because it is "none". The script marks the chosen one .on
-     (and aria-pressed) beside its own .active, so the ink edge and the square are the shared ones. A chosen card's edge
-     is 2px, so its focus ring stands 1px further off to keep a clear gap; the note under the cards takes 12, as Riso's. */
+  /* Presets: tools.css's preset cards, Original across the top because it is "none". The script marks the chosen one .on
+     (and aria-pressed) beside its own .active, so the ink edge and the square are the shared ones. The note under the
+     cards takes 12, as Riso's, and Reset stands 16 clear of it, as Riso's. */
   .presets>button:first-child{grid-column:1/-1}
-  .presets>button.on:focus-visible{outline-offset:3px}
-  .presets + .hint{margin-top:var(--spacing-12)}
 
   /* An effect section is a details.panel header with an on/off switch beside it. The header and the switch are two
      controls side by side, never one inside the other, so turning an effect on never folds its section. */
@@ -35,15 +33,16 @@
   .fx-sum:hover,.fx-sum:active{background:transparent;color:var(--text-primary)}
   .fx-sum::before{content:"";flex:0 0 5px;width:5px;height:5px;margin:-2px 3px 0 1px;border-right:var(--border-width) solid currentColor;border-bottom:var(--border-width) solid currentColor;transform:rotate(-45deg)}
   .fx.open .fx-sum::before{margin-top:-5px;transform:rotate(45deg)}
-  .fx-sum .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .fx-sum .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:16px}
   .fx.enabled .fx-sum{color:var(--text-primary)}
   /* The switch with its word: the whole strip is the target, header-high. On is ink with the knob right and says On.
-     Measured at 4x: the word's baseline meets the name's (23px down the header) with no nudge, and the switch rides
-     1px above centre so its middle meets the words' middle. */
+     The name and the word each sit in a 16px line box, as a section's .t and .v do. The name's box starts 1px lower
+     (the button's 2px top, centred), which is the pixel tools.css lifts .v by, so the two baselines meet with no nudge
+     (measured with the baseline probe). The switch rides 1px above centre so its middle meets the word's middle. */
   .fx-on{display:flex;align-items:center;gap:var(--spacing-8);padding:0 0 0 var(--spacing-8);cursor:pointer;
     font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted);transition:color var(--duration-fast) var(--ease-standard)}
   .fx-on:hover,.fx.enabled .fx-on{color:var(--text-primary)}
-  .fx-state{min-width:20px;text-align:right}
+  .fx-state{min-width:20px;text-align:right;line-height:16px}
   .fx-on>.switch{margin-bottom:2px}
   .fx>.body{display:none;padding:0 0 var(--spacing-16)}
   .fx.open>.body{display:block}
@@ -59,23 +58,16 @@
   .fx:not(.enabled)>.body input[type=range]:focus-visible::-webkit-slider-thumb{background:var(--text-muted)}
   .fx:not(.enabled)>.body input[type=range]:hover::-moz-range-thumb,.fx:not(.enabled)>.body input[type=range]:active::-moz-range-thumb{background:var(--text-muted)}
 
-  /* A colour: tools.css's colour well, then its hex (tools.css's .hex). The script still paints its #swatch-* wrapper
-     inline; the wrapper draws no box, so the well, its chip hairline, hover and focus ring are the shared ones. The hex
-     is selectable in one click, to copy. */
-  .color-swatch{display:contents}
+  /* A colour: tools.css's native colour well, then its hex (.hex), as in the specimen. The hex is selectable in one
+     click, to copy. */
   .row>.hex{user-select:all}
 
-  /* The bar over the stage: the picture's size on the left, zoom on the right. tools.css drops the bar's mono figures
-     2px to the buttons' label baseline; the hint is sans, so it takes the buttons' full 4px nudge to share Fit's
-     baseline, and the zoom figure inside its group takes the mono 2px. The zoom figure keeps its width as it changes. */
-  .topbar .zoom{display:flex;align-items:center;gap:var(--spacing-4)}
-  .topbar>span.zoom-hint{padding-top:var(--optical-nudge);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
-  #zoomLevel{min-width:40px;padding-top:2px;text-align:center;color:var(--text-secondary)}
-  .zoom:has(button:disabled) #zoomLevel{color:var(--action-disabled-text)}
-  #imgInfo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* The bar over the stage: the figures on the left (px, the file, the render), Zoom on the right, all tools.css. The
+     figures give way before the zoom does. */
+  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
 
   /* The stage. Fit is scale 1: the canvas shrinks into the stage and the script zooms and pans it with a transform about
-     its centre, so it stays centred and clipped (never scrolled). */
+     its centre, so it stays centred and clipped (never scrolled). The Zoom select reads the true scale either way. */
   #canvasContainer{overflow:hidden}
   #canvas{display:none;max-width:100%;max-height:100%}
   /* Empty, the whole stage is the way in: a dashed target you can click, or drop on. It sits at the same 12px inset
@@ -92,19 +84,16 @@
   /* A note while a frame renders, in the stage's corner: tools.css's .tag, on paper so it reads over the picture. */
   .processing{display:none;position:absolute;top:var(--spacing-12);right:var(--spacing-12);background:var(--surface-paper)}
 
-  /* The prompt is something to read and copy, so it is the secondary ink, not the muted one. */
-  #promptText{color:var(--text-secondary)}
-
-  /* Narrow: the panel goes over the stage at the window's width, so the five looks sit in one row. The frame keeps the
+  /* Narrow: the panel goes over the stage at the window's width, so the five presets sit in one row. The frame keeps the
      window's height as it does wide: the panel takes the top 40% and scrolls in itself, the stage gives way, and so the
-     export bar stays on screen and the page never scrolls behind the panel. (tools.css lets the page grow instead.) */
+     export bar stays on screen. The page never scrolls, because a scroll over the picture zooms it: a page that scrolled
+     would turn into a zoom under the pointer. (tools.css lets the page grow instead.) */
   @media (max-width:900px){
     .app{height:calc(100vh - var(--tool-banner,0px));height:calc(100dvh - var(--tool-banner,0px));min-height:0;grid-template-rows:minmax(0,40vh) minmax(0,1fr)}
     aside{max-height:none}
     .stage{flex:1;height:auto;padding:var(--spacing-16)}
     .presets{grid-template-columns:repeat(5,minmax(0,1fr))}
     .presets>button:first-child{grid-column:auto}
-    .topbar>span.zoom-hint{display:none}
   }
   @media (max-width:600px){
     .presets{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -119,7 +108,7 @@
 
 <div class="app">
   <aside>
-    <h1>Image effects</h1>
+    <h1>Image effects editor</h1>
     <p class="sub">Print and film effects for a photo, and a prompt that describes the look.</p>
 
     <details class="panel" data-panel="image" open>
@@ -127,60 +116,64 @@
       <div class="body">
         <button type="button" class="drop" id="uploadZone" aria-keyshortcuts="O"><b>Drop an image here</b>or click to choose · O</button>
         <input type="file" id="fileInput" accept="image/*" hidden>
+        <div class="btn-row"><button type="button" id="sample">Use the sample image</button></div>
         <p class="hint">Scaled to 900 px on its long side, the size the PNG comes out at, and kept in this browser.</p>
       </div>
     </details>
 
     <details class="panel" data-panel="looks" open>
-      <summary><span class="t">Looks</span><span class="v" id="lookName">Original</span></summary>
+      <summary><span class="t">Presets</span><span class="v" id="lookName">Original</span></summary>
       <div class="body">
-        <div class="presets" id="presetPills" role="group" aria-label="Looks">
+        <div class="presets" id="presetPills" role="group" aria-label="Presets">
           <button type="button" class="preset-pill active on" data-preset="Original" aria-pressed="true" aria-keyshortcuts="1" title="Original (1)">Original<small>no effects, the photo as it came</small></button>
-          <button type="button" class="preset-pill" data-preset="Film Noir" aria-pressed="false" aria-keyshortcuts="2" title="Film Noir (2)">Film Noir<small>bone duotone, grain, vignette</small></button>
+          <button type="button" class="preset-pill" data-preset="Film Noir" aria-pressed="false" aria-keyshortcuts="2" title="Film noir (2)">Film noir<small>bone duotone, grain, vignette</small></button>
           <button type="button" class="preset-pill" data-preset="Newsprint" aria-pressed="false" aria-keyshortcuts="3" title="Newsprint (3)">Newsprint<small>fine dots on newsprint</small></button>
           <button type="button" class="preset-pill" data-preset="Dirty 35mm" aria-pressed="false" aria-keyshortcuts="4" title="Dirty 35mm (4)">Dirty 35mm<small>heavy grain, grime, vignette</small></button>
-          <button type="button" class="preset-pill" data-preset="Screen Print" aria-pressed="false" aria-keyshortcuts="5" title="Screen Print (5)">Screen Print<small>navy dots on yellow</small></button>
+          <button type="button" class="preset-pill" data-preset="Screen Print" aria-pressed="false" aria-keyshortcuts="5" title="Screen print (5)">Screen print<small>navy dots on yellow</small></button>
         </div>
-        <p class="hint">A look sets every effect below; keys 1–5 pick one. Effects run top to bottom.</p>
+        <p class="hint">A preset sets every effect below; keys <kbd>1</kbd>–<kbd>5</kbd> pick one. Effects run top to bottom.</p>
+        <div class="btn-row"><button type="button" id="resetTool" class="danger">Reset to defaults</button></div>
+        <p class="hint">Reset clears everything this tool saved in this browser, image included.</p>
       </div>
     </details>
 
-    <!-- The effects, in the order the engine runs them (stepsFromState): blur, duotone, posterize, halftone, texture, grain, vignette. -->
-    <section class="fx open" id="sect-blur" role="group" aria-label="Blur">
+    <!-- The effects, in the order the engine runs them (stepsFromState): blur, duotone, posterize, halftone, texture, grain, vignette.
+         Each starts closed; the script opens the ones that are on. -->
+    <section class="fx" id="sect-blur" role="group" aria-label="Blur">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-blur" onclick="toggleSection('blur')"><span class="t">Blur</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-blur" onclick="toggleSection('blur')"><span class="t">Blur</span></button>
         <label class="fx-on" title="Turn blur on or off (B)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-blur" aria-label="Blur" aria-keyshortcuts="B" onclick="event.stopPropagation(); toggleEffect('blur')"></label>
       </div>
       <div class="body" id="fx-blur">
-        <div class="slider"><label for="blur-radius">Radius</label><output id="val-blur-radius" for="blur-radius">3px</output><input type="range" min="1" max="20" value="3" id="blur-radius"></div>
+        <div class="slider"><label for="blur-radius">Radius</label><output id="val-blur-radius" for="blur-radius">3 px</output><input type="range" min="1" max="20" value="3" id="blur-radius"></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-duotone" role="group" aria-label="Duotone">
+    <section class="fx" id="sect-duotone" role="group" aria-label="Duotone">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-duotone" onclick="toggleSection('duotone')"><span class="t">Duotone</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-duotone" onclick="toggleSection('duotone')"><span class="t">Duotone</span></button>
         <label class="fx-on" title="Turn duotone on or off (D)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-duotone" aria-label="Duotone" aria-keyshortcuts="D" onclick="event.stopPropagation(); toggleEffect('duotone')"></label>
       </div>
       <div class="body" id="fx-duotone">
-        <div class="row"><label for="duotone-shadow">Shadows</label><div class="color-swatch" id="swatch-duotone-shadow" style="background:#1a0533"><input type="color" value="#1a0533" id="duotone-shadow"></div><span class="hex" id="hex-duotone-shadow">#1a0533</span></div>
-        <div class="row"><label for="duotone-highlight">Highlights</label><div class="color-swatch" id="swatch-duotone-highlight" style="background:#e8e0d8"><input type="color" value="#e8e0d8" id="duotone-highlight"></div><span class="hex" id="hex-duotone-highlight">#e8e0d8</span></div>
+        <div class="row"><label for="duotone-shadow">Shadows</label><input type="color" value="#1a0533" id="duotone-shadow"><span class="hex" id="hex-duotone-shadow">#1a0533</span></div>
+        <div class="row"><label for="duotone-highlight">Highlights</label><input type="color" value="#e8e0d8" id="duotone-highlight"><span class="hex" id="hex-duotone-highlight">#e8e0d8</span></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-posterize" role="group" aria-label="Posterize">
+    <section class="fx" id="sect-posterize" role="group" aria-label="Posterize">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-posterize" onclick="toggleSection('posterize')"><span class="t">Posterize</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-posterize" onclick="toggleSection('posterize')"><span class="t">Posterize</span></button>
         <label class="fx-on" title="Turn posterize on or off (P)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-posterize" aria-label="Posterize" aria-keyshortcuts="P" onclick="event.stopPropagation(); toggleEffect('posterize')"></label>
       </div>
       <div class="body" id="fx-posterize">
         <div class="slider"><label for="posterize-levels">Levels</label><output id="val-posterize-levels" for="posterize-levels">4</output><input type="range" min="2" max="8" value="4" id="posterize-levels"></div>
-        <div class="slider"><label for="posterize-gamma">Gamma</label><output id="val-posterize-gamma" for="posterize-gamma">5</output><input type="range" min="1" max="10" value="5" id="posterize-gamma"></div>
+        <div class="slider"><label for="posterize-gamma">Gamma</label><output id="val-posterize-gamma" for="posterize-gamma">1.0</output><input type="range" min="1" max="10" value="5" id="posterize-gamma"></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-halftone" role="group" aria-label="Halftone">
+    <section class="fx" id="sect-halftone" role="group" aria-label="Halftone">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-halftone" onclick="toggleSection('halftone')"><span class="t">Halftone</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-halftone" onclick="toggleSection('halftone')"><span class="t">Halftone</span></button>
         <label class="fx-on" title="Turn halftone on or off (H)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-halftone" aria-label="Halftone" aria-keyshortcuts="H" onclick="event.stopPropagation(); toggleEffect('halftone')"></label>
       </div>
       <div class="body" id="fx-halftone">
@@ -191,24 +184,24 @@
           <option value="line">Line screen</option>
           <option value="ellipse">Ellipse</option>
         </select></div>
-        <div class="slider"><label for="halftone-spacing">Dot size</label><output id="val-halftone-spacing" for="halftone-spacing">8px</output><input type="range" min="3" max="24" value="8" id="halftone-spacing"></div>
+        <div class="slider"><label for="halftone-spacing">Dot size</label><output id="val-halftone-spacing" for="halftone-spacing">8 px</output><input type="range" min="3" max="24" value="8" id="halftone-spacing"></div>
         <div class="slider"><label for="halftone-angle">Angle</label><output id="val-halftone-angle" for="halftone-angle">45°</output><input type="range" min="0" max="179" value="45" id="halftone-angle"></div>
-        <div class="slider"><label for="halftone-contrast">Contrast</label><output id="val-halftone-contrast" for="halftone-contrast">5</output><input type="range" min="1" max="10" value="5" id="halftone-contrast"></div>
-        <div class="row"><label for="halftone-color">Dots</label><div class="color-swatch" id="swatch-halftone-color" style="background:#000000"><input type="color" value="#000000" id="halftone-color"></div><span class="hex" id="hex-halftone-color">#000000</span></div>
-        <div class="row"><label for="halftone-bg">Paper</label><div class="color-swatch" id="swatch-halftone-bg" style="background:#ffffff"><input type="color" value="#ffffff" id="halftone-bg"></div><span class="hex" id="hex-halftone-bg">#ffffff</span></div>
+        <div class="slider"><label for="halftone-contrast">Contrast</label><output id="val-halftone-contrast" for="halftone-contrast">1.0×</output><input type="range" min="1" max="10" value="5" id="halftone-contrast"></div>
+        <div class="row"><label for="halftone-color">Dots</label><input type="color" value="#000000" id="halftone-color"><span class="hex" id="hex-halftone-color">#000000</span></div>
+        <div class="row"><label for="halftone-bg">Paper</label><input type="color" value="#ffffff" id="halftone-bg"><span class="hex" id="hex-halftone-bg">#ffffff</span></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-texture" role="group" aria-label="Texture">
+    <section class="fx" id="sect-texture" role="group" aria-label="Texture">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-texture" onclick="toggleSection('texture')"><span class="t">Texture</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-texture" onclick="toggleSection('texture')"><span class="t">Texture</span></button>
         <label class="fx-on" title="Turn texture on or off (T)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-texture" aria-label="Texture" aria-keyshortcuts="T" onclick="event.stopPropagation(); toggleEffect('texture')"></label>
       </div>
       <div class="body" id="fx-texture">
         <div class="row"><label for="texture-type">Type</label><select id="texture-type" class="control-select">
           <option value="paper">Paper</option>
           <option value="canvas">Canvas</option>
-          <option value="fibers">Fibers</option>
+          <option value="fibers">Fibres</option>
           <option value="concrete">Concrete</option>
           <option value="crosshatch">Crosshatch</option>
         </select></div>
@@ -219,58 +212,54 @@
           <option value="screen">Screen</option>
           <option value="hard-light">Hard light</option>
         </select></div>
-        <div class="slider"><label for="texture-intensity">Intensity</label><output id="val-texture-intensity" for="texture-intensity">35</output><input type="range" min="1" max="100" value="35" id="texture-intensity"></div>
-        <div class="slider"><label for="texture-scale">Scale</label><output id="val-texture-scale" for="texture-scale">50</output><input type="range" min="5" max="100" value="50" id="texture-scale"></div>
+        <div class="slider"><label for="texture-intensity">Intensity</label><output id="val-texture-intensity" for="texture-intensity">35%</output><input type="range" min="1" max="100" value="35" id="texture-intensity"></div>
+        <div class="slider"><label for="texture-scale">Scale</label><output id="val-texture-scale" for="texture-scale">50%</output><input type="range" min="5" max="100" value="50" id="texture-scale"></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-grain" role="group" aria-label="Grain">
+    <section class="fx" id="sect-grain" role="group" aria-label="Grain">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-grain" onclick="toggleSection('grain')"><span class="t">Grain</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-grain" onclick="toggleSection('grain')"><span class="t">Grain</span></button>
         <label class="fx-on" title="Turn grain on or off (G)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-grain" aria-label="Grain" aria-keyshortcuts="G" onclick="event.stopPropagation(); toggleEffect('grain')"></label>
       </div>
       <div class="body" id="fx-grain">
-        <div class="slider"><label for="grain-intensity">Intensity</label><output id="val-grain-intensity" for="grain-intensity">40</output><input type="range" min="1" max="100" value="40" id="grain-intensity"></div>
-        <div class="slider"><label for="grain-mono">Monochrome</label><output id="val-grain-mono" for="grain-mono">80</output><input type="range" min="0" max="100" value="80" id="grain-mono"></div>
+        <div class="slider"><label for="grain-intensity">Intensity</label><output id="val-grain-intensity" for="grain-intensity">40%</output><input type="range" min="1" max="100" value="40" id="grain-intensity"></div>
+        <div class="slider"><label for="grain-mono">Monochrome</label><output id="val-grain-mono" for="grain-mono">80%</output><input type="range" min="0" max="100" value="80" id="grain-mono"></div>
       </div>
     </section>
 
-    <section class="fx open" id="sect-vignette" role="group" aria-label="Vignette">
+    <section class="fx" id="sect-vignette" role="group" aria-label="Vignette">
       <div class="fx-head">
-        <button type="button" class="fx-sum" aria-expanded="true" aria-controls="fx-vignette" onclick="toggleSection('vignette')"><span class="t">Vignette</span></button>
+        <button type="button" class="fx-sum" aria-expanded="false" aria-controls="fx-vignette" onclick="toggleSection('vignette')"><span class="t">Vignette</span></button>
         <label class="fx-on" title="Turn vignette on or off (V)"><span class="fx-state">Off</span><input type="checkbox" role="switch" class="switch toggle" id="toggle-vignette" aria-label="Vignette" aria-keyshortcuts="V" onclick="event.stopPropagation(); toggleEffect('vignette')"></label>
       </div>
       <div class="body" id="fx-vignette">
-        <div class="slider"><label for="vignette-intensity">Intensity</label><output id="val-vignette-intensity" for="vignette-intensity">70</output><input type="range" min="1" max="100" value="70" id="vignette-intensity"></div>
-        <div class="slider"><label for="vignette-spread">Spread</label><output id="val-vignette-spread" for="vignette-spread">85</output><input type="range" min="40" max="130" value="85" id="vignette-spread"></div>
+        <div class="slider"><label for="vignette-intensity">Intensity</label><output id="val-vignette-intensity" for="vignette-intensity">70%</output><input type="range" min="1" max="100" value="70" id="vignette-intensity"></div>
+        <div class="slider"><label for="vignette-spread">Spread</label><output id="val-vignette-spread" for="vignette-spread">85%</output><input type="range" min="40" max="130" value="85" id="vignette-spread"></div>
       </div>
     </section>
   </aside>
 
   <main id="previewArea">
     <div class="topbar">
-      <span id="imgInfo">No image</span>
+      <span id="meta">No image</span>
       <span class="spacer"></span>
-      <span class="zoom-hint">Scroll to zoom · drag to pan</span>
-      <div class="zoom" role="group" aria-label="Zoom">
-        <button type="button" class="icon" data-zoom onclick="changeZoom(-0.25)" title="Zoom out" aria-label="Zoom out" disabled>−</button>
-        <span class="zoom-level" id="zoomLevel">100%</span>
-        <button type="button" class="icon" data-zoom onclick="changeZoom(0.25)" title="Zoom in" aria-label="Zoom in" disabled>+</button>
-        <button type="button" class="small" data-zoom onclick="resetZoom()" title="Zoom to fit" disabled>Fit</button>
-      </div>
+      <label>Zoom <select id="zoomSel" title="Scroll on the picture to zoom, drag to pan" disabled>
+        <option value="fit">Fit</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option>
+      </select></label>
     </div>
     <div class="stage" id="canvasContainer">
-      <button type="button" class="empty-drop" id="dropPlaceholder" aria-keyshortcuts="O"><span class="t">Drop an image here</span><span>or click to choose one · O</span></button>
+      <button type="button" class="empty-drop" id="dropPlaceholder" aria-keyshortcuts="O" style="display:none"><span class="t">Drop an image here</span><span>or click to choose · O</span></button>
       <canvas id="canvas"></canvas>
       <div class="processing tag" id="processing">rendering…</div>
     </div>
     <div class="footer">
       <div class="actions">
         <button type="button" class="primary" id="downloadBtn" onclick="downloadImage()" disabled title="Download PNG">Download PNG</button>
-        <button type="button" id="copyImgBtn" onclick="copyImage()" disabled title="Copy image">Copy image</button>
+        <button type="button" id="copyImgBtn" onclick="copyImage()" disabled title="Copy image" aria-live="polite">Copy image</button>
         <button type="button" id="copyBtn" onclick="copyPrompt()" disabled aria-live="polite">Copy prompt</button>
       </div>
-      <pre class="recipe" id="promptText" tabindex="0" role="region" aria-label="Prompt">Upload an image and apply effects to generate a prompt.</pre>
+      <pre class="recipe" id="promptText" tabindex="0" role="region" aria-label="Prompt">No image yet.</pre>
     </div>
   </main>
 </div>
@@ -335,30 +324,39 @@ const PRESETS = {
     texture:   { enabled: false, type: 'canvas',   intensity: 25, scale: 40, blend: 'multiply' },
   },
 };
+// The keys above are the contract (data-preset, saved state); what a person reads is in sentence case.
+const PRESET_NAMES = { 'Original': 'Original', 'Film Noir': 'Film noir', 'Newsprint': 'Newsprint', 'Dirty 35mm': 'Dirty 35mm', 'Screen Print': 'Screen print' };
+// In the panel's order, which is the order the engine runs them.
+const EFFECTS = ['blur', 'duotone', 'posterize', 'halftone', 'texture', 'grain', 'vignette'];
 
 let currentImage = null;
+let imageName = '';
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });   // every render reads the pixels back
 
 // ─── Image loading ───────────────────────────────────────────────────────────
 
+const dropPlaceholder = document.getElementById('dropPlaceholder');
+// The empty stage is the way in: shown only when there is no picture and none on its way.
+const showEmpty = on => { dropPlaceholder.style.display = on ? '' : 'none'; };
+
 function useImage(img, name, remember) {
   currentImage = img;
+  imageName = name;
   const MAX = 900;
   const scale = Math.min(1, MAX / Math.max(img.width, img.height));
   canvas.width  = Math.floor(img.width  * scale);
   canvas.height = Math.floor(img.height * scale);
   canvas.style.display = 'block';
-  document.getElementById('dropPlaceholder').style.display = 'none';
+  showEmpty(false);
   const fn = document.getElementById('filename');
   fn.textContent = name;
   fn.style.display = 'block';
+  // Every way out, and the zoom, wake with the first picture; the bar says the size the PNG comes out at.
   document.getElementById('downloadBtn').disabled = false;
-  // The other ways out, and the zoom, wake with the first picture; the bar says the size the PNG comes out at.
-  // Copy prompt wakes in updatePrompt, once there is a prompt to copy.
   document.getElementById('copyImgBtn').disabled = false;
-  document.querySelectorAll('[data-zoom]').forEach(b => { b.disabled = false; });
-  document.getElementById('imgInfo').textContent = `${canvas.width} × ${canvas.height} px`;
+  zoomSel.disabled = false;
+  updateMeta();
   resetZoom();
   renderEffects();
   if (remember && window.ToolKit) {
@@ -381,6 +379,19 @@ function loadImage(file) {
   reader.readAsDataURL(file);
 }
 
+// The example picture, Jared's chair. It goes in exactly as a dropped file does: fetched, made a File, and handed to
+// loadImage, so it is scaled, kept in this browser and described in the prompt like any other.
+const SAMPLE = 'sample-chair.webp';
+function useSample(quiet) {
+  return fetch(SAMPLE)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+    .then(blob => loadImage(new File([blob], SAMPLE, { type: blob.type || 'image/webp' })))
+    .catch(() => {
+      if (!currentImage) showEmpty(true);
+      if (!quiet) ToolKit.toast('The sample image did not load. Drop a picture instead.');
+    });
+}
+
 // ─── Effect pipeline ─────────────────────────────────────────────────────────
 
 let renderPending = false;
@@ -393,10 +404,21 @@ function renderEffects() {
   document.getElementById('processing').style.display = 'block';
   requestAnimationFrame(() => {
     renderPending = false;
+    const t0 = performance.now();
     _doRender();
+    updateMeta(Math.round(performance.now() - t0));
     document.getElementById('processing').style.display = 'none';
     updatePrompt();
   });
+}
+
+// The bar over the stage: the size the PNG comes out at, the picture's name, then how long the last render took.
+function updateMeta(ms) {
+  const el = document.getElementById('meta');
+  if (!currentImage) { el.textContent = 'No image'; el.removeAttribute('title'); return; }
+  const sep = ' · ';
+  el.textContent = `${canvas.width} × ${canvas.height} px${sep}${imageName}` + (ms != null ? `${sep}${ms} ms` : '');
+  el.title = el.textContent;
 }
 
 /**
@@ -434,9 +456,10 @@ function _doRender() {
 function updatePrompt() {
   const el = document.getElementById('promptText');
   const copyBtn = document.getElementById('copyBtn');
+  // No picture, nothing to copy: one short muted line. With a picture there is always a prompt, even for none.
+  copyBtn.disabled = !currentImage;
   if (!currentImage) {
-    el.textContent = 'Upload an image and apply effects to generate a prompt.';
-    copyBtn.disabled = true;
+    el.textContent = 'No image yet.';
     return;
   }
   const parts = [];
@@ -448,14 +471,14 @@ function updatePrompt() {
   if (state.halftone.enabled) {
     const sz = state.halftone.spacing <= 5 ? 'fine' : state.halftone.spacing <= 10 ? 'medium' : 'coarse';
     const shapeLabel = { circle: 'round dots', square: 'square dots', diamond: 'diamond dots', line: 'line screen', ellipse: 'ellipse dots' };
-    parts.push(`${sz} halftone ${shapeLabel[state.halftone.shape]} at ${state.halftone.angle}° (${state.halftone.spacing}px grid, dots: ${state.halftone.color}, bg: ${state.halftone.bgColor})`);
+    parts.push(`${sz} halftone ${shapeLabel[state.halftone.shape]} at ${state.halftone.angle}° (${state.halftone.spacing} px grid, dots: ${state.halftone.color}, bg: ${state.halftone.bgColor})`);
   }
   if (state.vignette.enabled) {
     const lvl = state.vignette.intensity < 40 ? 'subtle' : state.vignette.intensity < 70 ? 'medium' : 'deep';
     parts.push(`${lvl} vignette`);
   }
   if (state.blur.enabled) {
-    parts.push(`${state.blur.radius}px gaussian blur`);
+    parts.push(`${state.blur.radius} px Gaussian blur`);
   }
   if (state.duotone.enabled) {
     parts.push(`duotone — shadows ${state.duotone.shadow}, highlights ${state.duotone.highlight}`);
@@ -465,12 +488,11 @@ function updatePrompt() {
   }
   if (state.texture.enabled) {
     const lvl = state.texture.intensity < 25 ? 'subtle' : state.texture.intensity < 55 ? 'medium' : 'heavy';
-    parts.push(`${lvl} ${state.texture.type} texture (${state.texture.blend} blend)`);
+    const word = { fibers: 'fibres' }[state.texture.type] || state.texture.type;
+    parts.push(`${lvl} ${word} texture (${state.texture.blend.replace('-', ' ')} blend)`);
   }
-  // Nothing on, nothing to copy: the line says so, and Copy prompt rests until an effect is on.
-  copyBtn.disabled = parts.length === 0;
   if (parts.length === 0) {
-    el.textContent = 'No effects active. Enable effects to generate a prompt.';
+    el.textContent = 'Keep this image as it is, with no effects.';
     return;
   }
   const list = parts.length === 1
@@ -481,12 +503,20 @@ function updatePrompt() {
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
-function toggleSection(name) {
+// An effect's section opens and closes on its header. Only the effects that are on start open; turning one on opens
+// it, and turning it off leaves it open while you are there. A preset or a reset starts afresh: open is what is on.
+function setOpen(name, open) {
   const s = document.getElementById(`sect-${name}`);
-  const open = s.classList.toggle('open');
+  s.classList.toggle('open', open);
   const head = s.querySelector('.fx-sum');
   if (head) head.setAttribute('aria-expanded', String(open));
 }
+
+function toggleSection(name) {
+  setOpen(name, !document.getElementById(`sect-${name}`).classList.contains('open'));
+}
+
+const openWhatIsOn = () => EFFECTS.forEach(n => setOpen(n, state[n].enabled));
 
 function toggleEffect(name) {
   state[name].enabled = !state[name].enabled;
@@ -499,15 +529,17 @@ function refreshToggleUI(name) {
   const t  = document.getElementById(`toggle-${name}`);
   const s  = document.getElementById(`sect-${name}`);
   const on = state[name].enabled;
+  const was = s.classList.contains('enabled');
   t.classList.toggle('on', on);
   t.checked = on;   // the switch is a real checkbox: keep it in step with the state, whichever way the state changed
   s.classList.toggle('enabled', on);
   const word = s.querySelector('.fx-state');
   if (word) word.textContent = on ? 'On' : 'Off';
+  if (on && !was) setOpen(name, true);
 }
 
 function refreshAllToggles() {
-  ['grain','halftone','vignette','blur','duotone','posterize','texture'].forEach(refreshToggleUI);
+  EFFECTS.forEach(refreshToggleUI);
 }
 
 function applyPreset(name) {
@@ -515,6 +547,7 @@ function applyPreset(name) {
   if (!p) return;
   Object.keys(p).forEach(k => Object.assign(state[k], p[k]));
   syncAllControls();
+  openWhatIsOn();
   renderEffects();
   setActivePreset(name);
 }
@@ -526,11 +559,11 @@ function setActivePreset(name) {
     b.classList.toggle('on', on);   // .on is the shared chosen-card look in tools.css; .active stays for the contract
     b.setAttribute('aria-pressed', String(on));
   });
-  document.getElementById('lookName').textContent = name || 'custom';
+  document.getElementById('lookName').textContent = name ? PRESET_NAMES[name] : 'custom';
 }
 
-// The look the settings still match, if any: after an edit that lands back on a look, an undo, or a reload, the card
-// stays marked instead of every card going blank.
+// The preset the settings still match, if any: after an edit that lands back on a preset, an undo, or a reload, the
+// card stays marked instead of every card going blank.
 function matchingPreset() {
   return Object.keys(PRESETS).find(n => Object.keys(PRESETS[n]).every(k =>
     Object.keys(PRESETS[n][k]).every(f => state[k][f] === PRESETS[n][k][f]))) || null;
@@ -538,38 +571,45 @@ function matchingPreset() {
 
 function markPresetDirty() { setActivePreset(matchingPreset()); }
 
+// ─── Sliders and colours ────────────────────────────────────────────────────
+
+// Each figure carries its unit, a space between ("3 px"); amounts are percentages; contrast is the power the engine
+// bends the tone by (5 on the slider is even, 1.0×), and gamma is the gamma itself.
+const px = v => `${v} px`, pct = v => `${v}%`, deg = v => `${v}°`;
+const SLIDERS = [
+  ['blur-radius',        'blur',      'radius',    px],
+  ['posterize-levels',   'posterize', 'levels',    String],
+  ['posterize-gamma',    'posterize', 'gamma',     v => (v / 5).toFixed(1)],
+  ['halftone-spacing',   'halftone',  'spacing',   px],
+  ['halftone-angle',     'halftone',  'angle',     deg],
+  ['halftone-contrast',  'halftone',  'contrast',  v => `${(v / 5).toFixed(1)}×`],
+  ['texture-intensity',  'texture',   'intensity', pct],
+  ['texture-scale',      'texture',   'scale',     pct],
+  ['grain-intensity',    'grain',     'intensity', pct],
+  ['grain-mono',         'grain',     'mono',      pct],
+  ['vignette-intensity', 'vignette',  'intensity', pct],
+  ['vignette-spread',    'vignette',  'spread',    pct],
+];
+const COLOURS = [
+  ['duotone-shadow',    'duotone',  'shadow'],
+  ['duotone-highlight', 'duotone',  'highlight'],
+  ['halftone-color',    'halftone', 'color'],
+  ['halftone-bg',       'halftone', 'bgColor'],
+];
+const SELECTS = [
+  ['halftone-shape', 'halftone', 'shape'],
+  ['texture-type',   'texture',  'type'],
+  ['texture-blend',  'texture',  'blend'],
+];
+
 function syncAllControls() {
-  setSlider('grain-intensity',     state.grain.intensity,    'val-grain-intensity');
-  setSlider('grain-mono',          state.grain.mono,         'val-grain-mono');
-  setSlider('halftone-spacing',    state.halftone.spacing,   'val-halftone-spacing',  v => v + 'px');
-  setSlider('halftone-angle',      state.halftone.angle,     'val-halftone-angle',    v => v + '°');
-  setSlider('halftone-contrast',   state.halftone.contrast,  'val-halftone-contrast');
-  document.getElementById('halftone-shape').value = state.halftone.shape;
-  setSlider('vignette-intensity',  state.vignette.intensity, 'val-vignette-intensity');
-  setSlider('vignette-spread',     state.vignette.spread,    'val-vignette-spread');
-  setSlider('blur-radius',         state.blur.radius,        'val-blur-radius', v => v + 'px');
-  setColor('halftone-color',    'swatch-halftone-color',    state.halftone.color);
-  setColor('halftone-bg',       'swatch-halftone-bg',       state.halftone.bgColor);
-  setColor('duotone-shadow',    'swatch-duotone-shadow',    state.duotone.shadow);
-  setColor('duotone-highlight', 'swatch-duotone-highlight', state.duotone.highlight);
-  setSlider('posterize-levels', state.posterize.levels, 'val-posterize-levels');
-  setSlider('posterize-gamma',  state.posterize.gamma,  'val-posterize-gamma');
-  setSlider('texture-intensity', state.texture.intensity, 'val-texture-intensity');
-  setSlider('texture-scale',     state.texture.scale,     'val-texture-scale');
-  document.getElementById('texture-type').value  = state.texture.type;
-  document.getElementById('texture-blend').value = state.texture.blend;
+  SLIDERS.forEach(([id, k, f, fmt]) => {
+    document.getElementById(id).value = state[k][f];
+    document.getElementById(`val-${id}`).textContent = fmt(state[k][f]);
+  });
+  COLOURS.forEach(([id, k, f]) => { document.getElementById(id).value = state[k][f]; showHex(id, state[k][f]); });
+  SELECTS.forEach(([id, k, f]) => { document.getElementById(id).value = state[k][f]; });
   refreshAllToggles();
-}
-
-function setSlider(id, val, valId, fmt = v => String(v)) {
-  document.getElementById(id).value = val;
-  document.getElementById(valId).textContent = fmt(val);
-}
-
-function setColor(inputId, swatchId, val) {
-  document.getElementById(inputId).value = val;
-  document.getElementById(swatchId).style.background = val;
-  showHex(inputId, val);
 }
 
 // The hex beside each well, so a pick never rests on the colour alone.
@@ -578,60 +618,23 @@ function showHex(inputId, val) {
   if (el) el.textContent = String(val).toLowerCase();
 }
 
-// ─── Wire sliders and color pickers ─────────────────────────────────────────
-
-function wireSlider(id, stateKey, subKey, valId, fmt = v => String(v), parse = parseInt) {
-  document.getElementById(id).addEventListener('input', function () {
-    state[stateKey][subKey] = parse(this.value);
-    document.getElementById(valId).textContent = fmt(parse(this.value));
-    renderEffects();
-    markPresetDirty();
-  });
-}
-
-function wireColor(inputId, swatchId, stateKey, subKey) {
-  document.getElementById(inputId).addEventListener('input', function () {
-    state[stateKey][subKey] = this.value;
-    document.getElementById(swatchId).style.background = this.value;
-    showHex(inputId, this.value);
-    renderEffects();
-    markPresetDirty();
-  });
-}
-
-wireSlider('grain-intensity',    'grain',    'intensity',  'val-grain-intensity');
-wireSlider('grain-mono',         'grain',    'mono',       'val-grain-mono');
-wireSlider('halftone-spacing',   'halftone', 'spacing',    'val-halftone-spacing',  v => v + 'px');
-wireSlider('halftone-angle',     'halftone', 'angle',      'val-halftone-angle',    v => v + '°');
-wireSlider('halftone-contrast',  'halftone', 'contrast',   'val-halftone-contrast');
-document.getElementById('halftone-shape').addEventListener('change', function () {
-  state.halftone.shape = this.value;
+SLIDERS.forEach(([id, k, f, fmt]) => document.getElementById(id).addEventListener('input', function () {
+  state[k][f] = parseInt(this.value, 10);
+  document.getElementById(`val-${id}`).textContent = fmt(state[k][f]);
   renderEffects();
   markPresetDirty();
-});
-wireSlider('vignette-intensity', 'vignette', 'intensity',  'val-vignette-intensity');
-wireSlider('vignette-spread',    'vignette', 'spread',     'val-vignette-spread');
-wireSlider('blur-radius',        'blur',     'radius',     'val-blur-radius', v => v + 'px');
-
-wireColor('halftone-color',    'swatch-halftone-color',    'halftone', 'color');
-wireColor('halftone-bg',       'swatch-halftone-bg',       'halftone', 'bgColor');
-wireColor('duotone-shadow',    'swatch-duotone-shadow',    'duotone',  'shadow');
-wireColor('duotone-highlight', 'swatch-duotone-highlight', 'duotone',  'highlight');
-
-wireSlider('posterize-levels', 'posterize', 'levels', 'val-posterize-levels');
-wireSlider('posterize-gamma',  'posterize', 'gamma',  'val-posterize-gamma');
-wireSlider('texture-intensity', 'texture', 'intensity', 'val-texture-intensity');
-wireSlider('texture-scale',     'texture', 'scale',     'val-texture-scale', v => String(v), v => {
-  return parseInt(v);
-});
-
-document.getElementById('texture-type').addEventListener('change', function () {
-  state.texture.type = this.value;
-  renderEffects(); markPresetDirty();
-});
-document.getElementById('texture-blend').addEventListener('change', function () {
-  state.texture.blend = this.value; renderEffects(); markPresetDirty();
-});
+}));
+COLOURS.forEach(([id, k, f]) => document.getElementById(id).addEventListener('input', function () {
+  state[k][f] = this.value;
+  showHex(id, this.value);
+  renderEffects();
+  markPresetDirty();
+}));
+SELECTS.forEach(([id, k, f]) => document.getElementById(id).addEventListener('change', function () {
+  state[k][f] = this.value;
+  renderEffects();
+  markPresetDirty();
+}));
 
 document.querySelectorAll('.preset-pill').forEach(btn =>
   btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
@@ -644,8 +647,9 @@ const canvasContainer = document.getElementById('canvasContainer');
 
 uploadZone.addEventListener('click', () => fileInput.click());
 // Empty, the stage itself opens the picker.
-document.getElementById('dropPlaceholder').addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
+dropPlaceholder.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { loadImage(e.target.files[0]); fileInput.value = ''; });
+document.getElementById('sample').addEventListener('click', () => useSample(false));
 
 // While a file is over a target it carries .drag-over and the shared class beside it (.over on the drop zone,
 // .dropping on the stage), so tools.css draws the look.
@@ -667,19 +671,64 @@ canvasContainer.addEventListener('drop',      e  => {
 });
 
 // ─── Zoom & pan ──────────────────────────────────────────────────────────────
+// zoom.scale is relative to Fit (1 = the canvas shrunk into the stage) and the canvas is zoomed and panned with a
+// transform about its centre. The Zoom select reads the true scale, the drawn size over the bitmap's, so 100% is one
+// image pixel to one CSS pixel: Fit names its own ("Fit · 71%"), and a scroll that lands between the stops shows
+// where it landed ("137%"). The select, scroll, drag and ⌘0 / ⌘= / ⌘− all go through zoomTo.
 
 const zoom = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0 };
+const zoomSel = document.getElementById('zoomSel');
+const ZOOM_STOPS = [0.5, 1, 2];
+const near = (a, b) => Math.abs(a - b) < 0.005;
+// The true scale is the drawn width over the bitmap's (the bounding box carries the transform, and keeps the fraction
+// clientWidth would round off); Fit's own scale is that without the zoom.
+const trueScale = () => { const w = canvas.getBoundingClientRect().width; return canvas.width && w ? w / canvas.width : zoom.scale; };
+const fitScale = () => trueScale() / zoom.scale;
+const isFit = () => zoom.scale === 1 && !zoom.tx && !zoom.ty;
+// The old reach (a quarter of Fit to eight times it), widened when need be so 50% and 200% are always there.
+const clampZoom = s => { const f = fitScale(); return Math.max(Math.min(0.25, 0.5 / f), Math.min(Math.max(8, 2 / f), s)); };
+let shownScale = 1;
 
 function applyZoomTransform() {
   canvas.style.transformOrigin = 'center';
-  canvas.style.transform = `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})`;
-  document.getElementById('zoomLevel').textContent = Math.round(zoom.scale * 100) + '%';
+  const place = (dx, dy) => { canvas.style.transform = `translate(${zoom.tx + dx}px, ${zoom.ty + dy}px) scale(${zoom.scale})`; };
+  place(0, 0);
+  // Centred, the picture's corner can land on half a pixel, and then 100% and 200% are resampled soft. Nudge the drawn
+  // corner (not the pan) onto a whole device pixel, so each image pixel is drawn as it is.
+  const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const dx = Math.round(r.left * d) / d - r.left, dy = Math.round(r.top * d) / d - r.top;
+  if (dx || dy) place(dx, dy);
   canvasContainer.style.cursor = zoom.scale > 1 ? 'grab' : 'default';
+  showZoom();
 }
 
-function changeZoom(delta) {
-  if (!currentImage) return;   // nothing to zoom yet: the buttons rest, and so do the keys
-  zoom.scale = Math.max(0.25, Math.min(8, zoom.scale + delta));
+function showZoom() {
+  const fitOpt = zoomSel.options[0];
+  let custom = zoomSel.querySelector('option[value="custom"]');
+  const dropCustom = () => { if (custom) custom.remove(); };
+  if (!currentImage) { fitOpt.textContent = 'Fit'; dropCustom(); zoomSel.value = 'fit'; return; }
+  const pct = s => `${Math.round(s * 100)}%`;
+  const t = shownScale = trueScale();
+  fitOpt.textContent = `Fit · ${pct(fitScale())}`;
+  if (isFit()) { dropCustom(); zoomSel.value = 'fit'; return; }
+  const stop = ZOOM_STOPS.find(z => near(z, t));
+  if (stop) { dropCustom(); zoomSel.value = String(stop); return; }
+  // Between the stops: a figure of its own, in its place among them.
+  if (!custom) custom = new Option('', 'custom');
+  custom.textContent = pct(t);
+  const after = [...zoomSel.options].find(o => o.value !== 'fit' && o !== custom && parseFloat(o.value) > t);
+  zoomSel.insertBefore(custom, after || null);
+  zoomSel.value = 'custom';
+}
+
+// Zoom about a point given from the stage's centre (0, 0 is the centre), keeping that point where it is.
+function zoomTo(scale, mx = 0, my = 0) {
+  if (!currentImage) return;   // nothing to zoom yet: the select rests, and so do the keys
+  const old = zoom.scale;
+  zoom.scale = clampZoom(scale);
+  const ratio = zoom.scale / old;
+  zoom.tx = mx + (zoom.tx - mx) * ratio;
+  zoom.ty = my + (zoom.ty - my) * ratio;
   if (zoom.scale <= 1) { zoom.tx = 0; zoom.ty = 0; }
   applyZoomTransform();
 }
@@ -689,22 +738,38 @@ function resetZoom() {
   applyZoomTransform();
 }
 
+// 'fit', or a true scale (1 = one image pixel per CSS pixel), about the stage's centre.
+function setZoom(v) {
+  if (!currentImage) return;
+  if (v === 'fit') resetZoom(); else zoomTo(parseFloat(v) / fitScale());
+}
+
+// ⌘= and ⌘−: the next stop up or down from where it is now, Fit's own scale among them.
+function stepZoom(dir) {
+  if (!currentImage) return;
+  const t = trueScale(), f = fitScale();
+  const levels = [f, ...ZOOM_STOPS.filter(z => !near(z, f))].sort((a, b) => a - b);
+  const next = dir > 0 ? levels.find(z => z > t + 0.005) : levels.reverse().find(z => z < t - 0.005);
+  if (next == null) return;
+  if (near(next, f)) resetZoom(); else setZoom(next);
+}
+
+zoomSel.addEventListener('change', () => { if (zoomSel.value !== 'custom') setZoom(zoomSel.value); });
+
 canvasContainer.addEventListener('wheel', (e) => {
   if (!currentImage) return;   // an empty stage has nothing to zoom, so the readout stays at Fit
   e.preventDefault();
-  const delta = e.deltaY < 0 ? 0.2 : -0.2;
-  // zoom toward cursor
+  // Zoom toward the cursor.
   const rect = canvasContainer.getBoundingClientRect();
-  const mx = e.clientX - rect.left - rect.width / 2;
-  const my = e.clientY - rect.top  - rect.height / 2;
-  const oldScale = zoom.scale;
-  zoom.scale = Math.max(0.25, Math.min(8, zoom.scale + delta));
-  const ratio = zoom.scale / oldScale;
-  zoom.tx = mx + (zoom.tx - mx) * ratio;
-  zoom.ty = my + (zoom.ty - my) * ratio;
-  if (zoom.scale <= 1) { zoom.tx = 0; zoom.ty = 0; }
-  applyZoomTransform();
+  zoomTo(zoom.scale + (e.deltaY < 0 ? 0.2 : -0.2), e.clientX - rect.left - rect.width / 2, e.clientY - rect.top - rect.height / 2);
 }, { passive: false });
+
+// A new window size moves Fit's scale. Fitted, the readout follows it; zoomed, the picture keeps its true scale.
+new ResizeObserver(() => {
+  if (!currentImage) return;
+  if (!isFit()) zoom.scale = clampZoom(shownScale / fitScale());
+  applyZoomTransform();
+}).observe(canvasContainer);
 
 canvasContainer.addEventListener('mousedown', (e) => {
   if (zoom.scale <= 1) return;
@@ -731,49 +796,63 @@ window.addEventListener('mouseup', () => {
 
 // ─── Copy & download ─────────────────────────────────────────────────────────
 
-function copyPrompt() {
-  const text = document.getElementById('promptText').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copyBtn');
-    const prev = btn.dataset.label || (btn.dataset.label = btn.textContent);
-    btn.textContent = 'Copied';
-    setTimeout(() => btn.textContent = prev, 1500);
-  }, () => ToolKit.toast('Clipboard blocked'));
+// As in the other tools: a copy says how it went on its own button, and the PNG is named for the tool and its size.
+function flash(btn, msg) {
+  if (btn.dataset.rest == null) btn.dataset.rest = btn.textContent;
+  clearTimeout(btn._flash); btn.textContent = msg;
+  btn._flash = setTimeout(() => { btn.textContent = btn.dataset.rest; delete btn.dataset.rest; }, 1300);
+}
+
+async function copyPrompt() {
+  if (!currentImage) return;
+  const btn = document.getElementById('copyBtn');
+  try { await navigator.clipboard.writeText(document.getElementById('promptText').textContent); flash(btn, 'Copied'); }
+  catch (e) { flash(btn, 'Clipboard blocked'); }
 }
 
 function downloadImage() {
   if (!currentImage) return;
-  const a = document.createElement('a');
-  a.download = 'image-effects.png';
-  a.href = canvas.toDataURL('image/png');
-  a.click();
+  canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `image-effects-${canvas.width}x${canvas.height}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
 }
 async function copyImage() {
   if (!currentImage) return;
-  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); ToolKit.toast('Image copied'); }
-  catch (e) { ToolKit.toast('Clipboard blocked'); }
+  const btn = document.getElementById('copyImgBtn');
+  try { const blob = await new Promise(r => canvas.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(btn, 'Copied'); }
+  catch (e) { flash(btn, 'Clipboard blocked'); }
 }
 
 // ─── Shortcuts, undo/redo, local storage (shared kit) ────────────────────────
 const DEFAULT_STATE = JSON.parse(JSON.stringify(state));
+let afresh = false;   // set by a reset, so the sections it leaves open are only the ones that are on
 ToolKit.init({
   tool: 'image-effects', version: 1,
   getState: () => JSON.parse(JSON.stringify(state)),
-  setState: s => { Object.keys(s).forEach(k => { if (state[k]) Object.assign(state[k], s[k]); }); syncAllControls(); refreshAllToggles(); markPresetDirty(); renderEffects(); },
+  setState: s => {
+    Object.keys(s).forEach(k => { if (state[k]) Object.assign(state[k], s[k]); });
+    syncAllControls();
+    if (afresh) { openWhatIsOn(); afresh = false; }
+    markPresetDirty(); renderEffects();
+  },
   defaults: () => JSON.parse(JSON.stringify(DEFAULT_STATE)),
-  onReset: () => { ToolKit.saveAux('image', null); },
+  // The kept picture goes with everything else, and the sample takes its place so the stage is never left empty.
+  onReset: () => { afresh = true; ToolKit.saveAux('image', null); useSample(true); },
 });
-{ const kept = ToolKit.loadAux('image', true); if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.src = kept.data; } }
+document.getElementById('resetTool').addEventListener('click', () => ToolKit.reset());
+// The picture kept from last time, or the sample on a first visit.
+{
+  const kept = ToolKit.loadAux('image', true);
+  if (kept && kept.data) { const img = new Image(); img.onload = () => useImage(img, kept.name, false); img.onerror = () => useSample(true); img.src = kept.data; }
+  else useSample(true);
+}
 ToolKit.register('o', 'Open an image', () => fileInput.click(), { group: 'Image' });
 ToolKit.register('mod+s', 'Download PNG', downloadImage, { group: 'Export' });
 ToolKit.register('mod+shift+c', 'Copy image', copyImage, { group: 'Export' });
-Object.keys(PRESETS).forEach((name, i) => ToolKit.register(String(i + 1), `Look: ${name}`, () => applyPreset(name), { group: 'Looks' }));
-// In the panel's order, which is the order the engine runs them, so the help sheet lists them the same way.
+Object.keys(PRESETS).forEach((name, i) => ToolKit.register(String(i + 1), `Preset: ${PRESET_NAMES[name]}`, () => applyPreset(name), { group: 'Presets' }));
 [['b', 'blur', 'Blur'], ['d', 'duotone', 'Duotone'], ['p', 'posterize', 'Posterize'], ['h', 'halftone', 'Halftone'], ['t', 'texture', 'Texture'], ['g', 'grain', 'Grain'], ['v', 'vignette', 'Vignette']]
   .forEach(([k, name, label]) => ToolKit.register(k, `Toggle ${label.toLowerCase()}`, () => toggleEffect(name), { group: 'Effects' }));
-ToolKit.register('mod+0', 'Zoom to fit', resetZoom, { group: 'View' });
-ToolKit.register('mod+=', 'Zoom in', () => changeZoom(0.25), { group: 'View' });
-ToolKit.register('mod+-', 'Zoom out', () => changeZoom(-0.25), { group: 'View' });
+ToolKit.register('mod+0', 'Zoom to fit', () => setZoom('fit'), { group: 'View' });
+ToolKit.register('mod+=', 'Zoom in', () => stepZoom(1), { group: 'View' });
+ToolKit.register('mod+-', 'Zoom out', () => stepZoom(-1), { group: 'View' });
 // The export buttons name their keys the way the help sheet does on this machine: ⌘S on a Mac, Ctrl+S elsewhere.
 {
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || '');
