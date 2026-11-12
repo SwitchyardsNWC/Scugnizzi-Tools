@@ -22,17 +22,19 @@
   details.group>summary::before,details.more>summary::before{content:"";flex:0 0 4px;width:4px;height:4px;margin:-4px 4px 0 1px;
     border-right:var(--border-width) solid currentColor;border-bottom:var(--border-width) solid currentColor;transform:rotate(-45deg)}
   details.group[open]>summary::before,details.more[open]>summary::before{margin-top:-6px;transform:rotate(45deg)}
-  details.group>summary{min-height:32px;font-size:var(--text-meta);line-height:var(--leading-meta);color:var(--text-primary)}
+  /* The 13px name and the 12px state share a baseline, not a centre line: one wrapping flex line, baseline-aligned
+     inside and centred in the head, with the chevron centred on it. (The two never wrap: the name's basis is 0.) */
+  details.group>summary{min-height:32px;flex-wrap:wrap;align-content:center;align-items:baseline;font-size:var(--text-meta);line-height:var(--leading-meta);color:var(--text-primary)}
+  details.group>summary::before{align-self:center}
   details.group>summary .t{flex:1;min-width:0}
   details.group>summary .v{max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
     font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted)}
   details.group>.body{padding:0 0 var(--spacing-12)}
   details.more>summary{min-height:var(--control-height-sm);font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted)}
   details.more>summary:hover{color:var(--text-primary)}
-  details.more>.body{margin:0 0 var(--spacing-4) 3px;padding-left:var(--spacing-12);border-left:var(--border-width) solid var(--border-muted)}
+  /* 4 + 1 + 12 puts the fine sliders' labels on the same left edge as "Fine control" itself (1 + 4 + 4 + 8). */
+  details.more>.body{margin:0 0 var(--spacing-4) var(--spacing-4);padding-left:var(--spacing-12);border-left:var(--border-width) solid var(--border-muted)}
   details.more>.body>.slider:first-child{margin-top:var(--spacing-8)}
-  /* The master bleed drives the fine sliders, so its name is set in ink, a step above theirs. */
-  .master>.slider>label{color:var(--text-primary)}
 
   /* --- the layer's words and what follows them ---------------------------------------------------------------------- */
   /* The text you type keeps a typewriter face: it previews the content, not the chrome. */
@@ -43,10 +45,19 @@
   .layer-actions{display:flex;padding:var(--spacing-12) 0 0 calc(var(--row-label-width) + var(--spacing-8));border-top:var(--border-width) solid var(--border-muted)}
 
   /* --- layers ---------------------------------------------------------------------------------------------------------- */
-  /* Each row is a .list .item: the chosen one is ink-edged with the 2px marker. Its kind is a lettered square, T or S. */
+  /* Each row is a .list .item: the chosen one is ink-edged with the 2px marker. Its kind is a lettered square, T or S.
+     4px between rows, so a focus ring outside one row never meets the next row's edge. */
+  #layerList{gap:var(--spacing-4)}
   #layerList .kind{flex:0 0 18px;width:18px;height:18px;padding-top:3px;text-align:center;
     font-family:var(--font-mono-detail);font-size:11px;line-height:13px;letter-spacing:0;color:var(--text-secondary);
     border:var(--border-width) solid var(--border-control);border-radius:2px}
+  /* The name is the row's button (what Tab reaches and Enter picks), set as the plain line it was: no edge, no fill. */
+  #layerList .lrow>.name{display:block;min-height:0;padding:var(--optical-nudge) 0 0;border:0;border-radius:0;background:transparent;
+    font:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;text-align:left;cursor:inherit}
+  /* Its focus rings the whole row from outside, in the gutter, so a focused row never reads as the chosen one's ink edge. */
+  #layerList .lrow>.name:focus-visible{outline:none}
+  #layerList .lrow:has(>.name:focus-visible){outline:var(--border-width) solid var(--focus-ring);outline-offset:1px}
+  #layerList .x:focus-visible{outline-offset:1px}
   #layerList .x:not(:disabled):hover{color:var(--status-blocked);border-color:var(--status-blocked);background:var(--status-blocked-soft)}
   .addrow>select{flex:1;min-width:0}
   /* + Stamp… is a menu that adds, so it wears a button's edge, not a field's well. */
@@ -68,13 +79,18 @@
   .stack>.line>.times{padding-top:var(--optical-nudge);color:var(--text-muted)}
 
   /* --- the bar over the stage ---------------------------------------------------------------------------------------- */
-  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
-  .warn{color:var(--status-risk)}
-  .warn::before{content:"";display:inline-block;width:8px;height:8px;margin-right:var(--spacing-4);background:currentColor}
+  /* On a narrow bar the figures give way (their whole line is on hover); the warning after them never does. */
+  #meta{display:flex;align-items:baseline;gap:var(--spacing-12);min-width:0}
+  #meta>.figs{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .warn{flex:none;color:var(--status-risk)}
+  .warn>.sq{margin-right:var(--spacing-4)}
 
   /* --- the stage ----------------------------------------------------------------------------------------------------- */
   /* Fit shrinks the paper into the stage; a zoom sets the canvas size inline and the stage scrolls. The drag boxes are
      placed from the canvas's box, so the canvas carries no border or padding, only tools.css's hairline ring. */
+  /* The sheet's edge is part of judging it, and the default paper is nearly the light stage's tone, so the ring is the
+     control edge rather than the card's: it flips with the theme and still reads against a pale sheet. */
+  .stage canvas{box-shadow:0 0 0 var(--border-width) var(--border-control)}
   .stage.fit{overflow:hidden}
   .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
   .stage:not(.fit){display:block}
@@ -87,20 +103,34 @@
     border:var(--border-width) dashed transparent;outline:var(--border-width) dashed transparent;outline-offset:0}
   .tb:hover,.tb.drag{border-color:var(--text-primary);outline-color:var(--surface-paper)}
   .tb.sel{border-style:solid;outline-style:solid;border-color:var(--text-primary);outline-color:var(--surface-paper)}
-  .tb .tag{position:absolute;left:-2px;top:-24px;display:none;max-width:none;min-height:0;padding:3px 6px 1px;
+  .tb .tag{position:absolute;left:-2px;top:-24px;display:none;max-width:none;
     color:var(--surface-paper);background:var(--text-primary);border:0;border-radius:2px;outline:var(--border-width) solid var(--surface-paper);
     user-select:none;pointer-events:none}
   .tb:hover .tag,.tb.drag .tag{display:block}
 
   /* --- the export bar ------------------------------------------------------------------------------------------------ */
   /* Two columns of actions instead of one tall stack, so the bar is three controls high and the paper keeps the height.
-     The one that finishes the job spans both; with a project open it shares the row with Save, which takes the fill. */
+     The one that finishes the job spans both: Download PNG, or with a project open Save, whose label names the file.
+     Without a project Copy image spans the last row; with one it pairs with Preview GIF. Three rows either way, so the
+     bar keeps its height when a project opens. A label that outgrows its button (a long file name, a passing message)
+     ends in an ellipsis inside it, never over its neighbour. */
+  .actions>button{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
+  /* Copy recipe sits with what it copies, in the recipe's corner. */
+  .recipe-pane{display:flex;align-items:flex-start;gap:var(--spacing-8);min-width:0}
+  .recipe-pane>pre#recipe{flex:1;min-width:0;max-height:108px}
+  .recipe-pane>#copyRecipe{flex:none;min-width:80px}
   @media (min-width:901px){
-    .actions{display:grid;grid-template-columns:repeat(2,128px);min-width:0}
-    #download.primary{grid-column:1/-1}
+    /* 3 × 28 + 2 × 12 = 108: the recipe beside it, at 18px a line, shows six whole lines and scrolls for the rest. */
+    .actions{display:grid;grid-template-columns:repeat(2,128px);gap:var(--spacing-12);min-width:0}
+    #download.primary,#saveProject,#download.primary~#copyImg{grid-column:1/-1}
+    .recipe-pane{align-self:stretch;contain:size}
+    .recipe-pane>pre#recipe{align-self:stretch;max-height:none}
   }
-  #saveProject{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
-  pre#recipe{max-height:100px}
+  /* Stacked on a narrow window the page scrolls, so the stage gets a height of its own: without one, Fit has nothing to
+     fit a tall sheet into and a receipt draws at full size. */
+  @media (max-width:900px){
+    .stage{flex:none;height:60vh}
+  }
 </style>
 </head>
 <body>
@@ -181,7 +211,7 @@
       <div class="body">
         <div class="stack"><label for="sizeSel">Size</label><div class="line"><select id="sizeSel"></select><button id="rotate" class="icon" title="Swap width and height" aria-label="Swap width and height">⇄</button></div></div>
         <div class="stack" id="customRow" hidden><label for="wIn">Inches, width × height</label><div class="line"><input type="number" id="wIn" step="0.25" min="0.5" max="24" aria-label="Width in inches"><span class="times" aria-hidden="true">×</span><input type="number" id="hIn" step="0.25" min="0.5" max="24" aria-label="Height in inches"></div></div>
-        <div class="stack"><label for="dpiSel">Resolution</label><div class="line"><select id="dpiSel"></select></div></div>
+        <div class="row"><label for="dpiSel">Resolution</label><select id="dpiSel"></select></div>
         <div id="canvasSliders"></div>
       </div>
     </details>
@@ -216,12 +246,14 @@
       <div class="actions">
         <button id="saveProject" class="primary" hidden>Save to project</button>
         <button id="download" class="primary">Download PNG</button>
-        <button id="downloadGif" title="Six frames, each with a different random seed, looping" aria-live="polite">Download GIF</button>
-        <button id="previewGif" title="Render the six frames and loop them here before saving" aria-live="polite">Preview GIF</button>
+        <button id="downloadGif" title="Six frames, each with a different random seed, looping">Download GIF</button>
+        <button id="previewGif" title="Render the six frames and loop them here before saving">Preview GIF</button>
         <button id="copyImg" aria-live="polite">Copy image</button>
-        <button id="copyRecipe" aria-live="polite">Copy recipe</button>
       </div>
-      <pre id="recipe"></pre>
+      <div class="recipe-pane">
+        <pre id="recipe"></pre>
+        <button id="copyRecipe" class="small" aria-live="polite">Copy recipe</button>
+      </div>
     </div>
   </main>
 </div>
@@ -856,8 +888,12 @@ function applyZoom() {
   updateOverlay();
 }
 function updateMeta(ms) {
-  const { w, h } = canvasPx(), mp = (w * h / 1e6);
-  $('#meta').innerHTML = `${w} × ${h} px &nbsp;·&nbsp; ${state.wIn} × ${state.hIn} in @ ${state.dpi} dpi` + (ms != null ? ` &nbsp;·&nbsp; ${ms} ms` : '') + (mp > 3 ? ` &nbsp;<span class="warn">large canvas, renders may lag</span>` : '');
+  const { w, h } = canvasPx(), mp = (w * h / 1e6), sep = '  ·  ';
+  const figs = `${w} × ${h} px${sep}${state.wIn} × ${state.hIn} in @ ${state.dpi} dpi` + (ms != null ? `${sep}${ms} ms` : '');
+  const warn = mp > 3 ? 'large canvas, renders may lag' : '';
+  // The figures give way on a narrow window and the warning after them stays whole; the whole line is on hover.
+  $('#meta').innerHTML = `<span class="figs">${figs}</span>` + (warn ? `<span class="warn"><span class="sq"></span>${warn}</span>` : '');
+  $('#meta').title = figs + (warn ? sep + warn : '');
 }
 function updateRecipe() {
   const A = state.paper, pct = v => Math.round(v * 100) + '%';
@@ -913,21 +949,34 @@ function renderLayerList() {
   const only = state.layers.length <= 1;   // the last layer can't go, so its delete controls say so before they're pressed
   for (const L of state.layers) {
     const on = L.id === state.selected, name = layerName(L);
-    const row = document.createElement('div'); row.className = 'item lrow' + (on ? ' on' : '');
-    // A row is reached with Tab and picked with Enter or Space; the chosen one is announced as current, not only drawn.
-    row.tabIndex = 0; row.dataset.id = L.id; if (on) row.setAttribute('aria-current', 'true');
-    row.innerHTML = `<span class="kind ${L.kind}" aria-hidden="true">${L.kind === 'svg' ? 'S' : 'T'}</span><span class="name">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span><button type="button" class="icon x" title="Delete layer">×</button>`;
+    const row = document.createElement('div'); row.className = 'item lrow' + (on ? ' on' : ''); row.dataset.id = L.id;
+    // The name is the row's button: Tab reaches it, Enter or Space picks the layer, and the chosen one is announced as
+    // current, not only drawn. A click anywhere else on the row picks it too.
+    row.innerHTML = `<span class="kind ${L.kind}" aria-hidden="true">${L.kind === 'svg' ? 'S' : 'T'}</span><button type="button" class="name">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</button><button type="button" class="icon x" title="Delete layer">×</button>`;
+    if (on) row.querySelector('.name').setAttribute('aria-current', 'true');
     const x = row.querySelector('.x'); x.setAttribute('aria-label', `Delete layer ${name}`); x.disabled = only;
     row.addEventListener('click', e => {
       const kb = e.detail === 0;              // pressed from the keyboard: keep the focus in the list it rebuilds
       if (e.target.classList.contains('x')) deleteLayer(L.id); else selectLayer(L.id);
-      if (kb) { const r = $('#layerList .lrow.on'); if (r) r.focus(); }
+      if (kb) focusLayerRow();
     });
-    row.addEventListener('keydown', e => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); row.click(); } });
+    // A focused row keeps Delete and the arrows to itself, as a field does. Delete or Backspace removes this row's layer,
+    // not the selected one; ↑ ↓ Home End move between rows; nothing nudges the paper.
+    row.addEventListener('keydown', e => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); deleteLayer(L.id); focusLayerRow(); return; }
+      if (!/^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      const rows = [...list.children], i = rows.indexOf(row);
+      const j = { ArrowUp: i - 1, ArrowDown: i + 1, Home: 0, End: rows.length - 1 }[e.key];
+      if (j != null && j !== i && rows[j]) rows[j].querySelector('.name').focus();
+    });
     list.appendChild(row);
   }
   $('#delLayer').disabled = only;
 }
+// After the list is rebuilt from the keyboard, the focus goes back to the chosen layer's row.
+function focusLayerRow() { const b = $('#layerList .lrow.on .name'); if (b) b.focus(); }
 function selectLayer(id) {
   state.selected = id; renderLayerList(); refreshLayerControls(); updateOverlay(); updateHints(); openEditor();
 }
@@ -1047,8 +1096,10 @@ function syncSizeSel() {
   $('#wIn').value = state.wIn; $('#hIn').value = state.hIn;
 }
 sizeSel.addEventListener('change', () => {
+  // Custom… opens the width × height fields on the current size, instead of snapping back to the preset that matches it.
+  if (sizeSel.value === 'custom') { $('#customRow').hidden = false; $('#wIn').value = state.wIn; $('#hIn').value = state.hIn; return; }
   const s = SIZES[sizeSel.value];
-  if (sizeSel.value !== 'custom') { state.wIn = s[1]; state.hIn = s[2]; if (s[3]) { state.dpi = s[3]; dpiSel.value = s[3]; } }
+  state.wIn = s[1]; state.hIn = s[2]; if (s[3]) { state.dpi = s[3]; dpiSel.value = s[3]; }
   syncSizeSel(); invalidate('ink', 'paper');
 });
 $('#rotate').addEventListener('click', () => { [state.wIn, state.hIn] = [state.hIn, state.wIn]; syncSizeSel(); invalidate('ink', 'paper'); });
@@ -1173,7 +1224,8 @@ function buildGif(frames, w, h, delayCs) {
 // Six renders with different seeds so every random element boils; shared by Download and Preview.
 async function makeGif(btn) {
   const label = btn.textContent, seed0 = state.seed, frames = [], { w, h } = canvasPx();
-  if (w * h > 4e6) { flash(btn, 'Canvas too large for GIF'); return null; }
+  // The button's word fits its column; the sentence goes to the toast, which a screen reader also hears.
+  if (w * h > 4e6) { flash(btn, 'Too large'); if (window.ToolKit) ToolKit.toast('Canvas too large for a GIF: 4 megapixels at most'); return null; }
   try {
     for (let i = 0; i < 6; i++) {
       btn.textContent = `Frame ${i + 1} / 6…`; await new Promise(r => setTimeout(r, 0));
@@ -1192,7 +1244,9 @@ $('#copyImg').addEventListener('click', async () => {
   catch (e) { flash(btn, 'Clipboard blocked'); }
 });
 $('#copyRecipe').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); } catch (e) { flash($('#copyRecipe'), 'Clipboard blocked'); }
+  // Short words, so the corner button keeps its width and the recipe beside it doesn't reflow; the sentence is the toast.
+  try { await navigator.clipboard.writeText($('#recipe').textContent); flash($('#copyRecipe'), 'Copied!'); }
+  catch (e) { flash($('#copyRecipe'), 'Blocked'); if (window.ToolKit) ToolKit.toast('Clipboard blocked by the browser'); }
 });
 
 refreshAll();
