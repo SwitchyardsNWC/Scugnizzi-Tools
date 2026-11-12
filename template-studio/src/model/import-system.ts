@@ -29,6 +29,7 @@ import {
   type ThemeTokens,
   type TypeStyle,
 } from './design-system.ts';
+import { walkSystem } from './color-refs.ts';
 
 export type SourceShape = 'system' | 'tokens' | 'css' | 'html' | 'text' | 'none';
 
@@ -148,83 +149,41 @@ function unique(name: string, taken: Map<string, string>, hex?: string): string 
 
 // --- the repoint pass ---------------------------------------------------------------------------------------
 
-/** Every place in a DesignSystem that names a colour, as a get/set pair over one system. */
-function colorRefs(ds: DesignSystem): Array<{ path: string; get(): ColorRef; set(v: ColorRef): void }> {
-  const out: Array<{ path: string; get(): ColorRef; set(v: ColorRef): void }> = [];
-  for (const [name, theme] of Object.entries(ds.themes)) {
-    for (const key of ['band', 'container', 'text', 'link'] as const) {
-      out.push({
-        path: `themes.${name}.${key}`,
-        get: () => theme[key],
-        set: (v) => {
-          (theme as unknown as Record<string, unknown>)[key] = v;
-        },
-      });
-    }
-  }
-  for (const [name, button] of Object.entries(ds.buttons)) {
-    for (const key of ['fill', 'ink', 'border'] as const) {
-      out.push({
-        path: `buttons.${name}.${key}`,
-        get: () => button[key],
-        set: (v) => {
-          (button as unknown as Record<string, unknown>)[key] = v;
-        },
-      });
-    }
-  }
-  for (const key of ['quoteColor', 'ruleColor'] as const) {
-    out.push({
-      path: `richText.${key}`,
-      get: () => ds.richText[key],
-      set: (v) => {
-        (ds.richText as unknown as Record<string, unknown>)[key] = v;
-      },
-    });
-  }
-  out.push({ path: 'image.borderColor', get: () => ds.image.borderColor, set: (v) => void ((ds.image as unknown as Record<string, unknown>)['borderColor'] = v) });
-  for (const [name, style] of Object.entries(ds.type)) {
-    out.push({
-      path: `type.${name}.color`,
-      get: () => style.color ?? null,
-      set: (v) => {
-        if (v === null) delete (style as unknown as Record<string, unknown>)['color'];
-        else (style as unknown as Record<string, unknown>)['color'] = v;
-      },
-    });
-  }
-  out.push({ path: 'pageBorderColor', get: () => ds.pageBorderColor, set: (v) => void ((ds as unknown as Record<string, unknown>)['pageBorderColor'] = v) });
-  return out;
-}
-
 /**
  * The load-bearing half of an import.
  *
- * Replacing `colors` leaves every preset, button, quote bar and border naming a palette entry that no longer
- * exists. `colorOf` returns null for a name the palette lacks, and `theme()` then falls text and link back to
- * black — so an import without this produces a system whose every heading is black on a band that vanished.
+ * Replacing `colors` leaves every preset, button, quote bar, border, footer colour and brand preset naming a
+ * palette entry that no longer exists. `colorOf` returns null for a name the palette lacks, and `theme()` then
+ * falls text and link back to black — so an import without this produces a system whose every heading is black
+ * on a band that vanished.
  *
  * A reference whose old name is gone keeps the colour it resolved to, as a literal. A literal is visible in the
  * panel as "Literal #hex", which is the honest report: the value survived, the name did not.
+ *
+ * Where a colour can be named is `walkSystem`'s list, the same one renaming and removing a colour use. This pass
+ * kept its own until 2026-11-12, and it had no footer and no brand presets (learnings 3.103). Writes the result
+ * back into `ds`, which is the import's own working copy, because both callers carry on editing it.
  */
 export function repointRefs(ds: DesignSystem, beforeColors: Record<string, string>): { ds: DesignSystem; lost: string[] } {
   const lost = new Set<string>();
   /** The new palette, by lowered hex, so a colour that kept its value keeps a name too. */
   const byHex = new Map(Object.entries(ds.colors).map(([name, hex]) => [hex.toLowerCase(), name]));
-  for (const ref of colorRefs(ds)) {
-    const value = ref.get();
-    if (value === null || value.startsWith('#')) continue;
-    if (ds.colors[value] !== undefined) continue;
-    const was = beforeColors[value];
-    if (was === undefined) {
-      ref.set(null);
-      lost.add(value);
-      continue;
-    }
-    const renamed = byHex.get(was.toLowerCase());
-    ref.set(renamed ?? was.toLowerCase());
+  const next = walkSystem(ds, (value) => {
+    if (value.startsWith('#') || ds.colors[value] !== undefined) return value;
     lost.add(value);
+    const was = beforeColors[value];
+    if (was === undefined) return null;
+    return byHex.get(was.toLowerCase()) ?? was.toLowerCase();
+  });
+  // A role with no colour follows its section, and the file says that by leaving the key out.
+  for (const [name, role] of Object.entries(next.type)) {
+    if (role.color === null && ds.type[name]?.color !== null) {
+      const { color: _gone, ...rest } = role;
+      void _gone;
+      next.type = { ...next.type, [name]: rest };
+    }
   }
+  Object.assign(ds, next);
   return { ds, lost: [...lost].sort() };
 }
 

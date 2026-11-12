@@ -124,6 +124,37 @@ describe('replacing the palette', () => {
     expect(theme(ds, 'navy')).toEqual(theme(base, 'navy'));
   });
 
+  it('carries the footer’s colours and the brand presets, which its own list left out (learnings 3.103)', () => {
+    // Red is #d10000. The new palette has no red, so each keeps the colour it resolved to, as a literal.
+    const next: DesignSystem = { ...structuredClone(base), footer: { hairlineColor: 'red', linkColor: 'red' }, colors: { ink: '#111111' } };
+    const { ds, lost } = repointRefs(next, base.colors);
+    expect(ds.footer?.hairlineColor).toBe('#d10000');
+    expect(ds.footer?.linkColor).toBe('#d10000');
+    // The Shop sign is red in the shipped presets, which this system never wrote out.
+    expect(ds.canvasType?.['retro']?.color).toBe('#d10000');
+    expect(lost).toContain('red');
+  });
+
+  it('drops a role’s colour that named nothing before either, rather than writing null into the file', () => {
+    const next: DesignSystem = { ...structuredClone(base), colors: { ink: '#111111' } };
+    next.type = { ...next.type, h1: { ...next.type['h1']!, color: 'ghost' } };
+    const { ds, lost } = repointRefs(next, base.colors);
+    expect('color' in ds.type['h1']!).toBe(false);
+    expect(lost).toContain('ghost');
+  });
+
+  it('keeps the footer and the Shop sign red through a pasted palette that has no red', () => {
+    const out = importDesignSystem(':root { --color-ink: #111111; }', { ...base, footer: { linkColor: 'red' } });
+    expect(out.ds.colors['red']).toBeUndefined();
+    expect(out.ds.footer?.linkColor).toBe('#d10000');
+    expect(out.ds.canvasType?.['retro']?.color).toBe('#d10000');
+  });
+
+  it('leaves the shipped brand presets unwritten when the new palette still has every colour they name', () => {
+    const out = importDesignSystem(`:root { --color-red: ${base.colors['red']}; --color-ink: #111111; }`);
+    expect(out.ds.canvasType).toBeUndefined();
+  });
+
   it('keeps a name when the new palette holds the same colour under a new one', () => {
     const navy = base.colors['navy']!;
     const next: DesignSystem = { ...structuredClone(base), colors: { midnight: navy } };

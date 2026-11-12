@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// A box around a Text block sits outside `.sy-rich` (learnings 3.103).
+// A box around a Text block sits outside `.sy-rich` (learnings 3.104).
 //
 // `.sy-rich td { border:1px solid #d9d8d3; font-size:16px }` is for tables the team types, and HubSpot inlines it
 // onto every match at send. A box's own table under a `sy-rich` cell picked it up: cards 1 and 3 of the card starter

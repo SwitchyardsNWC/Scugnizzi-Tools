@@ -3263,7 +3263,33 @@ arrangement, links; asked about links, underlined by default.*
 - **"Socials first" was ledger-only and named for one direction.** `socialsAt` is above or below on every type;
   absent is where the type puts them, and a ledger that said `socialsFirst` keeps them first until somebody chooses.
 
-### 3.103 A box inside `.sy-rich` wore the team's table rule
+### 3.103 Two lists of where a colour lives, and they drifted
+
+*2026-11-11. Found as a card's fill: set to `card` (#123456), then the palette entry renamed to Callout. Usage came
+back empty, the fill stayed `card`, and the export lost the card.*
+
+- **Counting and carrying were two walks.** `colorUsage` counted, `repoint` rewrote, and each knew presets, roles,
+  buttons, stripes and dividers. Neither knew a column's fill or border, a brand mark, a freeform drawing (its
+  background, every layer's paint, a run's colour), the quote bar, the rule, the image and page borders, the
+  footer's hairline and link (system and per footer), or the brand presets. So `removeColor` called a colour used
+  only by a card unused, deleted it, and the card vanished: `boxOf` draws the wrapper only when the fill resolves.
+- **One walk, two endings.** `model/color-refs.ts` is the list. Whatever it visits is counted *and* carried; a
+  field it does not visit is neither, in one place. `tests/color-refs.test.ts` puts every kind through the same
+  four questions, and a new kind without a row there is the gap this closes.
+- **Absent brand presets are the shipped ones.** The Shop sign names red whether or not a system wrote
+  `canvasType`, so the walk reads the shipped set and writes `canvasType` only when one of them changed.
+- **A rename moves no pixel.** A freeform picture's and a brand mark's hash covers their recipe, names included, so
+  a rename would have called every one stale. A picture current before a rename stays current; a replace with a
+  different hex leaves it stale, which is true.
+- **Fonts had the same hole.** `fontUsage` saw roles and the email's stack, not brand presets or a freeform layer's
+  face and runs. It takes the document now, and `removeFont` refuses while any of them names the stack.
+- **There was a third list.** Pasting a design system in (Admin) replaces the palette and repoints what named the
+  old one, from its own list in `import-system.ts`, which had no footer and no brand presets. A pasted palette
+  without red left the footer's links and the Shop sign naming nothing. It walks `walkSystem` now (2026-11-12).
+- **Not reached, named.** A freeform block linked to a Freeform app frame takes its drawing from the frame, which
+  is another document with its own palette; repointing the block is undone on the next follow.
+
+### 3.104 A box inside `.sy-rich` wore the team's table rule
 
 *2026-11-11. Found in the card starter: cards 1 and 3 drew a grey hairline inside the ink border, and the copy's cell
 came out at 16px in a 13px system. Card 2 did not.*
@@ -3281,7 +3307,7 @@ came out at 16px in a 13px system. Card 2 did not.*
 - **No snapshot moved.** The block snapshots render unboxed Text, which is unchanged byte for byte. A boxed Text
   block gains one nested table, the same one a stack row already has.
 
-### 3.104 A drag never makes a group
+### 3.105 A drag never makes a group
 
 *2026-11-12. Jared: "dragging layers had issues with items getting auto-grouped, and sometimes I could not move
 them where I needed." On the email canvas, trying to give a block its own section, pull one out of a group, and
@@ -3307,7 +3333,7 @@ reorder inside one. Asked how dragging should choose, he chose: a drag never gro
   without a browser. `Preview.tsx` measures the document and draws the line. The sweeps were run in Chromium
   against the Switchyards and Card emails, before and after.
 
-### 3.105 A handle, a picture that moves, and space for several blocks at once
+### 3.106 A handle, a picture that moves, and space for several blocks at once
 
 *2026-11-12. Jared: "Select multiple blocks and change their spacing together. Images are hard to grab and move.
 Maybe blocks should have a clearer handle. Make any UI/UX updates you feel will improve the usability." Asked where

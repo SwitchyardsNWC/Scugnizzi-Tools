@@ -2,7 +2,7 @@
 //
 // Jared: "dragging layers had issues with items getting auto-grouped, and sometimes I could not move them where I
 // needed." Three quarters of every lone block meant "join its cell", which made a group. He chose the rule these
-// tests hold (learnings 3.104): a drag never makes a group. The live canvas wiring was checked in the browser; this
+// tests hold (learnings 3.105): a drag never makes a group. The live canvas wiring was checked in the browser; this
 // is the decision it delegates to.
 
 import { describe, expect, it } from 'vitest';

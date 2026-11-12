@@ -366,7 +366,7 @@ const CHROME = `
   }
   /* Pictures and links are content here, not things to carry out of the page. Left draggable, the
      browser took the pointer for its own image drag the moment one moved, and cancelled the block
-     drag under it — which is why an Image was the block that would not move (learnings 3.105). */
+     drag under it — which is why an Image was the block that would not move (learnings 3.106). */
   img, a { -webkit-user-drag: none; }
   /* The handle: in the margin, touching the left edge of the block under the pointer, or of the
      selected one. Put there at run time, like the copy in your hand, so it never reaches the email.
@@ -711,7 +711,7 @@ export function Preview({
    * What a pointer at these frame coordinates means. One resolver for both drags — the palette's
    * and the canvas's own — so the two cannot disagree about what a given pixel means.
    *
-   * A drag never makes a group (`drop-zones.ts`, learnings 3.104). Over a block on its own, the
+   * A drag never makes a group (`drop-zones.ts`, learnings 3.105). Over a block on its own, the
    * halves mean a section of its own above or below — the line runs the full width, at the band's
    * edge. Over a block that already shares a cell, the middle means *beside it in that cell*: the
    * line is inset to the block's content and the cell is framed, and the open ends of the cell's

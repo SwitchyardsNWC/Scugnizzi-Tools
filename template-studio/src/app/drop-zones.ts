@@ -3,7 +3,7 @@
 // Jared, 2026-11-11: "dragging layers had issues with items getting auto-grouped, and sometimes I could not move
 // them where I needed." Measured on the Switchyards email: three quarters of every block's height meant "join this
 // block's cell", which makes a group, and an 18px strip at each end meant "a section of its own". He chose the
-// rule here (learnings 3.104): **a drag never makes a group.** Over a block on its own, the halves are a section
+// rule here (learnings 3.105): **a drag never makes a group.** Over a block on its own, the halves are a section
 // above or below it. Over a block that already shares a cell — a group, or a column of a row — the inside is a
 // place to land, because joining or reordering there is what the drag is for. A new group is ⌘G on a selection.
 //

@@ -46,7 +46,7 @@ export function richTextParts(block: RichTextBlock, sec: Section, col: Column, c
 
   // `sy-rich` never sits above a table the compiler drew. `.sy-rich td` and `.sy-rich table` are for tables the team
   // types, and HubSpot inlines them onto every match at send — so a box's own cell under a `sy-rich` cell came out
-  // with a grey hairline and 16px type inside the card (learnings 3.103). With a box, the words go in a row of their
+  // with a grey hairline and 16px type inside the card (learnings 3.104). With a box, the words go in a row of their
   // own inside it, the same shape a stack's row has, and the outer cell keeps only the gutter's class.
   const inner = box && !inset ? row('0') : words;
   const side = padClass(col, ctx);
