@@ -168,7 +168,7 @@
     #tk-help .foot button,#tk-gif .btns button,#tk-ask .foot button{box-sizing:border-box;min-height:28px;padding:8px 12px 4px;border:1px solid ${v('border-control', '#454543')};border-radius:4px;background:transparent;
       color:${v('text-primary', '#f2f2f0')};font:13px/14px ${SANS};letter-spacing:.143px;cursor:pointer;transition:color 120ms linear,background-color 120ms linear,border-color 120ms linear}
     #tk-help .foot button:hover,#tk-gif .btns button:hover,#tk-ask .foot button:hover{background:${v('surface-row-hover', '#222222')}}
-    #tk-ask .foot button.danger{border-color:${v('status-blocked', '#dc7a64')};color:${v('status-blocked', '#dc7a64')}}
+    #tk-help .foot button.danger,#tk-ask .foot button.danger{color:${v('status-blocked', '#dc7a64')}} /* brick words at rest, as tools.css draws .danger */
     #tk-ask .foot button.primary{background:${v('action-primary', '#5a67a0')};border-color:${v('action-primary', '#5a67a0')};color:${v('action-primary-text', '#ffffff')}}
     #tk-ask .foot button.primary:hover{background:${v('action-primary-hover', '#4f5b93')};border-color:${v('action-primary-hover', '#4f5b93')}}
     #tk-help .foot button.danger:hover,#tk-ask .foot button.danger:hover{border-color:${v('status-blocked', '#dc7a64')};color:${v('status-blocked', '#dc7a64')};background:${v('status-blocked-soft', '#301b16')}}

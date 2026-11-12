@@ -2,7 +2,7 @@
  *
  * The board's chrome, because it is the same kind of page: one folder, a bar at the top, a status line at the
  * bottom. Everything between is a list of rows and a form, in the tools' own plain shapes — no cards, no shadows,
- * nothing that bounces. Every colour is the board's (project.css), Enkel's light values; every control is
+ * nothing that bounces. Every colour is the board's (project.css), Enkel's light or dark with the suite; every control is
  * Enkel's 28: 1 + 8 / 14 / 4 + 1. Rules that override project.css or app.css start at .ad-app, because the build
  * and the dev server load the three files in different orders and only specificity holds in both. */
 

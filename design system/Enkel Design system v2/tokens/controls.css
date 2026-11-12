@@ -22,6 +22,9 @@
 /* Check, radio and colour swatch: squares, like every other indicator. */
 --check-size:14px;
 --swatch-size:28px;
+/* The export bar: two columns of 160 (room for "Download separations"), three rows of 28 with 8 between. */
+--export-col:160px;
+--export-height:100px;
 --radius-controls:4px; /* everything you press in a tool panel; the panel itself stays square */
 }
 /* Fields are wells: sunken into the paper panel, one soft hairline, ink when focused. Declared on every themed element,

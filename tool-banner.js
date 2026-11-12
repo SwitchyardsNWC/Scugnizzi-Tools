@@ -12,16 +12,18 @@
   const style = document.createElement('style');
   style.textContent = `
     :root{--tool-banner:32px}
-    #tool-banner{box-sizing:border-box;height:32px;flex:0 0 32px;display:flex;align-items:center;gap:12px;padding:0 12px 0 8px;position:relative;z-index:50;
+    #tool-banner{box-sizing:border-box;height:32px;flex:0 0 32px;display:flex;align-items:center;gap:12px;padding:1px 12px 0 8px;position:relative;z-index:50;
       background:${v('surface-paper', '#151515')};border-bottom:1px solid ${v('border-hairline', '#3a3a38')};color:${v('text-primary', '#f2f2f0')};
       font:13px/1.25 ${v('font-helveticaneue', '"Helvetica Neue",Helvetica,Arial,sans-serif')};letter-spacing:.143px;-webkit-font-smoothing:antialiased;white-space:nowrap}
     #tool-banner *{box-sizing:border-box}
     #tool-banner .tb-crumb{order:0;display:flex;align-items:center;gap:8px;min-width:0}
-    #tool-banner .tb-home{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:4px;color:${v('text-muted', '#9a9c99')};text-decoration:none;
+    /* Every word in the bar sits on one baseline (20, measured): the boxes stay centred and the words take the 4px
+       optical nudge inside them, as the Light/Dark words do. */
+    #tool-banner .tb-home{display:inline-flex;align-items:center;gap:6px;height:24px;padding:4px 6px 0;border-radius:4px;color:${v('text-muted', '#9a9c99')};text-decoration:none;
       transition:color 120ms linear,background-color 120ms linear}
     #tool-banner .tb-home:hover{color:${v('text-primary', '#f2f2f0')};background:${v('surface-row-hover', '#222222')}}
-    #tool-banner .tb-sep{color:${v('text-faint', '#5e605d')}}
-    #tool-banner .name{min-width:0;overflow:hidden;text-overflow:ellipsis;color:${v('text-primary', '#f2f2f0')}}
+    #tool-banner .tb-sep{padding-top:4px;color:${v('text-faint', '#5e605d')}}
+    #tool-banner .name{min-width:0;padding-top:4px;overflow:hidden;text-overflow:ellipsis;color:${v('text-primary', '#f2f2f0')}}
     #tool-banner .name::after{content:"_"}
     #tool-banner .tb-grow{order:1;flex:1;min-width:8px}
     #tool-banner .sp-project{order:2}
@@ -31,7 +33,7 @@
       font:inherit;font-size:12px;line-height:14px;letter-spacing:.132px;cursor:pointer;transition:color 120ms linear,background-color 120ms linear}
     #tool-banner .tb-theme button:hover{color:${v('text-primary', '#f2f2f0')}}
     #tool-banner .tb-theme button[aria-checked="true"]{background:${v('text-primary', '#f2f2f0')};color:${v('surface-paper', '#151515')};cursor:default}
-    #tool-banner .ver{order:5;color:${v('text-muted', '#9a9c99')};font-family:${v('font-mono-detail', 'ui-monospace,Menlo,monospace')};font-size:11px;letter-spacing:0;text-decoration:none;transition:color 120ms linear}
+    #tool-banner .ver{order:5;padding-top:2px;color:${v('text-muted', '#9a9c99')};font-family:${v('font-mono-detail', 'ui-monospace,Menlo,monospace')};font-size:11px;letter-spacing:0;text-decoration:none;transition:color 120ms linear}
     #tool-banner .ver:hover{color:${v('text-primary', '#f2f2f0')}}
     #tool-banner a:focus-visible,#tool-banner button:focus-visible{outline:1px solid ${v('focus-ring', '#f2f2f0')};outline-offset:1px}
     @media (max-width:640px){#tool-banner .tb-home .tb-label,#tool-banner .ver{display:none}}`;

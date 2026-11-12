@@ -1,19 +1,22 @@
 /* The project board (src/project), second pass.
  *
  * The dashboard's shape, Enkel: a sunken page, paper for what you read, one sans for words and mono for figures,
- * hairlines for structure, square everything except what you press, no shadows, nothing that bounces. The board
- * stays light whatever the suite's theme: it is a table you work on, and what is on it (the emails, the frames, the
- * pictures, a note's paper, the cutting mat) is judged against paper. The one hint of an older screen is the
+ * hairlines for structure, square everything except what you press, no shadows, nothing that bounces. Light or dark
+ * with the rest of the suite (the Canvas menu's Theme, app/theme.ts). What is on the board keeps its own colours in
+ * both: the emails, the frames, the pictures, a note's paper, the cutting mat. The one hint of an older screen is the
  * drafting grid under everything, the status line along the bottom, and the corner marks on what is selected. */
 
 html, body, #app { height: 100%; margin: 0; }
-/* The page behind the app, before it draws: --surface-sunken, the --pb-ground below. */
+/* The page behind the app, before it draws: --surface-sunken, the --pb-ground below, in each theme. */
 body { background: #f5f5f4; }
+:root[data-theme="dark"] body { background: #0e0e0e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body { background: #0e0e0e; } }
 
 /* The palette is Enkel's, written out rather than imported (design system/Enkel Design system v2/tokens/). A comment
    `= --token` says which token a value is, in the theme its rule is for; tests/enkel-tokens.test.ts reads Enkel's
    files and fails when the two part, so a change to Enkel is carried here on purpose rather than drifting.
-   Light only: Enkel's `:root` values. */
+   A note is light paper in either theme (its colours are the project's, model/project.ts), so it takes the light
+   values whatever the page around it does: the ink on a note is always the light theme's. */
 .pb-note, .pb-app {
   /* surfaces */
   --pb-ground: #f5f5f4; /* = --surface-sunken */
@@ -72,6 +75,84 @@ body { background: #f5f5f4; }
   /* The bar across the top: Enkel's --tool-bar-height, a 28 control with 6 above and below. */
   --pb-bar: 40px;
   color-scheme: light;
+}
+/* Dark, picked by hand or by the system (app/theme.ts sets data-theme, or leaves it off to follow the system): the
+   same names, Enkel's dark values. Twice, as app.css does, because a media query cannot share a rule with a selector. */
+:root[data-theme="dark"] .pb-app {
+  --pb-ground: #0e0e0e; /* = --surface-sunken */
+  --pb-paper: #151515; /* = --surface-paper */
+  --pb-row: #222222; /* = --surface-row-hover */
+  --pb-selected: #2a2a2a; /* = --surface-selected */
+  --pb-field: #0e0e0e; /* = --surface-field */
+  --pb-scrim: rgba(0,0,0,.6); /* = --surface-scrim */
+  --pb-ink: #f2f2f0; /* = --text-primary */
+  --pb-text: #cfcfcc; /* = --text-secondary */
+  --pb-muted: #9a9c99; /* = --text-muted */
+  --pb-faint: #5e605d; /* = --text-faint */
+  --pb-on-accent: #ffffff; /* = --text-on-accent */
+  --pb-hairline: #3a3a38; /* = --border-hairline */
+  --pb-card-border: #2a2a29; /* = --border-card */
+  --pb-soft: #242423; /* = --border-muted */
+  --pb-control-edge: #666765; /* = --border-control */
+  --pb-track: #4a4a48; /* = --control-track */
+  --pb-accent: #5a67a0; /* = --action-primary */
+  --pb-accent-hover: #4f5b93; /* = --action-primary-hover */
+  --pb-disabled-surface: #232323; /* = --action-disabled-surface */
+  --pb-disabled-text: #5e605d; /* = --action-disabled-text */
+  --pb-blue: #7e92d6; /* = --data-1 */
+  --pb-green: #86b389; /* = --data-2 */
+  --pb-amber: #dba64d; /* = --data-3 */
+  --pb-brick: #e0705a; /* = --data-4 */
+  --pb-moss: #8fb082; /* = --status-done */
+  --pb-risk: #d9a54c; /* = --status-risk */
+  --pb-danger: #dc7a64; /* = --status-blocked */
+  --pb-danger-soft: #301b16; /* = --status-blocked-soft */
+  --pb-grid: rgb(242 242 240 / 0.05);
+  --pb-line: rgb(242 242 240 / 0.08);
+  --pb-line-major: rgb(242 242 240 / 0.16);
+  --pb-dot: rgb(242 242 240 / 0.3);
+  --pb-dot-major: rgb(242 242 240 / 0.46);
+  --pb-group-fill: rgb(21 21 21 / 0.6);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pb-app {
+    --pb-ground: #0e0e0e; /* = --surface-sunken */
+    --pb-paper: #151515; /* = --surface-paper */
+    --pb-row: #222222; /* = --surface-row-hover */
+    --pb-selected: #2a2a2a; /* = --surface-selected */
+    --pb-field: #0e0e0e; /* = --surface-field */
+    --pb-scrim: rgba(0,0,0,.6); /* = --surface-scrim */
+    --pb-ink: #f2f2f0; /* = --text-primary */
+    --pb-text: #cfcfcc; /* = --text-secondary */
+    --pb-muted: #9a9c99; /* = --text-muted */
+    --pb-faint: #5e605d; /* = --text-faint */
+    --pb-on-accent: #ffffff; /* = --text-on-accent */
+    --pb-hairline: #3a3a38; /* = --border-hairline */
+    --pb-card-border: #2a2a29; /* = --border-card */
+    --pb-soft: #242423; /* = --border-muted */
+    --pb-control-edge: #666765; /* = --border-control */
+    --pb-track: #4a4a48; /* = --control-track */
+    --pb-accent: #5a67a0; /* = --action-primary */
+    --pb-accent-hover: #4f5b93; /* = --action-primary-hover */
+    --pb-disabled-surface: #232323; /* = --action-disabled-surface */
+    --pb-disabled-text: #5e605d; /* = --action-disabled-text */
+    --pb-blue: #7e92d6; /* = --data-1 */
+    --pb-green: #86b389; /* = --data-2 */
+    --pb-amber: #dba64d; /* = --data-3 */
+    --pb-brick: #e0705a; /* = --data-4 */
+    --pb-moss: #8fb082; /* = --status-done */
+    --pb-risk: #d9a54c; /* = --status-risk */
+    --pb-danger: #dc7a64; /* = --status-blocked */
+    --pb-danger-soft: #301b16; /* = --status-blocked-soft */
+    --pb-grid: rgb(242 242 240 / 0.05);
+    --pb-line: rgb(242 242 240 / 0.08);
+    --pb-line-major: rgb(242 242 240 / 0.16);
+    --pb-dot: rgb(242 242 240 / 0.3);
+    --pb-dot-major: rgb(242 242 240 / 0.46);
+    --pb-group-fill: rgb(21 21 21 / 0.6);
+    color-scheme: dark;
+  }
 }
 .pb-app {
   position: fixed; inset: 0; overflow: hidden; color: var(--pb-ink); background: var(--pb-ground);

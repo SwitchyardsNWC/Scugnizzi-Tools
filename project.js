@@ -162,7 +162,7 @@
     css.textContent = `
       #tool-banner .sp-project{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
       #tool-banner .sp-project[hidden]{display:none}
-      #tool-banner .sp-project a{display:inline-flex;align-items:center;height:24px;margin-left:0;padding:0 6px;border-radius:4px;color:${v('text-primary', '#f2f2f0')};text-decoration:none;
+      #tool-banner .sp-project a{display:inline-flex;align-items:center;box-sizing:border-box;height:24px;margin-left:0;padding:4px 6px 0;border-radius:4px;color:${v('text-primary', '#f2f2f0')};text-decoration:none;
         max-width:220px;overflow:hidden;text-overflow:ellipsis;transition:color 120ms linear,background-color 120ms linear}
       #tool-banner .sp-project a:hover{background:${v('surface-row-hover', '#222222')}}
       #tool-banner .sp-project a.sp-muted{color:${v('text-muted', '#9a9c99')}}
