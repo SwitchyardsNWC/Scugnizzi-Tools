@@ -132,6 +132,9 @@
   .files .sz{color:var(--text-muted)}
   .files .sep{margin:var(--spacing-8) var(--spacing-4);border-top:var(--border-width) solid var(--border-muted)}
   .files .hint{margin:0;padding:0 var(--spacing-8)}
+  /* The folder and its size, a 16 px blank line, then why there are three files: 16 less the list's 2 px gap keeps the
+     second hint where the old blank line put it. */
+  .files .hint+.hint{margin-top:calc(var(--spacing-16) - 2px)}
   /* 11px mono in a 16px line of 12px words: at the line's own 16 its taller ascent grows the line to 17 (measured), so a
      two-line hint was 33 and a list of them stepped 19. At 14 it stays inside the line and on its baseline. */
   .hint .mono{font-family:var(--font-mono-detail);font-size:var(--text-micro);line-height:14px}
@@ -323,7 +326,7 @@
       <span class="vgroup"><span class="lab" id="labClient">Client</span>
         <span class="seg inline" id="clientSeg" role="group" aria-labelledby="labClient">
           <button type="button" data-client="all" title="A client that keeps the module's style block: Apple Mail, iOS Mail, Outlook.com (G)">Style block on</button>
-          <button type="button" data-client="gmail" title="Gmail strips a style block in the body. What is inline still holds (G)">Gmail</button>
+          <button type="button" data-client="gmail" title="Gmail strips a style block in the body. What is inline still holds, and rich text keeps its rules if HubSpot inlines them at send: one test send has to confirm it (G)">Gmail</button>
         </span></span>
       <span class="vgroup"><span class="lab" id="labDark">Email dark mode</span>
         <span class="seg inline" id="darkSeg" role="group" aria-labelledby="labDark">
@@ -841,9 +844,10 @@ function paintPreview() {
   fd.body.classList.toggle('dark', ui.dark);
   const note = $('#darkNote');
   note.hidden = !(ui.dark || ui.gmail);
+  // Two lines at most. The one test send that rich text relies on is in the titles of the Gmail button and Rich text rules.
   note.innerHTML = ui.gmail
-    ? `Gmail view: the module's style block is gone, as Gmail strips it. Everything inline holds, and columns still stack on a phone. Rich text keeps its rules on the expectation that HubSpot inlines them at send, which one test send has to confirm. ${ui.dark ? 'Gmail’s apps ignore every dark-mode rule and invert as they like; nothing can preview that.' : 'No phone font sizes, no dark-mode rules.'}`
-    : 'Email dark mode: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. It is not what Gmail’s apps do; they invert as they like and nothing can preview that.';
+    ? `Gmail view: Gmail strips the style block, so no phone font sizes and no dark-mode rules. ${ui.dark ? 'What is inline holds and columns still stack on a phone. Gmail’s apps invert as they like; nothing can preview that.' : 'What is inline holds, columns still stack on a phone, and rich text keeps its rules if HubSpot inlines them at send.'}`
+    : 'Email dark mode: this module’s <span class="mono">prefers-color-scheme</span> layer, applied unconditionally. It is what Apple Mail and clients that honour your rules show. Gmail’s apps invert as they like; nothing can preview that.';
   const t = SYS.themes[ui.theme];
   $('#deviceNote').textContent = `${phone ? `${PHONE} px phone${ui.gmail ? '' : ' · phone rules on'}` : `${d.width} px ${d.width === 600 ? 'email body' : 'column'}`} · ${t ? t.label : ''} theme · ${ui.empty ? 'optional fields empty' : 'defaults filled in'}`;
   paintSelection(); fit();
@@ -891,7 +895,7 @@ function renderCode() {
   const d = doc(), files = built.files;
   if (!files.some(f => f.path === ui.file)) ui.file = 'module.html';
   $('#fileList').innerHTML = files.map(f => `<button data-file="${esc(f.path)}" class="${f.path === ui.file ? 'on' : ''}" title="${esc(f.note || '')}"><span>${esc(f.path)}</span><span class="sz">${H.size(f.text)}</span></button>`).join('')
-    + `<div class="sep"></div><div class="hint">Folder <span class="mono">${esc(d.slug)}.module/</span><br>${files.length} files · ${H.size(files.map(f => f.text).join(''))}<br><br>No module.css or module.js: HubSpot refuses both on an email module, so the styles live inside module.html.</div>`;
+    + `<div class="sep"></div><div class="hint">Folder · ${files.length} files · ${H.size(files.map(f => f.text).join(''))}<br><span class="mono">${esc(d.slug)}.module/</span></div><div class="hint">HubSpot refuses module.css and module.js on email.</div>`;
   const f = files.find(x => x.path === ui.file);
   $('#codePath').textContent = `${d.slug}.module/${f.path}`;
   $('#codeSrc').innerHTML = highlight(f.text, f.path);
@@ -1008,11 +1012,14 @@ function syncInspectorHead() {
 }
 
 // Small builders. Every control carries data-k (the property) and data-t (how to read it).
+// Entry, Entries; Box, Boxes; Event, Events.
+const pluralOf = w => /[^aeiou]y$/i.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|z|ch|sh)$/i.test(w) ? w + 'es' : w + 's';
 const row = (label, ctl, title = '') => `<div class="row"${title ? ` title="${esc(title)}"` : ''}><label>${esc(label)}</label><div class="ctl">${ctl}</div></div>`;
 const txt = (k, v, ph = '') => `<input type="text" data-k="${k}" value="${esc(v)}" placeholder="${esc(ph)}">`;
 const num = (k, v, min, max, step = 1) => `<input type="number" data-k="${k}" data-t="num" value="${esc(v)}" min="${min}" max="${max}" step="${step}">`;
 const sel = (k, v, opts, t = '') => `<select data-k="${k}"${t ? ` data-t="${t}"` : ''}>${opts.map(([val, lab]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(lab)}</option>`).join('')}</select>`;
-const chk = (k, v, label, help = '') => `<label class="check"><input type="checkbox" data-k="${k}" data-t="bool" ${v ? 'checked' : ''}><span>${esc(label)}${help ? `<small>${esc(help)}</small>` : ''}</span></label>`;
+// A title, when given, is on the box and its words: it shows on hover and a screen reader reads it as the description.
+const chk = (k, v, label, help = '', title = '') => { const t = title ? ` title="${esc(title)}"` : ''; return `<label class="check"${t}><input type="checkbox" data-k="${k}" data-t="bool" ${v ? 'checked' : ''}${t}><span>${esc(label)}${help ? `<small>${esc(help)}</small>` : ''}</span></label>`; };
 const segs = (k, v, opts, t = '') => `<span class="seg">${opts.map(([val, lab, title]) => `<button type="button" data-seg="${k}"${t ? ` data-t="${t}"` : ''} data-v="${esc(val)}" class="${String(val) === String(v) ? 'on' : ''}" aria-pressed="${String(val) === String(v)}"${title ? ` title="${esc(title)}"` : ''}>${esc(lab)}</button>`).join('')}</span>`;
 // A pane's head: its name, then a bare count (.n, mono) or a state in words (.v).
 const pane = (title, body, n = '', v = '') => `<div class="pane"><div class="pane-head"><span class="t">${esc(title)}</span>${n !== '' ? `<span class="n">${esc(n)}</span>` : ''}${v ? `<span class="v">${esc(v)}</span>` : ''}</div>${body}</div>`;
@@ -1037,13 +1044,13 @@ function moduleInspector(d) {
     ${row('Bottom', sel('m.pad.bottom', d.pad.bottom, spaceOpts))}
     ${row('Sides', sel('m.pad.side', d.pad.side, spaceOpts), 'Inside the module, left and right. The phone rules keep it.')}
     ${row('Made for', sel('m.width', d.width, [[600, 'Full width · 600 px'], [300, 'Half column · 300 px']], 'num'), 'A drag-and-drop email is 600 px wide. Images size against this; dropped somewhere narrower, everything shrinks to fit.')}
-    <p class="hint">Content width <span class="mono" id="cwHint">${H.contentWidth(d, SYS)} px</span>. The module is fluid: in a narrower column it shrinks, and its columns stack.</p>`)}
+    <p class="hint">Content width <span class="mono" id="cwHint">${H.contentWidth(d, SYS)} px</span>. In a narrower column the module shrinks and its columns stack.</p>`)}
   ${pane('Style blocks', `
-    <p class="hint">What has to hold is inline; these add what cannot be. HubSpot warns about them and still sends.</p>
-    ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links in rich text. HubSpot should inline it at send; test once.')}
-    ${chk('m.css.sheet', d.css.sheet, 'Phone and dark-mode rules', 'Phone font sizes and the dark layers. Apple Mail and Outlook.com read them; Gmail strips them.')}`)}
+    <p class="hint">What has to hold is inline; these add what cannot be. HubSpot warns and still sends.</p>
+    ${chk('m.css.rich', d.css.rich, 'Rich text rules', 'Margins, headings, lists and links in rich text. HubSpot should inline it; test once.', 'HubSpot should inline these rules at send. One test send has to confirm it.')}
+    ${chk('m.css.sheet', d.css.sheet, 'Phone and dark-mode rules', 'Phone font sizes and the dark layers. Gmail strips them.', 'Apple Mail and Outlook.com read them; Gmail strips them.')}`)}
   ${pane('In HubSpot', `
-    <p class="hint">Select a part to set what the team edits. Parts tagged <span class="tag field">field</span> are sidebar fields, in this order:</p>
+    <p class="hint">Select a part to set what the team edits. The sidebar shows <span class="tag field">field</span> parts in this order:</p>
     <ol class="hint">${(built ? built.steps.fields : []).filter(f => !f.child).map(f => `<li>${esc(f.label)} <span class="mono">· ${esc(f.uiType)}</span></li>`).join('') || '<li>None yet</li>'}</ol>`)}`;
 }
 
@@ -1060,8 +1067,9 @@ function partInspector(d, r) {
 
 function contentPane(p, rep) {
   const editable = H.isEditable(p);
-  const title = editable ? (rep ? `Default for new ${rep.itemLabel || 'item'}s` : 'Default content') : 'Content';
-  const hint = editable ? `<p class="hint">${rep ? `What a new ${esc((rep.itemLabel || 'item').toLowerCase())} holds until the team replaces it. Each one's own copy is under ${esc(rep.label)}.` : 'What the field holds when the team drops the module in. They replace it.'}</p>` : '';
+  const title = editable ? (rep ? `Default for new ${pluralOf(rep.itemLabel || 'item')}` : 'Default content') : 'Content';
+  // No labels in the words, so it stays two lines whatever the team calls the group: the pane's title names the item.
+  const hint = editable ? `<p class="hint">${rep ? 'What a new one holds until the team replaces it. Each has its own on the group.' : 'What the field holds when the team drops the module in. They replace it.'}</p>` : '';
   let b = '';
   switch (p.type) {
     case 'eyebrow': case 'heading': case 'text':
@@ -1069,9 +1077,9 @@ function contentPane(p, rep) {
         ${chk('link', p.link, 'Linked', editable ? 'The words are a link; the team sets where it goes' : 'The words are a link')}
         ${p.link ? `<div class="stack"><label>Link</label><input type="url" data-k="href" value="${esc(p.href)}" placeholder="https://"></div>` : ''}`; break;
     case 'richtext':
-      b = `<div class="stack"><textarea data-k="value" rows="6">${esc(p.value)}</textarea><span class="hint">HTML. Paragraphs, <span class="mono">strong em a ul ol li h3 h4 blockquote</span>. Styled by the module's rich text rules.</span></div>`; break;
+      b = `<div class="stack"><textarea data-k="value" rows="6">${esc(p.value)}</textarea><span class="hint">HTML: <span class="mono">p strong em a ul ol li h3 h4 blockquote</span>. Styled by the rich text rules.</span></div>`; break;
     case 'image':
-      b = `<div class="stack"><label>Image URL</label><input type="url" data-k="src" value="${esc(p.src)}" placeholder="https://… hosted in HubSpot Files"><span class="hint">Leave empty to start blank. A hosted https address only: a file on your machine loads for no one else.</span></div>
+      b = `<div class="stack"><label>Image URL</label><input type="url" data-k="src" value="${esc(p.src)}" placeholder="https://… hosted in HubSpot Files"><span class="hint">A hosted https address, or empty to start blank. A local file loads for no one else.</span></div>
         <div class="stack"><label>Alt text</label>${txt('alt', p.alt, 'Says what the picture shows')}</div>
         ${chk('link', p.link, 'Linked', 'The picture is a link; the team sets where it goes')}
         ${p.link ? `<div class="stack"><label>Link</label><input type="url" data-k="href" value="${esc(p.href)}" placeholder="https://"></div>` : ''}`; break;
@@ -1112,7 +1120,7 @@ function stylePane(p, rep) {
       b = row('Width', num('width', p.width, 40, max) + `<span class="hint">px of ${max}</span>`, 'The display width. HubSpot reports the uploaded file\'s own width; the module never uses it (learnings 1.6a).')
         + `<div class="row"><span class="lab"></span><div class="ctl"><button type="button" data-fill="1" title="As wide as its column">Fill ${max} px</button></div></div>`
         + row('Align', alignSeg(p.align)) + chk('phoneFull', p.phoneFull, 'Full width on phones', 'Stretches to the screen on a phone')
-        + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint">px</span>') + '<p class="hint row-note">Square in Outlook on Windows.</p>'
+        + row('Corners', num('radius', p.radius, 0, 60) + '<span class="hint">px</span>') + '<p class="row-note">Square in Outlook on Windows.</p>'
         + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break; }
     case 'button':
       b = chk('themed', p.themed, 'Use the theme\'s button', 'Navy theme swaps to the secondary button, as the system does')
@@ -1122,7 +1130,7 @@ function stylePane(p, rep) {
     case 'divider':
       b = row('Colour', sel('color', p.color, colorOpts())) + row('Thickness', num('thickness', p.thickness, 1, 12) + '<span class="hint">px</span>') + row('Length', num('length', p.length, 5, 100) + '<span class="hint">%</span>') + row('Align', alignSeg(p.align)) + row('Space below', num('gap', p.gap, 0, 120) + '<span class="hint">px</span>'); break;
     case 'spacer':
-      b = row('Height', num('height', p.height, 4, 200) + '<span class="hint">px</span>') + row('On phones', num('phoneHeight', p.phoneHeight, 0, 200) + '<span class="hint">px</span>') + '<p class="hint row-note">0 keeps the height above.</p>'; break;
+      b = row('Height', num('height', p.height, 4, 200) + '<span class="hint">px</span>') + row('On phones', num('phoneHeight', p.phoneHeight, 0, 200) + '<span class="hint">px</span>') + '<p class="row-note">0 keeps the height above.</p>'; break;
   }
   return pane('Style', b);
 }
@@ -1162,7 +1170,7 @@ function repeatInspector(p) {
     ${row('Gap', num('gap', p.gap, 0, 80) + '<span class="hint">px</span>')}
     ${p.layout === 'list' ? chk('rule', p.rule, 'Rule between items', 'A hairline in the theme accent') : ''}
     ${row('Space below', num('gap2', p.gapBelow, 0, 120) + '<span class="hint">px</span>')}
-  `) + pane(`${p.itemLabel || 'Item'}s it starts with`, `<p class="hint">The defaults a new copy of the module holds. The team adds and removes their own, ${p.min}–${p.max}.</p><div class="items">${items}</div>
+  `) + pane(`${pluralOf(p.itemLabel || 'Item')} it starts with`, `<p class="hint">What a new copy of the module holds. The team adds and removes their own, ${p.min}–${p.max}.</p><div class="items">${items}</div>
     <button type="button" data-item-act="add" ${p.items.length >= p.max ? 'disabled' : ''}>+ ${esc(p.itemLabel || 'Item')}</button>`, String(p.items.length));
 }
 function itemControl(rep, it, i, k) {

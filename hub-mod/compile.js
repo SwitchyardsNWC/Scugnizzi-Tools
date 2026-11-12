@@ -1120,7 +1120,7 @@ ${ind(inner, 6)}
         { cmd: 'hs account auth', note: 'It opens HubSpot in the browser to make a personal access key and waits for it. Your user needs the Design tools permission.' },
       ],
       cli: [
-        { cmd: `cd ~/Downloads && unzip -o "$(ls -t ${folder}*.zip | head -1)"`, note: 'Unzips the newest download, so a second export saved as "(1).zip" is the one that goes up. The CLI uploads a folder, not a zip. Safari unzips on its own: use the newest folder it made.' },
+        { cmd: `cd ~/Downloads && unzip -o "$(ls -t ${folder}*.zip | head -1)"`, note: 'Unzips the newest download, so a second export saved as "(1).zip" goes up. The CLI uploads a folder, not a zip. Safari unzips on its own: use the newest folder it made.' },
         { cmd: `hs cms lint ${folder}`, note: 'Optional: HubSpot checks the HubL before anything goes up.' },
         { cmd: `hs cms upload ${folder} "${dest}"`, note: 'Goes live straight away. A module folder has no draft upload: CLI 8.18 ignores -m draft for a folder.' },
       ],

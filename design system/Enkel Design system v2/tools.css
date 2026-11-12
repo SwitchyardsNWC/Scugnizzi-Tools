@@ -96,8 +96,9 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 /* A colour row is label, well, readout: the well is the control and stays put, the readout after it (hex first, then
    the name) runs on and ends in an ellipsis when it is long. */
 .row>.hex{min-width:0;overflow:hidden;text-overflow:ellipsis}
-/* A note under a row's control, lined up with the control rather than the label. */
-.row-note{margin:calc(var(--spacing-4) * -1) 0 var(--spacing-8) calc(var(--row-label-width) + var(--spacing-8));font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
+/* A note under a row's control, lined up with the control rather than the label. On its own: with .hint, .hint's margin
+   would win and put it back at the label's edge. */
+.row-note{margin:calc(var(--spacing-4) * -1) 0 var(--spacing-8) calc(var(--row-label-width) + var(--spacing-8));font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
 .stack>.hint{margin-top:0}
 .row>.ctl{flex:1;min-width:0;display:flex;align-items:center;gap:var(--spacing-8)}
 .row>select,.row>input[type=text],.row>input[type=url],.row>input[type=search]{flex:1;min-width:0}
