@@ -123,6 +123,34 @@ the acceptance list, and `learnings.md`, which records every fact about HubSpot 
 rendering the project has paid for and how confident we are in each. Read that one before
 changing the compiler.
 
+## The HubSpot desk
+
+Template Studio's side of HubSpot, as a page that runs in claude.ai. It works with the portal through your own
+HubSpot connector: no token lives anywhere in it.
+
+- **Lists the portal's coded email templates** and reads each one back: who made it and when, the fields the team
+  fills in, and what HubSpot holds it to (the header it needs, the CAN-SPAM variables, Gmail's clip, hosted
+  pictures).
+- **Previews it.** Exactly, when the design is inside the file; otherwise drawn from its field defaults, and labelled
+  as such.
+- **Compares it** with what this build writes from its design, so an edit made in Design Manager, or a compiler
+  change, shows as the lines it touched. For an older export, attach its `.template.json` and the `.system.json` it
+  follows. Before offering a replacement it names any field that would lose what the team typed into it, and the
+  design itself downloads as the `.template.json` the app opens.
+- **Makes a draft email from it.** One form, a confirmation that shows the exact request, one call. Nothing sends.
+
+The connector can read templates but not write one, so a template still goes up through Design Manager or
+`hs cms upload`; the desk downloads the file for it. Every file Template Studio exports now carries its own design in
+a HubL comment, which HubSpot never renders, so any template read back can be opened again
+(`template-studio/docs/learnings.md` §1.19).
+
+```bash
+cd template-studio && npm run desk   # writes dist-desk/: index.html and desk.js, the files the artifact publishes
+```
+
+`dist-desk/preview.html` opens locally. With no claude.ai around it there is no HubSpot, but it still opens an
+exported file from disk.
+
 ## HUB-MOD
 
 Template Studio makes whole coded templates. HUB-MOD makes the piece below that: a **custom email module**, the
@@ -162,7 +190,8 @@ Scugnizzi-Tools/
 ├── tool-banner.js  tool-kit.js     shared by the single-file tools
 ├── design system/                  Enkel, the index page's design system
 ├── text bleed/  image effects/  split flap/  riso/  hub-mod/
-└── template-studio/                the email template builder (Vite + TypeScript + Preact)
+└── template-studio/                the email template builder (Vite + TypeScript + Preact),
+                                    and the HubSpot desk (src/desk) that runs in claude.ai
 ```
 
 ## Where this is going
