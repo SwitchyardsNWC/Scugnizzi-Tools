@@ -112,6 +112,9 @@
   function inTextField(t) { return !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'color', 'file', 'button', 'submit'].includes(t.type))); }
   function inControl(t) { return !!t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   const NAV = new Set(['up', 'down', 'left', 'right', 'space', 'enter', 'tab', 'home', 'end', 'pageup', 'pagedown']);
+  // Single keys a keyboard-focused control keeps from the tool: the arrows scroll a pane or move in a group, and
+  // Backspace or Delete on a button must never quietly delete the layer selected somewhere else.
+  const OWNED = new Set(['up', 'down', 'left', 'right', 'backspace', 'delete', 'home', 'end', 'pageup', 'pagedown']);
   // A button, link or section header reached with the keyboard keeps Space and Enter: they press it. Clicked with the
   // mouse it has no visible focus, so the tool's own Space or Enter still works straight after a click.
   function activates(t) {
@@ -126,6 +129,7 @@
       if (inTextField(t) && (!mod || NATIVE.has(combo))) return;             // typing: leave the field alone
       if (inControl(t) && !mod && NAV.has(combo.split('+').pop())) return;    // sliders and selects keep their arrow keys
       if ((combo === 'space' || combo === 'enter') && activates(t)) return;    // a focused button presses
+      if (OWNED.has(combo) && activates(t)) return;                           // ...and keeps the keys that move and delete
     }
     e.preventDefault(); s.fn(e);
   });
@@ -175,8 +179,8 @@
     #tk-gif .btns{display:flex;gap:8px}
     #tk-gif .btns button.primary{background:${v('action-primary', '#5a67a0')};border-color:${v('action-primary', '#5a67a0')};color:${v('action-primary-text', '#ffffff')}}
     #tk-gif .btns button.primary:hover{background:${v('action-primary-hover', '#6b78b3')};border-color:${v('action-primary-hover', '#6b78b3')}}
-    #tk-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1001;box-sizing:border-box;max-width:calc(100vw - 32px);min-height:32px;padding:9px 12px 5px;
-      background:${v('text-primary', '#f2f2f0')};color:${v('surface-paper', '#151515')};font:13px/16px ${SANS};letter-spacing:.143px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    #tk-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1001;box-sizing:border-box;width:max-content;max-width:min(480px,calc(100vw - 32px));min-height:32px;padding:9px 12px 5px;
+      background:${v('text-primary', '#f2f2f0')};color:${v('surface-paper', '#151515')};font:13px/16px ${SANS};letter-spacing:.143px;
       opacity:0;transition:opacity 120ms linear;pointer-events:none}
     #tk-toast.on{opacity:1}`;
   let helpEl = null, toastEl = null, toastT = 0, btnUndo = null, btnRedo = null;
@@ -236,7 +240,8 @@
     gifEl.hidden = false;
   }
   function hideGif() { if (gifEl) gifEl.hidden = true; }
-  function toast(msg) { ensureUI(); toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 900); }
+  // On screen long enough to read: about a second for a word or two, longer for a sentence, never past six.
+  function toast(msg) { ensureUI(); toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), Math.min(6000, 900 + String(msg).length * 45)); }
 
   // ---- init ----
   function init(options) {

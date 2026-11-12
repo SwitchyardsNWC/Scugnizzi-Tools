@@ -83,7 +83,14 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 /* A label's words drop by the same 4px nudge as the control's, so the two share a baseline (padding 4 centred = 2 down). */
 .row>label,.row>.lab{flex:0 0 var(--row-label-width);min-width:0;padding-top:var(--optical-nudge);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row>.hint,.row>span{padding-top:var(--optical-nudge)}
-.row>.hint{margin:0}
+/* Measured: a 12px hint lands on a 13px label's baseline with 2px, and a mono readout (a hex, a figure) with none,
+   because the mono's taller ascent already drops it. */
+.row>.hint{margin:0;padding-top:2px}
+.row>.mono,.row>.hex,.row>span.mono,.row>span.hex{padding-top:0}
+.hex{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary);white-space:nowrap}
+/* A note under a row's control, lined up with the control rather than the label. */
+.row-note{margin:calc(var(--spacing-4) * -1) 0 var(--spacing-8) calc(var(--row-label-width) + var(--spacing-8));font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
+.stack>.hint{margin-top:0}
 .row>.ctl{flex:1;min-width:0;display:flex;align-items:center;gap:var(--spacing-8)}
 .row>select,.row>input[type=text],.row>input[type=url],.row>input[type=search]{flex:1;min-width:0}
 .stack{display:flex;flex-direction:column;gap:var(--spacing-4);margin:var(--spacing-12) 0}
@@ -95,6 +102,8 @@ aside h3,.group-head{margin:var(--spacing-16) 0 var(--spacing-8);font-size:var(-
 .hint{margin:var(--spacing-8) 0 0;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted);max-width:none}
 .hint b,.hint strong{font-weight:400;color:var(--text-secondary)}
 .hint code,.hint kbd{font-family:var(--font-mono-detail);font-size:11px;letter-spacing:0}
+/* A shortcut chip inside a line of words or a button keeps that line's pitch: inline, no extra height. */
+.hint kbd,button kbd,.drop kbd{display:inline;min-width:0;padding:0 4px;line-height:inherit;vertical-align:baseline}
 
 /* --- buttons ------------------------------------------------------------------------------------------------------------- */
 /* 28 tall from padding, never centring: 1 + 8 / 14 / 4 + 1. An outline on the control edge; ink when it matters. */
@@ -111,7 +120,9 @@ button.primary:hover,.button.primary:hover{background:var(--action-primary-hover
 /* Quiet: no edge until you point at it. */
 button.ghost,.button.ghost{border-color:transparent;color:var(--text-muted)}
 button.ghost:hover,.button.ghost:hover{border-color:transparent;color:var(--text-primary)}
-/* Destructive: reads as a normal button until you point at it, then says so in brick and in its edge. Its label says what it does. */
+/* Destructive: brick words at rest, a brick edge and ground when you point at it. Its label always says what it
+   destroys, so the colour is never the only cue; a reset asks first (ToolKit.ask). */
+button.danger,.button.danger{color:var(--status-blocked)}
 button.danger:hover,.button.danger:hover{border-color:var(--status-blocked);color:var(--status-blocked);background:var(--status-blocked-soft)}
 /* A glyph in a square: up, down, remove, refresh. 24, so it sits inside a 28 row without crowding it. */
 button.icon,.button.icon{flex:none;width:var(--control-height-xs);min-width:var(--control-height-xs);min-height:var(--control-height-xs);height:var(--control-height-xs);padding:0;
@@ -129,6 +140,7 @@ button.ghost:disabled,button.icon:disabled{border-color:transparent}
 .seg button{flex:1 1 0;min-width:0;min-height:22px;padding:6px 8px 2px;border:0;border-radius:2px;background:transparent;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis}
 .seg button:hover{background:transparent;color:var(--text-primary)}
 .seg button.on,.seg button[aria-checked="true"],.seg button[aria-pressed="true"]{background:var(--text-primary);color:var(--surface-paper);cursor:default}
+.seg.fit button{flex:1 1 auto;padding-left:4px;padding-right:4px} /* labels of different lengths share the width by their size */
 .seg.inline{display:inline-flex;flex:0 0 auto}
 .seg.inline button{flex:0 0 auto;padding-left:10px;padding-right:10px}
 
@@ -199,21 +211,23 @@ input[type=color]{flex:0 0 var(--swatch-size);width:var(--swatch-size);height:va
   border:var(--border-width) solid var(--border-card);border-radius:var(--radius-controls);cursor:pointer;-webkit-appearance:none;appearance:none}
 input[type=color]:hover{border-color:var(--border-control)}
 input[type=color]::-webkit-color-swatch-wrapper{padding:0}
-input[type=color]::-webkit-color-swatch{border:var(--border-width) solid var(--border-muted);border-radius:2px}
-input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--border-muted);border-radius:2px}
+input[type=color]::-webkit-color-swatch{border:var(--border-width) solid var(--border-control);border-radius:2px}
+input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--border-control);border-radius:2px}
 /* A row of preset chips: square-ish, the chosen one outlined in ink with paper between. */
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(24px,1fr));gap:4px;margin:var(--spacing-8) 0}
-.swatches>button{height:24px;min-height:24px;padding:0;border:var(--border-width) solid var(--border-muted);border-radius:2px}
+.swatches>button{height:24px;min-height:24px;padding:0;border:var(--border-width) solid var(--border-control);border-radius:2px}
 .swatches>button:hover{border-color:var(--text-primary)}
 .swatches>button.on{outline:var(--border-width-focus) solid var(--text-primary);outline-offset:1px}
+.swatches>button.on:focus-visible{box-shadow:0 0 0 4px var(--surface-paper),0 0 0 5px var(--focus-ring)} /* chosen and focused: a second ring outside the first */
 
 /* --- presets ------------------------------------------------------------------------------------------------------------- */
 /* Cards you pick a look from: a name and one line on what it is. Chosen: an ink edge two pixels thick and a square mark. */
 .presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--spacing-8)}
-.presets>button{position:relative;display:block;width:100%;min-height:0;padding:10px 10px 8px;text-align:left;white-space:normal;line-height:16px;border-color:var(--border-card)}
+.presets.wide{grid-template-columns:minmax(0,1fr)} /* one column, for looks described in a sentence */
+.presets>button{position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:0;width:100%;min-height:0;padding:10px 20px 8px 10px;text-align:left;white-space:normal;line-height:16px;border-color:var(--border-card)}
 .presets>button small{display:block;margin-top:2px;font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-muted)}
-.presets>button.on{border-color:var(--text-primary);box-shadow:inset 0 0 0 var(--border-width) var(--text-primary);background:var(--surface-row-hover)}
-.presets>button.on::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;background:var(--text-primary)}
+.presets>button.on,.presets>button[aria-pressed="true"]{border-color:var(--text-primary);box-shadow:inset 0 0 0 var(--border-width) var(--text-primary);background:var(--surface-row-hover)}
+.presets>button.on::before,.presets>button[aria-pressed="true"]::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;background:var(--text-primary)}
 .presets>button.saved{padding-right:28px}
 .presets>button .x{position:absolute;top:4px;right:4px;width:20px;height:20px;display:grid;place-items:center;color:var(--text-muted);font-size:var(--text-meta);line-height:1;border-radius:2px}
 .presets>button .x:hover{color:var(--status-blocked);background:var(--status-blocked-soft)}
@@ -229,22 +243,32 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 .item:hover{background:var(--surface-row-hover);border-color:var(--border-control)}
 .item.on,.item[aria-selected="true"]{background:var(--surface-selected);border-color:var(--text-primary);box-shadow:inset 2px 0 0 var(--text-primary)}
 .item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item .name,.item .meta{padding-top:var(--optical-nudge)}
+.item .name{padding-top:var(--optical-nudge)}
+.item:focus-visible{outline-offset:1px} /* in the 2px gutter between rows, so it never reads as the selected edge */
 .item .meta{font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
+
+/* A selectable card that holds more than a line (a message with its board, a layer with its settings): same
+   treatment as .item, padded all round. */
+.item.card{display:block;padding:var(--spacing-8) var(--spacing-8) var(--spacing-8) var(--spacing-12)}
 
 /* --- drop zone ----------------------------------------------------------------------------------------------------------- */
 .drop{display:block;padding:var(--spacing-16);text-align:center;color:var(--text-muted);font-size:var(--text-caption);line-height:16px;cursor:pointer;
   background:var(--surface-field);border:var(--border-width) dashed var(--border-control);border-radius:var(--radius-controls);
   transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
 .drop b{display:block;margin-bottom:2px;font-weight:400;font-size:var(--text-meta);line-height:18px;color:var(--text-primary)}
+button.drop{width:100%;white-space:normal;font:inherit;font-size:var(--text-caption);line-height:16px;color:var(--text-muted)}
+.drop *{pointer-events:none}
 .drop:hover,.drop.over{border-color:var(--text-primary);border-style:solid;color:var(--text-secondary);background:var(--surface-row-hover)}
 
 /* --- the bar over the stage ---------------------------------------------------------------------------------------------- */
 /* Figures about the work in mono, its views on the right. */
-.topbar{flex:none;display:flex;align-items:center;gap:var(--spacing-12);min-height:var(--tool-bar-height);padding:0 var(--spacing-16);
+/* 40 = 1 + 38 + the 1px edge: the top pixel keeps a centred 28 or 24 on whole pixels. Mono figures drop 2px to the
+   label baseline of the buttons beside them. */
+.topbar{flex:none;display:flex;align-items:center;gap:var(--spacing-12);min-height:var(--tool-bar-height);padding:1px var(--spacing-16) 0;
   background:var(--surface-paper);border-bottom:var(--border-width) solid var(--border-card);
   font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-muted);white-space:nowrap}
 .topbar .spacer{flex:1}
+.topbar>span:not(.spacer){padding-top:2px}
 .topbar label{display:inline-flex;align-items:baseline;gap:var(--spacing-8);font-family:var(--font-helveticaneue);letter-spacing:var(--tracking-caption)}
 .topbar button,.topbar select{font-family:var(--font-helveticaneue)}
 .topbar select{width:auto}
@@ -254,7 +278,8 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
 /* Sunken and flat. The work sits on it in a hairline, not a shadow, so its own edges and colours are what you judge. */
 .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:var(--spacing-32);display:flex;align-items:center;justify-content:center;background:var(--surface-sunken)}
 .stage canvas,.stage .work{box-shadow:0 0 0 var(--border-width) var(--border-card)}
-.stage.dropping::after{content:"Drop an image";position:absolute;inset:var(--spacing-12);display:flex;align-items:center;justify-content:center;pointer-events:none;
+.stage.dropping>*,.stage.drag-over>*{pointer-events:none}
+.stage.dropping::after,.stage.drag-over::after{content:"Drop an image";position:absolute;inset:var(--spacing-12);display:flex;align-items:center;justify-content:center;pointer-events:none;
   border:var(--border-width) dashed var(--text-primary);background:color-mix(in srgb,var(--surface-sunken) 82%,transparent);color:var(--text-primary);font-size:var(--text-meta)}
 
 /* --- the export bar ------------------------------------------------------------------------------------------------------ */
@@ -262,14 +287,17 @@ input[type=color]::-moz-color-swatch{border:var(--border-width) solid var(--bord
   background:var(--surface-paper);border-top:var(--border-width) solid var(--border-hairline)}
 .actions{display:flex;flex-direction:column;gap:var(--spacing-8);min-width:168px}
 .actions>button{justify-content:flex-start;width:100%}
-pre.recipe,pre#recipe{margin:0;max-height:96px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
+.actions.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))} /* four or more exports: two columns, the primary across both */
+.actions.two>.primary{grid-column:1/-1}
+pre.recipe,pre#recipe{margin:0;padding-top:5px;max-height:96px;overflow:auto;white-space:pre-wrap;color:var(--text-muted);
   font-family:var(--font-mono-detail);font-size:var(--text-caption);line-height:18px;letter-spacing:0}
 
 /* --- small parts --------------------------------------------------------------------------------------------------------- */
 kbd{display:inline-block;min-width:18px;padding:2px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;text-align:center;
   color:var(--text-secondary);background:var(--surface-field);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
-.tag{display:inline-block;max-width:100%;min-height:18px;padding:3px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.tag{display:inline-block;max-width:100%;min-height:18px;padding:1px 5px 0;font-family:var(--font-mono-detail);font-size:11px;line-height:14px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   color:var(--text-muted);border:var(--border-width) solid var(--border-card);border-radius:var(--radius-tags-sm)}
+.hint .tag,p .tag{overflow:visible;vertical-align:baseline}
 .empty{color:var(--text-muted);font-size:var(--text-meta)}
 .sq{display:inline-block;flex:none;width:8px;height:8px;background:currentColor}
 
@@ -286,5 +314,7 @@ input[type=text]:focus-visible,input[type=number]:focus-visible,input[type=url]:
   .footer{grid-template-columns:1fr}
   .actions{flex-direction:row;flex-wrap:wrap;min-width:0}
   .actions>button{width:auto}
+  .stage{flex:none;height:60vh}
+  pre.recipe,pre#recipe{padding-top:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
