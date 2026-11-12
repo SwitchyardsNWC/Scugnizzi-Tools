@@ -1,2 +1,27 @@
-<!-- @dsCard group="Spacing" viewport="700x150" name="Radius & borders" subtitle="Square structure; soft radius only on buttons, labels, photographs" -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:16px;box-sizing:border-box}.row{display:flex;gap:16px}.sw{flex:1;display:flex;flex-direction:column;gap:5px}.chip{height:64px;border:1px solid var(--color-ink-black)}.lbl{font-size:13px;letter-spacing:.143px}.mut{color:var(--text-muted)}</style></head><body><div class="row"><div class="sw"><div style="height:64px;border:1px solid #000"></div><div class="lbl">Card · 0px · 1px #000</div></div><div class="sw"><div style="height:64px;border:1px solid #2c2222"></div><div class="lbl">Divider weight · #2c2222</div></div><div class="sw"><div style="height:64px;border:1px solid #000;border-radius:var(--radius-tags)"></div><div class="lbl">Label · 6px · 4px at 20px</div></div><div class="sw"><div style="height:64px;background:#495472;border-radius:var(--radius-buttons)"></div><div class="lbl">Button · 8px · 6px small</div></div><div class="sw"><div style="height:64px;border:1px solid #000;border-radius:var(--radius-images)"></div><div class="lbl">Photo · 8px · 4px thumb</div></div></div></body></html>
+<!-- @dsCard group="Spacing" viewport="700x270" name="Radius & borders" subtitle="Square structure; soft radius only on things you press or look at: buttons, labels, tool controls, photographs" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Radius and borders</title><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:16px;box-sizing:border-box;background:var(--surface-sunken);font-size:13px;line-height:16px;letter-spacing:.143px}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 16px}
+.sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* Every specimen is drawn at its real size, so the radius reads as it will in use. Colours are tokens, so the card flips. */
+.stage{height:64px;display:flex;align-items:flex-end;gap:8px;margin-bottom:4px}
+.card{flex:1;align-self:stretch;background:var(--surface-card);border:1px solid var(--border-card);border-radius:var(--radius-cards)}
+.rule{flex:1;align-self:stretch;background:var(--surface-paper);border-right:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline)}
+.tag{display:inline-block;padding:5px 8px 1px;line-height:14px;border:1px solid var(--border-hairline);border-radius:var(--radius-tags);color:var(--text-primary);white-space:nowrap}
+.btn{box-sizing:border-box;background:var(--action-primary);border-radius:var(--radius-buttons)}
+.btn.md{width:72px;height:36px}
+.btn.sm{width:52px;height:28px;border-radius:var(--radius-buttons-sm)}
+.ctl{width:72px;height:28px;box-sizing:border-box;background:var(--surface-field);border:1px solid var(--border-control);border-radius:var(--radius-controls)}
+.img{background:var(--text-faint);border-radius:var(--radius-images)}
+.img.lg{width:64px;height:64px}
+.img.th{width:32px;height:32px;border-radius:var(--radius-images-sm)}
+.lbl{color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mut{color:var(--text-muted);font-size:12px;line-height:16px;letter-spacing:.132px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style></head><body><div class="row">
+<div class="sw"><div class="stage"><div class="rule"></div></div><div class="lbl">Structure · 0</div><div class="mut">--border-hairline, ink: rail and header</div></div>
+<div class="sw"><div class="stage"><div class="card"></div></div><div class="lbl">Card · 0</div><div class="mut">--border-card, the soft hairline</div></div>
+<div class="sw"><div class="stage"><span class="tag">In storage</span></div><div class="lbl">Label · 4</div><div class="mut">--radius-tags</div></div>
+<div class="sw"><div class="stage"><div class="btn md"></div><div class="btn sm"></div></div><div class="lbl">Button · 6 · 4 small</div><div class="mut">--radius-buttons, -sm</div></div>
+<div class="sw"><div class="stage"><div class="ctl"></div></div><div class="lbl">Tool control · 4</div><div class="mut">--radius-controls: fields, wells</div></div>
+<div class="sw"><div class="stage"><div class="img lg"></div><div class="img th"></div></div><div class="lbl">Photo · 6 · 4 thumb</div><div class="mut">--radius-images, -sm</div></div>
+</div></body></html>

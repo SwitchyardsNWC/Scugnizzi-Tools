@@ -2,15 +2,16 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Control geometry</title><link rel="stylesheet" href="../styles.css"><style>
 body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;letter-spacing:.143px}
 .h{color:var(--text-muted);border-bottom:1px solid var(--border-muted);padding-bottom:5px;margin-bottom:14px}
-.btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:14px;line-height:16px;letter-spacing:.154px;min-height:36px;padding:11px 16px 7px;border:1px solid var(--action-primary);background:var(--action-primary);color:var(--action-primary-text)}
-.btn.o{background:transparent;color:var(--text-primary);border-color:var(--border-hairline)}
-.btn.sm{min-height:28px;padding:7px 10px 3px;font-size:13px;line-height:14px}
-.lab{display:inline-block;width:max-content;max-width:100%;min-height:22px;padding:5px 8px 1px;box-sizing:border-box;font-size:13px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--border-hairline)}
-.tab{display:inline-flex;align-items:center;min-height:18px;padding:4px 5px 0;box-sizing:border-box;font-size:11px;line-height:12px;letter-spacing:.3px;text-transform:uppercase;background:var(--color-charcoal);color:var(--color-paper-white)}
+/* No min-height anywhere: each height below is border + top / line / bottom + border, and nothing else. */
+.btn{display:inline-flex;justify-content:center;box-sizing:border-box;font-size:14px;line-height:16px;letter-spacing:.154px;padding:11px 16px 7px;border:1px solid var(--action-primary);border-radius:var(--radius-buttons);background:var(--action-primary);color:var(--action-primary-text)}
+.btn.o{background:transparent;color:var(--text-primary);border-color:var(--border-control)}
+.btn.sm{padding:8px 12px 4px;font-size:13px;line-height:14px;letter-spacing:.143px;border-radius:var(--radius-buttons-sm)}
+.lab{display:inline-block;width:max-content;max-width:100%;padding:5px 8px 1px;box-sizing:border-box;font-size:13px;line-height:14px;letter-spacing:.143px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:top;border:1px solid var(--border-hairline);border-radius:var(--radius-tags)}
+.tab{display:inline-block;padding:4px 5px 2px;box-sizing:border-box;font-size:11px;line-height:12px;letter-spacing:.3px;text-transform:uppercase;background:var(--color-charcoal);color:var(--color-paper-white)}
 .btn>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .n{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .top{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:start}
-/* The 44px primary drawn ×3, so a 4px padding difference is actually visible. */
+/* The 36px primary drawn ×3, so a 4px padding difference is actually visible. */
 .an{position:relative;padding-left:26px;padding-right:38px}
 .box{display:flex;flex-direction:column;box-sizing:border-box;width:max-content;border:3px solid var(--action-primary);background:var(--action-primary);color:var(--action-primary-text);font-size:45px;line-height:54px;letter-spacing:.5px}
 .box>*{flex:0 0 auto}
@@ -48,15 +49,15 @@ body{margin:0;padding:16px;box-sizing:border-box;font-size:13px;letter-spacing:.
 </div>
 <div>
 <div class="sc">
-<span class="hd">Size</span><span class="hd">Top / line / btm</span><span class="hd">Live</span>
-<span class="n">36</span><span class="n">11 / 16 / 7</span><span><span class="btn"><span>Add work</span></span></span>
-<span class="n">28</span><span class="n">7 / 14 / 3</span><span><span class="btn sm"><span>Save</span></span></span>
-<span class="n">22</span><span class="n">5 / 14 / 1</span><span><span class="lab">In storage</span></span>
-<span class="n">18</span><span class="n">4 / 12 / 0</span><span><span class="tab">Warehouse</span></span>
+<span class="hd">Size</span><span class="hd">Build</span><span class="hd">Live</span>
+<span class="n">36</span><span class="n">1 + 11 / 16 / 7 + 1</span><span><span class="btn"><span>Add work</span></span></span>
+<span class="n">28</span><span class="n">1 + 8 / 14 / 4 + 1</span><span><span class="btn sm"><span>Save</span></span></span>
+<span class="n">22</span><span class="n">1 + 5 / 14 / 1 + 1</span><span><span class="lab">In storage</span></span>
+<span class="n">18</span><span class="n">4 / 12 / 2, no edge</span><span><span class="tab">Warehouse</span></span>
 </div>
 </div>
 </div>
-<div class="note">Every control is a line box with a padding band above and below, the top band always <b>4px</b> deeper (<b>--optical-nudge</b>). Flex centring centres the line box, not the letters. Never override a control's padding or line-height to make room for something — change what's inside it.</div>
+<div class="note">Every control is a line box with a padding band above and below, the top band <b>4px</b> deeper (<b>--optical-nudge</b>). Read <b>1 + 11 / 16 / 7 + 1</b> as border + top padding / line-height / bottom padding + border. Flex centring centres the line box, not the letters. The 11px uppercase tab is the one exception: there the cap block sits only about 1.5px high, and of the even splits of its 6px, a <b>2px</b> nudge lands closest. Never override a control's padding or line-height to make room for something — change what's inside it.</div>
 <div class="h" style="margin-top:21px">In a tight column, a label shrinks and clips — it never stretches, never pushes past</div>
 <div class="tight">
 <span class="n">110px</span><span class="n">150px</span><span class="n">90px</span>

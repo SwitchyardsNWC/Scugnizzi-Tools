@@ -22,32 +22,33 @@
 ## Colour
 
 - **Surfaces** (`tokens/colors.css`): the page is `--surface-sunken` (#f5f5f4), cards are `--surface-card` (#fff), rows hover to `--surface-row-hover` (#f0f0ef), selection is `--surface-selected`. Rail and header stay paper. That is the whole tint set.
-- **Text:** `--text-primary` #0d0d0d, `--text-secondary` #3a3a38, `--text-muted` graphite #6f726e (4.9:1 — the readable grey), `--text-faint` #a8aaa7 for placeholders only, never copy.
-- **Lines:** `--border-hairline` (ink) only for structure — rail edge, shell header, section rules on editorial pages. Inside cards everything is soft: `--border-card` #dededc around a card, `--border-muted` #e6e6e4 between rows.
-- **Slate iris** `#495472` is still the only chroma in chrome: filled buttons and the accent card. Never text, icons or borders.
-- **Data palette** (`--data-1…6`): 1 blue #4a5fa5 is the default bar/line; 2 green #5b8a5e revenue/good; 3 amber #c48a2e warn; 4 brick #b8412b bad; 5 grey neutral; 6 teal secondary series. `--data-track` is the empty bar. One tone per chart; 3 and 4 only to flag the row that matters.
+- **Text:** `--text-primary` #0d0d0d, `--text-secondary` #3a3a38, `--text-muted` graphite #666965 (5.6:1 on white, 5.1:1 on the sunken page: the readable grey, on every ground the dashboard uses). Placeholders take muted. `--text-faint` #a8aaa7 is for disabled text and decorative strokes only, never copy (2.3:1).
+- **Lines:** `--border-hairline` (ink) only for structure — rail edge, shell header, section rules on editorial pages. Inside cards everything is soft: `--border-card` #dededc around a card, `--border-muted` #e6e6e4 between rows. The edge of anything you press or type into is `--border-control` #8f918d, 3:1 against paper and card: the outline button, a field or colour well on hover, the drop zone.
+- **Slate iris** `#495472` is the only chroma in chrome, and there it only fills: filled buttons and the accent card, never chrome text, icons or borders. It is also the in-progress status colour (`--status-progress`, `--source-build`), where `StatusBadge` uses it as text and indicator like every other status.
+- **Data palette** (`--data-1…6`): 1 blue #4a5fa5 is the default bar/line; 2 green #5b8a5e revenue/good; 3 amber #ba832c warn; 4 brick #b8412b bad; 5 grey neutral; 6 teal secondary series. `--data-track` is the empty bar. One tone per chart; 3 and 4 only to flag the row that matters.
 - **Deltas:** `--delta-up` #2f7a44, `--delta-down` #b8412b, `--delta-flat` graphite. Direction of good follows the metric (`invert` for costs, open items).
 - **Status set** (`tokens/status.css`): done/on track moss, in progress slate, at risk amber, blocked brick, not started graphite; each with a soft ground. Colour means status, not personality.
 - **Dark mode:** every token above flips under `[data-theme="dark"]` (sunken #0e0e0e, card #1a1a1a, text #f2f2f0, hairline #3a3a38, data colours lifted). Components never hard-code a hex — if something doesn't flip, fix the token use. `ThemeToggle` sets the attribute and remembers it in localStorage `enkel-theme`; first load follows the OS. The Scugnizzi suite sets the attribute with its own `theme.js` instead (key `scuggnizzi.theme`, dark unless picked), so the dashboard, the tools and Template Studio share one choice.
 
 ## Type
 
-- **HelveticaNeue** 400 for every word. **Mono** (`--font-mono`: system monospace stack) for every figure that can change — Stat values, Delta, table numbers, codes. Never mono for labels.
-- Scale: 11 (uppercase kickers) / 12 (column labels) / 13 (labels, hints, card titles) / 14 (body, cells, buttons) / 16 / 18 (shell and panel titles) / 24 (section heading) / 28 (Stat value, mono) / 40 (hero figure, editorial title). Tracking 0.011em of the size; mono is tracked 0 (−0.2px at 28). Line-heights 1.2–1.3 for UI, 1.5 for prose.
-- Phone floor is 16px body; 13px only for meta.
+- **HelveticaNeue** 400 for every word. **Mono** (`--font-mono`: IBM Plex Mono 400/500, pinned from Google Fonts) for every figure that can change — Stat values, Delta, table numbers. Never mono for labels.
+- **Mono detail** (`--font-mono-detail`: JetBrains Mono 300/400) for codes, paths and IDs: anything a person copies or reads character by character. **Detail** (`--font-detail`: Helvetica Neue Condensed) for dense detail — metadata rows, table notes, drawer specs — at 13px and below; never headings, prose or figures. `guidelines/type-detail.html` shows both.
+- Scale: 11 (uppercase kickers) / 12 (column labels) / 13 (labels, hints, card titles) / 14 (body, cells, buttons) / 16 / 18 (shell and panel titles) / 24 (section heading) / 28 (Stat value, mono) / 40 (hero figure, editorial title). Tracking 0.011em of the size, with one exception: `--tracking-micro` is 0.3px for 11px uppercase (0.011em would be 0.12px, too tight for capitals). Mono is tracked 0 (−0.2px at 28). Line-heights 1.2–1.3 for UI, 1.5 for prose.
+- Phone floor is 16px body (`--text-body-mobile`); meta goes up to 14 (`--text-meta-mobile`).
 - Hierarchy is made by size and colour, not weight: card title 13 secondary, figure 28 ink, delta 13 coloured, hint 13 muted.
 
 ## Space, line, shape
 
 - 4-based rhythm: 4 / 8 / 12 / 16 / 24 / 32. Card padding 16, gap between cards 12, page gutter 24 (32 on reading pages), section gap 32. Page max 1440. The old 21 / 42 / 84 rhythm survives for editorial pages.
-- Cards are square, one soft hairline, no shadow, no radius. Radii live only on things you press or look at: buttons 6 (4 small), labels and chips 4, photographs 6 (4 thumbs). Never a pill, never a radius on a container.
+- Cards are square, one soft hairline, no shadow, no radius. Radii live only on things you press or look at: buttons 6 (4 small), labels and chips 4, tool controls 4 (`--radius-controls`), photographs 6 (4 thumbs). Never a pill, never a radius on a container.
 - Every indicator is a square: status dots, sparkline end-points, clock glyphs, delta glyphs. No circles.
 - Shadows, blur, gradients, textures: none. The scrim is the one transparency.
 
 ## Interaction
 
-- **Control geometry:** height from padding, never centring — 36px control = 1 + 11 / 16 line / 7 + 1; 28 small = 7 / 14 / 3; 22 label = 5 / 14 / 1; 18 uppercase tab = 4 / 12 / 0. Top padding = bottom + 4px (`--optical-nudge`) to land the cap height on the true middle of this face.
-- **Controls:** Button filled slate / outline / ghost, 36 or 28 tall. Segmented (2–5 options, active filled ink) for period, view, group-by. FilterChip for active filters. Select for 6+ options. Fields hairline-bottom, focus thickens to 2px ink.
+- **Control geometry:** height from padding, never centring — 36px control = 1 + 11 / 16 line / 7 + 1; 28 small = 1 + 8 / 14 / 4 + 1; 22 label = 1 + 5 / 14 / 1 + 1; 18 uppercase tab = 4 / 12 / 2 with no border. Top padding = bottom + 4px (`--optical-nudge`) to land the cap height on the true middle of this face; the 11px uppercase tab takes 2, the nearest even split at that size.
+- **Controls:** Button filled slate / outline (`--border-control` edge) / ghost, 36 or 28 tall. Segmented (2–5 options, active filled ink, on the sunken ground: 36 = 1 + 2 + (9 / 16 / 5) + 2 + 1, 28 = 1 + 2 + (6 / 14 / 2) + 2 + 1) for period, view, group-by. FilterChip for active filters. Select for 6+ options. Fields hairline-bottom, focus thickens to 2px ink.
 - **Drill-down — four ways down, one rule each** (`guidelines/layout-drilldown.html`):
   1. **Peek** — hover 250ms, 3–5 fields beside the trigger; click still commits; never the only route.
   2. **Inline expand** — click a row, it opens in place under a 2px ink marker (`DataTable expandedKey + renderExpanded`). "A little more."
@@ -78,7 +79,7 @@ The dashboard is for reading; a tool is for making. `tools.css` is the same syst
 
 - **Shell:** `AppShell` owns the viewport — 200px paper rail | static `header` (ShellHeader + FilterBar) above a scrolling `main`. `ground="sunken"` tints the main for dashboards; `width="full"` for tables. `ShellHeader` 56px: kicker/breadcrumb, 18px title, actions.
 - **Dashboard page order:** `StatGrid` (4–6 Stats) → `CardGrid` of Cards (min 320) → tables in a Card. Nothing above the Stats but the header.
-- **Desktop ≥1024:** rail 200, gutter 24 (full) / 32 (page), content max 1440. **Tablet 768–1023:** rail 160, gutter 24. **Phone <768:** rail disappears; `TopBar` (48px) + `BottomTabs` (56px); drawer becomes a bottom sheet; `DataTable` rows become `ListRow`; StatGrid and CardGrid drop to one column on their own.
+- **Desktop ≥1024:** rail 200, gutter 24 (full) / 32 (page), content max 1440. **Tablet 768–1023:** rail 160, gutter 24. **Phone <768:** gutter 16; rail disappears; `TopBar` (48px) + `BottomTabs` (56px); drawer becomes a bottom sheet; `DataTable` rows become `ListRow`; StatGrid and CardGrid drop to one column on their own.
 - **Touch:** 44px minimum target, 56px rows, 8px between adjacent targets.
 
 ## Components
