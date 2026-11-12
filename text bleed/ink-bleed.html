@@ -1,120 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ink Bleed</title>
+<title>Ink bleed</title>
+<meta name="theme-color" content="#151515">
+<script src="../theme.js"></script>
+<link rel="stylesheet" href="../design system/Enkel Design system v2/styles.css">
+<link rel="stylesheet" href="../design system/Enkel Design system v2/tools.css">
 <style>
-  :root{
-    --bg:#121213; --panel:#1b1b1d; --panel2:#232326; --line:#2c2c30;
-    --text:#e8e5df; --muted:#8f8c86; --accent:#d9b36b; --accent-ink:#1a1408; --sel:#3b82f6;
-  }
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-  .app{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - var(--tool-banner,0px))}
-  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 48px}
-  h1{font-size:17px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
-  .sub{margin:0 0 18px;color:var(--muted)}
-  /* Collapsible panels: top-level sections, sub-panels inside the layer editor, and a third level for fine control. */
-  details.panel{border-top:1px solid var(--line)}
-  details.panel>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;cursor:pointer;user-select:none;
-    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
-  details.panel>summary::-webkit-details-marker{display:none}
-  details.panel>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
-    transform:rotate(-45deg);transition:transform .15s;flex:0 0 6px;margin-left:2px}
-  details.panel[open]>summary::before{transform:rotate(45deg)}
-  details.panel>summary:hover{color:var(--text)}
-  details.panel>summary .t{flex:1}
-  details.panel>summary .v{color:var(--accent);text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  details.panel>.body{padding:0 0 10px}
-  details.sub{border:1px solid var(--line);border-radius:6px;margin:8px 0;background:rgba(255,255,255,.015)}
-  details.sub>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;font-size:12.5px;font-weight:600}
-  details.sub>summary::-webkit-details-marker{display:none}
-  details.sub>summary::before{content:"";width:5px;height:5px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:0 0 5px;margin-left:1px}
-  details.sub[open]>summary::before{transform:rotate(45deg)}
-  details.sub>summary .t{flex:1}
-  details.sub>summary .v{color:var(--muted);font-weight:400;font-size:11.5px;font-family:ui-monospace,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
-  details.sub>.body{padding:0 10px 8px}
-  details.sub2>summary{list-style:none;cursor:pointer;color:var(--muted);font-size:12px;padding:6px 0;user-select:none}
-  details.sub2>summary::-webkit-details-marker{display:none}
-  details.sub2>summary .t::before{content:"▸ "}
-  details.sub2[open]>summary .t::before{content:"▾ "}
-  details.sub2>summary:hover{color:var(--text)}
-  textarea{width:100%;resize:vertical;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;
-    padding:8px 10px;font:12.5px/1.45 "Courier New",Courier,monospace;outline:none}
-  textarea:focus,select:focus,input:focus{border-color:#4a4a50}
-  .hint{margin:6px 0 0;color:var(--muted);font-size:11.5px}
-  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
-  .row>label{flex:0 0 78px;color:var(--muted)}
-  .row select,.row input[type=number],.row input[type=text]{flex:1;min-width:0;background:var(--panel2);color:var(--text);
-    border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:12.5px inherit;font-family:inherit}
-  .row input[type=number]{width:64px;flex:0 1 72px}
-  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2)}
-  button,select.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:5px 10px;
-    font:12.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
-  button:hover{border-color:#55555c}
-  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  button.primary:hover{filter:brightness(1.06)}
-  button.danger:hover{border-color:#b04a4a;color:#f0b0b0}
-  .seg{display:flex;flex:1}
-  .seg button{flex:1;border-radius:0;padding:5px 0}
-  .seg button:first-child{border-radius:5px 0 0 5px}
-  .seg button:last-child{border-radius:0 5px 5px 0}
-  .seg button.on{background:#3a3a40;color:#fff}
-  .slider{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin:9px 0 6px}
-  .slider label{color:var(--text)}
-  .slider output{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
-  .slider input{grid-column:1/-1;width:100%;margin:4px 0 0;accent-color:var(--accent)}
-  .master{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px 8px;margin-bottom:6px}
-  .master .slider label{font-weight:600}
-  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .presets button{text-align:left;padding:7px 9px;line-height:1.3;white-space:normal}
-  .presets button small{display:block;color:var(--muted);font-size:11px}
-  .presets button.on{border-color:var(--accent);color:#fff}
-  /* Layer list */
-  #layerList{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
-  .lrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:pointer}
-  .lrow:hover{border-color:#55555c}
-  .lrow.on{border-color:var(--sel)}
-  .lrow .kind{flex:0 0 18px;height:18px;border-radius:4px;background:#3a3a40;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:18px}
-  .lrow .kind.svg{background:#5b4a86}
-  .lrow .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lrow .x{color:var(--muted);padding:0 4px}
-  .lrow .x:hover{color:#f0b0b0}
-  .addrow{display:flex;gap:6px}
-  .addrow button,.addrow select{flex:1}
-  .addrow .icon{flex:0 0 32px}
-  main{display:flex;flex-direction:column;min-width:0;min-height:0}
-  .topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
-  .topbar .spacer{flex:1}
-  .topbar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-family:inherit}
-  .stage{flex:1;min-height:0;position:relative;overflow:auto;padding:32px;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at 50% 40%,#1e1e21 0%,#0f0f10 80%)}
+  /* Ink bleed: only what is particular to this tool. The panel, rows, fields, sliders, presets, bars and stage are
+     Enkel's tool layer (tools.css). The paper, the ink and the preset colours are the work, not chrome, and stay in JS. */
+
+  /* --- sections inside a section ------------------------------------------------------------------------------------- */
+  /* The layer editor nests one and two levels down. A group is a 13px head on a soft hairline with the panel's chevron,
+     a size smaller; Fine control is a 12px muted toggle whose sliders hang off a hairline. No boxes, no fills. */
+  details.group{border-top:var(--border-width) solid var(--border-muted)}
+  details.group>summary,details.more>summary{list-style:none;display:flex;align-items:center;gap:var(--spacing-8);padding:var(--optical-nudge) 0 0;cursor:pointer;user-select:none;
+    transition:color var(--duration-fast) var(--ease-standard)}
+  details.group>summary::-webkit-details-marker,details.more>summary::-webkit-details-marker{display:none}
+  details.group>summary::before,details.more>summary::before{content:"";flex:0 0 4px;width:4px;height:4px;margin:-4px 4px 0 1px;
+    border-right:var(--border-width) solid currentColor;border-bottom:var(--border-width) solid currentColor;transform:rotate(-45deg)}
+  details.group[open]>summary::before,details.more[open]>summary::before{margin-top:-6px;transform:rotate(45deg)}
+  details.group>summary{min-height:32px;font-size:var(--text-meta);line-height:var(--leading-meta);color:var(--text-primary)}
+  details.group>summary .t{flex:1;min-width:0}
+  details.group>summary .v{max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+    font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+  details.group>.body{padding:0 0 var(--spacing-12)}
+  details.more>summary{min-height:var(--control-height-sm);font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-muted)}
+  details.more>summary:hover{color:var(--text-primary)}
+  details.more>.body{margin:0 0 var(--spacing-4) 3px;padding-left:var(--spacing-12);border-left:var(--border-width) solid var(--border-muted)}
+  details.more>.body>.slider:first-child{margin-top:var(--spacing-8)}
+  /* The master bleed drives the fine sliders, so its name is set in ink, a step above theirs. */
+  .master>.slider>label{color:var(--text-primary)}
+
+  /* --- the layer's words and what follows them ---------------------------------------------------------------------- */
+  /* The text you type keeps a typewriter face: it previews the content, not the chrome. */
+  #layerText{font-family:"Courier New",Courier,monospace;font-size:var(--text-meta);letter-spacing:0}
+  #textContent{padding-bottom:var(--spacing-12)}
+  #svgContent{padding-bottom:var(--spacing-4)}
+  /* Delete sits apart from the controls it would take away, in the control column, after the last group's rule. */
+  .layer-actions{display:flex;padding:var(--spacing-12) 0 0 calc(var(--row-label-width) + var(--spacing-8));border-top:var(--border-width) solid var(--border-muted)}
+
+  /* --- layers ---------------------------------------------------------------------------------------------------------- */
+  /* Each row is a .list .item: the chosen one is ink-edged with the 2px marker. Its kind is a lettered square, T or S. */
+  #layerList .kind{flex:0 0 18px;width:18px;height:18px;padding-top:3px;text-align:center;
+    font-family:var(--font-mono-detail);font-size:11px;line-height:13px;letter-spacing:0;color:var(--text-secondary);
+    border:var(--border-width) solid var(--border-control);border-radius:2px}
+  #layerList .x:not(:disabled):hover{color:var(--status-blocked);border-color:var(--status-blocked);background:var(--status-blocked-soft)}
+  .addrow>select{flex:1;min-width:0}
+  /* + Stamp… is a menu that adds, so it wears a button's edge, not a field's well. */
+  select.btn{padding-left:24px;text-align:center;text-align-last:center;background-color:transparent;border-color:var(--border-control);color:var(--text-primary)}
+  select.btn:hover{background-color:var(--surface-row-hover);border-color:var(--text-muted)}
+  select.btn:focus{border-color:var(--text-primary)}
+  /* A glyph beside 28px controls is a 28px square with the same edge, so the row keeps one height and one rhythm. */
+  .addrow>button.icon,.line>button.icon{width:var(--control-height-sm);min-width:var(--control-height-sm);height:var(--control-height-sm);min-height:var(--control-height-sm);
+    padding:var(--optical-nudge) 0 0;border-color:var(--border-control);color:var(--text-primary)}
+  .addrow>button.icon:hover,.line>button.icon:hover{border-color:var(--text-muted)}
+
+  /* --- rows ---------------------------------------------------------------------------------------------------------- */
+  /* A colour's value is written beside its swatch, so it can be read, not only seen. */
+  /* A mono's baseline sits lower than the sans's in the same box, so it takes no optical nudge to meet the label's. */
+  .row>.hex{padding-top:0;font-family:var(--font-mono-detail);font-size:var(--text-caption);letter-spacing:0;color:var(--text-secondary)}
+  /* Size names run long ("Social square · 1080 × 1080 px"), so the canvas picks sit under their labels at full width. */
+  .stack>.line{display:flex;align-items:center;gap:var(--spacing-8)}
+  .stack>.line>select{flex:1;min-width:0}
+  .stack>.line>.times{padding-top:var(--optical-nudge);color:var(--text-muted)}
+
+  /* --- the bar over the stage ---------------------------------------------------------------------------------------- */
+  #meta{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .warn{color:var(--status-risk)}
+  .warn::before{content:"";display:inline-block;width:8px;height:8px;margin-right:var(--spacing-4);background:currentColor}
+
+  /* --- the stage ----------------------------------------------------------------------------------------------------- */
+  /* Fit shrinks the paper into the stage; a zoom sets the canvas size inline and the stage scrolls. The drag boxes are
+     placed from the canvas's box, so the canvas carries no border or padding, only tools.css's hairline ring. */
   .stage.fit{overflow:hidden}
   .stage.fit canvas{max-width:100%;max-height:100%;width:auto;height:auto}
   .stage:not(.fit){display:block}
   .stage:not(.fit) canvas{display:block;margin:0 auto}
-  .stage.dropping::after{content:"Drop .svg to add a stamp";position:absolute;inset:12px;border:2px dashed var(--sel);border-radius:10px;
-    display:flex;align-items:center;justify-content:center;color:#cfe0ff;background:rgba(59,130,246,.12);pointer-events:none}
-  canvas{filter:drop-shadow(0 18px 28px rgba(0,0,0,.6)) drop-shadow(0 2px 4px rgba(0,0,0,.45));background:transparent}
+  .stage.dropping::after{content:"Drop .svg to add a stamp"}
   #overlay{position:absolute;pointer-events:none}
-  .tb{position:absolute;pointer-events:auto;cursor:move;border:1px dashed transparent;border-radius:2px;transform-origin:50% 50%}
-  .tb:hover,.tb.drag,.tb.sel{border-color:var(--sel)}
-  .tb.sel{border-style:solid;border-color:rgba(59,130,246,.55)}
-  .tb .tag{position:absolute;left:-1px;top:-18px;background:var(--sel);color:#fff;font-size:10px;line-height:14px;padding:0 5px;border-radius:3px;display:none;user-select:none;white-space:nowrap}
+  /* A box is chrome over the artwork, drawn twice, ink inside paper, so it shows on light and dark sheets alike.
+     Pointing at a layer dashes it; the chosen layer is solid. Shape carries the state, not colour. */
+  .tb{position:absolute;pointer-events:auto;cursor:move;transform-origin:50% 50%;
+    border:var(--border-width) dashed transparent;outline:var(--border-width) dashed transparent;outline-offset:0}
+  .tb:hover,.tb.drag{border-color:var(--text-primary);outline-color:var(--surface-paper)}
+  .tb.sel{border-style:solid;outline-style:solid;border-color:var(--text-primary);outline-color:var(--surface-paper)}
+  .tb .tag{position:absolute;left:-2px;top:-24px;display:none;max-width:none;min-height:0;padding:3px 6px 1px;
+    color:var(--surface-paper);background:var(--text-primary);border:0;border-radius:2px;outline:var(--border-width) solid var(--surface-paper);
+    user-select:none;pointer-events:none}
   .tb:hover .tag,.tb.drag .tag{display:block}
-  .footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
-  .actions{display:flex;flex-direction:column;gap:6px}
-  pre#recipe{margin:0;white-space:pre-wrap;color:var(--muted);font:11.5px/1.5 ui-monospace,Menlo,monospace;max-height:96px;overflow:auto}
-  .warn{color:#e0a15a}
-  @media (max-width:900px){
-    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto}
-    aside{max-height:50vh}
-    .footer{grid-template-columns:1fr}
-    .actions{flex-direction:row;flex-wrap:wrap}
+
+  /* --- the export bar ------------------------------------------------------------------------------------------------ */
+  /* Two columns of actions instead of one tall stack, so the bar is three controls high and the paper keeps the height.
+     The one that finishes the job spans both; with a project open it shares the row with Save, which takes the fill. */
+  @media (min-width:901px){
+    .actions{display:grid;grid-template-columns:repeat(2,128px);min-width:0}
+    #download.primary{grid-column:1/-1}
   }
+  #saveProject{display:block;overflow:hidden;text-overflow:ellipsis;text-align:left}
+  pre#recipe{max-height:100px}
 </style>
 </head>
 <body>
@@ -123,20 +109,20 @@
 <script src="../project.js"></script>
 <div class="app">
   <aside>
-    <h1>Ink Bleed</h1>
+    <h1>Ink bleed</h1>
     <p class="sub">Type on a card or page, then push the ink and paper around.</p>
 
     <details class="panel" data-panel="layers" open>
       <summary><span class="t">Layers</span><span class="v" id="hint-layers"></span></summary>
       <div class="body">
-        <div id="layerList"></div>
+        <div class="list" id="layerList"></div>
         <div class="addrow">
           <button id="addText">+ Text</button>
-          <select id="stampSel" class="btn"><option value="">+ Stamp…</option></select>
-          <button id="rescan" class="icon" title="Re-read the assets folder">↻</button>
+          <select id="stampSel" class="btn" aria-label="Add a stamp"><option value="">+ Stamp…</option></select>
+          <button id="rescan" class="icon" title="Re-read the assets folder" aria-label="Re-read the assets folder" aria-live="polite">⟳</button>
         </div>
         <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
-        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (↻ after adding files), or drop an .svg onto the paper. With a project open, the SVG pictures in its assets are stamps too, and they come back after a reload.</p>
+        <p class="hint">Click a layer to edit it, drag it on the paper to place it. Every .svg in the <b>assets</b> folder is offered as a stamp (⟳ after adding files), or drop an .svg onto the paper. With a project open, the SVG pictures in its assets are stamps too, and they come back after a reload.</p>
       </div>
     </details>
 
@@ -144,41 +130,41 @@
       <summary><span class="t">Editing</span><span class="v" id="editName"></span></summary>
       <div class="body">
         <div id="textContent">
-          <textarea id="layerText" rows="7" spellcheck="false" placeholder="Type here"></textarea>
+          <textarea id="layerText" rows="7" spellcheck="false" placeholder="Type here" aria-label="Layer text"></textarea>
           <p class="hint">__double underscores__ underline. Leading spaces are kept, so you can indent by hand.</p>
         </div>
         <div id="svgContent">
-          <div class="row"><label>Stamp</label><select id="assetSel"></select></div>
+          <div class="row"><label for="assetSel">Stamp</label><select id="assetSel"></select></div>
         </div>
 
-        <details class="sub" data-panel="type" open>
+        <details class="group" data-panel="type" open>
           <summary><span class="t">Type</span><span class="v" id="hint-type"></span></summary>
           <div class="body">
-            <div class="row" id="fontRow"><label>Font</label><select id="fontSel"></select></div>
-            <div class="row" id="customFontRow" hidden><label>Family</label><input type="text" id="customFont" placeholder="Any installed font name"></div>
-            <div class="row" id="alignRow"><label>Align</label><div class="seg" id="alignSeg"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div></div>
-            <div class="row"><label>Ink color</label><input type="color" id="inkColor"></div>
+            <div class="row" id="fontRow"><label for="fontSel">Font</label><select id="fontSel"></select></div>
+            <div class="row" id="customFontRow" hidden><label for="customFont">Family</label><input type="text" id="customFont" placeholder="Any installed font name"></div>
+            <div class="row" id="alignRow"><label>Align</label><div class="seg" id="alignSeg" role="group" aria-label="Align"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div></div>
+            <div class="row"><label for="inkColor">Ink color</label><input type="color" id="inkColor"><span class="hex" id="inkHex"></span></div>
             <div id="textSliders"></div>
             <div id="svgSliders"></div>
             <div id="commonSliders"></div>
           </div>
         </details>
-        <details class="sub" data-panel="bleed">
+        <details class="group" data-panel="bleed">
           <summary><span class="t">Ink bleed</span><span class="v" id="hint-bleed"></span></summary>
           <div class="body">
             <div class="master" id="bleedMaster"></div>
-            <details class="sub2" data-panel="bleedfine"><summary><span class="t">Fine control</span></summary><div class="body" id="bleedSliders"></div></details>
+            <details class="more" data-panel="bleedfine"><summary><span class="t">Fine control</span></summary><div class="body" id="bleedSliders"></div></details>
           </div>
         </details>
-        <details class="sub" data-panel="stamp">
+        <details class="group" data-panel="stamp">
           <summary><span class="t">Stamp</span><span class="v" id="hint-stamp"></span></summary>
           <div class="body" id="stampSliders"></div>
         </details>
-        <details class="sub" data-panel="copy">
+        <details class="group" data-panel="copy">
           <summary><span class="t">Photocopy</span><span class="v" id="hint-copy"></span></summary>
           <div class="body" id="copySliders"></div>
         </details>
-        <div class="row" style="margin-top:12px"><label></label><button id="delLayer" class="danger">Delete layer</button></div>
+        <div class="layer-actions"><button id="delLayer" class="danger" aria-live="polite">Delete layer</button></div>
       </div>
     </details>
 
@@ -193,9 +179,9 @@
     <details class="panel" data-panel="canvas">
       <summary><span class="t">Canvas</span><span class="v" id="hint-canvas"></span></summary>
       <div class="body">
-        <div class="row"><label>Size</label><select id="sizeSel"></select><button id="rotate" title="Swap width and height">⟳</button></div>
-        <div class="row" id="customRow" hidden><label>Inches</label><input type="number" id="wIn" step="0.25" min="0.5" max="24"> <span class="hint">×</span> <input type="number" id="hIn" step="0.25" min="0.5" max="24"></div>
-        <div class="row"><label>Resolution</label><select id="dpiSel"></select></div>
+        <div class="stack"><label for="sizeSel">Size</label><div class="line"><select id="sizeSel"></select><button id="rotate" class="icon" title="Swap width and height" aria-label="Swap width and height">⇄</button></div></div>
+        <div class="stack" id="customRow" hidden><label for="wIn">Inches, width × height</label><div class="line"><input type="number" id="wIn" step="0.25" min="0.5" max="24" aria-label="Width in inches"><span class="times" aria-hidden="true">×</span><input type="number" id="hIn" step="0.25" min="0.5" max="24" aria-label="Height in inches"></div></div>
+        <div class="stack"><label for="dpiSel">Resolution</label><div class="line"><select id="dpiSel"></select></div></div>
         <div id="canvasSliders"></div>
       </div>
     </details>
@@ -203,7 +189,7 @@
     <details class="panel" data-panel="paper">
       <summary><span class="t">Paper</span><span class="v" id="hint-paper"></span></summary>
       <div class="body">
-        <div class="row"><label>Paper color</label><input type="color" id="paperColor"></div>
+        <div class="row"><label for="paperColor">Paper color</label><input type="color" id="paperColor"><span class="hex" id="paperHex"></span></div>
         <div id="paperSliders"></div>
       </div>
     </details>
@@ -211,7 +197,7 @@
     <details class="panel" data-panel="random">
       <summary><span class="t">Randomness</span><span class="v" id="hint-random"></span></summary>
       <div class="body">
-        <div class="row"><label>Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
+        <div class="row"><label for="seed">Seed</label><input type="number" id="seed" min="1" step="1"><button id="reshuffle">Reshuffle</button></div>
         <p class="hint">The seed drives jitter, grain, tears and specks. Same seed, same result.</p>
       </div>
     </details>
@@ -230,10 +216,10 @@
       <div class="actions">
         <button id="saveProject" class="primary" hidden>Save to project</button>
         <button id="download" class="primary">Download PNG</button>
-        <button id="downloadGif" title="Six frames, each with a different random seed, looping">Download GIF</button>
-        <button id="previewGif" title="Render the six frames and loop them here before saving">Preview GIF</button>
-        <button id="copyImg">Copy image</button>
-        <button id="copyRecipe">Copy recipe</button>
+        <button id="downloadGif" title="Six frames, each with a different random seed, looping" aria-live="polite">Download GIF</button>
+        <button id="previewGif" title="Render the six frames and loop them here before saving" aria-live="polite">Preview GIF</button>
+        <button id="copyImg" aria-live="polite">Copy image</button>
+        <button id="copyRecipe" aria-live="polite">Copy recipe</button>
       </div>
       <pre id="recipe"></pre>
     </div>
@@ -924,12 +910,23 @@ new ResizeObserver(() => updateOverlay()).observe(stage);
 // ---------- Layers UI ----------
 function renderLayerList() {
   const list = $('#layerList'); list.innerHTML = '';
+  const only = state.layers.length <= 1;   // the last layer can't go, so its delete controls say so before they're pressed
   for (const L of state.layers) {
-    const row = document.createElement('div'); row.className = 'lrow' + (L.id === state.selected ? ' on' : '');
-    row.innerHTML = `<span class="kind ${L.kind}">${L.kind === 'svg' ? 'S' : 'T'}</span><span class="name">${layerName(L).replace(/</g, '&lt;')}</span><span class="x" title="Delete layer">✕</span>`;
-    row.addEventListener('click', e => { if (e.target.classList.contains('x')) deleteLayer(L.id); else selectLayer(L.id); });
+    const on = L.id === state.selected, name = layerName(L);
+    const row = document.createElement('div'); row.className = 'item lrow' + (on ? ' on' : '');
+    // A row is reached with Tab and picked with Enter or Space; the chosen one is announced as current, not only drawn.
+    row.tabIndex = 0; row.dataset.id = L.id; if (on) row.setAttribute('aria-current', 'true');
+    row.innerHTML = `<span class="kind ${L.kind}" aria-hidden="true">${L.kind === 'svg' ? 'S' : 'T'}</span><span class="name">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span><button type="button" class="icon x" title="Delete layer">×</button>`;
+    const x = row.querySelector('.x'); x.setAttribute('aria-label', `Delete layer ${name}`); x.disabled = only;
+    row.addEventListener('click', e => {
+      const kb = e.detail === 0;              // pressed from the keyboard: keep the focus in the list it rebuilds
+      if (e.target.classList.contains('x')) deleteLayer(L.id); else selectLayer(L.id);
+      if (kb) { const r = $('#layerList .lrow.on'); if (r) r.focus(); }
+    });
+    row.addEventListener('keydown', e => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); row.click(); } });
     list.appendChild(row);
   }
+  $('#delLayer').disabled = only;
 }
 function selectLayer(id) {
   state.selected = id; renderLayerList(); refreshLayerControls(); updateOverlay(); updateHints(); openEditor();
@@ -957,7 +954,7 @@ function refreshLayerControls() {
   if (isText) { $('#layerText').value = L.text; $('#fontSel').value = L.font; $('#customFont').value = L.customFont; }
   else { $('#assetSel').value = L.asset; }
   for (const bt of $('#alignSeg').children) bt.classList.toggle('on', bt.dataset.v === L.align);
-  $('#inkColor').value = L.inkColor;
+  $('#inkColor').value = L.inkColor; $('#inkHex').textContent = L.inkColor;
   refreshGroup('L.');
 }
 
@@ -1021,7 +1018,7 @@ addSlider(Pp, { path: 'paper.speckle', label: 'Toner speckle', min: 0, max: 1, s
 // Layer content controls
 $('#layerText').addEventListener('input', e => { const L = sel(); if (!L) return; L.text = e.target.value; renderLayerList(); $('#editName').textContent = layerName(L); invalidate('layer'); });
 $('#alignSeg').addEventListener('click', e => { const bt = e.target.closest('button'), L = sel(); if (!bt || !L) return; L.align = bt.dataset.v; refreshLayerControls(); invalidate('layer'); });
-$('#inkColor').addEventListener('input', e => { const L = sel(); if (!L) return; L.inkColor = e.target.value; clearPresetHighlight(); invalidate(); });
+$('#inkColor').addEventListener('input', e => { const L = sel(); if (!L) return; L.inkColor = e.target.value; $('#inkHex').textContent = L.inkColor; clearPresetHighlight(); invalidate(); });
 $('#assetSel').addEventListener('change', e => { const L = sel(); if (!L) return; L.asset = e.target.value; renderLayerList(); refreshLayerControls(); invalidate('layer'); });
 $('#addText').addEventListener('click', () => { const base = sel() && sel().kind === 'text' ? sel() : TEXT_LAYER; addLayer(newLayer(TEXT_LAYER, { text: '', font: base.font, inkColor: base.inkColor, bleed: base.bleed, copy: base.copy, jitter: base.jitter, jitterRot: base.jitterRot, strikeVar: base.strikeVar })); });
 $('#stampSel').addEventListener('change', e => {
@@ -1062,7 +1059,7 @@ dpiSel.addEventListener('change', () => { state.dpi = +dpiSel.value; invalidate(
 fontSel.addEventListener('change', () => { const L = sel(); if (!L) return; L.font = fontSel.value; $('#customFontRow').hidden = L.font !== 'custom'; clearPresetHighlight(); invalidate('layer'); });
 $('#customFont').addEventListener('input', e => { const L = sel(); if (!L) return; L.customFont = e.target.value; invalidate('layer'); });
 $('#paperColor').addEventListener('input', e => {
-  const wasDark = isDark(state.paper.color); state.paper.color = e.target.value;
+  const wasDark = isDark(state.paper.color); state.paper.color = e.target.value; $('#paperHex').textContent = state.paper.color;
   // Crossing between light and dark paper flips any ink that would vanish against the new sheet.
   if (isDark(state.paper.color) !== wasDark) {
     for (const L of state.layers) if (Math.abs(lum(L.inkColor) - lum(state.paper.color)) < 0.35) L.inkColor = invertHex(L.inkColor);
@@ -1090,12 +1087,17 @@ PRESETS.forEach((p, i) => {
   presetsEl.appendChild(b);
 });
 function clearPresetHighlight() { [...presetsEl.children].forEach(c => c.classList.remove('on')); updateHints(); }
+// The chosen look and the chosen alignment are pressed buttons to a screen reader too: aria-pressed follows .on.
+for (const box of [presetsEl, $('#alignSeg')]) {
+  const sync = () => { for (const b of box.children) b.setAttribute('aria-pressed', String(b.classList.contains('on'))); };
+  new MutationObserver(sync).observe(box, { subtree: true, attributeFilter: ['class'] }); sync();
+}
 
 function refreshAll() {
   for (const p in controls) controls[p].refresh();
   renderLayerList(); refreshLayerControls();
   syncSizeSel(); dpiSel.value = state.dpi;
-  $('#paperColor').value = state.paper.color; $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
+  $('#paperColor').value = state.paper.color; $('#paperHex').textContent = state.paper.color; $('#seed').value = state.seed; $('#zoomSel').value = state.zoom;
 }
 
 // Export
