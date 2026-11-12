@@ -28,6 +28,12 @@ Every tool on Enkel.
 - The Board and the Studio library follow light and dark with the suite.
 - Lined up: the banner's words, section names and their state, the stage bar's figures and the Zoom label, and the
   recipe's first line and the first export button each share a baseline.
+- HUB-MOD: every hint is two lines at most, at every window width from 820 px up. What no longer fits is in the
+  title of its control. A note under a control (Corners, On phones) lines up with that control. A new group's
+  items are Entries, not Entrys.
+- Template Studio: the editor's styles stay inside the editor and Freeform, so the Board and the library no longer
+  need patches against them. The editor's empty trash can no longer holds the file list 9.5 px low until the first
+  delete. In Freeform's Canvas menu each value sits on its label's baseline, in any face.
 
 ## 0.9.0 · 2026-11-11
 
