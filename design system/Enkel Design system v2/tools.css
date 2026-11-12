@@ -64,9 +64,10 @@ details.panel>summary::-webkit-details-marker{display:none}
 details.panel>summary::before{content:"";flex:0 0 5px;width:5px;height:5px;margin:-2px 3px 0 1px;border-right:var(--border-width) solid currentColor;border-bottom:var(--border-width) solid currentColor;transform:rotate(-45deg)}
 details.panel[open]>summary::before{margin-top:-5px;transform:rotate(45deg)}
 details.panel>summary:hover{color:var(--text-primary)}
-details.panel>summary .t{flex:1;min-width:0}
+/* The name (11 caps) and its state (12) share one 16px line box, so their baselines meet (measured within 0.3px). */
+details.panel>summary .t{flex:1;min-width:0;line-height:16px}
 details.panel>summary .v{max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-transform:none;
-  font-size:var(--text-caption);line-height:var(--leading-caption);letter-spacing:var(--tracking-caption);color:var(--text-secondary)}
+  font-size:var(--text-caption);line-height:16px;letter-spacing:var(--tracking-caption);color:var(--text-secondary)}
 details.panel>.body{padding:0 0 var(--spacing-16)}
 /* A plain section without the disclosure, for panels that never collapse. */
 .pane{padding:var(--spacing-16) var(--panel-pad);border-bottom:var(--border-width) solid var(--border-muted)}
